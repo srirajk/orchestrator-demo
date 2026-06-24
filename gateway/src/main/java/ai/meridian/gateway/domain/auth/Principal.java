@@ -21,10 +21,10 @@ public record Principal(
         List<String> book,    // relationship IDs this RM is permitted to view
         int clearance
 ) {
-    /** Fallback for unauthenticated / anonymous callers — read-only access to demo data. */
+    /** Fallback for unauthenticated / anonymous callers — empty book, no data access. */
     public static Principal anonymous() {
         return new Principal("anonymous", List.of("relationship_manager"),
-                List.of("REL-00042", "REL-00099"), 2);
+                List.of(), 2);
     }
 
     /**

@@ -1,0 +1,16 @@
+{
+  "name": "meridian-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Playwright E2E tests for Meridian AI gateway and LibreChat UI",
+  "scripts": {
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
+    "e2e:headed": "playwright test --headed",
+    "e2e:report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "@types/node": "^20.0.0"
+  }
+}

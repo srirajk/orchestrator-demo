@@ -38,10 +38,10 @@ public class EntityResolver {
 
     static {
         // ── Relationship seed entities (from agent-catalog.md) ───────────────
-        RELATIONSHIP_TABLE.put("whitman", "REL-00042");
-        RELATIONSHIP_TABLE.put("chen",    "REL-00099");
-        RELATIONSHIP_TABLE.put("patterson", "REL-00188");
-        RELATIONSHIP_TABLE.put("okafor", "REL-00251");   // kept for authz-denial tests
+        RELATIONSHIP_TABLE.put("whitman",  "REL-00042");
+        RELATIONSHIP_TABLE.put("chen",     "REL-00099");
+        RELATIONSHIP_TABLE.put("okafor",   "REL-00188");  // rm_jane denied by JWT book, not by bad ID
+        RELATIONSHIP_TABLE.put("andersen", "REL-00200");
 
         // ── Fund seed entities ───────────────────────────────────────────────
         FUND_TABLE.put("fnd-7781", "FND-7781");          // identity mapping

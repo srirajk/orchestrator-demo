@@ -33,3 +33,5 @@ endpoints:
       headers:
         # Phase 8 M15: trusted internal hop identity (upgraded to OIDC Bearer in M16)
         X-User-Id: "rm_jane"
+        # Phase 9: forward conversation ID so gateway logs/session match LibreChat
+        X-Conversation-Id: "{{LIBRECHAT_BODY_CONVERSATIONID}}"

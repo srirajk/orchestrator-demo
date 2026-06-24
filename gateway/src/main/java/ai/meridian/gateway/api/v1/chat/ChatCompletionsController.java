@@ -1,6 +1,8 @@
 package ai.meridian.gateway.api.v1.chat;
 
 import ai.meridian.gateway.api.v1.chat.dto.ChatRequest;
+import ai.meridian.gateway.domain.auth.Principal;
+import ai.meridian.gateway.domain.auth.RequestContext;
 import ai.meridian.gateway.domain.chat.ChatService;
 import ai.meridian.gateway.infrastructure.identity.IdentityExtractor;
 import jakarta.servlet.http.HttpServletRequest;
@@ -45,10 +47,15 @@ public class ChatCompletionsController {
 
         String userId = identityExtractor.extractUserId(httpRequest);
 
-        log.debug("Chat completions: model={}, messages={}, stream={}, userId={}",
+        // Capture servlet-thread context BEFORE crossing the async boundary.
+        // ThreadLocals (RequestContext, MDC) are not inherited by CompletableFuture threads.
+        Principal principal = RequestContext.getPrincipal(); // null if no JWT
+        String conversationId = httpRequest.getHeader("X-Conversation-Id");
+
+        log.debug("Chat completions: model={}, messages={}, stream={}, userId={}, conversationId={}",
                 request.model(),
                 request.messages() != null ? request.messages().size() : 0,
-                request.stream(), userId);
+                request.stream(), userId, conversationId);
 
         SseEmitter emitter = new SseEmitter(120_000L);
 
@@ -58,7 +65,8 @@ public class ChatCompletionsController {
             log.debug("Detected auto-title request — short-circuiting");
             CompletableFuture.runAsync(() -> chatService.streamTitle(emitter));
         } else {
-            CompletableFuture.runAsync(() -> chatService.handleChat(request, emitter, userId));
+            CompletableFuture.runAsync(() ->
+                    chatService.handleChat(request, emitter, userId, principal, conversationId));
         }
 
         return emitter;

@@ -134,12 +134,25 @@ public class ChatService {
         } catch (Exception e) { emitter.completeWithError(e); }
     }
 
-    public void handleChat(ChatRequest request, SseEmitter emitter, String userId) {
-        String requestId    = TraceEventPublisher.newRequestId();
+    /**
+     * Entry point from the controller — called on a virtual thread after the async boundary.
+     *
+     * @param jwtPrincipal      the JWT-verified principal captured on the servlet thread
+     *                          before {@code CompletableFuture.runAsync()}; null if no JWT
+     * @param headerConvId      value of the {@code X-Conversation-Id} header, or null
+     */
+    public void handleChat(ChatRequest request, SseEmitter emitter, String userId,
+                           Principal jwtPrincipal, String headerConvId) {
         long   requestStart = System.currentTimeMillis();
         Span   rootSpan     = tracer.spanBuilder("chat.handle").startSpan();
+        // Use the OTel trace_id as the single correlation ID across logs, glass-box, and traces.
+        String requestId    = rootSpan.getSpanContext().isValid()
+                ? rootSpan.getSpanContext().getTraceId()
+                : TraceEventPublisher.newRequestId();
         String latestPrompt = extractLatestUserMessage(request);
-        String conversationId = deriveConversationId(request);
+        String conversationId = (headerConvId != null && !headerConvId.isBlank())
+                ? headerConvId
+                : ("conv-" + UUID.randomUUID());
 
         log.info("handleChat requestId={} userId={} conversationId={} prompt='{}'",
                 requestId, userId, conversationId,
@@ -162,10 +175,10 @@ public class ChatService {
 
             switch (intentResult.intent()) {
                 case FETCH_DATA -> handleFetchData(request, emitter, latestPrompt,
-                        conversationId, session, userId, requestId, requestStart, rootSpan);
+                        conversationId, session, userId, jwtPrincipal, requestId, requestStart, rootSpan);
                 case FOLLOW_UP  -> handleFollowUp(request, emitter, latestPrompt,
-                        conversationId, session, userId, requestId, requestStart, rootSpan);
-                case CLARIFY    -> handleClarify(emitter, session, userId, requestId, requestStart);
+                        conversationId, session, userId, jwtPrincipal, requestId, requestStart, rootSpan);
+                case CLARIFY    -> handleClarify(emitter, session, userId, jwtPrincipal, requestId, requestStart);
                 case CHITCHAT   -> handleChitchat(request, emitter, requestId, requestStart);
             }
 
@@ -184,6 +197,7 @@ public class ChatService {
     private void handleFetchData(ChatRequest request, SseEmitter emitter,
                                   String latestPrompt, String conversationId,
                                   ConversationSession session, String userId,
+                                  Principal jwtPrincipal,
                                   String requestId, long requestStart, Span rootSpan) throws Exception {
         Span span = tracer.spanBuilder("chat.fetch_data").startSpan();
         try {
@@ -193,8 +207,12 @@ public class ChatService {
                     .map(c -> new AgentsResolvedData.AgentRef(
                             c.manifest().agentId(), c.manifest().protocol(), c.score()))
                     .collect(Collectors.toList());
+            List<AgentsResolvedData.FilteredRef> skippedRefs = resolved.skipped().stream()
+                    .map(c -> new AgentsResolvedData.FilteredRef(
+                            c.manifest().agentId(), "below-confidence-floor"))
+                    .collect(Collectors.toList());
             tracePublisher.publish(TraceEvent.of("agents_resolved", requestId,
-                    new AgentsResolvedData(selectedRefs, List.of())));
+                    new AgentsResolvedData(selectedRefs, skippedRefs)));
 
             if (resolved.fallback() || resolved.selected().isEmpty()) {
                 streamText(emitter, "I wasn't sure which services to consult. " +
@@ -216,15 +234,26 @@ public class ChatService {
                 streamText(emitter, "Please specify the client name (e.g. 'Whitman Family Office')."); return;
             }
 
-            Principal principal = principalStore.load(userId);
+            // Use the JWT-verified principal if available; the JWT book claim is authoritative.
+            // jwtPrincipal was captured on the servlet thread before the async boundary —
+            // ThreadLocal (RequestContext) is not visible here.
+            Principal principal = (jwtPrincipal != null)
+                    ? jwtPrincipal
+                    : principalStore.load(userId);
             String resolvedRelId = extractResolvedRelId(synthesis);
             if (resolvedRelId != null) {
                 EntitlementResult ent = entitlementService.checkRelationship(principal, resolvedRelId);
                 tracePublisher.publish(TraceEvent.of("entitlement_check", requestId,
                         new EntitlementCheckData(resolvedRelId, userId, ent.allowed(), ent.reason())));
                 if (!ent.allowed()) {
-                    streamText(emitter, "Access denied: you are not authorised to view relationship " +
-                            resolvedRelId + ". This denial has been logged.");
+                    String denialMsg = "Access denied: you are not authorized to view relationship " +
+                            resolvedRelId + ". This denial has been logged.";
+                    try {
+                        streamText(emitter, denialMsg);
+                    } catch (Exception denialEx) {
+                        log.warn("Could not stream denial message (client disconnect?): {}", denialEx.getMessage());
+                        try { emitter.complete(); } catch (Exception ce) { emitter.completeWithError(ce); }
+                    }
                     tracePublisher.publish(TraceEvent.of("request_complete", requestId,
                             new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
                     return;
@@ -269,6 +298,7 @@ public class ChatService {
     private void handleFollowUp(ChatRequest request, SseEmitter emitter,
                                  String latestPrompt, String conversationId,
                                  ConversationSession session, String userId,
+                                 Principal jwtPrincipal,
                                  String requestId, long requestStart, Span rootSpan) throws Exception {
         Span span = tracer.spanBuilder("chat.follow_up").startSpan();
         try {
@@ -279,7 +309,7 @@ public class ChatService {
                 answerSynthesizer.synthesize(session.lastAgentResults(), latestPrompt, request.messages(), emitter);
             } else if (session.relationshipId() != null) {
                 String enriched = latestPrompt + " [session_relationship_id: " + session.relationshipId() + "]";
-                handleFetchData(request, emitter, enriched, conversationId, session, userId, requestId, requestStart, rootSpan);
+                handleFetchData(request, emitter, enriched, conversationId, session, userId, jwtPrincipal, requestId, requestStart, rootSpan);
                 return;
             } else {
                 answerSynthesizer.synthesizeFromHistory(request.messages(), latestPrompt, emitter);
@@ -290,15 +320,16 @@ public class ChatService {
     }
 
     private void handleClarify(SseEmitter emitter, ConversationSession session,
-                                String userId, String requestId, long requestStart) throws Exception {
-        Principal principal = principalStore.load(userId);
+                                String userId, Principal jwtPrincipal,
+                                String requestId, long requestStart) throws Exception {
+        Principal principal = (jwtPrincipal != null) ? jwtPrincipal : principalStore.load(userId);
         List<String> allowedRels = entitlementService.filterCovered(principal, new java.util.ArrayList<>(REL_NAMES.keySet()));
 
         StringBuilder msg = new StringBuilder();
         if (session.relationshipId() != null) {
             msg.append("Could you clarify what you'd like to know about ")
                .append(REL_NAMES.getOrDefault(session.relationshipId(), session.relationshipId()))
-               .append("? For example: holdings, performance, settlements, or tax lots.");
+               .append("? For example: holdings, performance, settlements, or corporate actions.");
         } else if (!allowedRels.isEmpty()) {
             msg.append("Which client relationship are you asking about? You have access to:\n");
             for (String relId : allowedRels) {
@@ -338,16 +369,6 @@ public class ChatService {
         if (session.fundId() != null)
             sb.append(" [session_fund_id: ").append(session.fundId()).append("]");
         return sb.toString();
-    }
-
-    private String deriveConversationId(ChatRequest request) {
-        if (request.messages() == null || request.messages().isEmpty())
-            return "unknown-" + UUID.randomUUID();
-        return request.messages().stream()
-                .filter(m -> "user".equals(m.role()) && m.content() != null)
-                .findFirst()
-                .map(m -> "conv-" + Math.abs(m.content().hashCode()))
-                .orElse("conv-" + UUID.randomUUID());
     }
 
     private String extractResolvedRelId(SynthesisResult synthesis) {

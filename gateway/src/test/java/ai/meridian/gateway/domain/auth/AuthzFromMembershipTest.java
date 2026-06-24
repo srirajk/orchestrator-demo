@@ -175,7 +175,7 @@ class AuthzFromMembershipTest {
         String responseBody = result.getResponse().getContentAsString();
         // Must NOT be rejected with an access-denied message at the entitlement gate
         assertThat(responseBody)
-                .doesNotContain("you are not authorised");
+                .doesNotContain("access denied: you are not authorized");
     }
 
     // ── Test: principal is built from JWT claims, not only Redis ─────────────────
@@ -210,7 +210,7 @@ class AuthzFromMembershipTest {
         String responseBody = result.getResponse().getContentAsString();
         // Must NOT say access denied for REL-00042 even though rm_new isn't in Redis
         assertThat(responseBody)
-                .doesNotContain("you are not authorised");
+                .doesNotContain("access denied: you are not authorized");
     }
 
     // ── Test: Principal.fromJwtClaims() maps claims correctly ────────────────────

@@ -72,13 +72,17 @@ public class AgentResolver {
 
         boolean fallback = selected.isEmpty();
 
-        log.debug("Resolver: prompt='{}' → {} candidates, {} selected (floor={:.3f}/relative={:.3f}), topScore={}",
-                prompt, candidates.size(), selected.size(), confidenceFloor, effectiveFloor, topScore);
+        List<RoutingCandidate> skipped = candidates.stream()
+                .filter(c -> c.score() < effectiveFloor)
+                .toList();
+
+        log.debug("Resolver: prompt='{}' → {} candidates, {} selected, {} skipped (floor={:.3f}/relative={:.3f}), topScore={}",
+                prompt, candidates.size(), selected.size(), skipped.size(), confidenceFloor, effectiveFloor, topScore);
 
         meterRegistry.gauge("resolver.route.confidence", topScore);
         if (fallback) meterRegistry.counter("resolver.fallback").increment();
 
-        return new ResolverResult(selected, fallback, topScore, prompt);
+        return new ResolverResult(selected, skipped, fallback, topScore, prompt);
     }
 
     /** Convenience overload — no domain filter. */
