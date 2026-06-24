@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: meridian-gateway
+  threads:
+    virtual:
+      enabled: true   # Java 21+ virtual threads via Spring Boot 3.2+; on Java 25 also benefits from JEP-491
+
+server:
+  port: 8080
+  # Virtual threads make per-request thread blocking cheap, so no large pool needed.
+  tomcat:
+    threads:
+      min-spare: 5
+      max: 50     # low ceiling — virtual threads do the real lifting
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    ai.meridian: DEBUG
+    org.springframework.web: INFO
