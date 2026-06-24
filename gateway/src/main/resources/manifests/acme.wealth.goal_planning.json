@@ -1,0 +1,40 @@
+{
+  "agent_id": "acme.wealth.goal_planning",
+  "name": "Wealth Goal Planning",
+  "description": "Returns the financial goal status and on-track assessment for a given wealth management relationship, including goal funding progress. Accepts relationship_id as the primary key.",
+  "version": "1.0.0",
+  "provider": {
+    "organization": "Meridian Demo Bank"
+  },
+  "domain": "wealth-management",
+  "protocol": "http",
+  "connection": {
+    "openapi_url": "http://wealth-http:8081/openapi.json",
+    "operation_id": "get_goal_status_goal_planning_get"
+  },
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false
+  },
+  "skills": [
+    {
+      "id": "get_goal_status",
+      "name": "get_goal_status",
+      "description": "Retrieve financial goals, on-track status, and funding progress for a wealth management relationship.",
+      "tags": ["goals", "financial-plan", "goal-planning", "on-track", "wealth-management"],
+      "examples": [
+        "is this client on track for their goals",
+        "financial plan status for the relationship",
+        "are the Whitman goals funded",
+        "goal progress for this account"
+      ],
+      "inputModes": ["application/json"],
+      "outputModes": ["application/json"]
+    }
+  ],
+  "constraints": {
+    "is_mutating": false,
+    "data_classification": "confidential-pii",
+    "sla_timeout_ms": 2500
+  }
+}

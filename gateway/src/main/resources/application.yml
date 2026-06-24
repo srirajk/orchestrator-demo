@@ -33,6 +33,17 @@ management:
       export:
         url: ${MANAGEMENT_OTLP_METRICS_EXPORT_URL:http://localhost:4318/v1/metrics}
 
+meridian:
+  embedding:
+    provider: ${MERIDIAN_EMBEDDING_PROVIDER:hash}   # hash | remote
+    dimension: ${MERIDIAN_EMBEDDING_DIMENSION:384}
+    model: ${MERIDIAN_EMBEDDING_MODEL:all-MiniLM-L6-v2}
+    remote:
+      url: ${MERIDIAN_EMBEDDING_REMOTE_URL:http://localhost:8083/v1/embeddings}
+  resolver:
+    confidence-floor: 0.30   # cosine similarity floor; multi-topic queries naturally score lower
+    top-k: 10
+
 logging:
   pattern:
     # Include MDC keys (requestId, conversationId, userId) in every log line

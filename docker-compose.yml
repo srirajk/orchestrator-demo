@@ -94,6 +94,9 @@ services:
       ZAI_API_KEY: ${ZAI_API_KEY}
       SPRING_DATA_REDIS_HOST: redis-stack
       SPRING_DATA_REDIS_PORT: 6379
+      MERIDIAN_EMBEDDING_PROVIDER: remote
+      MERIDIAN_EMBEDDING_REMOTE_URL: http://embeddings:8083/v1/embeddings
+      MERIDIAN_EMBEDDING_DIMENSION: 384
       # OTel export endpoint (within compose network)
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       MANAGEMENT_OTLP_TRACING_ENDPOINT: http://otel-collector:4318/v1/traces
@@ -101,11 +104,30 @@ services:
     depends_on:
       redis-stack:
         condition: service_healthy
+      embeddings:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
       interval: 10s
       timeout: 5s
       retries: 15
+      start_period: 30s
+    restart: unless-stopped
+
+  # ── Embedding sidecar (sentence-transformers all-MiniLM-L6-v2, 384-dim) ──────
+
+  embeddings:
+    build:
+      context: ./mock-agents/embeddings
+      dockerfile: Dockerfile
+    container_name: meridian-embeddings
+    ports:
+      - "8083:8083"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8083/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
       start_period: 30s
     restart: unless-stopped
 
