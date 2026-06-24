@@ -34,6 +34,10 @@ management:
         url: ${MANAGEMENT_OTLP_METRICS_EXPORT_URL:http://localhost:4318/v1/metrics}
 
 meridian:
+  auth:
+    jwks-url: ${MERIDIAN_AUTH_JWKS_URL:http://user-mgmt:8084/.well-known/jwks.json}
+    required-issuer: meridian-user-mgmt
+    required-audience: meridian-gateway
   embedding:
     provider: ${MERIDIAN_EMBEDDING_PROVIDER:hash}   # hash | remote
     dimension: ${MERIDIAN_EMBEDDING_DIMENSION:384}

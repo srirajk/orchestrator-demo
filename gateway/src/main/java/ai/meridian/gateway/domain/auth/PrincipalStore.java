@@ -61,10 +61,24 @@ public class PrincipalStore {
     }
 
     /**
-     * Load the principal for {@code userId}. Returns {@link Principal#anonymous()}
+     * Load the principal for {@code userId}.
+     *
+     * <p>Phase 8 (M15): if a JWT-verified {@link Principal} is available in
+     * {@link RequestContext} and its {@code id} matches {@code userId}, it is
+     * returned immediately — the JWT issuer's attestation takes precedence over
+     * the Redis record, and we avoid an unnecessary network hop.
+     *
+     * <p>Falls back to the Redis record, then to {@link Principal#anonymous()}
      * if the user is not found or Redis is unavailable.
      */
     public Principal load(String userId) {
+        // Short-circuit: use JWT-verified principal when it matches the requested userId
+        Principal jwtPrincipal = RequestContext.getPrincipal();
+        if (jwtPrincipal != null && jwtPrincipal.id() != null && jwtPrincipal.id().equals(userId)) {
+            log.debug("PrincipalStore: using JWT-verified principal for userId={}", userId);
+            return jwtPrincipal;
+        }
+
         if (userId == null || userId.isBlank() || "anonymous".equals(userId)) {
             return Principal.anonymous();
         }

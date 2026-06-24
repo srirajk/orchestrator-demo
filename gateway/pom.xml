@@ -68,6 +68,13 @@
             <artifactId>jedis</artifactId>
         </dependency>
 
+        <!-- RS256 JWT verification -->
+        <dependency>
+            <groupId>com.nimbusds</groupId>
+            <artifactId>nimbus-jose-jwt</artifactId>
+            <version>9.47</version>
+        </dependency>
+
         <!-- ── JSON Schema validation (manifest contract enforcement) ─────── -->
         <dependency>
             <groupId>com.networknt</groupId>

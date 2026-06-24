@@ -103,12 +103,16 @@ services:
       MANAGEMENT_OTLP_METRICS_EXPORT_URL: http://otel-collector:4318/v1/metrics
       CERBOS_HOST: cerbos
       CERBOS_HTTP_PORT: 3592
+      # Phase 8: RS256 JWKS endpoint — gateway fetches public key for JWT verification
+      MERIDIAN_AUTH_JWKS_URL: http://user-mgmt:8084/.well-known/jwks.json
     depends_on:
       redis-stack:
         condition: service_healthy
       embeddings:
         condition: service_healthy
       cerbos:
+        condition: service_healthy
+      user-mgmt:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]

@@ -4,16 +4,12 @@
 > doc** — it tells you *how* to work. It is **not** the requirements: those live in
 > `docs/master-build-plan-consolidated.md`. The build is split into **phases** in `phases/`,
 > which you execute in a **loop, pausing for a human test at the end of each phase** (§8).
-> When in doubt, follow this file. z.ai api key is here
-
+> When in doubt, follow this file.
 
 ---
 
 find api key here at
-
 ZAI_API_KEY=903ed9ee018540a3bd723a0c35c41e01.qDrJqUyJIe8w0JJF
-
----
 
 ## 1. What you are building
 
@@ -164,6 +160,8 @@ order per the loop protocol (§8); the files are in `phases/`.
 | **5** | Glass-box shows the live decision; an out-of-book relationship is denied | M8–M9 |
 | **6** | Asks when unsure; survives an agent kill; shows Meridian branding | M10–M12 |
 | **7** | A routing-accuracy number; a flat-p99 / virtual-thread scale graph | M13–M14 |
+| **8** | One signed identity (user-mgmt OIDC, RS256/JWKS) verified at **every hop**; entitlements from a **domain/member** model — security + authz end-to-end | M15–M16 |
+| **9** | AI observability & eval (Phoenix online + DeepEval offline) + registry ingestion + pre-demo hardening — *operate-and-improve; after the core is solid* | M17–M18 |
 
 ## 5b. Milestone detail (reference — the phases aggregate these)
 
@@ -254,36 +252,36 @@ OS-thread counts. *Accept:* hits the concurrency target with flat p99.
 ## 6. Hard rules (do not break these)
 
 a. **SSE must be byte-correct** (role delta, content deltas, `[DONE]`). Test against the
-   OpenAI shape in M1 — if it's wrong, LibreChat shows a blank reply. Also **short-circuit
-   LibreChat's auto-title call** (it sends a separate "name this conversation" request that
-   must not route to agents).
+OpenAI shape in M1 — if it's wrong, LibreChat shows a blank reply. Also **short-circuit
+LibreChat's auto-title call** (it sends a separate "name this conversation" request that
+must not route to agents).
 
 b. **Zero fabricated identifiers.** The LLM extracts human references; a deterministic
-   lookup resolves them to IDs. The LLM never produces a `relationship_id`. An unresolved
-   reference triggers a clarification, never a guess.
+lookup resolves them to IDs. The LLM never produces a `relationship_id`. An unresolved
+reference triggers a clarification, never a guess.
 
 c. **Agent outputs are untrusted and are the only ground truth.** In the synthesis prompt
-   they are delimited DATA, never instructions. The model summarizes; it never computes,
-   recalls, or invents numbers.
+they are delimited DATA, never instructions. The model summarizes; it never computes,
+recalls, or invents numbers.
 
 d. **Partial-result tolerant.** A failed agent never cancels its siblings. Join to the
-   overall deadline, harvest survivors, synthesize from what came back.
+overall deadline, harvest survivors, synthesize from what came back.
 
 e. **Build the simple path; leave the seam.** Flat plans (not a planner), flat semantic
-   routing (not hierarchical), HTTP+MCP (A2A stubbed behind the interface), stubbed auth
-   identity. Define the interfaces that allow the scale version later; do **not** build the
-   scale version.
+routing (not hierarchical), HTTP+MCP (A2A stubbed behind the interface), stubbed auth
+identity. Define the interfaces that allow the scale version later; do **not** build the
+scale version.
 
 f. **Do not fork LibreChat's code.** Integrate via `librechat.yaml` and cosmetic rebrand
-   only. Run the glass-box as a separate page beside it.
+only. Run the glass-box as a separate page beside it.
 
 g. **The gateway is one JVM (Java/Spring Boot) service** — no Python, no LangGraph, no
-   external agent gateway *inside the gateway*. The **mock agents are Python/FastAPI**, and
-   that is fine: they stand in for external domain-team agents and are not part of the
-   gateway's request-processing path.
+external agent gateway *inside the gateway*. The **mock agents are Python/FastAPI**, and
+that is fine: they stand in for external domain-team agents and are not part of the
+gateway's request-processing path.
 
 h. **Instrument from M4 onward, not at the end.** The OTel trace context must thread through
-   the harness from the first outbound call.
+the harness from the first outbound call.
 
 ---
 
@@ -367,13 +365,13 @@ results into `BUILD_REPORT.md`.
 ## 10. Running the stack & reporting back
 
 - Use **docker-compose profiles** to keep the everyday demo lean:
-  - **`core`** (default): `redis-stack`, `gateway`, `mock-agents` (HTTP + MCP), `cerbos`,
-    `glassbox`, `librechat` (+ `mongodb`). Disable LibreChat's **Meilisearch** (set search
-    off) to drop a container — the demo doesn't need conversation search.
-  - **`scale`** (M14 only): adds `otel-collector`, `grafana`, `prometheus`, `k6`.
-  - `docker compose up -d` brings up `core`; `docker compose --profile scale up -d` adds the
-    rest. Each service has a **healthcheck**; the gateway depends on `redis-stack` and
-    `cerbos` being healthy.
+    - **`core`** (default): `redis-stack`, `gateway`, `mock-agents` (HTTP + MCP), `cerbos`,
+      `glassbox`, `librechat` (+ `mongodb`). Disable LibreChat's **Meilisearch** (set search
+      off) to drop a container — the demo doesn't need conversation search.
+    - **`scale`** (M14 only): adds `otel-collector`, `grafana`, `prometheus`, `k6`.
+    - `docker compose up -d` brings up `core`; `docker compose --profile scale up -d` adds the
+      rest. Each service has a **healthcheck**; the gateway depends on `redis-stack` and
+      `cerbos` being healthy.
 - Provide **`scripts/wait-for-healthy.sh`** so tests never run before services are up.
 - Provide **`.env.example`** listing required env (`ZAI_API_KEY`, ports, etc.); load it
   via compose `env_file`. Never hardcode secrets.

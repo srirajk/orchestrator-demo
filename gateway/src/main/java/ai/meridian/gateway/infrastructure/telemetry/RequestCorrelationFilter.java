@@ -1,5 +1,9 @@
 package ai.meridian.gateway.infrastructure.telemetry;
 
+import ai.meridian.gateway.domain.auth.JwtAuthFilter;
+import ai.meridian.gateway.domain.auth.Principal;
+import ai.meridian.gateway.domain.auth.RequestContext;
+import com.nimbusds.jwt.JWTClaimsSet;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,6 +25,11 @@ import java.util.UUID;
  * MDC is cleared after the request completes so there is no thread-local leakage
  * across requests — important with virtual threads (one vthread per request, but
  * MDC values persist until explicitly cleared).
+ *
+ * Phase 8 (M15): when {@link JwtAuthFilter} (Order 0) has verified a Bearer JWT,
+ * this filter builds a {@link Principal} from the verified claims and stores it in
+ * {@link RequestContext} so downstream services can bypass the Redis lookup. The
+ * userId MDC key is set to the JWT {@code sub} claim in that case.
  */
 @Component
 @Order(1)
@@ -42,7 +51,22 @@ public class RequestCorrelationFilter extends OncePerRequestFilter {
 
         String requestId      = UUID.randomUUID().toString();
         String conversationId = coalesce(request.getHeader(HEADER_CONVERSATION_ID), "");
-        String userId         = coalesce(request.getHeader(HEADER_USER_ID), "anonymous");
+
+        // Phase 8: prefer verified JWT sub over the X-User-Id header
+        String userId;
+        Boolean jwtVerified = (Boolean) request.getAttribute(JwtAuthFilter.ATTR_JWT_VERIFIED);
+        if (Boolean.TRUE.equals(jwtVerified)) {
+            JWTClaimsSet claims = (JWTClaimsSet) request.getAttribute(JwtAuthFilter.ATTR_JWT_CLAIMS);
+            if (claims != null) {
+                userId = claims.getSubject() != null ? claims.getSubject() : "anonymous";
+                // Store the JWT-derived principal so PrincipalStore can short-circuit
+                RequestContext.setPrincipal(Principal.fromJwtClaims(claims));
+            } else {
+                userId = coalesce(request.getHeader(HEADER_USER_ID), "anonymous");
+            }
+        } else {
+            userId = coalesce(request.getHeader(HEADER_USER_ID), "anonymous");
+        }
 
         MDC.put(MDC_REQUEST_ID, requestId);
         MDC.put(MDC_CONVERSATION_ID, conversationId);
@@ -55,6 +79,7 @@ public class RequestCorrelationFilter extends OncePerRequestFilter {
             chain.doFilter(request, response);
         } finally {
             MDC.clear();
+            RequestContext.clear();
         }
     }
 

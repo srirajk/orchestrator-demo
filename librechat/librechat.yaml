@@ -30,3 +30,6 @@ endpoints:
         - "n"
         - "logprobs"
       streamRate: 35
+      headers:
+        # Phase 8 M15: trusted internal hop identity (upgraded to OIDC Bearer in M16)
+        X-User-Id: "rm_jane"
