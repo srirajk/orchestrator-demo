@@ -26,12 +26,15 @@ public class ChatCompletionsController {
         this.chatService = chatService;
     }
 
-    @PostMapping(value = "/chat/completions", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PostMapping(value = "/chat/completions")
     public SseEmitter chatCompletions(
             @RequestBody ChatRequest request,
             HttpServletResponse response) {
 
-        // Prevent proxy/browser buffering
+        // Force SSE content type regardless of Accept header (LibreChat agents client
+        // may send Accept: application/json which Spring would 406 with produces constraint)
+        response.setContentType("text/event-stream");
+        response.setCharacterEncoding("UTF-8");
         response.setHeader("Cache-Control", "no-cache");
         response.setHeader("X-Accel-Buffering", "no");
         response.setHeader("Connection", "keep-alive");

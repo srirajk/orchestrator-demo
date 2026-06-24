@@ -2,7 +2,7 @@
 
 ---
 
-## PHASE 3 COMPLETE — Evidence captured below. Phase 4 in progress.
+## PHASE 4 COMPLETE — run the human test steps in Phase 4 section, then reply "proceed to Phase 5".
 
 > **Status (2026-06-24):** Phases 1, 2, 3 done and verified live.
 > Phase 4 (input synthesis + executor + Z.AI answer synthesis) is actively building.
@@ -179,25 +179,87 @@ $ curl -s "http://localhost:8080/debug/resolve?prompt=what+is+the+NAV+of+fund+FN
 
 ---
 
-## Phase 4 — End-to-End Answer (M5, M6, M7) — IN PROGRESS
+## Phase 4 — End-to-End Answer (M5, M6, M7) ✅ DONE
 
-### Building
-- [x] Input synthesis `EntityExtractor` (Z.AI GLM tool-calling)
-- [x] `EntityResolver` (deterministic lookup, no LLM)
-- [x] `InputSynthesizerImpl` (Extract→Resolve→Bind)
-- [ ] `ProtocolAdapter` interface + `HttpAdapter` + `McpAdapter`
-- [ ] `FlatPlanExecutor` + Resilience4j harness per agent
-- [ ] Z.AI GLM answer synthesis (streaming, grounded)
-- [ ] Wire into `/v1/chat/completions` pipeline
+### Built
 
-### Human test gate (after Phase 4)
+| Component | Notes |
+|-----------|-------|
+| `EntityExtractor` | Z.AI glm-4.5-flash tool-calling; keyword fallback |
+| `EntityResolver` | Deterministic lookup; whitman→REL-00042; zero fabrication |
+| `InputSynthesizerImpl` | Extract→Resolve→Bind; drops agents with unresolvable required fields |
+| `ProtocolAdapter` / `HttpAdapter` | OpenAPI-driven HTTP adapter |
+| `McpAdapter` | MCP SSE protocol — HTTP/1.1 forced; 3-event sequence (endpoint → init ACK → tool result) |
+| `FlatPlanExecutor` | Virtual-thread parallel fan-out; 30s overall deadline; partial harvest |
+| `AgentHarness` | Resilience4j CircuitBreaker → TimeLimiter → Bulkhead per agent |
+| `AnswerSynthesizer` | Z.AI glm-4.5-flash streaming; grounded synthesis prompt; numeric check |
+| `ChatService` | Full pipeline wired into `/v1/chat/completions` |
+
+### Root Causes Fixed (Phase 4 debugging)
+
+| Bug | Root cause | Fix |
+|-----|-----------|-----|
+| Model not found (HTTP 400) | `glm-4-flash` is not a valid Z.AI model ID | Changed to `glm-4.5-flash` (free tier) |
+| MCP returns HTTP 421 | FastMCP 1.28.0 enables DNS rebinding protection by default; rejects `Host: servicing-mcp:8082` | `FastMCP(..., transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False))` |
+| MCP timeout at 2500ms | 421 rejection caused immediate failure, not timeout; root was host validation | Fixed via server-side change; bumped SLA to 10000ms as additional headroom |
+| Wrong SSE message counted | First `event: message` = initialize ACK, second = tool result; old code completed `responseFuture` on ACK | `messageCount` counter in `parseSseStream`; only complete on message #2 |
+| Z.AI 429 insufficient balance | `glm-4.6` (standard model) requires paid plan | Switched to `glm-4.5-flash` (free dev model) for both extraction and synthesis |
+
+### Live Evidence (verified 2026-06-24)
+
+```
+Fan-out: 8/8 agents succeeded in ~35ms total
+HTTP agents: holdings, performance, risk_profile, goal_planning → all OK in ~28ms
+MCP agents: settlement_status, corporate_actions, custody_positions, cash_management → all OK in ~34ms
+
+Full hero prompt answer (grounded, streamed):
+  # Whitman Family Office Relationship Briefing
+  
+  ## Wealth Summary
+  ### Current Holdings
+  The Whitman Family Office (REL-00042) has total assets of $1,967,000 USD:
+  - AAPL: 1,200 shares ($318,000)
+  - MSFT: 800 shares ($372,000)   ← cross-match with settlement T-9912 ✓
+  - GOOGL: 150 shares ($289,500)
+  - JPM: 2,500 shares ($487,500)
+  - T-BILL-2026: 1 bill ($500,000)
+  Asset allocation: 68% Equity, 24% Fixed Income, 8% Cash
+  
+  ### Performance (QTD)
+  Total return: 12.4% (benchmark +2.2%), PnL: $243,908, Sharpe: 1.43
+  
+  ### Risk Profile
+  Moderate (score 6); AAPL concentration flag at 16.2% (>15% threshold)
+  
+  ## Servicing Summary
+  ### Settlement Status
+  Trade T-9912: Buy MSFT $372,000 settling June 25, 2026
+  
+  ### Cash Position
+  USD: $529,000 ($157k settled + $372k unsettled = pending MSFT buy) ← cross-domain ✓
+  GBP: £45,000
+  
+  ### Corporate Actions
+  AAPL dividend CA-2245: $0.25/share, $300 total (Jul 15)
+  GOOGL 20:1 split CA-2301: effective July 10
+  
+  ### Custody
+  BNY Mellon (ACC-78823): AAPL + MSFT; State Street (ACC-34421): GOOGL + JPM
+```
+
+### Grounding verification
+- MSFT $372k in holdings → same $372k in settlement T-9912 → same $372k in cash as "unsettled" ✓
+- REL-00042 resolved from "Whitman Family Office" deterministically (no LLM fabrication) ✓
+- All numbers in the answer appear in canned agent data ✓
+
+### Human test gate — Phase 4
 1. Open LibreChat at http://localhost:3080
-2. Type the hero prompt (verbatim, from `docs/agent-catalog.md`)
-3. **Confirm** one merged answer streams in covering: holdings, performance, risk, settlements, corporate actions, cash
-4. **Pick a number** in the answer — confirm it matches canned data (grounding works)
-5. (Optional) Set `MCP_FAULT_TOOL=get_settlements`, re-ask → answer returns, states settlement data unavailable
+2. Type the hero prompt: *"Give me a unified relationship briefing on the Whitman Family Office relationship — current holdings, performance, and risk on the wealth side, plus any pending settlements, upcoming corporate actions, and cash position on the servicing side."*
+3. **PASS:** A streamed answer appears covering all six domains (holdings, performance, risk, settlements, actions, cash)
+4. **Verify grounding:** MSFT $372k appears in holdings AND in settlement T-9912 AND in cash (unsettled)
+5. (Optional resilience test) `docker exec meridian-servicing-mcp env MCP_FAULT_TOOL=get_settlements` → re-ask → answer should acknowledge missing settlement data
 
-**PASS =** the real demo answer appears, grounded and merged across both protocols.
+**PASS = grounded, attributed answer streaming in LibreChat from both HTTP and MCP agents.**
 
 ---
 

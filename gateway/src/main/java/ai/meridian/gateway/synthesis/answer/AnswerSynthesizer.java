@@ -1,5 +1,6 @@
 package ai.meridian.gateway.synthesis.answer;
 
+import ai.meridian.gateway.api.v1.chat.dto.Message;
 import ai.meridian.gateway.orchestration.model.NodeResult;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -18,6 +19,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.Collections;
+import java.util.List;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -77,13 +80,14 @@ public class AnswerSynthesizer {
      *
      * <p>Never throws — errors are logged and the emitter is completed with a fallback.
      */
-    public void synthesize(List<NodeResult> results, String originalPrompt, SseEmitter emitter) {
+    public void synthesize(List<NodeResult> results, String originalPrompt,
+                           List<Message> history, SseEmitter emitter) {
         String completionId = "chatcmpl-" + UUID.randomUUID().toString().replace("-", "");
         long created = System.currentTimeMillis() / 1_000L;
 
         try {
             String userContent = buildUserContent(results);
-            String requestBody = buildRequestBody(userContent, originalPrompt);
+            String requestBody = buildRequestBody(userContent, originalPrompt, history);
 
             log.debug("AnswerSynthesizer: calling {} model={} agents={}",
                     baseUrl, model, results.size());
@@ -141,24 +145,93 @@ public class AnswerSynthesizer {
         return sb.toString();
     }
 
-    private String buildRequestBody(String dataContent, String originalPrompt) throws Exception {
+    private String buildRequestBody(String dataContent, String originalPrompt,
+                                    List<Message> history) throws Exception {
         ObjectNode root = mapper.createObjectNode();
         root.put("model", model);
         root.put("stream", true);
 
         ArrayNode messages = root.putArray("messages");
 
-        // System message: grounding rules
-        ObjectNode systemMsg = messages.addObject();
-        systemMsg.put("role", "system");
-        systemMsg.put("content", SYSTEM_PROMPT);
+        // System: grounding rules
+        messages.addObject().put("role", "system").put("content", SYSTEM_PROMPT);
 
-        // User message: data blocks + the actual question
-        ObjectNode userMsg = messages.addObject();
-        userMsg.put("role", "user");
-        userMsg.put("content", dataContent + "\n\nQuestion: " + originalPrompt);
+        // Include prior conversation turns (max 6) so the LLM has context for follow-ups.
+        // We exclude the last user message (it becomes the final data+question message below).
+        if (history != null && history.size() > 1) {
+            int start = Math.max(0, history.size() - 7); // keep last 6 + current
+            for (int i = start; i < history.size() - 1; i++) {
+                Message m = history.get(i);
+                if (m.content() != null && !m.content().isBlank()) {
+                    messages.addObject()
+                            .put("role", m.role())
+                            .put("content", m.content());
+                }
+            }
+        }
+
+        // Final user message: agent data blocks + the current question
+        messages.addObject()
+                .put("role", "user")
+                .put("content", dataContent + "\n\nQuestion: " + originalPrompt);
 
         return mapper.writeValueAsString(root);
+    }
+
+    /**
+     * Follow-up path: no agent data — answer purely from conversation history.
+     * Used when the user asks a clarifying/reformulation question (e.g. "explain in simpler terms")
+     * after the assistant has already returned agent data in a prior turn.
+     */
+    public void synthesizeFollowUp(List<Message> history, SseEmitter emitter) {
+        String completionId = "chatcmpl-" + java.util.UUID.randomUUID().toString().replace("-", "");
+        long created = System.currentTimeMillis() / 1_000L;
+
+        try {
+            ObjectNode root = mapper.createObjectNode();
+            root.put("model", model);
+            root.put("stream", true);
+
+            ArrayNode messages = root.putArray("messages");
+            messages.addObject().put("role", "system").put("content",
+                    "You are a banking AI assistant for Meridian Bank. Answer the user's follow-up " +
+                    "question based only on the information already provided in this conversation. " +
+                    "Do not invent new facts or numbers. If the question requires fresh data not in " +
+                    "the conversation, say so and ask the user to rephrase with the entity name.");
+
+            // Include the full conversation history.
+            if (history != null) {
+                int start = Math.max(0, history.size() - 8);
+                for (int i = start; i < history.size(); i++) {
+                    Message m = history.get(i);
+                    if (m.content() != null && !m.content().isBlank()) {
+                        messages.addObject().put("role", m.role()).put("content", m.content());
+                    }
+                }
+            }
+
+            String requestBody = mapper.writeValueAsString(root);
+            log.debug("synthesizeFollowUp: calling {} model={}", baseUrl, model);
+
+            emitter.send(SseEmitter.event().data(roleDelta(completionId, created, mapper)));
+            streamFromLlm(requestBody, emitter, completionId, created, new StringBuilder());
+            emitter.send(SseEmitter.event().data(stopDelta(completionId, created, mapper)));
+            emitter.send(SseEmitter.event().data("[DONE]"));
+            emitter.complete();
+
+        } catch (Exception e) {
+            log.error("synthesizeFollowUp failed: {}", e.getMessage(), e);
+            try {
+                emitter.send(SseEmitter.event().data(
+                        contentDelta(completionId, created,
+                                "I couldn't process that follow-up. Please rephrase.", mapper)));
+                emitter.send(SseEmitter.event().data(stopDelta(completionId, created, mapper)));
+                emitter.send(SseEmitter.event().data("[DONE]"));
+                emitter.complete();
+            } catch (Exception inner) {
+                emitter.completeWithError(e);
+            }
+        }
     }
 
     // ── LLM streaming ────────────────────────────────────────────────────────

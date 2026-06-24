@@ -93,18 +93,29 @@ public class ChatService {
     // ── Main pipeline ─────────────────────────────────────────────────────────
 
     public void handleChat(ChatRequest request, SseEmitter emitter) {
-        String prompt = extractLatestUserMessage(request);
-        log.info("handleChat prompt='{}'", prompt.length() > 120 ? prompt.substring(0, 120) + "…" : prompt);
+        String latestPrompt = extractLatestUserMessage(request);
+        // Build a context-enriched string for entity extraction (last 6 messages max).
+        String contextPrompt = buildContextPrompt(request);
+        log.info("handleChat prompt='{}'", latestPrompt.length() > 120
+                ? latestPrompt.substring(0, 120) + "…" : latestPrompt);
 
         try {
-            // Stage 1 — Resolve which agents to call
-            ResolverResult resolved = resolver.resolve(prompt);
+            // Stage 1 — Resolve which agents to call (use latest message only for vector search)
+            ResolverResult resolved = resolver.resolve(latestPrompt);
 
             if (resolved.fallback() || resolved.selected().isEmpty()) {
-                log.warn("Resolver fallback — no agents matched, returning clarification");
-                streamText(emitter, "I wasn't sure which services to consult for that question. " +
-                        "Could you rephrase it? For example, try mentioning a specific relationship name, " +
-                        "fund, or what type of data you need (holdings, performance, settlements, etc.).");
+                // No agent match on the latest message alone.
+                // If there is prior conversation context, let the LLM answer as a follow-up
+                // (e.g., "explain in simpler terms") without hitting agents.
+                if (hasPriorAssistantTurn(request)) {
+                    log.info("Resolver fallback but prior context exists — routing as follow-up");
+                    answerSynthesizer.synthesizeFollowUp(request.messages(), emitter);
+                } else {
+                    log.warn("Resolver fallback — no agents matched, no prior context");
+                    streamText(emitter, "I wasn't sure which services to consult for that question. " +
+                            "Could you rephrase it? For example, try mentioning a specific relationship name, " +
+                            "fund, or what type of data you need (holdings, performance, settlements, etc.).");
+                }
                 return;
             }
 
@@ -115,20 +126,32 @@ public class ChatService {
             log.info("Resolver selected {} agents: {}", selectedManifests.size(),
                     selectedManifests.stream().map(AgentManifest::agentId).collect(Collectors.joining(", ")));
 
-            // Stage 2 — Synthesize per-agent inputs (Extract→Resolve→Bind)
-            SynthesisResult synthesis = inputSynthesizer.synthesize(prompt, selectedManifests);
+            // Stage 2 — Synthesize per-agent inputs using context-enriched prompt.
+            SynthesisResult synthesis = inputSynthesizer.synthesize(contextPrompt, selectedManifests);
 
             if (synthesis.needsClarification()) {
                 log.info("Input synthesis needs clarification: {}", synthesis.clarificationMessage());
-                streamText(emitter, synthesis.clarificationMessage());
+                // If we already have conversation context, try a follow-up answer instead
+                // of asking for entity clarification again.
+                if (hasPriorAssistantTurn(request)) {
+                    log.info("Clarification needed but prior context exists — routing as follow-up");
+                    answerSynthesizer.synthesizeFollowUp(request.messages(), emitter);
+                } else {
+                    streamText(emitter, synthesis.clarificationMessage());
+                }
                 return;
             }
 
             if (synthesis.inputs().isEmpty()) {
                 log.warn("Input synthesis produced no bindable inputs — all agents dropped");
-                streamText(emitter,
-                        "I couldn't determine the specific relationship or fund you're asking about. " +
-                        "Please include the client name (e.g. 'Whitman Family Office') or relationship ID.");
+                if (hasPriorAssistantTurn(request)) {
+                    // Try answering as a follow-up instead of asking for clarification again.
+                    answerSynthesizer.synthesizeFollowUp(request.messages(), emitter);
+                } else {
+                    streamText(emitter,
+                            "I couldn't determine the specific relationship or fund you're asking about. " +
+                            "Please include the client name (e.g. 'Whitman Family Office') or relationship ID.");
+                }
                 return;
             }
 
@@ -156,8 +179,9 @@ public class ChatService {
             long okCount = results.stream().filter(NodeResult::isOk).count();
             log.info("Fan-out complete: {}/{} agents succeeded", okCount, results.size());
 
-            // Stage 4 — Stream the synthesized answer from Z.AI GLM
-            answerSynthesizer.synthesize(results, prompt, emitter);
+            // Stage 4 — Stream the synthesized answer from Z.AI GLM (pass full message history
+            // so the LLM can frame its answer in the context of the conversation).
+            answerSynthesizer.synthesize(results, latestPrompt, request.messages(), emitter);
 
         } catch (Exception e) {
             log.error("Chat pipeline failed", e);
@@ -173,7 +197,6 @@ public class ChatService {
 
     private String extractLatestUserMessage(ChatRequest request) {
         if (request.messages() == null || request.messages().isEmpty()) return "";
-        // Take the last user message
         for (int i = request.messages().size() - 1; i >= 0; i--) {
             Message m = request.messages().get(i);
             if ("user".equals(m.role()) && m.content() != null) {
@@ -181,6 +204,37 @@ public class ChatService {
             }
         }
         return request.messages().get(request.messages().size() - 1).content();
+    }
+
+    /**
+     * Build a context-enriched prompt for entity extraction.
+     * Includes the last 3 user messages so the entity extractor can carry forward
+     * entity references from earlier in the conversation (e.g., "Whitman" said two
+     * turns ago still informs "show me the allocation" today).
+     */
+    private String buildContextPrompt(ChatRequest request) {
+        if (request.messages() == null || request.messages().isEmpty()) return "";
+        List<Message> msgs = request.messages();
+        // Collect last 3 user turns (excluding the very latest which is the current question).
+        List<String> recentUserMsgs = new java.util.ArrayList<>();
+        int count = 0;
+        for (int i = msgs.size() - 2; i >= 0 && count < 3; i--) {
+            Message m = msgs.get(i);
+            if ("user".equals(m.role()) && m.content() != null) {
+                recentUserMsgs.add(0, m.content());
+                count++;
+            }
+        }
+        String latest = extractLatestUserMessage(request);
+        if (recentUserMsgs.isEmpty()) return latest;
+        // Prepend prior context so the extractor sees the full picture.
+        return "Previous context: " + String.join(" | ", recentUserMsgs) + "\nCurrent question: " + latest;
+    }
+
+    /** True if the conversation has at least one prior assistant turn (follow-up scenario). */
+    private boolean hasPriorAssistantTurn(ChatRequest request) {
+        if (request.messages() == null) return false;
+        return request.messages().stream().anyMatch(m -> "assistant".equals(m.role()));
     }
 
     private void streamText(SseEmitter emitter, String text) throws Exception {
