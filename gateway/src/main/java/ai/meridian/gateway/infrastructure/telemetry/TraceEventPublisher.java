@@ -28,9 +28,11 @@ public class TraceEventPublisher {
 
     private final ConcurrentHashMap<String, SseEmitter> subscribers = new ConcurrentHashMap<>();
     private final ObjectMapper mapper;
+    private final TraceStorageAdapter storage;
 
-    public TraceEventPublisher(ObjectMapper mapper) {
-        this.mapper = mapper;
+    public TraceEventPublisher(ObjectMapper mapper, TraceStorageAdapter storage) {
+        this.mapper  = mapper;
+        this.storage = storage;
     }
 
     /**
@@ -56,10 +58,13 @@ public class TraceEventPublisher {
     }
 
     /**
-     * Publish {@code event} to all connected glass-box clients.
-     * Never throws — dead subscribers are silently pruned.
+     * Publish {@code event} to all connected glass-box clients and persist it to Redis.
+     * Never throws — dead subscribers are silently pruned; storage errors are logged.
      */
     public void publish(TraceEvent event) {
+        // Persist regardless of whether any SSE clients are connected
+        storage.save(event);
+
         if (subscribers.isEmpty()) return;
 
         String json;

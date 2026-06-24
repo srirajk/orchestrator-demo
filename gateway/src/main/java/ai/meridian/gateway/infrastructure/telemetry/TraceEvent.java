@@ -6,7 +6,8 @@ import com.fasterxml.jackson.annotation.JsonInclude;
  * A single structured event emitted by the request pipeline to the glass-box panel.
  *
  * <p>Events are published via {@link TraceEventPublisher} and streamed to all connected
- * glass-box clients over {@code /trace/stream} SSE.
+ * glass-box clients over {@code /trace/stream} SSE. They are also persisted to Redis by
+ * {@link RedisTraceStorageAdapter} so historical requests can be replayed.
  *
  * <p>Event types and their {@code data} shapes:
  * <ul>
@@ -24,10 +25,17 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 public record TraceEvent(
         String type,
         String requestId,
+        String conversationId,   // null when not associated with a conversation
         long   timestamp,
         Object data
 ) {
+    /** Factory — no conversationId (backwards-compatible). */
     public static TraceEvent of(String type, String requestId, Object data) {
-        return new TraceEvent(type, requestId, System.currentTimeMillis(), data);
+        return new TraceEvent(type, requestId, null, System.currentTimeMillis(), data);
+    }
+
+    /** Factory — with conversationId for cross-request history. */
+    public static TraceEvent of(String type, String requestId, String conversationId, Object data) {
+        return new TraceEvent(type, requestId, conversationId, System.currentTimeMillis(), data);
     }
 }

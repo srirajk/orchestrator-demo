@@ -3,13 +3,27 @@ resourcePolicy:
   version: "default"
   resource: relationship
   rules:
+    # relationship_manager: allowed only if the relationship is in their book
     - actions: ["read"]
       effect: EFFECT_ALLOW
       roles: ["relationship_manager"]
       condition:
         match:
-          # Allow only if the relationship ID is in the RM's book of relationships
           expr: P.attr.book.exists(b, b == R.id)
+
+    # domain_admin: same book-scoped check as RM (they have their domain's relationships)
+    - actions: ["read"]
+      effect: EFFECT_ALLOW
+      roles: ["domain_admin"]
+      condition:
+        match:
+          expr: P.attr.book.exists(b, b == R.id)
+
+    # platform_admin and legacy admin: unrestricted access across all relationships
+    - actions: ["read"]
+      effect: EFFECT_ALLOW
+      roles: ["platform_admin"]
+
     - actions: ["read"]
       effect: EFFECT_ALLOW
       roles: ["admin"]

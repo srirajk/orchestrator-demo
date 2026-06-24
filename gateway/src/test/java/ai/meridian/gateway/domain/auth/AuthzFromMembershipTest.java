@@ -23,8 +23,10 @@ import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -68,8 +70,14 @@ class AuthzFromMembershipTest {
     @Autowired
     MockMvc mvc;
 
+    @Autowired
+    EntitlementService entitlementService;
+
     @MockBean
     JwksClient jwksClient;
+
+    @MockBean
+    CerbosEntitlementAdapter cerbosAdapter;
 
     @BeforeEach
     void wireMockKey() {
@@ -77,6 +85,26 @@ class AuthzFromMembershipTest {
                 .thenReturn((RSAPublicKey) keyPair.getPublic());
         when(jwksClient.getPublicKey(argThat(k -> !"membership-key-1".equals(k))))
                 .thenReturn(null);
+
+        // Default: Cerbos allows REL-00042 and REL-00099 (in rm_jane's book),
+        // denies REL-00188 unless a test explicitly overrides this stub.
+        when(cerbosAdapter.checkRelationships(any(), any()))
+                .thenAnswer(inv -> {
+                    @SuppressWarnings("unchecked")
+                    List<String> ids = (List<String>) inv.getArgument(1);
+                    // Guard: during Mockito stub recording the arg may be null
+                    if (ids == null) return new CerbosEntitlementAdapter.BatchResult(Map.of(), "cerbos");
+                    Principal p = inv.getArgument(0);
+                    java.util.Map<String, Boolean> decisions = new java.util.HashMap<>();
+                    for (String id : ids) {
+                        // Honour the principal's book claim as the local proxy for Cerbos
+                        boolean adminRole = p != null && p.roles().stream()
+                                .anyMatch(r -> r.contains("admin"));
+                        boolean inBook    = p != null && p.book().contains(id);
+                        decisions.put(id, adminRole || inBook);
+                    }
+                    return new CerbosEntitlementAdapter.BatchResult(decisions, "cerbos");
+                });
     }
 
     // ── Token minting helper ─────────────────────────────────────────────────────
@@ -120,10 +148,10 @@ class AuthzFromMembershipTest {
         assertThat(fromJwt.book()).doesNotContain("REL-00188");
 
         // EntitlementService must deny REL-00188 for this JWT-derived principal
-        EntitlementService svc = new EntitlementService();
-        EntitlementService.EntitlementResult result = svc.checkRelationship(fromJwt, "REL-00188");
+        // cerbosAdapter is stubbed in @BeforeEach to honour the principal's book claim
+        EntitlementService.EntitlementResult result = entitlementService.checkRelationship(fromJwt, "REL-00188");
         assertThat(result.allowed()).isFalse();
-        assertThat(result.reason()).isEqualTo("not-in-book");
+        assertThat(result.source()).isEqualTo("cerbos");
 
         // HTTP-level: JWT is accepted (200, not 401), proving verification + principal extraction
         String token = mintToken("rm_jane", List.of("REL-00042", "REL-00099"));
@@ -248,42 +276,47 @@ class AuthzFromMembershipTest {
         assertThat(principal.clearance()).isEqualTo(2);
     }
 
-    // ── Test: entitlement with is_mutating flag via EntitlementService directly ───
+    // ── Test: EntitlementService delegates to Cerbos adapter ─────────────────────
 
     @Test
     void entitlementService_adminRole_grantsAccessRegardlessOfBook() {
-        // An admin role bypasses the book check.
-        EntitlementService svc = new EntitlementService();
-        Principal admin = new Principal("admin", List.of("admin"), List.of(), 5, List.of());
+        // platform_admin/admin: Cerbos returns ALLOW (policy has no book condition for admin roles).
+        // We stub the adapter to return ALLOW — the point is EntitlementService honours the verdict.
+        Principal admin = new Principal("admin", List.of("platform_admin"), List.of(), 5, List.of());
+        when(cerbosAdapter.checkRelationships(any(), any()))
+                .thenReturn(new CerbosEntitlementAdapter.BatchResult(Map.of("REL-00188", true), "cerbos"));
 
-        EntitlementService.EntitlementResult result = svc.checkRelationship(admin, "REL-00188");
+        EntitlementService.EntitlementResult result = entitlementService.checkRelationship(admin, "REL-00188");
 
         assertThat(result.allowed()).isTrue();
-        assertThat(result.reason()).isEqualTo("admin-override");
+        assertThat(result.source()).isEqualTo("cerbos");
     }
 
     @Test
     void entitlementService_rmWithoutRelInBook_denied() {
-        EntitlementService svc = new EntitlementService();
+        // Cerbos denies REL-00188 because it's not in rm_jane's book.
         Principal rm = new Principal("rm_jane", List.of("relationship_manager"),
                 List.of("REL-00042", "REL-00099"), 2, List.of());
+        when(cerbosAdapter.checkRelationships(any(), any()))
+                .thenReturn(new CerbosEntitlementAdapter.BatchResult(Map.of("REL-00188", false), "cerbos"));
 
-        EntitlementService.EntitlementResult result = svc.checkRelationship(rm, "REL-00188");
+        EntitlementService.EntitlementResult result = entitlementService.checkRelationship(rm, "REL-00188");
 
         assertThat(result.allowed()).isFalse();
-        assertThat(result.reason()).isEqualTo("not-in-book");
+        assertThat(result.source()).isEqualTo("cerbos");
     }
 
     @Test
     void entitlementService_rmWithRelInBook_allowed() {
-        EntitlementService svc = new EntitlementService();
-        // Simulate membership add: REL-00188 now in book
+        // Cerbos allows REL-00188 because rm_jane's book now contains it.
         Principal rm = new Principal("rm_jane", List.of("relationship_manager"),
                 List.of("REL-00042", "REL-00099", "REL-00188"), 2, List.of());
+        when(cerbosAdapter.checkRelationships(any(), any()))
+                .thenReturn(new CerbosEntitlementAdapter.BatchResult(Map.of("REL-00188", true), "cerbos"));
 
-        EntitlementService.EntitlementResult result = svc.checkRelationship(rm, "REL-00188");
+        EntitlementService.EntitlementResult result = entitlementService.checkRelationship(rm, "REL-00188");
 
         assertThat(result.allowed()).isTrue();
-        assertThat(result.reason()).isEqualTo("in-book");
+        assertThat(result.source()).isEqualTo("cerbos");
     }
 }

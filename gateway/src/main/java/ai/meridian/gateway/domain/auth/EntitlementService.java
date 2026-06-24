@@ -5,68 +5,78 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Enforces relationship-level entitlements.
+ * Enforces relationship-level entitlements by delegating to the Cerbos PDP.
  *
- * <p><strong>Implementation strategy (Phase 1 — demo):</strong> the authoritative check is
- * a local attribute comparison ({@code principal.book().contains(relationshipId)}).
- * This mirrors exactly what the Cerbos PDP policy evaluates:
- * {@code P.attr.book.exists(b, b == R.id)}. The local check is O(1) and fail-safe.
+ * <p><strong>Phase 11:</strong> The Cerbos PDP verdict is the authoritative answer.
+ * {@link CerbosEntitlementAdapter} issues a single batched {@code CheckResources} call
+ * for all candidate relationships — {@link #filterCovered(Principal, List)} never makes
+ * N round-trips.
  *
- * <p>The Cerbos PDP sidecar is used for the glass-box audit trail: every check is logged
- * as an entitlement decision that appears in the live trace panel. The PDP's verdict is
- * advisory in this phase — the gateway enforces the local result.
- *
- * <p><strong>Phase 2 upgrade path:</strong> replace the local book check with a full
- * {@code CheckResources} call to Cerbos (using the SDK or REST API) and make the PDP
- * verdict authoritative. The {@link EntitlementResult} contract stays the same.
+ * <p>Fail-mode (open or closed) is configured on the adapter. The {@link EntitlementResult}
+ * carries a {@code source} field ("cerbos" | "local-fallback") so the glass-box and audit
+ * trail show where the verdict came from.
  */
 @Service
 public class EntitlementService {
 
     private static final Logger log = LoggerFactory.getLogger(EntitlementService.class);
 
-    /**
-     * Checks whether {@code principal} may read {@code relationshipId}.
-     *
-     * @return an {@link EntitlementResult} with {@code allowed=true} if the relationship
-     *         is in the principal's book, {@code false} otherwise
-     */
-    public EntitlementResult checkRelationship(Principal principal, String relationshipId) {
-        if (relationshipId == null || relationshipId.isBlank()) {
-            return new EntitlementResult(true, relationshipId, "no-entity", "no relationship resolved");
-        }
+    private final CerbosEntitlementAdapter cerbos;
 
-        boolean allowed = principal.roles().contains("admin")
-                || principal.book().contains(relationshipId);
-
-        String reason = allowed
-                ? (principal.roles().contains("admin") ? "admin-override" : "in-book")
-                : "not-in-book";
-
-        log.info("Entitlement: userId={} relationship={} allowed={} reason={}",
-                principal.id(), relationshipId, allowed, reason);
-
-        return new EntitlementResult(allowed, relationshipId, principal.id(), reason);
+    public EntitlementService(CerbosEntitlementAdapter cerbos) {
+        this.cerbos = cerbos;
     }
 
     /**
-     * Filters {@code candidateRelIds} to only those the principal is entitled to see.
-     * Used for prune-before-fan-out when multiple relationships are in scope.
+     * Checks whether {@code principal} may read {@code relationshipId} according to the PDP.
+     */
+    public EntitlementResult checkRelationship(Principal principal, String relationshipId) {
+        if (relationshipId == null || relationshipId.isBlank()) {
+            return new EntitlementResult(true, relationshipId, principal.id(), "no-entity", "cerbos");
+        }
+
+        CerbosEntitlementAdapter.BatchResult batch =
+                cerbos.checkRelationships(principal, List.of(relationshipId));
+
+        boolean allowed = batch.isAllowed(relationshipId);
+        String reason = allowed ? "allowed-by-pdp" : "denied-by-pdp";
+
+        log.info("Entitlement: userId={} relationship={} allowed={} source={} reason={}",
+                principal.id(), relationshipId, allowed, batch.source(), reason);
+
+        return new EntitlementResult(allowed, relationshipId, principal.id(), reason, batch.source());
+    }
+
+    /**
+     * Filters {@code candidateRelIds} to those the principal is entitled to see.
+     *
+     * <p><strong>One PDP call</strong> for all candidates — never N round-trips.
      */
     public List<String> filterCovered(Principal principal, List<String> candidateRelIds) {
-        return candidateRelIds.stream()
-                .filter(relId -> checkRelationship(principal, relId).allowed())
+        if (candidateRelIds == null || candidateRelIds.isEmpty()) return List.of();
+
+        CerbosEntitlementAdapter.BatchResult batch =
+                cerbos.checkRelationships(principal, candidateRelIds);
+
+        List<String> allowed = candidateRelIds.stream()
+                .filter(batch::isAllowed)
                 .collect(Collectors.toList());
+
+        log.debug("filterCovered: principal={} candidates={} allowed={} source={}",
+                principal.id(), candidateRelIds.size(), allowed.size(), batch.source());
+        return allowed;
     }
 
     /** Immutable result of an entitlement check — published as a trace event. */
     public record EntitlementResult(
             boolean allowed,
-            String relationshipId,
-            String userId,
-            String reason
+            String  relationshipId,
+            String  userId,
+            String  reason,
+            String  source   // "cerbos" | "local-fallback"
     ) {}
 }

@@ -158,7 +158,7 @@ public class ChatService {
                 requestId, userId, conversationId,
                 latestPrompt.length() > 120 ? latestPrompt.substring(0, 120) + "..." : latestPrompt);
 
-        tracePublisher.publish(TraceEvent.of("request_start", requestId,
+        tracePublisher.publish(TraceEvent.of("request_start", requestId, conversationId,
                 new RequestStartData(userId, latestPrompt)));
 
         try {
@@ -244,7 +244,7 @@ public class ChatService {
             if (resolvedRelId != null) {
                 EntitlementResult ent = entitlementService.checkRelationship(principal, resolvedRelId);
                 tracePublisher.publish(TraceEvent.of("entitlement_check", requestId,
-                        new EntitlementCheckData(resolvedRelId, userId, ent.allowed(), ent.reason())));
+                        new EntitlementCheckData(resolvedRelId, userId, ent.allowed(), ent.reason(), ent.source())));
                 if (!ent.allowed()) {
                     String denialMsg = "Access denied: you are not authorized to view relationship " +
                             resolvedRelId + ". This denial has been logged.";

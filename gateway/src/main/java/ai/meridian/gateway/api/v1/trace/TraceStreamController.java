@@ -1,13 +1,14 @@
 package ai.meridian.gateway.api.v1.trace;
 
+import ai.meridian.gateway.infrastructure.telemetry.TraceEvent;
 import ai.meridian.gateway.infrastructure.telemetry.TraceEventPublisher;
+import ai.meridian.gateway.infrastructure.telemetry.TraceStorageAdapter;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.MediaType;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -24,9 +25,11 @@ import java.util.UUID;
 public class TraceStreamController {
 
     private final TraceEventPublisher publisher;
+    private final TraceStorageAdapter  storage;
 
-    public TraceStreamController(TraceEventPublisher publisher) {
+    public TraceStreamController(TraceEventPublisher publisher, TraceStorageAdapter storage) {
         this.publisher = publisher;
+        this.storage   = storage;
     }
 
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -42,6 +45,24 @@ public class TraceStreamController {
         emitter.onError(e ->      publisher.unsubscribe(clientId));
 
         return emitter;
+    }
+
+    /** Returns all stored events for a specific request (glass-box replay). */
+    @GetMapping("/{requestId}")
+    public List<TraceEvent> getByRequestId(@PathVariable String requestId) {
+        return storage.getByRequestId(requestId);
+    }
+
+    /**
+     * Returns the {@code limit} most-recent requestIds for a conversation, newest-first.
+     * Use to build the conversation history timeline in the glass-box panel.
+     */
+    @GetMapping("/history")
+    public Map<String, Object> history(
+            @RequestParam String conversationId,
+            @RequestParam(defaultValue = "20") int limit) {
+        List<String> requestIds = storage.getRequestIdsByConversation(conversationId, limit);
+        return Map.of("conversationId", conversationId, "requestIds", requestIds, "count", requestIds.size());
     }
 
     @GetMapping("/health")

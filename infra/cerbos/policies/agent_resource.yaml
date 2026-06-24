@@ -3,9 +3,10 @@ resourcePolicy:
   version: "default"
   resource: agent
   rules:
+    # All authenticated roles may invoke read-only agents if clearance is sufficient
     - actions: ["invoke"]
       effect: EFFECT_ALLOW
-      roles: ["relationship_manager", "admin"]
+      roles: ["relationship_manager", "domain_admin", "platform_admin", "admin"]
       condition:
         match:
           all:

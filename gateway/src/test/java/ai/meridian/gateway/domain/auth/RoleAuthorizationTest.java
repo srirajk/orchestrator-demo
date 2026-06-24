@@ -22,6 +22,9 @@ import java.security.interfaces.RSAPublicKey;
 import java.util.Date;
 import java.util.List;
 
+import java.util.Map;
+
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -58,6 +61,7 @@ class RoleAuthorizationTest {
 
     @Autowired MockMvc mvc;
     @MockBean  JwksClient jwksClient;
+    @MockBean  CerbosEntitlementAdapter cerbosAdapter;
 
     @BeforeEach
     void wireKey() {
@@ -65,6 +69,9 @@ class RoleAuthorizationTest {
                 .thenReturn((RSAPublicKey) keyPair.getPublic());
         when(jwksClient.getPublicKey(argThat(k -> !"role-test-key".equals(k))))
                 .thenReturn(null);
+        // Default stub: Cerbos allows everything in tests focused on role/URL authorization
+        when(cerbosAdapter.checkRelationships(any(), any()))
+                .thenReturn(new CerbosEntitlementAdapter.BatchResult(Map.of(), "cerbos"));
     }
 
     // ── Token minting ──────────────────────────────────────────────────────────

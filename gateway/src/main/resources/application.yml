@@ -63,6 +63,9 @@ meridian:
   cerbos:
     host: ${CERBOS_HOST:localhost}
     http-port: ${CERBOS_HTTP_PORT:3592}
+    # closed (default) = Cerbos unreachable → deny all (production safe)
+    # local = Cerbos unreachable → fall back to JWT book claim (demo resilience)
+    fail-mode: ${MERIDIAN_CERBOS_FAIL_MODE:closed}
 
 logging:
   pattern:

@@ -2,6 +2,7 @@ package ai.meridian.gateway.domain.auth;
 
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.JWTClaimsSet;
@@ -274,6 +275,55 @@ class JwtAuthFilterTest {
                         .content(body))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.reason").value(containsString("signature verification failed")));
+    }
+
+    // ── Algorithm-confusion attacks ────────────────────────────────────────────
+
+    @Test
+    void algNone_rejected() throws Exception {
+        // Craft a JWT with alg=none manually (PlainJWT) — a gateway that doesn't
+        // check the algorithm header would accept any claims the attacker provides.
+        // Our decoder calls SignedJWT.parse() which throws on a plain JWT → 401.
+        String header  = java.util.Base64.getUrlEncoder().withoutPadding()
+                .encodeToString("{\"alg\":\"none\",\"kid\":\"test-key-1\"}".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        JWTClaimsSet claims = new JWTClaimsSet.Builder()
+                .subject("attacker").issuer("meridian-user-mgmt")
+                .audience(List.of("meridian-gateway"))
+                .expirationTime(new java.util.Date(System.currentTimeMillis() + 3_600_000L))
+                .claim("roles", List.of("platform_admin")).build();
+        String payload = java.util.Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(claims.toJSONObject().toString()
+                        .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        // alg=none tokens have an empty signature part
+        String algNoneToken = header + "." + payload + ".";
+
+        mvc.perform(post("/v1/chat/completions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Authorization", "Bearer " + algNoneToken)
+                        .content("{\"model\":\"meridian-assistant\",\"messages\":[{\"role\":\"user\",\"content\":\"hello\"}],\"stream\":true}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void algHS256_rejected() throws Exception {
+        // A JWT signed with HMAC-SHA256 — an attacker could forge this if they guessed
+        // the key. Our decoder checks algorithm == RS256 and rejects everything else.
+        byte[] secret = "32-byte-test-secret-do-not-use!!".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        JWTClaimsSet claims = new JWTClaimsSet.Builder()
+                .subject("attacker").issuer("meridian-user-mgmt")
+                .audience(List.of("meridian-gateway"))
+                .expirationTime(new java.util.Date(System.currentTimeMillis() + 3_600_000L))
+                .claim("roles", List.of("platform_admin")).build();
+        JWSHeader header = new JWSHeader.Builder(JWSAlgorithm.HS256).keyID("test-key-1").build();
+        SignedJWT jwt = new SignedJWT(header, claims);
+        jwt.sign(new MACSigner(secret));
+        String algHs256Token = jwt.serialize();
+
+        mvc.perform(post("/v1/chat/completions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Authorization", "Bearer " + algHs256Token)
+                        .content("{\"model\":\"meridian-assistant\",\"messages\":[{\"role\":\"user\",\"content\":\"hello\"}],\"stream\":true}"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
