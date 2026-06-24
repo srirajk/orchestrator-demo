@@ -222,10 +222,30 @@ public class ChatService {
                 return;
             }
 
+            // Use the JWT-verified principal if available; the JWT book claim is authoritative.
+            Principal principal = (jwtPrincipal != null)
+                    ? jwtPrincipal
+                    : principalStore.load(userId);
+
+            // Prune agents the principal is not permitted to invoke (domain + classification).
+            // Must happen BEFORE input synthesis so we never synthesize inputs for denied agents.
             List<AgentManifest> manifests = resolved.selected().stream()
                     .map(c -> c.manifest()).collect(Collectors.toList());
+            List<AgentManifest> allowedManifests = entitlementService.filterAgents(principal, manifests);
+            if (allowedManifests.isEmpty()) {
+                streamText(emitter, "You do not have access to any of the required services for this query.");
+                tracePublisher.publish(TraceEvent.of("request_complete", requestId,
+                        new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                return;
+            }
+            if (allowedManifests.size() < manifests.size()) {
+                log.info("Agent pruning: {}/{} agents allowed for principal={}",
+                        allowedManifests.size(), manifests.size(), principal.id());
+            }
+            final List<AgentManifest> finalManifests = allowedManifests;
+
             String entityPrompt = buildEntityPrompt(latestPrompt, session);
-            SynthesisResult synthesis = inputSynthesizer.synthesize(entityPrompt, manifests);
+            SynthesisResult synthesis = inputSynthesizer.synthesize(entityPrompt, finalManifests);
 
             if (synthesis.needsClarification() && synthesis.inputs().isEmpty()) {
                 streamText(emitter, synthesis.clarificationMessage()); return;
@@ -234,12 +254,6 @@ public class ChatService {
                 streamText(emitter, "Please specify the client name (e.g. 'Whitman Family Office')."); return;
             }
 
-            // Use the JWT-verified principal if available; the JWT book claim is authoritative.
-            // jwtPrincipal was captured on the servlet thread before the async boundary —
-            // ThreadLocal (RequestContext) is not visible here.
-            Principal principal = (jwtPrincipal != null)
-                    ? jwtPrincipal
-                    : principalStore.load(userId);
             String resolvedRelId = extractResolvedRelId(synthesis);
             if (resolvedRelId != null) {
                 EntitlementResult ent = entitlementService.checkRelationship(principal, resolvedRelId);
@@ -262,7 +276,7 @@ public class ChatService {
 
             List<PlanNode> nodes = synthesis.inputs().entrySet().stream()
                     .map(e -> {
-                        AgentManifest m = manifests.stream()
+                        AgentManifest m = finalManifests.stream()
                                 .filter(a -> a.agentId().equals(e.getKey())).findFirst().orElseThrow();
                         return new PlanNode(e.getKey(), m, e.getValue(), List.of());
                     }).collect(Collectors.toList());

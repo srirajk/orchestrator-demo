@@ -1,5 +1,6 @@
 package ai.meridian.gateway.domain.auth;
 
+import ai.meridian.gateway.registry.model.AgentManifest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -68,6 +69,34 @@ public class EntitlementService {
 
         log.debug("filterCovered: principal={} candidates={} allowed={} source={}",
                 principal.id(), candidateRelIds.size(), allowed.size(), batch.source());
+        return allowed;
+    }
+
+    /**
+     * Filters {@code manifests} to those the principal is entitled to invoke.
+     *
+     * <p><strong>One PDP call</strong> for all candidate agents — no N round-trips.
+     * Reasons for filtering: domain mismatch, data-classification clearance, or mutating agent.
+     */
+    public List<AgentManifest> filterAgents(Principal principal, List<AgentManifest> manifests) {
+        if (manifests == null || manifests.isEmpty()) return List.of();
+
+        CerbosEntitlementAdapter.BatchResult batch = cerbos.checkAgents(principal, manifests);
+
+        List<AgentManifest> allowed = manifests.stream()
+                .filter(m -> batch.isAllowed(m.agentId()))
+                .collect(Collectors.toList());
+
+        log.debug("filterAgents: principal={} candidates={} allowed={} source={}",
+                principal.id(), manifests.size(), allowed.size(), batch.source());
+
+        if (allowed.size() < manifests.size()) {
+            List<String> denied = manifests.stream()
+                    .map(AgentManifest::agentId)
+                    .filter(id -> !batch.isAllowed(id))
+                    .collect(Collectors.toList());
+            log.info("Agent access denied by PDP: principal={} denied={}", principal.id(), denied);
+        }
         return allowed;
     }
 

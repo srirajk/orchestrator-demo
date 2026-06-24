@@ -2,14 +2,77 @@ apiVersion: api.cerbos.dev/v1
 resourcePolicy:
   version: "default"
   resource: agent
+
+  # Resource attributes expected in each CheckResources call:
+  #   R.attr.domain              — "wealth-management" | "asset-servicing"
+  #   R.attr.is_mutating         — bool (read-only agents only allowed by default)
+  #   R.attr.data_classification — "confidential-pii" | "confidential" | "internal"
+  #
+  # Principal attributes set by CerbosEntitlementAdapter:
+  #   P.attr.segments       — ["wealth"], ["servicing"] — business segment membership
+  #   P.attr.domains        — ["wealth-private-banking", ...] — org domain membership
+  #   P.attr.admin_domains  — domains this principal administers
+  #   P.attr.clearance      — numeric clearance level (1–5)
+
   rules:
-    # All authenticated roles may invoke read-only agents if clearance is sufficient
+
+    # ── platform_admin: unrestricted across all domains and classifications ────────
+    - actions: ["invoke", "register", "deregister"]
+      effect: EFFECT_ALLOW
+      roles: ["platform_admin"]
+
+    # ── domain_admin: may invoke agents whose domain maps from their administered org-domain
+    #    wealth-private-banking / intl-wealth  →  wealth-management agents
+    #    servicing-ops                         →  asset-servicing agents
     - actions: ["invoke"]
       effect: EFFECT_ALLOW
-      roles: ["relationship_manager", "domain_admin", "platform_admin", "admin"]
+      roles: ["domain_admin"]
+      condition:
+        match:
+          any:
+            of:
+              # wealth-facing org domains → wealth-management agent domain
+              - expr: >
+                  !R.attr.is_mutating &&
+                  R.attr.domain == "wealth-management" &&
+                  P.attr.admin_domains.exists(d, d == "wealth-private-banking" || d == "intl-wealth")
+              # servicing-ops org domain → asset-servicing agent domain
+              - expr: >
+                  !R.attr.is_mutating &&
+                  R.attr.domain == "asset-servicing" &&
+                  P.attr.admin_domains.exists(d, d == "servicing-ops")
+
+    # ── domain_admin: may register/deregister agents in their administered domain ─
+    - actions: ["register", "deregister"]
+      effect: EFFECT_ALLOW
+      roles: ["domain_admin"]
+      condition:
+        match:
+          any:
+            of:
+              - expr: >
+                  R.attr.domain == "wealth-management" &&
+                  P.attr.admin_domains.exists(d, d == "wealth-private-banking" || d == "intl-wealth")
+              - expr: >
+                  R.attr.domain == "asset-servicing" &&
+                  P.attr.admin_domains.exists(d, d == "servicing-ops")
+
+    # ── relationship_manager: domain-scoped + data-classification gate ─────────
+    #    "wealth" segment → may invoke wealth-management agents
+    #    "servicing" segment → may invoke asset-servicing agents
+    #    confidential-pii requires clearance >= 2 (senior enough to see PII)
+    - actions: ["invoke"]
+      effect: EFFECT_ALLOW
+      roles: ["relationship_manager"]
       condition:
         match:
           all:
             of:
-              - expr: R.attr.is_mutating == false
-              - expr: int(P.attr.clearance) >= int(R.attr.required_clearance)
+              - expr: "!R.attr.is_mutating"
+              # Data-classification gate
+              - expr: >
+                  (R.attr.data_classification != "confidential-pii" || int(P.attr.clearance) >= 2)
+              # Domain access via segment membership
+              - expr: >
+                  (R.attr.domain == "wealth-management" && P.attr.segments.exists(s, s == "wealth")) ||
+                  (R.attr.domain == "asset-servicing"  && P.attr.segments.exists(s, s == "servicing"))

@@ -40,20 +40,36 @@ public class PrincipalStore {
 
     @PostConstruct
     void seedDemoPrincipals() {
-        seed("rm_jane",   List.of("relationship_manager"), List.of("REL-00042", "REL-00099"), 2);
-        seed("rm_okafor", List.of("relationship_manager"), List.of("REL-00188", "REL-00200"), 2);
-        seed("admin",     List.of("admin"),                List.of(),                         5);
-        log.info("PrincipalStore: demo principals seeded (rm_jane, rm_okafor, admin)");
+        // segments: business verticals the RM covers ("wealth", "servicing")
+        // domains:  org-unit memberships used for domain-scoped ABAC
+        // adminDomains: org-unit admin rights (domain_admin role only)
+        seed("rm_jane",   List.of("relationship_manager"), List.of("REL-00042", "REL-00099"), 2,
+                List.of("wealth"),    List.of("wealth-private-banking"), List.of());
+        seed("rm_okafor", List.of("relationship_manager"), List.of("REL-00188", "REL-00200"), 2,
+                List.of("servicing"), List.of("servicing-ops"),          List.of());
+        seed("rm_diaz",   List.of("relationship_manager"), List.of("REL-00300", "REL-00301"), 2,
+                List.of("servicing"), List.of("servicing-ops"),          List.of());
+        seed("da_wpb",    List.of("domain_admin"),         List.of(), 3,
+                List.of("wealth"),    List.of("wealth-private-banking"), List.of("wealth-private-banking"));
+        seed("admin",     List.of("platform_admin"),       List.of(), 5,
+                List.of("wealth", "servicing"),
+                List.of("wealth-private-banking", "intl-wealth", "servicing-ops"),
+                List.of("wealth-private-banking", "intl-wealth", "servicing-ops"));
+        log.info("PrincipalStore: demo principals seeded (rm_jane, rm_okafor, rm_diaz, da_wpb, admin)");
     }
 
-    private void seed(String userId, List<String> roles, List<String> book, int clearance) {
+    private void seed(String userId, List<String> roles, List<String> book, int clearance,
+                      List<String> segments, List<String> domains, List<String> adminDomains) {
         String key = KEY_PREFIX + userId;
         try {
             jedis.hset(key, Map.of(
-                    "id",        userId,
-                    "roles",     mapper.writeValueAsString(roles),
-                    "book",      mapper.writeValueAsString(book),
-                    "clearance", String.valueOf(clearance)
+                    "id",           userId,
+                    "roles",        mapper.writeValueAsString(roles),
+                    "book",         mapper.writeValueAsString(book),
+                    "clearance",    String.valueOf(clearance),
+                    "segments",     mapper.writeValueAsString(segments),
+                    "domains",      mapper.writeValueAsString(domains),
+                    "adminDomains", mapper.writeValueAsString(adminDomains)
             ));
         } catch (Exception e) {
             log.warn("PrincipalStore.seed failed for {}: {}", userId, e.getMessage());
@@ -88,10 +104,13 @@ public class PrincipalStore {
                 log.debug("PrincipalStore: no record for userId={}, using anonymous", userId);
                 return Principal.anonymous();
             }
-            List<String> roles = parseList(fields.get("roles"));
-            List<String> book  = parseList(fields.get("book"));
-            int clearance      = parseInt(fields.get("clearance"), 2);
-            return new Principal(userId, roles, book, clearance, List.of());
+            List<String> roles        = parseList(fields.get("roles"));
+            List<String> book         = parseList(fields.get("book"));
+            int          clearance    = parseInt(fields.get("clearance"), 2);
+            List<String> segments     = parseList(fields.get("segments"));
+            List<String> domains      = parseList(fields.get("domains"));
+            List<String> adminDomains = parseList(fields.get("adminDomains"));
+            return new Principal(userId, roles, book, clearance, adminDomains, segments, domains);
         } catch (Exception e) {
             log.warn("PrincipalStore.load failed for {}: {}", userId, e.getMessage());
             return Principal.anonymous();
@@ -100,14 +119,23 @@ public class PrincipalStore {
 
     /** Create or replace a principal's attributes. */
     public void upsert(String userId, List<String> roles, List<String> book, int clearance) {
+        upsert(userId, roles, book, clearance, List.of(), List.of(), List.of());
+    }
+
+    /** Create or replace a principal's attributes including domain membership. */
+    public void upsert(String userId, List<String> roles, List<String> book, int clearance,
+                       List<String> segments, List<String> domains, List<String> adminDomains) {
         try {
             jedis.hset(KEY_PREFIX + userId, Map.of(
-                    "id",        userId,
-                    "roles",     mapper.writeValueAsString(roles),
-                    "book",      mapper.writeValueAsString(book),
-                    "clearance", String.valueOf(clearance)
+                    "id",           userId,
+                    "roles",        mapper.writeValueAsString(roles),
+                    "book",         mapper.writeValueAsString(book),
+                    "clearance",    String.valueOf(clearance),
+                    "segments",     mapper.writeValueAsString(segments),
+                    "domains",      mapper.writeValueAsString(domains),
+                    "adminDomains", mapper.writeValueAsString(adminDomains)
             ));
-            log.info("PrincipalStore.upsert: userId={} book={}", userId, book);
+            log.info("PrincipalStore.upsert: userId={} segments={} domains={}", userId, segments, domains);
         } catch (Exception e) {
             log.warn("PrincipalStore.upsert failed for {}: {}", userId, e.getMessage());
         }

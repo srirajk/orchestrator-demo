@@ -168,6 +168,7 @@ public class SecurityConfig {
 
         copyListClaim(claims, claimsMap, "roles");
         copyListClaim(claims, claimsMap, "book");
+        copyListClaim(claims, claimsMap, "segments");
         copyListClaim(claims, claimsMap, "domains");
         copyListClaim(claims, claimsMap, "admin_domains");
         Object clearance = claims.getClaim("clearance");

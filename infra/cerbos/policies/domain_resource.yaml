@@ -1,0 +1,34 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: domain
+
+  # Governs administrative operations on an org-domain (e.g. "wealth-private-banking").
+  #
+  # Resource: domain ID matches the org-domain name (e.g. R.id == "wealth-private-banking")
+  # Principal attributes:
+  #   P.attr.admin_domains — org domains this caller administers
+  #   P.attr.domains       — org domains this caller is a member of
+
+  rules:
+
+    # ── platform_admin: full control over every domain ───────────────────────────
+    - actions: ["view", "create", "update", "delete", "manage_members", "add_member", "remove_member"]
+      effect: EFFECT_ALLOW
+      roles: ["platform_admin"]
+
+    # ── domain_admin: can view and manage membership in their own domains ────────
+    - actions: ["view", "manage_members", "add_member", "remove_member"]
+      effect: EFFECT_ALLOW
+      roles: ["domain_admin"]
+      condition:
+        match:
+          expr: P.attr.admin_domains.exists(d, d == R.id)
+
+    # ── relationship_manager: can view domains they belong to (read-only) ────────
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles: ["relationship_manager"]
+      condition:
+        match:
+          expr: P.attr.domains.exists(d, d == R.id)
