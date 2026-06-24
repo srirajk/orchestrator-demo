@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://meridian.dev/schemas/agent-manifest.schema.json",
+  "title": "Meridian Agent Manifest (domain-team submission)",
+  "description": "Canonical contract a domain team submits to register one agent. A2A-Agent-Card-aligned with gateway extensions (protocol, connection, constraints). Input/output schemas are DERIVED by the gateway via introspection and are NOT part of this submission. Validate submissions against this BEFORE introspection and storage.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["agent_id", "name", "description", "version", "provider", "domain", "protocol", "connection", "capabilities", "skills", "constraints"],
+  "properties": {
+    "agent_id": {
+      "type": "string",
+      "description": "Stable dotted identifier, e.g. acme.wealth.holdings",
+      "pattern": "^[a-z0-9]+(\\.[a-z0-9_]+)+$"
+    },
+    "name": { "type": "string", "minLength": 1 },
+    "description": { "type": "string", "minLength": 1 },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Semantic version, e.g. 1.0.0"
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["organization"],
+      "properties": {
+        "organization": { "type": "string", "minLength": 1 },
+        "contactEmail": { "type": "string" }
+      }
+    },
+    "domain": {
+      "type": "string",
+      "description": "Coarse business bucket the resolver narrows by. Demo uses two; extend for scale.",
+      "enum": ["wealth-management", "asset-servicing"]
+    },
+    "protocol": {
+      "type": "string",
+      "description": "Gateway extension: which adapter invokes this agent.",
+      "enum": ["http", "mcp", "a2a"]
+    },
+    "connection": {
+      "type": "object",
+      "description": "How to reach the agent. Required keys depend on protocol (see conditionals below)."
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["streaming"],
+      "properties": {
+        "streaming": { "type": "boolean" }
+      }
+    },
+    "securitySchemes": {
+      "type": "object",
+      "description": "Optional, OpenAPI-aligned auth declaration."
+    },
+    "skills": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "description", "tags", "examples"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "name": { "type": "string", "minLength": 1 },
+          "description": { "type": "string", "minLength": 1 },
+          "tags": {
+            "type": "array",
+            "description": "Structured/faceted discovery keys.",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "examples": {
+            "type": "array",
+            "description": "Representative prompts; embedded for semantic routing. At least 3.",
+            "minItems": 3,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "inputModes": { "type": "array", "items": { "type": "string" } },
+          "outputModes": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Scope-of-authority and operational limits.",
+      "required": ["is_mutating", "data_classification", "sla_timeout_ms"],
+      "properties": {
+        "is_mutating": {
+          "type": "boolean",
+          "description": "Phase 1 agents MUST be false; the resolver/entitlement layer enforces read-only."
+        },
+        "data_classification": {
+          "type": "string",
+          "enum": ["public", "internal", "confidential", "confidential-pii"]
+        },
+        "sla_timeout_ms": { "type": "integer", "minimum": 100, "maximum": 60000 },
+        "rate_limit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["requests", "per_seconds"],
+          "properties": {
+            "requests": { "type": "integer", "minimum": 1 },
+            "per_seconds": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "protocol": { "const": "http" } } },
+      "then": {
+        "properties": {
+          "connection": {
+            "required": ["openapi_url", "operation_id"],
+            "properties": {
+              "openapi_url": { "type": "string" },
+              "operation_id": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "protocol": { "const": "mcp" } } },
+      "then": {
+        "properties": {
+          "connection": {
+            "required": ["server_url", "tool"],
+            "properties": {
+              "server_url": { "type": "string" },
+              "tool": { "type": "string" },
+              "transport": { "type": "string", "enum": ["sse", "stdio"], "default": "sse" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "protocol": { "const": "a2a" } } },
+      "then": {
+        "properties": {
+          "connection": {
+            "required": ["agent_card_url"],
+            "properties": { "agent_card_url": { "type": "string" } }
+          }
+        }
+      }
+    }
+  ]
+}
