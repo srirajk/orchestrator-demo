@@ -1,13 +1,13 @@
 """
-Asset Servicing MCP server — Domain 2 mock agent.
+Asset Servicing MCP server — Domain 2 mock agents.
 Exposes 5 tools over SSE transport via FastMCP.
 
-Tools registered:
-  get_custody_positions   (relationship_id)
-  get_settlements         (relationship_id)
-  get_corporate_actions   (relationship_id)
-  get_nav                 (fund_id)          ← keyed by fund, not relationship
-  get_cash                (relationship_id)
+Agent layout (each agent in its own top-level subfolder):
+  servicing/settlements/          → get_settlements
+  servicing/corporate_actions/    → get_corporate_actions (RAG-augmented)
+  servicing/custody/              → get_custody_positions
+  servicing/nav/                  → get_nav  (keyed by fund_id, not relationship_id)
+  servicing/cash/                 → get_cash
 
 Fault knobs (env vars, set in docker-compose for resilience tests):
   MCP_FAULT_TOOL=get_settlements   → that tool returns an error
@@ -17,15 +17,17 @@ Fault knobs (env vars, set in docker-compose for resilience tests):
 The gateway's McpAdapter connects to: http://servicing:8082/sse
 """
 
+import sys
+import os
+sys.path.insert(0, os.path.dirname(__file__))
+
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
-from tools import (
-    get_custody_positions as _get_custody_positions,
-    get_settlements as _get_settlements,
-    get_corporate_actions as _get_corporate_actions,
-    get_nav as _get_nav,
-    get_cash as _get_cash,
-)
+from settlements.tool import get_settlements as _get_settlements
+from corporate_actions.tool import get_corporate_actions as _get_corporate_actions
+from custody.tool import get_custody_positions as _get_custody_positions
+from nav.tool import get_nav as _get_nav
+from cash.tool import get_cash as _get_cash
 
 # Disable DNS-rebinding protection: this server runs inside Docker and is only
 # reachable by the gateway service — cross-container Host headers (e.g.
@@ -33,8 +35,9 @@ from tools import (
 mcp = FastMCP(
     "Meridian Asset Servicing",
     instructions=(
-        "Asset Servicing domain agent for the Meridian demo bank. "
-        "Returns canned custody, settlement, corporate action, NAV, and cash data. "
+        "Asset Servicing domain agents for the Meridian demo bank. "
+        "Each agent lives in its own subfolder with schema, prompts, OTel spans, "
+        "and (for corporate_actions) a RAG knowledge base. "
         "Fault knobs are controlled via env vars."
     ),
     transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
@@ -72,13 +75,13 @@ def get_settlements(relationship_id: str) -> str:
 @mcp.tool()
 def get_corporate_actions(relationship_id: str) -> str:
     """
-    Get upcoming corporate actions (dividends, splits, rights) for a relationship.
+    Get upcoming corporate actions (dividends, splits, rights) with regulatory context for a relationship.
 
     Args:
         relationship_id: Unique relationship identifier (e.g. REL-00042)
 
     Returns:
-        JSON: upcoming_actions[], as_of_date
+        JSON: upcoming_actions[], regulatory_context[], as_of_date
     """
     return _get_corporate_actions(relationship_id)
 
@@ -88,7 +91,6 @@ def get_nav(fund_id: str) -> str:
     """
     Get the latest Net Asset Value (NAV) for a fund.
     Note: keyed by fund_id, NOT relationship_id — this is intentional.
-    The hero prompt does NOT include NAV because the hero uses relationship_id.
 
     Args:
         fund_id: Fund identifier (e.g. FND-7781)
@@ -120,7 +122,12 @@ if __name__ == "__main__":
     from starlette.routing import Route, Mount
 
     async def health(request):
-        return JSONResponse({"status": "ok", "service": "servicing-mcp", "version": "0.2.0"})
+        return JSONResponse({
+            "status": "ok",
+            "service": "servicing-mcp",
+            "version": "0.3.0",
+            "agents": ["settlements", "corporate_actions", "custody", "nav", "cash"],
+        })
 
     app = Starlette(routes=[
         Route("/health", health),

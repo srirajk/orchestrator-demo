@@ -260,6 +260,24 @@ services:
       - gateway
     restart: unless-stopped
 
+  # ── Arize Phoenix — LLM observability: traces, evals, agent experiments ──────
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    container_name: meridian-phoenix
+    ports:
+      - "6006:6006"   # Phoenix UI + OTLP/HTTP /v1/traces receiver
+    environment:
+      PHOENIX_WORKING_DIR: /phoenix
+    volumes:
+      - phoenix-data:/phoenix
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:6006/')"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
   # ── k6 load test — Phase 7 only (scale profile) ───────────────────────────────
 
   k6:
@@ -279,3 +297,4 @@ volumes:
   librechat-images:
   grafana-data:
   tempo-data:
+  phoenix-data:
