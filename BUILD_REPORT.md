@@ -2,6 +2,79 @@
 
 ---
 
+## PHASE 11 COMPLETE — Cerbos as authoritative PDP + JWT algorithm-confusion guards + trace persistence; 32/32 tests pass; policy-flip proven live
+
+### Phase 11 — Run the test steps below, then reply "proceed to Phase 12"
+
+**Test 1 — Cerbos is the authoritative PDP (run policy-flip proof)**
+```bash
+# 1a. Get rm_jane token (book: REL-00042, REL-00099 — NOT REL-00188)
+TOKEN=$(curl -s -X POST http://localhost:8084/auth/token \
+  -H "Content-Type: application/json" -d '{"user_id":"rm_jane"}' | jq -r '.access_token')
+
+# 1b. Ask about Okafor (REL-00188) — expect "Access denied" in the stream
+curl -s -X POST http://localhost:8080/v1/chat/completions \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+  -d '{"model":"meridian-assistant","messages":[{"role":"user","content":"portfolio holdings for REL-00188 Okafor Family Trust"}],"stream":false}' \
+  | grep -o '"content":"[^"]*"' | head -3
+# Expected: "Access", " ", "denied:"
+```
+
+**Test 2 — JWT algorithm-confusion rejection**
+```bash
+# Forge an alg=none token (empty signature) and verify 401
+HEADER=$(echo -n '{"alg":"none","kid":"test-key-1"}' | python3 -c "import sys,base64; print(base64.urlsafe_b64encode(sys.stdin.buffer.read()).rstrip(b'=').decode())")
+PAYLOAD=$(echo -n '{"sub":"attacker","roles":["platform_admin"],"iss":"meridian-user-mgmt","aud":"meridian-gateway","exp":9999999999}' | python3 -c "import sys,base64; print(base64.urlsafe_b64encode(sys.stdin.buffer.read()).rstrip(b'=').decode())")
+ALG_NONE_TOKEN="$HEADER.$PAYLOAD."
+curl -s -o /dev/null -w "HTTP %{http_code}\n" -X POST http://localhost:8080/v1/chat/completions \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $ALG_NONE_TOKEN" \
+  -d '{"model":"meridian-assistant","messages":[{"role":"user","content":"hi"}],"stream":false}'
+# Expected: HTTP 401
+```
+
+**Test 3 — Trace persistence (replay past request)**
+```bash
+# Send a request with a custom conversation ID
+CONV_ID="manual-test-conv-$(date +%s)"
+TOKEN=$(curl -s -X POST http://localhost:8084/auth/token \
+  -H "Content-Type: application/json" -d '{"user_id":"rm_jane"}' | jq -r '.access_token')
+curl -s -X POST http://localhost:8080/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "X-Conversation-Id: $CONV_ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"model":"meridian-assistant","messages":[{"role":"user","content":"Show me Whitman Family Office holdings REL-00042"}],"stream":false}' > /dev/null
+
+sleep 2
+# Retrieve conversation history
+curl -s "http://localhost:8080/trace/history?conversationId=$CONV_ID" | jq .
+# Expected: {"conversationId":"...","count":1,"requestIds":["..."]}
+
+# Retrieve events for that request
+REQ_ID=$(curl -s "http://localhost:8080/trace/history?conversationId=$CONV_ID" | jq -r '.requestIds[0]')
+curl -s "http://localhost:8080/trace/$REQ_ID" | jq '[.[] | .type]'
+# Expected: ["request_start","intent_classified","agents_resolved","entitlement_check","agent_start",...,"request_complete"]
+```
+
+---
+
+**What was built in Phase 11:**
+
+| Step | Deliverable | Status |
+|------|------------|--------|
+| Step 0 | JWT algorithm-confusion tests (`algNone_rejected`, `algHS256_rejected`) in `JwtAuthFilterTest` | ✅ DONE |
+| Step 1 | `CerbosEntitlementAdapter` — batched `CheckResources` call (1 PDP round-trip for N relationships); `EntitlementService` rewritten to delegate; `source` field ("cerbos"\|"local-fallback") in results | ✅ DONE |
+| Step 1 | Cerbos policies updated for `platform_admin` (unrestricted) and `domain_admin` (book-scoped) | ✅ DONE |
+| Step 1 | Policy-flip test: removed book condition → rm_jane allowed REL-00188; reverted → denied again. Cerbos is authoritative. | ✅ PROVEN |
+| Step 2 | Role-based endpoint authorization (Phase 10 carry-forward) | ✅ DONE (Phase 10) |
+| Step 3 | `TraceStorageAdapter` + `RedisTraceStorageAdapter` (list per requestId + sorted set per convId); `TraceEventPublisher` wired to persist every event; `GET /trace/{requestId}` + `GET /trace/history?conversationId=X` endpoints | ✅ DONE |
+
+**Test results:**
+- Gateway unit tests: **32/32 PASS**
+- Live policy-flip: DENY → ALLOW (flip) → DENY (revert) ✅
+- Live trace persistence: 17 events stored and retrieved for test request ✅
+
+---
+
 ## PHASE 10 COMPLETE — role-based authorization + declarative org seed; 30/30 gateway tests pass; 7/7 live authz checks pass
 
 ### Phase 10 — Run the test steps below, then reply "proceed to Phase 11"
