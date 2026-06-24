@@ -43,6 +43,11 @@ meridian:
   resolver:
     confidence-floor: 0.30   # cosine similarity floor; multi-topic queries naturally score lower
     top-k: 10
+  llm:
+    base-url: ${MERIDIAN_LLM_BASE_URL:https://api.z.ai/api/paas/v4}
+    api-key: ${ZAI_API_KEY:}
+    synthesis-model: ${MERIDIAN_LLM_SYNTHESIS_MODEL:glm-4.5-flash}
+    extraction-model: ${MERIDIAN_LLM_EXTRACTION_MODEL:glm-4.5-flash}
 
 logging:
   pattern:

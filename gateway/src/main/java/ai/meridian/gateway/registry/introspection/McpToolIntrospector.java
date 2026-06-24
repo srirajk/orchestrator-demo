@@ -41,6 +41,7 @@ public class McpToolIntrospector {
     public McpToolIntrospector(ObjectMapper mapper) {
         this.mapper = mapper;
         this.httpClient = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)  // FastMCP/uvicorn returns 421 on HTTP/2
                 .connectTimeout(TIMEOUT)
                 .build();
     }

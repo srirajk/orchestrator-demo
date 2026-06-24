@@ -18,6 +18,7 @@ The gateway's McpAdapter connects to: http://servicing:8082/sse
 """
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 from tools import (
     get_custody_positions as _get_custody_positions,
     get_settlements as _get_settlements,
@@ -26,6 +27,9 @@ from tools import (
     get_cash as _get_cash,
 )
 
+# Disable DNS-rebinding protection: this server runs inside Docker and is only
+# reachable by the gateway service — cross-container Host headers (e.g.
+# "servicing-mcp:8082") would otherwise be rejected with HTTP 421.
 mcp = FastMCP(
     "Meridian Asset Servicing",
     instructions=(
@@ -33,6 +37,7 @@ mcp = FastMCP(
         "Returns canned custody, settlement, corporate action, NAV, and cash data. "
         "Fault knobs are controlled via env vars."
     ),
+    transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
 )
 
 

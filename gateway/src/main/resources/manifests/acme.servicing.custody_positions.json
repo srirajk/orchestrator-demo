@@ -22,20 +22,30 @@
       "id": "get_custody_positions",
       "name": "get_custody_positions",
       "description": "Retrieve holdings broken down by custodian for a given asset servicing relationship.",
-      "tags": ["custody", "positions", "custodian", "holdings", "asset-servicing"],
+      "tags": [
+        "custody",
+        "positions",
+        "custodian",
+        "holdings",
+        "asset-servicing"
+      ],
       "examples": [
         "custody holdings for the relationship",
         "what's held at the custodian",
         "custody positions for this account",
         "where are these assets custodied"
       ],
-      "inputModes": ["application/json"],
-      "outputModes": ["application/json"]
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
     }
   ],
   "constraints": {
     "is_mutating": false,
     "data_classification": "confidential",
-    "sla_timeout_ms": 2500
+    "sla_timeout_ms": 10000
   }
 }

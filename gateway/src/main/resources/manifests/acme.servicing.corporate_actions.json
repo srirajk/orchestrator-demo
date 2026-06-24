@@ -22,20 +22,30 @@
       "id": "get_corporate_actions",
       "name": "get_corporate_actions",
       "description": "Retrieve upcoming corporate actions including dividends, splits, and elections due for a given asset servicing relationship.",
-      "tags": ["corporate-actions", "dividends", "splits", "elections", "asset-servicing"],
+      "tags": [
+        "corporate-actions",
+        "dividends",
+        "splits",
+        "elections",
+        "asset-servicing"
+      ],
       "examples": [
         "upcoming corporate actions",
         "any dividends or splits coming up",
         "elections due on this account",
         "corporate action calendar for the relationship"
       ],
-      "inputModes": ["application/json"],
-      "outputModes": ["application/json"]
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
     }
   ],
   "constraints": {
     "is_mutating": false,
     "data_classification": "confidential",
-    "sla_timeout_ms": 2500
+    "sla_timeout_ms": 10000
   }
 }

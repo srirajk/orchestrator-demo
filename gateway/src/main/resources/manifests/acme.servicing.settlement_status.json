@@ -22,7 +22,13 @@
       "id": "get_settlements",
       "name": "get_settlements",
       "description": "Retrieve pending and failed trade settlements for a given asset servicing relationship.",
-      "tags": ["settlements", "pending", "failed-trades", "trade-status", "asset-servicing"],
+      "tags": [
+        "settlements",
+        "pending",
+        "failed-trades",
+        "trade-status",
+        "asset-servicing"
+      ],
       "examples": [
         "any pending settlements on this account",
         "failed trades for the relationship",
@@ -33,13 +39,17 @@
         "show me pending and failed settlements for this relationship",
         "settlement activity and trade status across wealth and servicing"
       ],
-      "inputModes": ["application/json"],
-      "outputModes": ["application/json"]
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
     }
   ],
   "constraints": {
     "is_mutating": false,
     "data_classification": "confidential",
-    "sla_timeout_ms": 2500
+    "sla_timeout_ms": 10000
   }
 }

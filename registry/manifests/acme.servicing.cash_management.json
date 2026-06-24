@@ -22,20 +22,30 @@
       "id": "get_cash",
       "name": "get_cash",
       "description": "Retrieve cash balances and projected cash positions for a given asset servicing relationship.",
-      "tags": ["cash", "liquidity", "balances", "projected-cash", "asset-servicing"],
+      "tags": [
+        "cash",
+        "liquidity",
+        "balances",
+        "projected-cash",
+        "asset-servicing"
+      ],
       "examples": [
         "cash position for the relationship",
         "projected cash for this account",
         "available cash balances",
         "liquidity on the Whitman account"
       ],
-      "inputModes": ["application/json"],
-      "outputModes": ["application/json"]
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
     }
   ],
   "constraints": {
     "is_mutating": false,
     "data_classification": "confidential",
-    "sla_timeout_ms": 2500
+    "sla_timeout_ms": 10000
   }
 }

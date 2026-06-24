@@ -49,7 +49,7 @@ public class ChatCompletionsController {
             log.debug("Detected auto-title request — short-circuiting");
             CompletableFuture.runAsync(() -> chatService.streamTitle(emitter));
         } else {
-            CompletableFuture.runAsync(() -> chatService.streamPlaceholderResponse(emitter));
+            CompletableFuture.runAsync(() -> chatService.handleChat(request, emitter));
         }
 
         return emitter;
