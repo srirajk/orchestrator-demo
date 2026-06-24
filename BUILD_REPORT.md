@@ -2,6 +2,42 @@
 
 ---
 
+## PHASE 9 COMPLETE — identity/authz correctness verified; all 21 gateway tests + 25 Playwright E2E tests pass
+
+---
+
+## Phase 9 — Identity, Authorization & Correlation Correctness
+
+### What was fixed
+
+| # | Item | Status |
+|---|------|--------|
+| ★ 1 | **JWT drives authz (flip test)** — principal captured on servlet thread before `CompletableFuture.runAsync()`; JWT book claim now authoritative across the async boundary | ✅ |
+| ★ 2 | **Verifier rejects forgeries** — 21 unit tests covering wrong-key, expired, wrong-aud/iss, tampered payload, missing token | ✅ |
+| ★ 3 | **One conversation ID** — `X-Conversation-Id` header from LibreChat forwarded and used; `librechat.yaml` updated | ✅ |
+| ★ 4 | **One trace ID** — OTel `trace_id` used as single correlation key in logs + glass-box (no more `req-...`) | ✅ |
+| 5 | **Glass-box shows skipped agents** — below-threshold candidates (nav, etc.) emitted as `FilteredRef` in `agents_resolved` event | ✅ |
+| 6 | **Entitlement honesty** — `anonymous()` now has empty book; no-token callers cannot see Whitman data | ✅ |
+| 7 | **Entity resolver corrected** — "okafor" → `REL-00188` (correct ID); denial now comes from JWT book, not a permanently-unmatchable ID | ✅ |
+| 8 | **Hygiene** — "tax lots" removed from clarify message; test assertions updated to correct spelling | ✅ |
+
+### Flip test (live, confirmed)
+```
+Without REL-00188 in JWT:  denied ✓   ("Access denied: you are not authorized to view relationship REL-00188")
+With    REL-00188 in JWT:  allowed ✓  ("# Complete Portfolio for REL-00188 Okafor Family Trust…")
+```
+
+### Test matrix
+- **Gateway unit tests:** 21/21 PASS (JwtAuthFilterTest: 10, AuthzFromMembershipTest: 8, GatewayApplicationTests: 3)
+- **Playwright E2E:** 25/25 PASS (all 6 spec files against live LibreChat + gateway stack)
+
+### Production seams (documented, not built for demo)
+- **M16 per-hop verification:** agents (FastAPI/MCP) currently trust the gateway; each agent would need to verify the JWT signature itself before serving.
+- **OIDC redirect login:** full authorization-code flow with Keycloak or a hardened hand-rolled provider; LibreChat configured to redirect to the IdP.
+- **Key rotation:** automated RSA key rotation with JWKS TTL-based cache invalidation in the gateway.
+
+---
+
 ## PHASE 8 (M15) COMPLETE — run the human test steps below, then reply "proceed to M16"
 
 ---
