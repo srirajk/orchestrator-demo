@@ -2,6 +2,145 @@
 
 ---
 
+## PHASE 8 (M15) COMPLETE — run the human test steps below, then reply "proceed to M16"
+
+---
+
+## Phase 8 — Identity, Domains & End-to-End Authorization
+
+### M15 — Core identity + domain-driven authz ✅ COMPLETE
+
+#### Built
+
+| Component | What changed |
+|-----------|-------------|
+| **user-mgmt RS256** | JWT signing upgraded HS256 → RS256 (python-jose, 2048-bit RSA) |
+| **JWKS endpoint** | `GET http://localhost:8084/.well-known/jwks.json` — RSA public key for gateway |
+| **Domain model** | CRUD: `/domains`, `/domains/{id}/members`, `/users/{id}/domains` |
+| **Seed domains** | `wealth-private-banking` (rm_jane, rm_chen; REL-00042, REL-00099) · `intl-wealth` (rm_okafor; REL-00188, REL-00200) |
+| **JWT book derivation** | Token `book` claim = union of domain's relationships, not a hardcoded seed list |
+| **JwtAuthFilter** | `@Order(0)` Spring filter — verifies RS256 signature + `exp` + `iss` + `aud`; 401 on any failure |
+| **JwksClient** | Fetches + caches RSA public key from user-mgmt (5-min TTL); `@MockBean`-able in tests |
+| **RequestContext** | `ThreadLocal<Principal>` — JWT-derived principal set per-request, cleared in `finally` |
+| **Principal.fromJwtClaims** | Maps `sub`, `roles`, `book`, `clearance` from verified JWT claims |
+| **PrincipalStore** | JWT-verified principal takes precedence over Redis lookup |
+| **LibreChat** | Forwards `X-User-Id: rm_jane` (trusted internal hop for M15; OIDC in M16) |
+
+#### Automated test results
+
+```
+Gateway (JUnit + MockMvc):
+  JwtAuthFilterTest    10/10: wrong-sig·expired·wrong-iss·wrong-aud·unknown-kid·tampered·missing → 401; valid → 200
+  AuthzFromMembershipTest  8/8: JWT→Principal mapping, book derivation, EntitlementService unit checks
+  GatewayApplicationTests   3/3: existing smoke tests
+  TOTAL: 21/21 PASS
+
+user-mgmt (pytest):
+  test_user_mgmt.py  29/29: JWKS structure, RS256 sign+verify, domain CRUD, membership effects
+  TOTAL: 29/29 PASS
+```
+
+#### Live verification
+```bash
+# Valid RS256 token → 200
+TOKEN=$(curl -s -X POST localhost:8084/auth/token -d '{"user_id":"rm_jane"}' -H Content-Type:application/json | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
+curl -s -o /dev/null -w "%{http_code}" -X POST localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer $TOKEN" -H Content-Type:application/json \
+  -d '{"model":"meridian-assistant","messages":[{"role":"user","content":"hello"}],"stream":false}'
+# → 200
+
+# Tampered token → 401
+curl -s -X POST localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer eyJhbGciOiJSUzI1NiJ9.invalid.sig" \
+  -d '{"model":"meridian-assistant","messages":[{"role":"user","content":"x"}]}'
+# → {"error":"unauthorized","reason":"signature verification failed"}
+
+# Domain membership → book update
+curl -X POST localhost:8084/domains/intl-wealth/members -d '{"user_id":"rm_jane"}'
+# → {"added":true}
+# New token now contains REL-00188 in book → entitlement check passes
+```
+
+---
+
+### M15 Human Test Steps
+
+**Prerequisites:** `docker compose up -d` — all containers healthy.
+
+**Step 1 — Hero prompt as rm_jane (trusted internal hop):**
+1. Open LibreChat at `http://localhost:3080`
+2. Type the hero prompt: *"Show me the complete picture for the Whitman Family Office account — holdings, performance, risk profile, settlement status, and cash position"*
+3. ✅ Expect: streamed answer with grounded numbers
+
+**Step 2 — Okafor denial via JWT book:**
+```bash
+# Issue rm_jane's token (book = REL-00042, REL-00099 only)
+TOKEN=$(curl -s -X POST localhost:8084/auth/token \
+  -H Content-Type:application/json -d '{"user_id":"rm_jane"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+
+# Ask about Okafor — denied because REL-00188 not in book
+curl -s -X POST localhost:8080/v1/chat/completions \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+  -d '{"model":"meridian-assistant","messages":[{"role":"user","content":"Show me holdings for the Okafor Family Trust REL-00188"}],"stream":false}'
+# ✅ Expect: "Access denied: you are not authorised to view relationship REL-00188"
+```
+
+**Step 3 — Add rm_jane to Okafor domain → access flips to allowed:**
+```bash
+# Admin adds rm_jane to intl-wealth domain
+curl -s -X POST localhost:8084/domains/intl-wealth/members \
+  -H Content-Type:application/json -d '{"user_id":"rm_jane"}'
+# → {"added":true}
+
+# Issue new token — book now includes REL-00188 (derived from domain)
+NEW_TOKEN=$(curl -s -X POST localhost:8084/auth/token \
+  -H Content-Type:application/json -d '{"user_id":"rm_jane"}' \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['access_token'])")
+
+# Same request — now allowed
+curl -s -X POST localhost:8080/v1/chat/completions \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $NEW_TOKEN" \
+  -d '{"model":"meridian-assistant","messages":[{"role":"user","content":"Show me holdings for Okafor Family Trust REL-00188"}],"stream":false}'
+# ✅ Expect: portfolio data returned (no denial)
+
+# Reset
+curl -X DELETE localhost:8084/domains/intl-wealth/members/rm_jane
+```
+
+**Step 4 — Live rejection (tampered token → 401):**
+```bash
+curl -s localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer eyJhbGciOiJSUzI1NiJ9.tampered.signature" \
+  -d '{"model":"meridian-assistant","messages":[{"role":"user","content":"x"}]}'
+# ✅ Expect: HTTP 401, {"error":"unauthorized","reason":"..."}
+```
+
+**Step 5 — Admin creates a new domain + member:**
+```bash
+curl -s -X POST localhost:8084/domains \
+  -H Content-Type:application/json \
+  -d '{"id":"test-domain","name":"Test Domain","relationships":["REL-00300"]}'
+curl -s -X POST localhost:8084/domains/test-domain/members \
+  -H Content-Type:application/json -d '{"user_id":"rm_chen"}'
+# Issue token for rm_chen — should contain REL-00300 in book
+curl -s -X POST localhost:8084/auth/token \
+  -H Content-Type:application/json -d '{"user_id":"rm_chen"}' \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print('book:', d['user']['book'], 'derived_book:', d.get('derived_book'))"
+# ✅ Expect: REL-00300 in book (derived from test-domain membership)
+```
+
+---
+
+### Production seam (documented, not built for demo)
+The production path from M15 → enterprise-grade:
+1. **Key rotation:** RS256 keypair in a secrets manager (Vault/AWS KMS); JWKS endpoint serves multiple kids; gateway and agents accept any valid kid and fall back on cache miss
+2. **Short-lived tokens + refresh:** 15-min access tokens; secure HttpOnly refresh token; silent renewal in the client
+3. **OIDC federation:** user-mgmt replaced by (or fronted with) the bank's IdP (Keycloak SAML bridge → OIDC provider); domain/member data flows from LDAP/AD groups
+4. **Agent-to-agent JWT:** service account tokens (client_credentials flow) for gateway → agent calls; each agent verifies the gateway's service token (M16 completes this)
+
+---
+
 ## PHASE 4 COMPLETE — run the human test steps in Phase 4 section, then reply "proceed to Phase 5".
 
 > **Status (2026-06-24):** Phases 1, 2, 3 done and verified live.
