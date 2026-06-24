@@ -1,6 +1,6 @@
 services:
 
-  # ── State & search ───────────────────────────────────────────────────────────
+  # ── State ─────────────────────────────────────────────────────────────────────
 
   redis-stack:
     image: redis/redis-stack-server:7.4.0-v3
@@ -30,7 +30,58 @@ services:
       retries: 10
     restart: unless-stopped
 
-  # ── Gateway (the thing we're building) ───────────────────────────────────────
+  # ── Observability stack (always-on — user wants full Grafana/OTel from the start) ──
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: meridian-otel
+    volumes:
+      - ./infra/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "8889:8889"   # Prometheus metrics scrape endpoint
+    restart: unless-stopped
+
+  tempo:
+    image: grafana/tempo:2.6.1
+    container_name: meridian-tempo
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./infra/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - "3200:3200"   # Tempo HTTP query API
+      - "4319:4317"   # OTLP gRPC (host port offset to avoid conflict)
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: meridian-prometheus
+    volumes:
+      - ./infra/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    container_name: meridian-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: meridian
+      GF_SECURITY_ADMIN_USER: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+      - tempo
+    restart: unless-stopped
+
+  # ── Gateway (Java/Spring Boot — the thing we're building) ────────────────────
 
   gateway:
     build:
@@ -43,6 +94,10 @@ services:
       ZAI_API_KEY: ${ZAI_API_KEY}
       SPRING_DATA_REDIS_HOST: redis-stack
       SPRING_DATA_REDIS_PORT: 6379
+      # OTel export endpoint (within compose network)
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      MANAGEMENT_OTLP_TRACING_ENDPOINT: http://otel-collector:4318/v1/traces
+      MANAGEMENT_OTLP_METRICS_EXPORT_URL: http://otel-collector:4318/v1/metrics
     depends_on:
       redis-stack:
         condition: service_healthy
@@ -54,23 +109,43 @@ services:
       start_period: 30s
     restart: unless-stopped
 
-  # ── Mock agents (placeholder for Phase 1; full impl in Phase 2) ─────────────
+  # ── Mock agents (Domain 1: Wealth HTTP / Domain 2: Asset Servicing MCP) ──────
 
-  mock-agents:
+  wealth-http:
     build:
-      context: ./mock-agents
+      context: ./mock-agents/wealth
       dockerfile: Dockerfile
-    container_name: meridian-mock-agents
+    container_name: meridian-wealth-http
     ports:
-      - "8090:8090"
+      - "8081:8081"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/health')"]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
 
-  # ── Chat UI (LibreChat — config + cosmetic only; no code fork) ───────────────
+  servicing-mcp:
+    build:
+      context: ./mock-agents/servicing
+      dockerfile: Dockerfile
+    container_name: meridian-servicing-mcp
+    ports:
+      - "8082:8082"
+    environment:
+      # Fault knobs — override in tests; defaults leave all tools healthy
+      MCP_FAULT_TOOL: ""
+      MCP_FAULT_ALL: "false"
+      MCP_FAULT_DELAY_MS: "0"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8082/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    restart: unless-stopped
+
+  # ── Chat UI (LibreChat — config + cosmetic only; no code fork) ────────────────
 
   librechat:
     image: registry.librechat.ai/danny-avila/librechat-dev:latest
@@ -81,22 +156,16 @@ services:
       HOST: "0.0.0.0"
       PORT: "3080"
       MONGO_URI: "mongodb://mongodb:27017/LibreChat"
-      # Disable Meilisearch — the demo doesn't need conversation search
       SEARCH: "false"
       MEILI_NO_ANALYTICS: "true"
-      # Auth
       JWT_SECRET: ${JWT_SECRET:-meridian-demo-jwt-secret-change-in-production}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-meridian-demo-jwt-refresh-secret-change-in-production}
-      # Open registration so the tester can sign up without an invite
       ALLOW_REGISTRATION: "true"
       ALLOW_SOCIAL_LOGIN: "false"
       NO_INDEX: "true"
     volumes:
-      # LibreChat reads its runtime config from /app/.env on startup
       - ./.env:/app/.env:ro
-      # Our custom endpoint + UI config
       - ./librechat/librechat.yaml:/app/librechat.yaml:ro
-      # Persist uploaded files and conversation images
       - librechat-uploads:/app/uploads
       - librechat-images:/app/client/public/images
     depends_on:
@@ -112,50 +181,22 @@ services:
       start_period: 45s
     restart: unless-stopped
 
-  # ── Glass-box (standalone SSE trace dashboard — Phase 5 / M9) ───────────────
-  # Placeholder: the real single-page HTML/JS panel is built in Phase 5.
-  # Uncomment and replace with the real glassbox service then.
-  #
+  # ── Glass-box — built in Phase 5 / M9; placeholder commented out ─────────────
   # glassbox:
   #   build: ./glassbox
-  #   ports:
-  #     - "4000:4000"
+  #   ports: ["4000:4000"]
 
-  # ── Scale profile (M14 only — Prometheus, Grafana, k6) ──────────────────────
-  # These services start only with: docker compose --profile scale up -d
+  # ── k6 load test — Phase 7 only (scale profile) ───────────────────────────────
 
-  otel-collector:
-    image: otel/opentelemetry-collector-contrib:latest
-    container_name: meridian-otel
+  k6:
+    image: grafana/k6:latest
+    container_name: meridian-k6
     profiles: [scale]
     volumes:
-      - ./infra/otel-collector.yaml:/etc/otelcol/config.yaml:ro
-    ports:
-      - "4317:4317"   # gRPC
-      - "4318:4318"   # HTTP
-    restart: unless-stopped
-
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: meridian-prometheus
-    profiles: [scale]
-    volumes:
-      - ./infra/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-    ports:
-      - "9090:9090"
-    restart: unless-stopped
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: meridian-grafana
-    profiles: [scale]
-    ports:
-      - "3000:3000"
+      - ./loadtest:/scripts
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: meridian
-    volumes:
-      - grafana-data:/var/lib/grafana
-    restart: unless-stopped
+      K6_OUT: "experimental-prometheus-rw=http://prometheus:9090/api/v1/write"
+    command: run /scripts/load-test.js
 
 volumes:
   redis-data:
@@ -163,3 +204,4 @@ volumes:
   librechat-uploads:
   librechat-images:
   grafana-data:
+  tempo-data:

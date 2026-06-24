@@ -1,0 +1,125 @@
+"""
+Asset Servicing MCP server — Domain 2 mock agent.
+Exposes 5 tools over SSE transport via FastMCP.
+
+Tools registered:
+  get_custody_positions   (relationship_id)
+  get_settlements         (relationship_id)
+  get_corporate_actions   (relationship_id)
+  get_nav                 (fund_id)          ← keyed by fund, not relationship
+  get_cash                (relationship_id)
+
+Fault knobs (env vars, set in docker-compose for resilience tests):
+  MCP_FAULT_TOOL=get_settlements   → that tool returns an error
+  MCP_FAULT_ALL=true               → all tools fail
+  MCP_FAULT_DELAY_MS=500           → inject latency (ms) to every call
+
+The gateway's McpAdapter connects to: http://servicing:8082/sse
+"""
+
+from mcp.server.fastmcp import FastMCP
+from tools import (
+    get_custody_positions as _get_custody_positions,
+    get_settlements as _get_settlements,
+    get_corporate_actions as _get_corporate_actions,
+    get_nav as _get_nav,
+    get_cash as _get_cash,
+)
+
+mcp = FastMCP(
+    "Meridian Asset Servicing",
+    instructions=(
+        "Asset Servicing domain agent for the Meridian demo bank. "
+        "Returns canned custody, settlement, corporate action, NAV, and cash data. "
+        "Fault knobs are controlled via env vars."
+    ),
+)
+
+
+@mcp.tool()
+def get_custody_positions(relationship_id: str) -> str:
+    """
+    Get assets held at each custodian for a relationship.
+
+    Args:
+        relationship_id: Unique relationship identifier (e.g. REL-00042)
+
+    Returns:
+        JSON: holdings_by_custodian[], as_of_date
+    """
+    return _get_custody_positions(relationship_id)
+
+
+@mcp.tool()
+def get_settlements(relationship_id: str) -> str:
+    """
+    Get pending and failed settlement trades for a relationship.
+
+    Args:
+        relationship_id: Unique relationship identifier (e.g. REL-00042)
+
+    Returns:
+        JSON: pending[], failed[], as_of_date
+    """
+    return _get_settlements(relationship_id)
+
+
+@mcp.tool()
+def get_corporate_actions(relationship_id: str) -> str:
+    """
+    Get upcoming corporate actions (dividends, splits, rights) for a relationship.
+
+    Args:
+        relationship_id: Unique relationship identifier (e.g. REL-00042)
+
+    Returns:
+        JSON: upcoming_actions[], as_of_date
+    """
+    return _get_corporate_actions(relationship_id)
+
+
+@mcp.tool()
+def get_nav(fund_id: str) -> str:
+    """
+    Get the latest Net Asset Value (NAV) for a fund.
+    Note: keyed by fund_id, NOT relationship_id — this is intentional.
+    The hero prompt does NOT include NAV because the hero uses relationship_id.
+
+    Args:
+        fund_id: Fund identifier (e.g. FND-7781)
+
+    Returns:
+        JSON: nav, as_of_date, currency, aum
+    """
+    return _get_nav(fund_id)
+
+
+@mcp.tool()
+def get_cash(relationship_id: str) -> str:
+    """
+    Get cash balances and projected cash position for a relationship.
+
+    Args:
+        relationship_id: Unique relationship identifier (e.g. REL-00042)
+
+    Returns:
+        JSON: balances[], projected_cash_usd, as_of_date
+    """
+    return _get_cash(relationship_id)
+
+
+if __name__ == "__main__":
+    import uvicorn
+    from starlette.applications import Starlette
+    from starlette.responses import JSONResponse
+    from starlette.routing import Route, Mount
+
+    async def health(request):
+        return JSONResponse({"status": "ok", "service": "servicing-mcp", "version": "0.2.0"})
+
+    app = Starlette(routes=[
+        Route("/health", health),
+        Mount("/", app=mcp.sse_app()),
+    ])
+
+    uvicorn.run(app, host="0.0.0.0", port=8082)

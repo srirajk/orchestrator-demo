@@ -3,26 +3,41 @@ spring:
     name: meridian-gateway
   threads:
     virtual:
-      enabled: true   # Java 21+ virtual threads via Spring Boot 3.2+; on Java 25 also benefits from JEP-491
+      enabled: true   # Java 21+ GA virtual threads; Java 25 adds JEP-491 (no synchronized pinning)
 
 server:
   port: 8080
-  # Virtual threads make per-request thread blocking cheap, so no large pool needed.
   tomcat:
     threads:
       min-spare: 5
-      max: 50     # low ceiling — virtual threads do the real lifting
+      max: 50   # virtual threads handle real concurrency; Tomcat pool is just the acceptor
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus,metrics
   endpoint:
     health:
       show-details: always
+  # Micrometer → OTel bridge: exports traces to the OTel Collector
+  tracing:
+    enabled: true
+    sampling:
+      probability: 1.0   # 100% sampling in the demo; tune down in production
+  # OTLP trace export
+  otlp:
+    tracing:
+      endpoint: ${MANAGEMENT_OTLP_TRACING_ENDPOINT:http://localhost:4318/v1/traces}
+    metrics:
+      export:
+        url: ${MANAGEMENT_OTLP_METRICS_EXPORT_URL:http://localhost:4318/v1/metrics}
 
 logging:
+  pattern:
+    # Include MDC keys (requestId, conversationId, userId) in every log line
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} [rid=%X{requestId} cid=%X{conversationId} uid=%X{userId}] - %msg%n"
   level:
     ai.meridian: DEBUG
     org.springframework.web: INFO
+    io.opentelemetry: WARN
