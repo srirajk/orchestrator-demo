@@ -23,7 +23,7 @@ not invention.
 |---|---|
 | Backend | OpenAI-compatible API + **SSE**; stateless per request |
 | UI | **LibreChat** (config + shallow rebrand); experience layer only |
-| Runtime | **Spring Boot 3 + Java 21 virtual threads** (one JVM service) |
+| Runtime | **Spring Boot 3 + Java 21+ virtual threads** (25 preferred for JEP 491; one JVM service) |
 | Protocol wiring | **Build in-JVM wrappers** behind `ProtocolAdapter`; **no agent gateway** (future option for the wire leg only) |
 | Protocols pass 1 | **HTTP (OpenAPI) + MCP (`tools/list`)**; A2A deferred behind the interface |
 | Schema capture | **Introspect the spec**; align registry record to the **A2A Agent Card** standard |
