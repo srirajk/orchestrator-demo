@@ -1,0 +1,15 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: relationship
+  rules:
+    - actions: ["read"]
+      effect: EFFECT_ALLOW
+      roles: ["relationship_manager"]
+      condition:
+        match:
+          # Allow only if the relationship ID is in the RM's book of relationships
+          expr: P.attr.book.exists(b, b == R.id)
+    - actions: ["read"]
+      effect: EFFECT_ALLOW
+      roles: ["admin"]

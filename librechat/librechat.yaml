@@ -2,6 +2,7 @@ version: 1.3.13
 cache: true
 
 interface:
+  appTitle: "Meridian AI"
   modelSelect: false
   parameters: false
   presets: false

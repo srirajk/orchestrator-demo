@@ -19,8 +19,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.util.Collections;
-import java.util.List;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -58,17 +56,20 @@ public class AnswerSynthesizer {
     private final String baseUrl;
     private final String apiKey;
     private final String model;
+    private final boolean showReasoning;
     private final HttpClient httpClient;
 
     public AnswerSynthesizer(
             ObjectMapper mapper,
             @Value("${meridian.llm.base-url:https://api.z.ai/api/paas/v4}") String baseUrl,
             @Value("${meridian.llm.api-key:${ZAI_API_KEY:}}") String apiKey,
-            @Value("${meridian.llm.synthesis-model:glm-4.6}") String model) {
+            @Value("${meridian.llm.synthesis-model:glm-4.5-flash}") String model,
+            @Value("${meridian.llm.show-reasoning:false}") boolean showReasoning) {
         this.mapper = mapper;
         this.baseUrl = baseUrl;
         this.apiKey = apiKey;
         this.model = model;
+        this.showReasoning = showReasoning;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
@@ -95,9 +96,9 @@ public class AnswerSynthesizer {
             // Send the role-delta chunk first so the client sees "assistant" immediately.
             emitter.send(SseEmitter.event().data(roleDelta(completionId, created, mapper)));
 
-            // Stream the LLM response line by line.
+            // Stream the LLM response line by line (reasoning + content).
             StringBuilder synthesizedText = new StringBuilder();
-            streamFromLlm(requestBody, emitter, completionId, created, synthesizedText);
+            streamFromLlm(requestBody, emitter, completionId, created, synthesizedText, showReasoning);
 
             // Send stop chunk and [DONE].
             emitter.send(SseEmitter.event().data(stopDelta(completionId, created, mapper)));
@@ -179,12 +180,17 @@ public class AnswerSynthesizer {
     }
 
     /**
-     * Follow-up path: no agent data — answer purely from conversation history.
-     * Used when the user asks a clarifying/reformulation question (e.g. "explain in simpler terms")
-     * after the assistant has already returned agent data in a prior turn.
+     * History-only path: answer from conversation history without calling any agents.
+     *
+     * <p>Used for:
+     * <ul>
+     *   <li>{@code FOLLOW_UP} when session cache is stale and no entity carryforward is available</li>
+     *   <li>{@code CHITCHAT} direct answers</li>
+     * </ul>
      */
-    public void synthesizeFollowUp(List<Message> history, SseEmitter emitter) {
-        String completionId = "chatcmpl-" + java.util.UUID.randomUUID().toString().replace("-", "");
+    public void synthesizeFromHistory(List<Message> history, String latestPrompt,
+                                      SseEmitter emitter) {
+        String completionId = "chatcmpl-" + UUID.randomUUID().toString().replace("-", "");
         long created = System.currentTimeMillis() / 1_000L;
 
         try {
@@ -194,12 +200,11 @@ public class AnswerSynthesizer {
 
             ArrayNode messages = root.putArray("messages");
             messages.addObject().put("role", "system").put("content",
-                    "You are a banking AI assistant for Meridian Bank. Answer the user's follow-up " +
-                    "question based only on the information already provided in this conversation. " +
+                    "You are a banking AI assistant for Meridian Bank. Answer the user's question " +
+                    "based only on the information already provided in this conversation. " +
                     "Do not invent new facts or numbers. If the question requires fresh data not in " +
-                    "the conversation, say so and ask the user to rephrase with the entity name.");
+                    "the conversation, say so politely and ask the user to specify the client name.");
 
-            // Include the full conversation history.
             if (history != null) {
                 int start = Math.max(0, history.size() - 8);
                 for (int i = start; i < history.size(); i++) {
@@ -211,20 +216,21 @@ public class AnswerSynthesizer {
             }
 
             String requestBody = mapper.writeValueAsString(root);
-            log.debug("synthesizeFollowUp: calling {} model={}", baseUrl, model);
+            log.debug("synthesizeFromHistory: model={}", model);
 
             emitter.send(SseEmitter.event().data(roleDelta(completionId, created, mapper)));
-            streamFromLlm(requestBody, emitter, completionId, created, new StringBuilder());
+            streamFromLlm(requestBody, emitter, completionId, created, new StringBuilder(),
+                    showReasoning);
             emitter.send(SseEmitter.event().data(stopDelta(completionId, created, mapper)));
             emitter.send(SseEmitter.event().data("[DONE]"));
             emitter.complete();
 
         } catch (Exception e) {
-            log.error("synthesizeFollowUp failed: {}", e.getMessage(), e);
+            log.error("synthesizeFromHistory failed: {}", e.getMessage(), e);
             try {
                 emitter.send(SseEmitter.event().data(
                         contentDelta(completionId, created,
-                                "I couldn't process that follow-up. Please rephrase.", mapper)));
+                                "I couldn't process that. Please rephrase.", mapper)));
                 emitter.send(SseEmitter.event().data(stopDelta(completionId, created, mapper)));
                 emitter.send(SseEmitter.event().data("[DONE]"));
                 emitter.complete();
@@ -238,14 +244,20 @@ public class AnswerSynthesizer {
 
     /**
      * POST to the LLM with streaming=true and forward each content delta to the emitter.
-     * Accumulates the full synthesized text in {@code synthesizedText} for the grounding check.
+     *
+     * <p>When {@code emitReasoning} is true, {@code reasoning_content} deltas from thinking
+     * models (glm-4.5-flash, etc.) are streamed as a faint markdown blockquote before the
+     * main answer — visible in LibreChat without any frontend changes.
+     *
+     * <p>Accumulates the final answer text in {@code synthesizedText} for the grounding check.
      */
     private void streamFromLlm(
             String requestBody,
             SseEmitter emitter,
             String completionId,
             long created,
-            StringBuilder synthesizedText) throws Exception {
+            StringBuilder synthesizedText,
+            boolean emitReasoning) throws Exception {
 
         String endpoint = baseUrl + "/chat/completions";
 
@@ -265,46 +277,78 @@ public class AnswerSynthesizer {
             throw new RuntimeException("LLM returned HTTP " + response.statusCode() + ": " + body);
         }
 
+        StringBuilder reasoningBuffer = new StringBuilder();
+        boolean reasoningEmitted = false;  // have we already opened the blockquote?
+        boolean firstContent = true;        // have we seen the first content token?
+
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(response.body()))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                if (!line.startsWith("data:")) {
-                    continue;
-                }
+                if (!line.startsWith("data:")) continue;
                 String data = line.substring("data:".length()).strip();
-                if (data.equals("[DONE]")) {
-                    break;
-                }
-                if (data.isBlank()) {
-                    continue;
+                if (data.equals("[DONE]")) break;
+                if (data.isBlank()) continue;
+
+                DeltaChunk chunk = parseChunk(data);
+                if (chunk == null) continue;
+
+                // ── Reasoning content (thinking trace) ────────────────────────
+                if (chunk.reasoning != null && !chunk.reasoning.isEmpty()) {
+                    reasoningBuffer.append(chunk.reasoning);
+                    if (emitReasoning) {
+                        if (!reasoningEmitted) {
+                            // Open the thinking blockquote once
+                            emitter.send(SseEmitter.event().data(
+                                    contentDelta(completionId, created,
+                                            "> 🤔 **Thinking...**\n> ", mapper)));
+                            reasoningEmitted = true;
+                        }
+                        // Stream reasoning deltas as blockquote lines
+                        String reasoningFmt = chunk.reasoning.replace("\n", "\n> ");
+                        emitter.send(SseEmitter.event().data(
+                                contentDelta(completionId, created, reasoningFmt, mapper)));
+                    }
                 }
 
-                // Parse the chunk and extract content delta.
-                String content = extractDeltaContent(data);
-                if (content != null && !content.isEmpty()) {
-                    synthesizedText.append(content);
+                // ── Answer content ─────────────────────────────────────────────
+                if (chunk.content != null && !chunk.content.isEmpty()) {
+                    if (firstContent && reasoningEmitted) {
+                        // Close the thinking block and add a separator before the answer
+                        emitter.send(SseEmitter.event().data(
+                                contentDelta(completionId, created, "\n\n---\n\n", mapper)));
+                        firstContent = false;
+                    } else {
+                        firstContent = false;
+                    }
+                    synthesizedText.append(chunk.content);
                     emitter.send(SseEmitter.event().data(
-                            contentDelta(completionId, created, content, mapper)));
+                            contentDelta(completionId, created, chunk.content, mapper)));
                 }
             }
         }
+
+        if (reasoningBuffer.length() > 0) {
+            log.debug("Reasoning content captured ({} chars, emitted={})",
+                    reasoningBuffer.length(), emitReasoning);
+        }
     }
 
-    /** Extract {@code choices[0].delta.content} from a streaming chunk JSON string. */
-    private String extractDeltaContent(String chunkJson) {
+    /** Parsed delta from a single SSE chunk. */
+    private record DeltaChunk(String content, String reasoning) {}
+
+    /** Extract both {@code delta.content} and {@code delta.reasoning_content} from a chunk. */
+    private DeltaChunk parseChunk(String chunkJson) {
         try {
             JsonNode root = mapper.readTree(chunkJson);
             JsonNode choices = root.path("choices");
-            if (!choices.isArray() || choices.isEmpty()) {
-                return null;
-            }
+            if (!choices.isArray() || choices.isEmpty()) return null;
             JsonNode delta = choices.get(0).path("delta");
-            JsonNode content = delta.path("content");
-            if (content.isMissingNode() || content.isNull()) {
-                return null;
-            }
-            return content.asText();
+            String content = delta.has("content") && !delta.path("content").isNull()
+                    ? delta.path("content").asText(null) : null;
+            String reasoning = delta.has("reasoning_content") && !delta.path("reasoning_content").isNull()
+                    ? delta.path("reasoning_content").asText(null) : null;
+            return new DeltaChunk(content, reasoning);
         } catch (Exception e) {
             log.debug("Could not parse SSE chunk: {}", chunkJson);
             return null;

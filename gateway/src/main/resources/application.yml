@@ -41,13 +41,24 @@ meridian:
     remote:
       url: ${MERIDIAN_EMBEDDING_REMOTE_URL:http://localhost:8083/v1/embeddings}
   resolver:
-    confidence-floor: 0.30   # cosine similarity floor; multi-topic queries naturally score lower
+    confidence-floor: 0.30       # absolute cosine similarity floor
+    relative-floor-factor: 0.65  # dynamic floor = max(absolute, topScore * factor); prunes long-tail matches
     top-k: 10
   llm:
     base-url: ${MERIDIAN_LLM_BASE_URL:https://api.z.ai/api/paas/v4}
     api-key: ${ZAI_API_KEY:}
-    synthesis-model: ${MERIDIAN_LLM_SYNTHESIS_MODEL:glm-4.5-flash}
+    # Fast/cheap model for intent classification and entity extraction (target p99 < 300ms)
+    intent-model: ${MERIDIAN_LLM_INTENT_MODEL:glm-4.5-flash}
     extraction-model: ${MERIDIAN_LLM_EXTRACTION_MODEL:glm-4.5-flash}
+    # Quality model for answer synthesis (streamed, grounded)
+    synthesis-model: ${MERIDIAN_LLM_SYNTHESIS_MODEL:glm-4.5-flash}
+    # Set to true to stream model reasoning (chain-of-thought) as a blockquote before the answer
+    show-reasoning: ${MERIDIAN_LLM_SHOW_REASONING:false}
+  session:
+    ttl-seconds: ${MERIDIAN_SESSION_TTL_SECONDS:1800}   # 30 min idle expiry
+  cerbos:
+    host: ${CERBOS_HOST:localhost}
+    http-port: ${CERBOS_HTTP_PORT:3592}
 
 logging:
   pattern:

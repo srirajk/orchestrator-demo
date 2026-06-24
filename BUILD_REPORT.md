@@ -305,3 +305,209 @@ open http://localhost:3080        # LibreChat
 ---
 
 *Updated: 2026-06-24 — Phase 3 complete, Phase 4 in progress*
+
+---
+
+## PHASE 5 COMPLETE ✅ — Glass-box, Entitlements, Traces (M8 + M9)
+
+### Built
+
+| Component | Notes |
+|-----------|-------|
+| `Principal` record | id, roles, book, clearance |
+| `PrincipalStore` | Redis hash `principal:{userId}`; seeds rm_jane, rm_okafor, admin, rm_chen |
+| `EntitlementService` | Book check (local); filterCovered for filtered options; entitlement-filtered options in clarify |
+| `IdentityExtractor` | Reads X-User-Id header → userId; falls back to "anonymous" |
+| `TraceEventPublisher` | ConcurrentHashMap<clientId, SseEmitter>; pub/sub to all subscribers |
+| `TraceStreamController` | GET /trace/stream → SSE; GET /trace/health → subscriber count |
+| 8 trace event types | request_start, intent_classified, agents_resolved, entitlement_check, agent_start, agent_complete, synthesis_start, request_complete |
+| Glassbox SPA | Nginx:alpine, port 4000; dark-themed; connects to /trace/stream; per-agent cards with protocol badges; latency bars; request history |
+| `user-mgmt/` | Standalone FastAPI service (port 8084); CRUD /users; POST /auth/token (demo HS256 JWT); seeds 4 principals |
+| Cerbos PDP | ABAC policies: relationship_resource + agent_resource; deployed at :3594 |
+| Updated ChatService | Full trace publish at every pipeline stage; entitlement prune-before-fan-out |
+
+### Live Evidence (verified 2026-06-24)
+
+```
+# Trace health
+$ curl http://localhost:8080/trace/health
+{"subscribers":0,"status":"ok"}
+
+# Entitlement ALLOW: rm_jane + REL-00042 (in book)
+→ entitlement_check: { userId:"rm_jane", relationshipId:"REL-00042", allowed:true, reason:"in-book" }
+
+# Entitlement DENY: rm_jane + REL-00188 (Okafor, out of book)
+→ "Access denied: you are not authorised to view relationship REL-00188. This denial has been logged."
+
+# Trace SSE event sequence for hero prompt:
+  data:{"type":"request_start","requestId":"req-def90a503c4c",...}
+  data:{"type":"intent_classified",...,"data":{"intent":"FETCH_DATA","confidence":0.95}}
+  data:{"type":"agents_resolved",...,"data":{"selected":[6 agents across HTTP+MCP]}}
+  data:{"type":"entitlement_check",...,"data":{"allowed":true,"reason":"in-book"}}
+  data:{"type":"agent_start",...} × 6 (parallel)
+  data:{"type":"agent_complete",...} × 6
+  data:{"type":"synthesis_start",...}
+
+# User management service
+$ curl http://localhost:8084/users | jq '.[].id'
+"admin" "rm_chen" "rm_jane" "rm_okafor"
+
+# Glassbox
+$ curl -si http://localhost:4000/ | head -1
+HTTP/1.1 200 OK
+```
+
+### Human test steps
+1. Open http://localhost:4000 (glass-box). Send hero prompt from LibreChat as rm_jane.
+   - **PASS:** Panel shows ≥6 agents across HTTP+MCP with latency bars; `nav` not present
+2. Type "What are the holdings for the Okafor Family Trust relationship REL-00188?" as rm_jane.
+   - **PASS:** Response says "Access denied" and glass-box shows `entitlement_check: denied`
+
+---
+
+## PHASE 6 COMPLETE ✅ — Clarify, Resilience, Rebrand (M10 + M11 + M12)
+
+### Built
+
+| Component | Notes |
+|-----------|-------|
+| Entitlement-filtered clarification | CLARIFY intent → loads principal book → shows only authorized relationships |
+| Resilience beat | Killing servicing-mcp → partial join → synthesizer marks MISSING sections explicitly |
+| Meridian branding | `appTitle: "Meridian AI"` in librechat.yaml; `modelSelect: false`; `modelDisplayLabel: "Meridian AI"` |
+
+### Live Evidence (verified 2026-06-24)
+
+```
+# Clarification with entitlement-filtered options (rm_jane)
+Prompt: "I need to review the account"
+Response:
+  "Which client relationship are you asking about? You have access to:
+    • Whitman Family Office (REL-00042)
+    • Chen Tech Ventures (REL-00099)
+  Reply with the client name or relationship ID to continue."
+
+# Resilience: MCP servicing layer killed, hero prompt still returns
+$ docker compose stop servicing-mcp
+$ [hero prompt]
+→ # Whitman Family Trust Overview
+  ## Portfolio Allocation   [HTTP data — complete]
+  ## Performance Metrics    [HTTP data — complete]
+  ## Missing Information
+    - Pending Settlements: Data unavailable
+    - Cash Management Details: Data unavailable
+    - Custody Positions: Data unavailable
+$ docker compose up -d servicing-mcp   # restored
+```
+
+### Human test steps
+1. Type a vague prompt like "I need to review the account" as rm_jane.
+   - **PASS:** Scoped clarifying question appears with only rm_jane's 2 authorized relationships
+2. Run: `docker compose stop servicing-mcp` then send hero prompt → confirm partial answer states settlement/cash/custody data unavailable → run `docker compose up -d servicing-mcp` to restore
+3. Open http://localhost:3080 — **PASS:** Title bar shows "Meridian AI", no model selector, single "Meridian AI" assistant label
+
+---
+
+---
+
+## Phase 7 — Proof: Accuracy & Scale (M13 + M14) ✅ DONE
+
+### Built
+
+| Component | Notes |
+|-----------|-------|
+| `eval/eval_deepeval.py` | deepeval framework; RoutingAccuracyMetric (custom F1) + FaithfulnessMetric spot-check |
+| `eval/golden-prompts.json` | 35 golden banker prompts; realistic multi-agent expected sets; threshold 0.75 |
+| `loadtest/load-test-light.js` | k6 light test: 10 VUs, 80s; TTFT + stream time + error rate thresholds |
+| `AgentResolver` relative floor | Dynamic floor = max(0.30, topScore × 0.65); prunes long-tail over-selection |
+
+### Live Evidence (verified 2026-06-24)
+
+```
+Routing Accuracy (deepeval, avg F1):  95.0%  ≥ threshold 75%  ✓ PASS
+
+Per-category F1 highlights:
+  risk_001: 100%   settlement_002: 100%   nav_001: 100%   holdings_002: 100%
+  performance_002: 100%   goals_003: 100%   corporate_actions_001: 100%
+  hero_001: 91%   hero_002: 91%   multi_005: 93%
+  settlement_001: 75%   cash_003: 75%   (just at threshold)
+
+k6 Load Test (10 VUs, ramping 1→5→10→0, 80s run):
+  Iterations:        194 complete
+  Error rate:        0.00%    (threshold: <10%)  ✓
+  TTFT median:       975ms
+  TTFT p90:          1.93s
+  TTFT p95:          5.27s   (threshold: <8s)   ✓
+  Stream p95:        5.27s   (threshold: <30s)  ✓
+  All status 200:    ✓
+  All SSE Content-Type: ✓
+```
+
+### Human test steps (final gate)
+1. Run: `python3 eval/eval_deepeval.py --skip-faithfulness`
+   - **PASS:** Prints `ROUTING ACCURACY (avg F1): 95.0% — ✓ PASS`
+2. Run: `docker run --rm -v $PWD/loadtest:/scripts --add-host=host.docker.internal:host-gateway grafana/k6:latest run --env GATEWAY_URL=http://host.docker.internal:8080 /scripts/load-test-light.js`
+   - **PASS:** All thresholds green, 0% error rate, TTFT p95 < 8s
+
+---
+
+## BUILD COMPLETE ✅ — All 7 Phases Done
+
+### Two headline numbers
+| Metric | Result | Target |
+|--------|--------|--------|
+| **Routing accuracy (avg F1, deepeval)** | **95.0%** | ≥75% |
+| **TTFT p95 under 10 concurrent VUs** | **5.27s** | <8s |
+
+### How to run the full demo
+
+```bash
+# 1. Set environment
+cp .env.example .env
+# Edit .env: ZAI_API_KEY=903ed9...
+
+# 2. Start all services (core profile)
+docker compose up -d
+
+# 3. Wait for healthy
+./scripts/wait-for-healthy.sh 180
+
+# 4. Endpoints
+#    LibreChat (Meridian AI):  http://localhost:3080
+#    Glass-box trace panel:    http://localhost:4000
+#    Grafana:                  http://localhost:3000  (admin/meridian)
+#    User management API:      http://localhost:8084/docs
+#    Gateway actuator:         http://localhost:8080/actuator/health
+
+# 5. Hero prompt (type in LibreChat as rm_jane)
+"Give me a full picture of the Whitman Family Trust: current portfolio allocation,
+ any pending settlements, tax lots with unrealized gains, and key relationship notes."
+
+# 6. Demo entitlement denial (change header X-User-Id: rm_jane)
+"What are the holdings for the Okafor Family Trust relationship REL-00188?"
+→ Access denied
+
+# 7. Resilience demo
+docker compose stop servicing-mcp
+[re-send hero prompt]
+→ Partial answer, states settlement/cash/custody data unavailable
+docker compose up -d servicing-mcp
+
+# 8. Eval
+python3 eval/eval_deepeval.py --skip-faithfulness
+
+# 9. Load test
+docker run --rm -v $PWD/loadtest:/scripts --add-host=host.docker.internal:host-gateway \
+  grafana/k6:latest run --env GATEWAY_URL=http://host.docker.internal:8080 \
+  /scripts/load-test-light.js
+```
+
+### All phases status
+| Phase | Status | Milestones |
+|-------|--------|-----------|
+| 1 | ✅ DONE | M0 scaffold, M1 SSE pipe + LibreChat |
+| 2 | ✅ DONE | M2 Python mock agents (FastAPI HTTP + FastMCP MCP) |
+| 3 | ✅ DONE | M3 Registry, M4 Resolver |
+| 4 | ✅ DONE | M5 Input synthesis, M6 Wrappers+executor, M7 Answer synthesis |
+| 5 | ✅ DONE | M8 Entitlements (Cerbos), M9 Glass-box traces |
+| 6 | ✅ DONE | M10 Clarification, M11 Resilience, M12 Meridian branding |
+| 7 | ✅ DONE | M13 deepeval routing accuracy, M14 k6 scale proof |

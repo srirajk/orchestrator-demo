@@ -1,0 +1,14 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: agent
+  rules:
+    - actions: ["invoke"]
+      effect: EFFECT_ALLOW
+      roles: ["relationship_manager", "admin"]
+      condition:
+        match:
+          all:
+            of:
+              - expr: R.attr.is_mutating == false
+              - expr: int(P.attr.clearance) >= int(R.attr.required_clearance)

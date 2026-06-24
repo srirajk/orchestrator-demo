@@ -31,6 +31,10 @@ public class AgentResolver {
     @Value("${meridian.resolver.confidence-floor:0.35}")
     private double confidenceFloor;
 
+    /** Applied when topScore > 0.55: floor = max(absolute, topScore * factor). Prunes long-tail matches. */
+    @Value("${meridian.resolver.relative-floor-factor:0.65}")
+    private double relativeFloorFactor;
+
     @Value("${meridian.resolver.top-k:10}")
     private int topK;
 
@@ -58,15 +62,18 @@ public class AgentResolver {
         double topScore = candidates.isEmpty() ? 0.0 :
                 candidates.stream().mapToDouble(RoutingCandidate::score).max().orElse(0.0);
 
-        // Stage B: apply confidence floor
+        // Stage B: dynamic floor — relative prunes long-tail matches for focused queries
+        double effectiveFloor = topScore > 0.55
+                ? Math.max(confidenceFloor, topScore * relativeFloorFactor)
+                : confidenceFloor;
         List<RoutingCandidate> selected = candidates.stream()
-                .filter(c -> c.score() >= confidenceFloor)
+                .filter(c -> c.score() >= effectiveFloor)
                 .toList();
 
         boolean fallback = selected.isEmpty();
 
-        log.debug("Resolver: prompt='{}' → {} candidates, {} selected (floor={}), topScore={}",
-                prompt, candidates.size(), selected.size(), confidenceFloor, topScore);
+        log.debug("Resolver: prompt='{}' → {} candidates, {} selected (floor={:.3f}/relative={:.3f}), topScore={}",
+                prompt, candidates.size(), selected.size(), confidenceFloor, effectiveFloor, topScore);
 
         meterRegistry.gauge("resolver.route.confidence", topScore);
         if (fallback) meterRegistry.counter("resolver.fallback").increment();

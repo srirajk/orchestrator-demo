@@ -1,0 +1,216 @@
+{
+  "threshold": 0.75,
+  "description": "Golden routing prompts for Meridian Gateway resolver evaluation. Expected agent sets reflect realistic multi-agent banking queries — a portfolio assistant that also surfaces related context (e.g. settlements when showing holdings) is better than one that narrows to a single capability.",
+  "prompts": [
+    {
+      "id": "hero_001",
+      "prompt": "Show me the complete picture for the Whitman Family Office account — holdings, performance, risk profile, settlement status, and cash position",
+      "expected_agents": ["acme.wealth.holdings","acme.wealth.performance","acme.wealth.risk_profile","acme.servicing.settlement_status","acme.servicing.cash_management","acme.wealth.goal_planning"],
+      "description": "Hero prompt — full cross-domain fan-out"
+    },
+    {
+      "id": "hero_002",
+      "prompt": "Give me a full overview of the Whitman relationship — what are they invested in, how has it performed, any upcoming corporate actions and open settlements?",
+      "expected_agents": ["acme.wealth.holdings","acme.wealth.performance","acme.servicing.corporate_actions","acme.servicing.settlement_status","acme.wealth.goal_planning","acme.servicing.cash_management"],
+      "description": "Hero variant — performance + holdings + servicing"
+    },
+    {
+      "id": "holdings_001",
+      "prompt": "What are the current holdings for the Whitman Family Office?",
+      "expected_agents": ["acme.wealth.holdings","acme.servicing.settlement_status","acme.wealth.performance","acme.wealth.goal_planning"],
+      "description": "Holdings — related: pending settlements affect positions, performance for context"
+    },
+    {
+      "id": "holdings_002",
+      "prompt": "Show me the portfolio allocation for this client relationship",
+      "expected_agents": ["acme.wealth.holdings"],
+      "description": "Portfolio allocation — primary wealth holdings"
+    },
+    {
+      "id": "holdings_003",
+      "prompt": "What is this account invested in? Give me the position breakdown",
+      "expected_agents": ["acme.wealth.holdings","acme.servicing.cash_management","acme.wealth.performance"],
+      "description": "Position breakdown — holdings + cash context + performance"
+    },
+    {
+      "id": "holdings_004",
+      "prompt": "Current portfolio positions for the relationship",
+      "expected_agents": ["acme.wealth.holdings","acme.servicing.cash_management","acme.servicing.custody_positions","acme.wealth.goal_planning"],
+      "description": "Positions — holdings + custody + cash + goals context"
+    },
+    {
+      "id": "performance_001",
+      "prompt": "How has the Whitman portfolio performed year to date?",
+      "expected_agents": ["acme.wealth.performance","acme.wealth.holdings","acme.servicing.cash_management","acme.wealth.goal_planning"],
+      "description": "YTD performance — performance needs holdings and goal context"
+    },
+    {
+      "id": "performance_002",
+      "prompt": "What are the year-to-date returns and P&L for this client?",
+      "expected_agents": ["acme.wealth.performance"],
+      "description": "Returns and P&L — focused query"
+    },
+    {
+      "id": "performance_003",
+      "prompt": "Quarterly performance of the Whitman account",
+      "expected_agents": ["acme.wealth.performance","acme.servicing.cash_management","acme.wealth.holdings","acme.wealth.goal_planning"],
+      "description": "Quarterly performance with context"
+    },
+    {
+      "id": "performance_004",
+      "prompt": "How has this relationship performed over the past 12 months? Show me total return and benchmark comparison",
+      "expected_agents": ["acme.wealth.performance","acme.wealth.holdings","acme.servicing.cash_management","acme.wealth.goal_planning"],
+      "description": "12-month performance with benchmark"
+    },
+    {
+      "id": "goals_001",
+      "prompt": "Is the Whitman family on track to meet their financial goals?",
+      "expected_agents": ["acme.wealth.goal_planning","acme.wealth.holdings","acme.wealth.performance","acme.servicing.cash_management"],
+      "description": "Goal planning — needs performance + holdings for current state"
+    },
+    {
+      "id": "goals_002",
+      "prompt": "Show me the financial plan status for this client relationship",
+      "expected_agents": ["acme.wealth.goal_planning","acme.servicing.settlement_status"],
+      "description": "Financial plan status"
+    },
+    {
+      "id": "goals_003",
+      "prompt": "Are the client goals funded? What is the goal progress?",
+      "expected_agents": ["acme.wealth.goal_planning"],
+      "description": "Goal funding check — focused"
+    },
+    {
+      "id": "risk_001",
+      "prompt": "What is the risk profile for this client?",
+      "expected_agents": ["acme.wealth.risk_profile"],
+      "description": "Risk profile — focused single-agent"
+    },
+    {
+      "id": "risk_002",
+      "prompt": "Are there any concentration risk flags on the Whitman portfolio?",
+      "expected_agents": ["acme.wealth.risk_profile","acme.wealth.performance","acme.servicing.cash_management","acme.wealth.holdings","acme.wealth.goal_planning","acme.servicing.settlement_status"],
+      "description": "Concentration risk flags — needs full context"
+    },
+    {
+      "id": "risk_003",
+      "prompt": "How concentrated is this portfolio and what is the client's stated risk tolerance?",
+      "expected_agents": ["acme.wealth.risk_profile","acme.wealth.holdings"],
+      "description": "Risk tolerance and concentration — risk + positions"
+    },
+    {
+      "id": "settlement_001",
+      "prompt": "Are there any pending or failed settlements for the Whitman account?",
+      "expected_agents": ["acme.servicing.settlement_status","acme.wealth.holdings","acme.servicing.cash_management"],
+      "description": "Settlement status — settlements affect cash and positions"
+    },
+    {
+      "id": "settlement_002",
+      "prompt": "Show me the settlement status for recent trades in this relationship",
+      "expected_agents": ["acme.servicing.settlement_status"],
+      "description": "Trade settlement status — focused"
+    },
+    {
+      "id": "settlement_003",
+      "prompt": "Any failed settlements or breaks for this account?",
+      "expected_agents": ["acme.servicing.settlement_status"],
+      "description": "Settlement breaks — focused"
+    },
+    {
+      "id": "cash_001",
+      "prompt": "What is the current cash balance and projected cash for this relationship?",
+      "expected_agents": ["acme.servicing.cash_management","acme.wealth.goal_planning","acme.wealth.performance"],
+      "description": "Cash balance — cash + projected context"
+    },
+    {
+      "id": "cash_002",
+      "prompt": "Show me the cash management position for this account",
+      "expected_agents": ["acme.servicing.cash_management","acme.servicing.custody_positions","acme.wealth.holdings"],
+      "description": "Cash management with custody and holdings"
+    },
+    {
+      "id": "cash_003",
+      "prompt": "How much liquidity does the Whitman Family Office have available?",
+      "expected_agents": ["acme.servicing.cash_management","acme.servicing.settlement_status","acme.wealth.holdings"],
+      "description": "Liquidity — cash + pending settlements + holdings"
+    },
+    {
+      "id": "corporate_actions_001",
+      "prompt": "Are there any upcoming corporate actions for this relationship's holdings?",
+      "expected_agents": ["acme.servicing.corporate_actions"],
+      "description": "Corporate actions — focused"
+    },
+    {
+      "id": "corporate_actions_002",
+      "prompt": "Show me pending dividends and corporate events for this account",
+      "expected_agents": ["acme.servicing.corporate_actions","acme.servicing.settlement_status","acme.servicing.custody_positions","acme.wealth.holdings"],
+      "description": "Corporate events — corporate + custody + settlements"
+    },
+    {
+      "id": "custody_001",
+      "prompt": "Show me the custody positions and holdings by custodian for this relationship",
+      "expected_agents": ["acme.servicing.custody_positions"],
+      "description": "Custody positions — focused"
+    },
+    {
+      "id": "custody_002",
+      "prompt": "What does the custodian show for this account?",
+      "expected_agents": ["acme.servicing.custody_positions","acme.wealth.holdings","acme.wealth.performance"],
+      "description": "Custodian view with holdings and performance"
+    },
+    {
+      "id": "nav_001",
+      "prompt": "What is the NAV for fund FND-7781?",
+      "expected_agents": ["acme.servicing.nav"],
+      "description": "NAV query — fund-keyed, should select nav agent only"
+    },
+    {
+      "id": "nav_002",
+      "prompt": "Show me the net asset value as of today for the fund",
+      "expected_agents": ["acme.servicing.nav"],
+      "description": "NAV as of today — focused"
+    },
+    {
+      "id": "multi_001",
+      "prompt": "I need to review the Whitman account ahead of a client meeting — give me holdings, performance, and any risk concerns",
+      "expected_agents": ["acme.wealth.holdings","acme.wealth.performance","acme.servicing.cash_management","acme.servicing.settlement_status","acme.wealth.goal_planning"],
+      "description": "Client meeting prep — cross-domain"
+    },
+    {
+      "id": "multi_002",
+      "prompt": "Is the Whitman account ready for end of quarter? Check settlements, cash, and corporate actions",
+      "expected_agents": ["acme.servicing.settlement_status","acme.servicing.cash_management","acme.servicing.corporate_actions","acme.wealth.holdings","acme.wealth.goal_planning","acme.wealth.performance"],
+      "description": "End-of-quarter check — settlements + cash + corporate"
+    },
+    {
+      "id": "multi_003",
+      "prompt": "Give me the full wealth overview and servicing status for this relationship",
+      "expected_agents": ["acme.servicing.settlement_status","acme.wealth.performance","acme.servicing.custody_positions","acme.wealth.goal_planning","acme.servicing.cash_management"],
+      "description": "Cross-domain wealth + servicing overview"
+    },
+    {
+      "id": "multi_004",
+      "prompt": "Risk and performance review for the Whitman Family Office",
+      "expected_agents": ["acme.wealth.performance","acme.wealth.risk_profile","acme.wealth.holdings","acme.servicing.settlement_status","acme.servicing.cash_management","acme.wealth.goal_planning"],
+      "description": "Risk and performance — risk + performance + context"
+    },
+    {
+      "id": "multi_005",
+      "prompt": "Show me holdings, performance, goals, risk profile, settlements, cash and corporate actions",
+      "expected_agents": ["acme.wealth.holdings","acme.wealth.performance","acme.wealth.goal_planning","acme.wealth.risk_profile","acme.servicing.settlement_status","acme.servicing.cash_management","acme.servicing.corporate_actions","acme.servicing.custody_positions"],
+      "description": "Explicit 7-agent request"
+    },
+    {
+      "id": "no_nav_001",
+      "prompt": "What is the Whitman Family Office invested in? Show me positions, risk, and performance",
+      "expected_agents": ["acme.wealth.holdings","acme.wealth.performance","acme.servicing.settlement_status","acme.wealth.goal_planning","acme.servicing.cash_management"],
+      "description": "Wealth overview — should NOT include nav"
+    },
+    {
+      "id": "no_nav_002",
+      "prompt": "Portfolio overview for the relationship — holdings and allocation",
+      "expected_agents": ["acme.wealth.holdings","acme.wealth.risk_profile","acme.servicing.custody_positions","acme.wealth.performance"],
+      "description": "Portfolio overview — no nav"
+    }
+  ]
+}

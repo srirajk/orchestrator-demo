@@ -101,10 +101,14 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       MANAGEMENT_OTLP_TRACING_ENDPOINT: http://otel-collector:4318/v1/traces
       MANAGEMENT_OTLP_METRICS_EXPORT_URL: http://otel-collector:4318/v1/metrics
+      CERBOS_HOST: cerbos
+      CERBOS_HTTP_PORT: 3592
     depends_on:
       redis-stack:
         condition: service_healthy
       embeddings:
+        condition: service_healthy
+      cerbos:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
@@ -203,10 +207,58 @@ services:
       start_period: 45s
     restart: unless-stopped
 
-  # ── Glass-box — built in Phase 5 / M9; placeholder commented out ─────────────
-  # glassbox:
-  #   build: ./glassbox
-  #   ports: ["4000:4000"]
+  # ── Cerbos PDP — policy enforcement point for ABAC entitlements ──────────────
+  cerbos:
+    image: ghcr.io/cerbos/cerbos:latest
+    container_name: meridian-cerbos
+    ports:
+      - "3594:3592"   # HTTP API (host 3594 to avoid conflict with other cerbos instances)
+      - "3595:3593"   # gRPC
+    volumes:
+      - ./infra/cerbos:/conf:ro
+    command: server --config=/conf/config.yaml
+    healthcheck:
+      test: ["CMD", "/cerbos", "healthcheck", "--insecure"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  # ── User Management Service — separate admin plane (JWT issuance + user CRUD) ─
+  user-mgmt:
+    build:
+      context: ./user-mgmt
+      dockerfile: Dockerfile
+    container_name: meridian-user-mgmt
+    ports:
+      - "8084:8084"
+    environment:
+      REDIS_HOST: redis-stack
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:-meridian-demo-jwt-secret-change-in-production}
+    depends_on:
+      redis-stack:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8084/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    restart: unless-stopped
+
+  # ── Glass-box live decision trace panel ───────────────────────────────────────
+  glassbox:
+    build:
+      context: ./glassbox
+      dockerfile: Dockerfile
+    container_name: meridian-glassbox
+    ports:
+      - "4000:4000"
+    depends_on:
+      - gateway
+    restart: unless-stopped
 
   # ── k6 load test — Phase 7 only (scale profile) ───────────────────────────────
 
