@@ -4,13 +4,16 @@
 > doc** — it tells you *how* to work. It is **not** the requirements: those live in
 > `docs/master-build-plan-consolidated.md`. The build is split into **phases** in `phases/`,
 > which you execute in a **loop, pausing for a human test at the end of each phase** (§8).
-> When in doubt, follow this file.
+> When in doubt, follow this file. z.ai api key is here
+
 
 ---
 
 find api key here at 
 
 ZAI_API_KEY=903ed9ee018540a3bd723a0c35c41e01.qDrJqUyJIe8w0JJF
+
+---
 
 ## 1. What you are building
 
@@ -28,7 +31,7 @@ LibreChat's code.
 and MCP** agents in parallel, streams one synthesized answer into a Meridian-branded
 LibreChat, shows routing + per-agent latency + the entitlement decision in a glass-box
 panel, and still answers when an agent is killed mid-request.
-
+ 
 ---
 
 ## 2. Locked stack — no substitutions
@@ -56,8 +59,8 @@ Pin these. If a newer stable patch exists, use it; do not change majors.
 
 | Thing | Version |
 |---|---|
-| JDK | **Temurin/OpenJDK 25 (LTS)** — latest LTS (supported to 2033); includes **JEP 491**, which stops `synchronized` blocks from pinning virtual threads (the exact risk for a Resilience4j + HTTP-client + virtual-thread gateway). No `--enable-preview` — use `CompletableFuture` (`StructuredTaskScope` is still preview in 25). Use **Scoped Values** (final in 25) for request context, not `ThreadLocal` |
-| Build tool | **Maven 3.9+** with **compiler plugin 3.14.1+** (required for JDK 25); one multi-module build |
+| JDK | **Temurin/OpenJDK 21 or newer.** 21 is fine for the demo (virtual threads are GA). **25 is preferred** for JEP 491, which stops `synchronized` blocks from pinning virtual threads — that mainly bites under load (the M14 scale test), not in normal use. Target whatever the build host has; note the choice in `BUILD_REPORT.md`. No `--enable-preview` — use `CompletableFuture`. On 25 use **Scoped Values** for request context; on 21, `ThreadLocal` is acceptable for the demo |
+| Build tool | **Maven 3.9+** (compiler plugin **3.14.1+** only if building with JDK 25); one multi-module build |
 | Spring Boot | **3.5.x** (mature, supports Java 25); Spring Framework 6.2+ |
 | MCP client | **Spring AI 1.0.x MCP client starter**; if unavailable, the official **MCP Java SDK** (`io.modelcontextprotocol.sdk`) |
 | Resilience4j | **2.x** (`resilience4j-spring-boot3`) |
@@ -75,15 +78,18 @@ Pin these. If a newer stable patch exists, use it; do not change majors.
 | Mock agents (MCP) | **Python MCP SDK (`mcp` / FastMCP), SSE transport** |
 
 **Build host prerequisites** (verify before starting; if missing, install or note in the
-report): Docker + Compose v2, JDK 21, Maven 3.9+, **Python 3.11+ (with `uv` or `pip`)**,
-Node 20 + npm, and outbound internet for Maven Central, PyPI, npm, the DJL model download,
-and the **Z.AI API**.
+report): Docker + Compose v2, **JDK 21+** (21 fine; 25 preferred), Maven 3.9+, **Python
+3.11+ (with `uv` or `pip`)**, Node 20 + npm, and — critically — **open outbound network** to
+Maven Central (`repo1.maven.org`), Docker Hub / GHCR, PyPI, npm, the embedding-model
+download, and the **Z.AI API**. If the run environment's egress policy blocks any of these
+(some sandboxes allow only PyPI + npm), the build **cannot proceed** — run somewhere with
+full egress (see note below).
 
 > **LLM provider note:** where any `/docs` spec says "Claude" or "Anthropic" as the
 > *gateway's* runtime LLM, substitute **Z.AI GLM** per this file — the `LLMClient` interface
 > is provider-agnostic and **this file is authoritative**. (This is separate from whatever
 > model Claude Code itself runs on while building.)
-
+ 
 ---
 
 ## 3. Repository structure — create this
@@ -103,7 +109,7 @@ and the **Z.AI API**.
 ├── librechat/                (librechat.yaml + rebrand assets + compose override)
 └── loadtest/                 (k6 scripts)
 ```
-
+ 
 ---
 
 ## 4. The specs in /docs (read the relevant one before its milestone)
@@ -124,7 +130,7 @@ and the **Z.AI API**.
 
 > `docs/agent-manifest.schema.json` is the **pinned, canonical** manifest contract (already
 > generated and validated). Validate manifests against it as-is — do not regenerate or alter it.
-
+ 
 ---
 
 ## 5. The phases — your loop unit
@@ -225,43 +231,43 @@ routing-accuracy number is produced and printed.
 
 **M14 — Scale proof (LAST).** k6: many concurrent streams; chart p99 + virtual-thread vs
 OS-thread counts. *Accept:* hits the concurrency target with flat p99.
-
+ 
 ---
 
 ## 6. Hard rules (do not break these)
 
 a. **SSE must be byte-correct** (role delta, content deltas, `[DONE]`). Test against the
-   OpenAI shape in M1 — if it's wrong, LibreChat shows a blank reply. Also **short-circuit
-   LibreChat's auto-title call** (it sends a separate "name this conversation" request that
-   must not route to agents).
+OpenAI shape in M1 — if it's wrong, LibreChat shows a blank reply. Also **short-circuit
+LibreChat's auto-title call** (it sends a separate "name this conversation" request that
+must not route to agents).
 
 b. **Zero fabricated identifiers.** The LLM extracts human references; a deterministic
-   lookup resolves them to IDs. The LLM never produces a `relationship_id`. An unresolved
-   reference triggers a clarification, never a guess.
+lookup resolves them to IDs. The LLM never produces a `relationship_id`. An unresolved
+reference triggers a clarification, never a guess.
 
 c. **Agent outputs are untrusted and are the only ground truth.** In the synthesis prompt
-   they are delimited DATA, never instructions. The model summarizes; it never computes,
-   recalls, or invents numbers.
+they are delimited DATA, never instructions. The model summarizes; it never computes,
+recalls, or invents numbers.
 
 d. **Partial-result tolerant.** A failed agent never cancels its siblings. Join to the
-   overall deadline, harvest survivors, synthesize from what came back.
+overall deadline, harvest survivors, synthesize from what came back.
 
 e. **Build the simple path; leave the seam.** Flat plans (not a planner), flat semantic
-   routing (not hierarchical), HTTP+MCP (A2A stubbed behind the interface), stubbed auth
-   identity. Define the interfaces that allow the scale version later; do **not** build the
-   scale version.
+routing (not hierarchical), HTTP+MCP (A2A stubbed behind the interface), stubbed auth
+identity. Define the interfaces that allow the scale version later; do **not** build the
+scale version.
 
 f. **Do not fork LibreChat's code.** Integrate via `librechat.yaml` and cosmetic rebrand
-   only. Run the glass-box as a separate page beside it.
+only. Run the glass-box as a separate page beside it.
 
 g. **The gateway is one JVM (Java/Spring Boot) service** — no Python, no LangGraph, no
-   external agent gateway *inside the gateway*. The **mock agents are Python/FastAPI**, and
-   that is fine: they stand in for external domain-team agents and are not part of the
-   gateway's request-processing path.
+external agent gateway *inside the gateway*. The **mock agents are Python/FastAPI**, and
+that is fine: they stand in for external domain-team agents and are not part of the
+gateway's request-processing path.
 
 h. **Instrument from M4 onward, not at the end.** The OTel trace context must thread through
-   the harness from the first outbound call.
-
+the harness from the first outbound call.
+ 
 ---
 
 ## 7. Secrets & environment
@@ -275,7 +281,6 @@ h. **Instrument from M4 onward, not at the end.** The OTel trace context must th
 - DJL will download the MiniLM model on first run; allow for that.
 - LibreChat custom-endpoint config: `baseURL` → the gateway's `/v1`; set `dropParams` for
   params the gateway doesn't accept; `streamRate` ~35.
-
 ---
 
 ## 8. Phase loop protocol (how you pace the work)
@@ -294,13 +299,11 @@ For each phase (`phases/PHASE-N.md`):
    "proceed to Phase N+1".` Then **HALT.**
 5. **Do not start the next phase** until the human replies to proceed. If they report a
    problem, fix it within the current phase and re-present the gate.
-
 - **Within a phase:** work autonomously — don't stop to ask; make reasonable assumptions and
   log them in `BUILD_REPORT.md`. On a failing check, attempt up to 3 fixes; if still stuck,
   mark the phase **BLOCKED** with your diagnosis and surface it at the gate.
 - **Between phases:** always stop. Never run two phases without a human OK in between.
 - **Commit** at least once per phase (`Phase N: <summary>`); keep the repo runnable throughout.
-
 ## 9. Testing & verification (must be automated so you can self-verify)
 
 Three layers, all runnable headless:
@@ -314,10 +317,9 @@ Cerbos via Testcontainers. Cover:
 - registry — introspection derives input/output schema from OpenAPI and MCP `tools/list`; an
   invalid manifest is rejected;
 - Cerbos — `rm_jane` is allowed the Whitman relationship and **denied** the Okafor one.
-
-**b. API smoke (RestAssured / curl).** `/v1/models` returns the one model; a streaming
-`/v1/chat/completions` call yields well-formed OpenAI SSE chunks ending in `[DONE]`;
-`/admin/agents` register+list works; `/trace/stream` emits events.
+  **b. API smoke (RestAssured / curl).** `/v1/models` returns the one model; a streaming
+  `/v1/chat/completions` call yields well-formed OpenAI SSE chunks ending in `[DONE]`;
+  `/admin/agents` register+list works; `/trace/stream` emits events.
 
 **c. End-to-end UI (Playwright, Chromium, headless) — drive the real Meridian-branded LibreChat.**
 Put these in an `e2e/` Playwright project with `npm run e2e`. Tests:
@@ -331,11 +333,10 @@ Put these in an `e2e/` Playwright project with `npm run e2e`. Tests:
    **not** answered (denied/filtered) and shown denied in the glass-box.
 5. **Clarification:** type an ambiguous prompt → assert a scoped clarifying question appears,
    select an option, assert it proceeds.
-
-**d. Eval (M13).** A script runs the 30–50 golden prompts through the resolver, prints a
-routing-accuracy number, and fails under a set threshold. The golden prompt set may be
-seeded from the user's existing prompt framework; agents themselves can also be exercised
-directly (FastAPI `/openapi.json` calls and MCP `tools/call`) using that framework.
+   **d. Eval (M13).** A script runs the 30–50 golden prompts through the resolver, prints a
+   routing-accuracy number, and fails under a set threshold. The golden prompt set may be
+   seeded from the user's existing prompt framework; agents themselves can also be exercised
+   directly (FastAPI `/openapi.json` calls and MCP `tools/call`) using that framework.
 
 Provide a single entry point — `scripts/verify.sh` (or a `make verify`) — that: builds all
 modules → `docker compose up -d` → waits for healthy → runs (a) → (b) → (c) → (d) → writes
@@ -344,13 +345,13 @@ results into `BUILD_REPORT.md`.
 ## 10. Running the stack & reporting back
 
 - Use **docker-compose profiles** to keep the everyday demo lean:
-  - **`core`** (default): `redis-stack`, `gateway`, `mock-agents` (HTTP + MCP), `cerbos`,
-    `glassbox`, `librechat` (+ `mongodb`). Disable LibreChat's **Meilisearch** (set search
-    off) to drop a container — the demo doesn't need conversation search.
-  - **`scale`** (M14 only): adds `otel-collector`, `grafana`, `prometheus`, `k6`.
-  - `docker compose up -d` brings up `core`; `docker compose --profile scale up -d` adds the
-    rest. Each service has a **healthcheck**; the gateway depends on `redis-stack` and
-    `cerbos` being healthy.
+    - **`core`** (default): `redis-stack`, `gateway`, `mock-agents` (HTTP + MCP), `cerbos`,
+      `glassbox`, `librechat` (+ `mongodb`). Disable LibreChat's **Meilisearch** (set search
+      off) to drop a container — the demo doesn't need conversation search.
+    - **`scale`** (M14 only): adds `otel-collector`, `grafana`, `prometheus`, `k6`.
+    - `docker compose up -d` brings up `core`; `docker compose --profile scale up -d` adds the
+      rest. Each service has a **healthcheck**; the gateway depends on `redis-stack` and
+      `cerbos` being healthy.
 - Provide **`scripts/wait-for-healthy.sh`** so tests never run before services are up.
 - Provide **`.env.example`** listing required env (`ZAI_API_KEY`, ports, etc.); load it
   via compose `env_file`. Never hardcode secrets.
@@ -360,7 +361,6 @@ results into `BUILD_REPORT.md`.
   BLOCKED with a reason and the human action needed), a running compose stack, and passing
   Playwright E2E results. If anything is blocked only on a missing secret or host
   prerequisite, say so clearly at the top of the report so we can unblock it immediately.
-
 ---
 
 ## 11. Definition of done
@@ -373,3 +373,4 @@ the glass-box, and **still answers when an agent is killed**. The eval set print
 routing-accuracy number. The k6 graph (last) shows flat p99 under load.
 
 Build M0 and M1 first, verify the slice runs, then proceed in order.
+
