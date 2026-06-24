@@ -1,15 +1,17 @@
 package ai.meridian.gateway.infrastructure.telemetry;
 
-import ai.meridian.gateway.domain.auth.JwtAuthFilter;
 import ai.meridian.gateway.domain.auth.Principal;
 import ai.meridian.gateway.domain.auth.RequestContext;
-import com.nimbusds.jwt.JWTClaimsSet;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.MDC;
 import org.springframework.core.annotation.Order;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -20,16 +22,16 @@ import java.util.UUID;
  * Sets MDC context keys on every inbound request so all log lines carry:
  *   requestId      — a fresh UUID per request (correlation across log lines for one call)
  *   conversationId — forwarded by LibreChat; ties gateway logs to the chat turn
- *   userId         — forwarded by LibreChat; drives entitlement checks in Phase 5
+ *   userId         — JWT sub (when present) or X-User-Id header fallback
  *
  * MDC is cleared after the request completes so there is no thread-local leakage
  * across requests — important with virtual threads (one vthread per request, but
  * MDC values persist until explicitly cleared).
  *
- * Phase 8 (M15): when {@link JwtAuthFilter} (Order 0) has verified a Bearer JWT,
- * this filter builds a {@link Principal} from the verified claims and stores it in
- * {@link RequestContext} so downstream services can bypass the Redis lookup. The
- * userId MDC key is set to the JWT {@code sub} claim in that case.
+ * Phase 10: reads the authenticated principal from {@link SecurityContextHolder}
+ * (set by Spring Security's BearerTokenAuthenticationFilter before this filter runs)
+ * and stores it in {@link RequestContext} so the controller can capture it on the
+ * servlet thread before handing off to the async pipeline.
  */
 @Component
 @Order(1)
@@ -52,18 +54,14 @@ public class RequestCorrelationFilter extends OncePerRequestFilter {
         String requestId      = UUID.randomUUID().toString();
         String conversationId = coalesce(request.getHeader(HEADER_CONVERSATION_ID), "");
 
-        // Phase 8: prefer verified JWT sub over the X-User-Id header
+        // Phase 10: read authenticated principal from Spring Security (runs before this filter).
+        // BearerTokenAuthenticationFilter sets the JwtAuthenticationToken for valid Bearer JWTs.
         String userId;
-        Boolean jwtVerified = (Boolean) request.getAttribute(JwtAuthFilter.ATTR_JWT_VERIFIED);
-        if (Boolean.TRUE.equals(jwtVerified)) {
-            JWTClaimsSet claims = (JWTClaimsSet) request.getAttribute(JwtAuthFilter.ATTR_JWT_CLAIMS);
-            if (claims != null) {
-                userId = claims.getSubject() != null ? claims.getSubject() : "anonymous";
-                // Store the JWT-derived principal so PrincipalStore can short-circuit
-                RequestContext.setPrincipal(Principal.fromJwtClaims(claims));
-            } else {
-                userId = coalesce(request.getHeader(HEADER_USER_ID), "anonymous");
-            }
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth instanceof JwtAuthenticationToken jwtAuth) {
+            Jwt jwt = (Jwt) jwtAuth.getCredentials();
+            userId = jwt.getSubject() != null ? jwt.getSubject() : "anonymous";
+            RequestContext.setPrincipal(Principal.fromSpringJwt(jwt));
         } else {
             userId = coalesce(request.getHeader(HEADER_USER_ID), "anonymous");
         }

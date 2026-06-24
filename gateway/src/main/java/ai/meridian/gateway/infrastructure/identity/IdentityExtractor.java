@@ -1,39 +1,36 @@
 package ai.meridian.gateway.infrastructure.identity;
 
-import ai.meridian.gateway.domain.auth.JwtAuthFilter;
-import com.nimbusds.jwt.JWTClaimsSet;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 
 /**
  * Extracts the caller's user ID from the inbound HTTP request.
  *
- * <p>LibreChat forwards the authenticated user's identity as the {@code X-User-Id} header
- * when the gateway is configured as a custom endpoint. For the demo, the header can be
- * set manually (e.g. {@code X-User-Id: rm_jane}) to test different permission scenarios.
- *
- * <p>Phase 8 (M15): when {@link JwtAuthFilter} has verified a Bearer JWT, the verified
- * {@code sub} claim is used as the user ID — the header is ignored in that case, preventing
- * callers from spoofing their identity via the {@code X-User-Id} header.
+ * <p>Phase 10: reads the authenticated principal from Spring Security's {@link SecurityContextHolder}
+ * (populated by BearerTokenAuthenticationFilter before the controller runs). Falls back to the
+ * {@code X-User-Id} header for trusted-internal-hop requests (LibreChat → gateway without a JWT).
  */
 @Component
 public class IdentityExtractor {
 
     public String extractUserId(HttpServletRequest request) {
-        // Phase 8: JWT-verified sub takes precedence over any header
-        Boolean jwtVerified = (Boolean) request.getAttribute(JwtAuthFilter.ATTR_JWT_VERIFIED);
-        if (Boolean.TRUE.equals(jwtVerified)) {
-            JWTClaimsSet claims = (JWTClaimsSet) request.getAttribute(JwtAuthFilter.ATTR_JWT_CLAIMS);
-            if (claims != null && claims.getSubject() != null && !claims.getSubject().isBlank()) {
-                return claims.getSubject();
-            }
+        // Phase 10: JWT-verified sub from Spring Security takes precedence
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth instanceof JwtAuthenticationToken jwtAuth) {
+            Jwt jwt = (Jwt) jwtAuth.getCredentials();
+            String sub = jwt.getSubject();
+            if (sub != null && !sub.isBlank()) return sub;
         }
 
+        // Trusted internal hop (LibreChat → gateway with X-User-Id header)
         String userId = request.getHeader("X-User-Id");
         if (userId != null && !userId.isBlank()) {
             return userId.trim();
         }
-        // Also check X-Forwarded-User for reverse-proxy setups
         String forwarded = request.getHeader("X-Forwarded-User");
         if (forwarded != null && !forwarded.isBlank()) {
             return forwarded.trim();
@@ -41,3 +38,4 @@ public class IdentityExtractor {
         return "anonymous";
     }
 }
+

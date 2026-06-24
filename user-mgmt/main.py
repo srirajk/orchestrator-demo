@@ -20,14 +20,19 @@ Endpoints:
   GET  /.well-known/jwks.json       RSA public key in JWK Set format
 
 Domain / Membership endpoints:
-  POST   /domains                              create domain
-  GET    /domains                              list all domains
-  GET    /domains/{domain_id}                  get one domain
-  PUT    /domains/{domain_id}/relationships    update relationships list
-  POST   /domains/{domain_id}/members          add user to domain
-  DELETE /domains/{domain_id}/members/{user_id} remove user from domain
-  GET    /domains/{domain_id}/members          list members of domain
-  GET    /users/{user_id}/domains              list domains the user belongs to
+  POST   /domains                                create domain
+  GET    /domains                                list all domains
+  GET    /domains/{domain_id}                    get one domain
+  PUT    /domains/{domain_id}/relationships       update relationships list
+  POST   /domains/{domain_id}/members            add user to domain
+  DELETE /domains/{domain_id}/members/{user_id}  remove user from domain
+  GET    /domains/{domain_id}/members            list members of domain
+  GET    /users/{user_id}/domains                list domains the user belongs to
+
+Phase 10 — Domain admin endpoints:
+  POST   /domains/{domain_id}/admins            make a user a domain admin
+  DELETE /domains/{domain_id}/admins/{user_id}  remove domain admin grant
+  GET    /domains/{domain_id}/admins            list domain admins
 """
 
 import base64
@@ -35,12 +40,14 @@ import json
 import math
 import os
 import time
+from pathlib import Path
 from typing import List, Optional
 
 import redis as redis_lib
+import yaml
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-from fastapi import FastAPI, HTTPException, Path
+from fastapi import FastAPI, HTTPException, Path as FPath
 from fastapi.middleware.cors import CORSMiddleware
 from jose import jwt
 from pydantic import BaseModel
@@ -48,7 +55,7 @@ from pydantic import BaseModel
 app = FastAPI(
     title="Meridian User Management",
     description="Manages RM principals, domain memberships, and issues RS256 JWTs",
-    version="2.0.0",
+    version="3.0.0",
 )
 
 app.add_middleware(
@@ -102,6 +109,8 @@ KEY_PREFIX = "principal:"
 DOMAIN_PREFIX = "domain:"
 MEMBERSHIP_PREFIX = "membership:"
 USER_DOMAINS_PREFIX = "user_domains:"
+DOMAIN_ADMINS_PREFIX = "domain_admins:"      # set of user_ids who admin this domain
+USER_ADMIN_DOMAINS_PREFIX = "user_admin_domains:"  # set of domain_ids this user admins
 
 _redis: Optional[redis_lib.Redis] = None
 
@@ -116,10 +125,17 @@ def get_redis() -> redis_lib.Redis:
 # ── Domain helpers ────────────────────────────────────────────────────────────
 
 def get_user_domains(user_id: str) -> List[str]:
-    """Return list of domain_ids the user belongs to."""
+    """Return list of domain_ids the user belongs to (member of)."""
     r = get_redis()
     members = r.smembers(USER_DOMAINS_PREFIX + user_id)
     return sorted(members) if members else []
+
+
+def get_user_admin_domains(user_id: str) -> List[str]:
+    """Return list of domain_ids the user is an admin of."""
+    r = get_redis()
+    ad = r.smembers(USER_ADMIN_DOMAINS_PREFIX + user_id)
+    return sorted(ad) if ad else []
 
 
 def get_book_from_domains(user_id: str) -> List[str]:
@@ -135,109 +151,176 @@ def get_book_from_domains(user_id: str) -> List[str]:
     return sorted(book)
 
 
-# ── Seed data ─────────────────────────────────────────────────────────────────
+# ── Org seed loading ──────────────────────────────────────────────────────────
 
-DEMO_PRINCIPALS = [
-    {
-        "id": "rm_jane",
-        "name": "Jane Smith",
-        "email": "jane.smith@meridianbank.com",
-        "roles": ["relationship_manager"],
-        "book": ["REL-00042", "REL-00099"],
-        "segments": ["wealth"],
-        "clearance": 2,
-        "team": "wealth-private-banking",
-    },
-    {
-        "id": "rm_okafor",
-        "name": "Chidi Okafor",
-        "email": "chidi.okafor@meridianbank.com",
-        "roles": ["relationship_manager"],
-        "book": ["REL-00188", "REL-00200"],
-        "segments": ["wealth"],
-        "clearance": 2,
-        "team": "wealth-private-banking",
-    },
-    {
-        "id": "admin",
-        "name": "Admin User",
-        "email": "admin@meridianbank.com",
-        "roles": ["admin"],
-        "book": [],
-        "segments": ["wealth", "servicing"],
-        "clearance": 5,
-        "team": "platform",
-    },
-    {
-        "id": "rm_chen",
-        "name": "Emily Chen",
-        "email": "emily.chen@meridianbank.com",
-        "roles": ["relationship_manager"],
-        "book": ["REL-00042"],
-        "segments": ["wealth"],
-        "clearance": 2,
-        "team": "wealth-ultra-hnw",
-    },
-]
-
-DEMO_DOMAINS = [
-    {
-        "id": "wealth-private-banking",
-        "name": "Wealth Private Banking",
-        "relationships": ["REL-00042", "REL-00099"],
-        "members": ["rm_jane", "rm_chen"],
-    },
-    {
-        "id": "intl-wealth",
-        "name": "International Wealth",
-        "relationships": ["REL-00188", "REL-00200"],
-        "members": ["rm_okafor"],
-    },
-    {
-        "id": "admin-domain",
-        "name": "Admin Domain",
-        "relationships": [],
-        "members": ["admin"],
-    },
-]
+ORG_YAML_PATH = Path(__file__).parent / "seed" / "org.yaml"
 
 
-@app.on_event("startup")
-def seed():
-    _load_or_generate_keypair()
+def _load_org_yaml() -> Optional[dict]:
+    if ORG_YAML_PATH.exists():
+        with open(ORG_YAML_PATH) as f:
+            return yaml.safe_load(f)
+    return None
 
+
+def _seed_from_yaml(org: dict) -> None:
     r = get_redis()
+    principals = org.get("principals", [])
+    domains = org.get("domains", [])
+    domain_admins = org.get("domain_admins", [])
 
-    # Seed principals
-    for p in DEMO_PRINCIPALS:
-        key = KEY_PREFIX + p["id"]
+    # Seed principals (idempotent: create if not exists; always sync roles)
+    for p in principals:
+        uid = p["id"]
+        key = KEY_PREFIX + uid
         if not r.exists(key):
             r.hset(key, mapping={
-                "id":        p["id"],
-                "name":      p.get("name", p["id"]),
+                "id":        uid,
+                "name":      p.get("name", uid),
                 "email":     p.get("email", ""),
-                "roles":     json.dumps(p["roles"]),
-                "book":      json.dumps(p["book"]),
+                "roles":     json.dumps(p.get("roles", ["relationship_manager"])),
+                "book":      json.dumps(p.get("book", [])),
                 "segments":  json.dumps(p.get("segments", [])),
                 "clearance": str(p.get("clearance", 2)),
                 "team":      p.get("team", ""),
             })
-    print(f"[user-mgmt] Seeded {len(DEMO_PRINCIPALS)} demo principals")
+        else:
+            # Always sync roles — allows upgrading admin → platform_admin on restart
+            r.hset(key, "roles", json.dumps(p.get("roles", ["relationship_manager"])))
+    print(f"[user-mgmt] Seeded {len(principals)} principals from org.yaml")
 
     # Seed domains and memberships
-    for d in DEMO_DOMAINS:
+    for d in domains:
         domain_key = DOMAIN_PREFIX + d["id"]
         if not r.exists(domain_key):
             r.hset(domain_key, mapping={
                 "id":            d["id"],
                 "name":          d["name"],
-                "relationships": json.dumps(d["relationships"]),
+                "relationships": json.dumps(d.get("relationships", [])),
             })
-        # Seed memberships (idempotent — sadd is a no-op for existing members)
         for member_id in d.get("members", []):
             r.sadd(USER_DOMAINS_PREFIX + member_id, d["id"])
             r.sadd(MEMBERSHIP_PREFIX + d["id"], member_id)
-    print(f"[user-mgmt] Seeded {len(DEMO_DOMAINS)} demo domains with memberships")
+    print(f"[user-mgmt] Seeded {len(domains)} domains from org.yaml")
+
+    # Seed domain admin grants
+    for grant in domain_admins:
+        uid = grant["user_id"]
+        for domain_id in grant.get("domains", []):
+            r.sadd(USER_ADMIN_DOMAINS_PREFIX + uid, domain_id)
+            r.sadd(DOMAIN_ADMINS_PREFIX + domain_id, uid)
+    if domain_admins:
+        print(f"[user-mgmt] Seeded {len(domain_admins)} domain admin grants from org.yaml")
+
+
+def _seed_inline() -> None:
+    """Fallback seed when no org.yaml is found."""
+    r = get_redis()
+
+    demo_principals = [
+        {
+            "id": "rm_jane",
+            "name": "Jane Smith",
+            "email": "jane.smith@meridianbank.com",
+            "roles": ["relationship_manager"],
+            "book": ["REL-00042", "REL-00099"],
+            "segments": ["wealth"],
+            "clearance": 2,
+            "team": "wealth-private-banking",
+        },
+        {
+            "id": "rm_okafor",
+            "name": "Chidi Okafor",
+            "email": "chidi.okafor@meridianbank.com",
+            "roles": ["relationship_manager"],
+            "book": ["REL-00188", "REL-00200"],
+            "segments": ["wealth"],
+            "clearance": 2,
+            "team": "wealth-private-banking",
+        },
+        {
+            "id": "admin",
+            "name": "Admin User",
+            "email": "admin@meridianbank.com",
+            "roles": ["platform_admin"],
+            "book": [],
+            "segments": ["wealth", "servicing"],
+            "clearance": 5,
+            "team": "platform",
+        },
+        {
+            "id": "rm_chen",
+            "name": "Emily Chen",
+            "email": "emily.chen@meridianbank.com",
+            "roles": ["relationship_manager"],
+            "book": ["REL-00042"],
+            "segments": ["wealth"],
+            "clearance": 2,
+            "team": "wealth-ultra-hnw",
+        },
+    ]
+
+    demo_domains = [
+        {
+            "id": "wealth-private-banking",
+            "name": "Wealth Private Banking",
+            "relationships": ["REL-00042", "REL-00099"],
+            "members": ["rm_jane", "rm_chen"],
+        },
+        {
+            "id": "intl-wealth",
+            "name": "International Wealth",
+            "relationships": ["REL-00188", "REL-00200"],
+            "members": ["rm_okafor"],
+        },
+        {
+            "id": "admin-domain",
+            "name": "Admin Domain",
+            "relationships": [],
+            "members": ["admin"],
+        },
+    ]
+
+    for p in demo_principals:
+        uid = p["id"]
+        key = KEY_PREFIX + uid
+        if not r.exists(key):
+            r.hset(key, mapping={
+                "id":        uid,
+                "name":      p.get("name", uid),
+                "email":     p.get("email", ""),
+                "roles":     json.dumps(p.get("roles", [])),
+                "book":      json.dumps(p.get("book", [])),
+                "segments":  json.dumps(p.get("segments", [])),
+                "clearance": str(p.get("clearance", 2)),
+                "team":      p.get("team", ""),
+            })
+    print(f"[user-mgmt] Seeded {len(demo_principals)} demo principals (inline fallback)")
+
+    for d in demo_domains:
+        domain_key = DOMAIN_PREFIX + d["id"]
+        if not r.exists(domain_key):
+            r.hset(domain_key, mapping={
+                "id":            d["id"],
+                "name":          d["name"],
+                "relationships": json.dumps(d.get("relationships", [])),
+            })
+        for member_id in d.get("members", []):
+            r.sadd(USER_DOMAINS_PREFIX + member_id, d["id"])
+            r.sadd(MEMBERSHIP_PREFIX + d["id"], member_id)
+    print(f"[user-mgmt] Seeded {len(demo_domains)} demo domains (inline fallback)")
+
+
+@app.on_event("startup")
+def seed():
+    _load_or_generate_keypair()
+    org = _load_org_yaml()
+    if org:
+        print(f"[user-mgmt] Loading org seed from {ORG_YAML_PATH}")
+        _seed_from_yaml(org)
+    else:
+        print("[user-mgmt] No org.yaml found — using inline seed")
+        _seed_inline()
 
 
 # ── Models ────────────────────────────────────────────────────────────────────
@@ -251,6 +334,7 @@ class PrincipalView(BaseModel):
     segments: List[str] = []
     clearance: int = 2
     team: str = ""
+    admin_domains: List[str] = []
 
 
 class CreatePrincipalRequest(BaseModel):
@@ -286,9 +370,14 @@ class MemberAdd(BaseModel):
     user_id: str
 
 
+class AdminGrant(BaseModel):
+    user_id: str
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def redis_to_principal(user_id: str, fields: dict) -> PrincipalView:
+    ad = get_user_admin_domains(user_id)
     return PrincipalView(
         id=fields.get("id", user_id),
         name=fields.get("name", user_id),
@@ -298,6 +387,7 @@ def redis_to_principal(user_id: str, fields: dict) -> PrincipalView:
         segments=json.loads(fields.get("segments", "[]")),
         clearance=int(fields.get("clearance", "2")),
         team=fields.get("team", ""),
+        admin_domains=ad,
     )
 
 
@@ -317,26 +407,28 @@ def write_principal(user_id: str, p: PrincipalView):
 # ── RS256 JWT issuance ────────────────────────────────────────────────────────
 
 def issue_jwt(user_id: str, principal: PrincipalView, ttl_seconds: int = 3600) -> str:
-    """Issue a RS256 JWT containing all claim attributes. Book is derived from domain memberships."""
+    """Issue a RS256 JWT containing all claim attributes.
+    Book is derived from domain memberships; admin_domains from domain admin grants."""
     now = int(time.time())
     derived_book = get_book_from_domains(user_id)
-    # Fall back to stored book if no domain memberships exist yet
     effective_book = derived_book if derived_book else principal.book
     domains = get_user_domains(user_id)
+    admin_domains = get_user_admin_domains(user_id)
 
     payload = {
-        "sub":      user_id,
-        "name":     principal.name,
-        "email":    principal.email,
-        "roles":    principal.roles,
-        "book":     effective_book,
-        "segments": principal.segments,
-        "clearance": principal.clearance,
-        "domains":  domains,
-        "iat":      now,
-        "exp":      now + ttl_seconds,
-        "iss":      "meridian-user-mgmt",
-        "aud":      "meridian-gateway",
+        "sub":          user_id,
+        "name":         principal.name,
+        "email":        principal.email,
+        "roles":        principal.roles,
+        "book":         effective_book,
+        "segments":     principal.segments,
+        "clearance":    principal.clearance,
+        "domains":      domains,
+        "admin_domains": admin_domains,
+        "iat":          now,
+        "exp":          now + ttl_seconds,
+        "iss":          "meridian-user-mgmt",
+        "aud":          "meridian-gateway",
     }
     return jwt.encode(
         payload,
@@ -378,6 +470,7 @@ def health():
             "redis": "connected",
             "jwt_algorithm": "RS256",
             "key_id": KEY_ID,
+            "org_seed": str(ORG_YAML_PATH) if ORG_YAML_PATH.exists() else "inline",
         }
     except Exception as e:
         return {
@@ -404,7 +497,7 @@ def list_users():
 
 
 @app.get("/users/{user_id}", response_model=PrincipalView)
-def get_user(user_id: str = Path(...)):
+def get_user(user_id: str = FPath(...)):
     fields = get_redis().hgetall(KEY_PREFIX + user_id)
     if not fields:
         raise HTTPException(status_code=404, detail=f"User '{user_id}' not found")
@@ -412,8 +505,8 @@ def get_user(user_id: str = Path(...)):
 
 
 @app.get("/users/{user_id}/domains")
-def get_user_domains_endpoint(user_id: str = Path(...)):
-    """List all domains the user belongs to."""
+def get_user_domains_endpoint(user_id: str = FPath(...)):
+    """List all domains the user belongs to (member of)."""
     if not get_redis().exists(KEY_PREFIX + user_id):
         raise HTTPException(status_code=404, detail=f"User '{user_id}' not found")
     domain_ids = get_user_domains(user_id)
@@ -427,7 +520,11 @@ def get_user_domains_endpoint(user_id: str = Path(...)):
                 "name": raw.get("name", ""),
                 "relationships": json.loads(raw.get("relationships", "[]")),
             })
-    return {"user_id": user_id, "domains": domains}
+    return {
+        "user_id": user_id,
+        "domains": domains,
+        "admin_domains": get_user_admin_domains(user_id),
+    }
 
 
 @app.post("/users", response_model=PrincipalView, status_code=201)
@@ -493,9 +590,7 @@ def delete_user(user_id: str):
 def issue_token(body: TokenRequest):
     """
     Demo-only: issue a RS256 JWT for a given user_id.
-    In production this would be a full OAuth2 password/client-credentials flow via your IdP.
-    The JWT contains all user attributes as claims so the gateway can enforce entitlements
-    without a database lookup on the hot path. The 'book' claim is derived from domain memberships.
+    The JWT contains roles, book (derived from domain memberships), and admin_domains.
     The public key is available at /.well-known/jwks.json for verification.
     """
     fields = get_redis().hgetall(KEY_PREFIX + body.user_id)
@@ -503,6 +598,7 @@ def issue_token(body: TokenRequest):
         raise HTTPException(status_code=404, detail=f"User '{body.user_id}' not found")
     principal = redis_to_principal(body.user_id, fields)
     derived_book = get_book_from_domains(body.user_id)
+    admin_domains = get_user_admin_domains(body.user_id)
     token = issue_jwt(body.user_id, principal)
     return {
         "access_token": token,
@@ -512,6 +608,7 @@ def issue_token(body: TokenRequest):
         "key_id": KEY_ID,
         "jwks_uri": "/.well-known/jwks.json",
         "derived_book": derived_book if derived_book else principal.book,
+        "admin_domains": admin_domains,
         "user": principal,
         "note": "RS256 JWT — verify with public key from /.well-known/jwks.json",
     }
@@ -541,23 +638,29 @@ def list_domains():
     for key in sorted(keys):
         raw = r.hgetall(key)
         if raw:
+            domain_id = key.removeprefix(DOMAIN_PREFIX)
+            admins = sorted(r.smembers(DOMAIN_ADMINS_PREFIX + domain_id) or set())
             domains.append({
                 "id": raw.get("id", ""),
                 "name": raw.get("name", ""),
                 "relationships": json.loads(raw.get("relationships", "[]")),
+                "admins": admins,
             })
     return domains
 
 
 @app.get("/domains/{domain_id}")
-def get_domain(domain_id: str = Path(...)):
-    raw = get_redis().hgetall(DOMAIN_PREFIX + domain_id)
+def get_domain(domain_id: str = FPath(...)):
+    r = get_redis()
+    raw = r.hgetall(DOMAIN_PREFIX + domain_id)
     if not raw:
         raise HTTPException(status_code=404, detail=f"Domain '{domain_id}' not found")
+    admins = sorted(r.smembers(DOMAIN_ADMINS_PREFIX + domain_id) or set())
     return {
         "id": raw.get("id", domain_id),
         "name": raw.get("name", ""),
         "relationships": json.loads(raw.get("relationships", "[]")),
+        "admins": admins,
     }
 
 
@@ -594,9 +697,43 @@ def remove_domain_member(domain_id: str, user_id: str):
 
 
 @app.get("/domains/{domain_id}/members")
-def list_domain_members(domain_id: str = Path(...)):
+def list_domain_members(domain_id: str = FPath(...)):
     r = get_redis()
     if not r.exists(DOMAIN_PREFIX + domain_id):
         raise HTTPException(status_code=404, detail=f"Domain '{domain_id}' not found")
     members = sorted(r.smembers(MEMBERSHIP_PREFIX + domain_id) or set())
     return {"domain_id": domain_id, "members": members}
+
+
+# ── Routes: domain admins (Phase 10) ─────────────────────────────────────────
+
+@app.post("/domains/{domain_id}/admins", status_code=201)
+def grant_domain_admin(domain_id: str, body: AdminGrant):
+    """Grant a user domain_admin role for a specific domain."""
+    r = get_redis()
+    if not r.exists(DOMAIN_PREFIX + domain_id):
+        raise HTTPException(status_code=404, detail=f"Domain '{domain_id}' not found")
+    if not r.exists(KEY_PREFIX + body.user_id):
+        raise HTTPException(status_code=404, detail=f"User '{body.user_id}' not found")
+    r.sadd(DOMAIN_ADMINS_PREFIX + domain_id, body.user_id)
+    r.sadd(USER_ADMIN_DOMAINS_PREFIX + body.user_id, domain_id)
+    return {"domain_id": domain_id, "user_id": body.user_id, "granted": True}
+
+
+@app.delete("/domains/{domain_id}/admins/{user_id}")
+def revoke_domain_admin(domain_id: str, user_id: str):
+    """Revoke a user's domain_admin grant for a specific domain."""
+    r = get_redis()
+    r.srem(DOMAIN_ADMINS_PREFIX + domain_id, user_id)
+    r.srem(USER_ADMIN_DOMAINS_PREFIX + user_id, domain_id)
+    return {"domain_id": domain_id, "user_id": user_id, "revoked": True}
+
+
+@app.get("/domains/{domain_id}/admins")
+def list_domain_admins(domain_id: str = FPath(...)):
+    """List all users who have domain_admin rights for this domain."""
+    r = get_redis()
+    if not r.exists(DOMAIN_PREFIX + domain_id):
+        raise HTTPException(status_code=404, detail=f"Domain '{domain_id}' not found")
+    admins = sorted(r.smembers(DOMAIN_ADMINS_PREFIX + domain_id) or set())
+    return {"domain_id": domain_id, "admins": admins}

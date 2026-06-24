@@ -11,10 +11,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -23,22 +21,12 @@ import java.util.Date;
 import java.util.List;
 
 /**
- * Verifies RS256 JWTs on every inbound request that supplies an Authorization: Bearer header.
+ * Hand-rolled JWT verifier — superseded by Spring Security's oauth2-resource-server in Phase 10.
  *
- * Verification:
- *   1. Signature — RS256 via JWKS public key (kid lookup)
- *   2. exp — token must not be expired
- *   3. iss — must be "meridian-user-mgmt"
- *   4. aud — must contain "meridian-gateway"
- *
- * If verification succeeds, stores the claims in a request attribute so
- * RequestCorrelationFilter can extract the verified sub without re-parsing.
- *
- * If no Bearer token is present, the filter passes through (trusted internal hop / health).
- * If a Bearer token is present but INVALID, returns HTTP 401 immediately.
+ * <p>This class is kept as a non-bean (no {@code @Component}) because {@link #ATTR_JWT_CLAIMS}
+ * and {@link #ATTR_JWT_VERIFIED} are still referenced by legacy code paths and tests.
+ * JWT validation in the running application is now done by {@link ai.meridian.gateway.config.SecurityConfig}.
  */
-@Component
-@Order(0)
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     public static final String ATTR_JWT_CLAIMS   = "meridian.jwt.claims";

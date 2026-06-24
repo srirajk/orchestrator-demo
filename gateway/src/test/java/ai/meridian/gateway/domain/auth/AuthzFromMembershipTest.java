@@ -254,7 +254,7 @@ class AuthzFromMembershipTest {
     void entitlementService_adminRole_grantsAccessRegardlessOfBook() {
         // An admin role bypasses the book check.
         EntitlementService svc = new EntitlementService();
-        Principal admin = new Principal("admin", List.of("admin"), List.of(), 5);
+        Principal admin = new Principal("admin", List.of("admin"), List.of(), 5, List.of());
 
         EntitlementService.EntitlementResult result = svc.checkRelationship(admin, "REL-00188");
 
@@ -266,7 +266,7 @@ class AuthzFromMembershipTest {
     void entitlementService_rmWithoutRelInBook_denied() {
         EntitlementService svc = new EntitlementService();
         Principal rm = new Principal("rm_jane", List.of("relationship_manager"),
-                List.of("REL-00042", "REL-00099"), 2);
+                List.of("REL-00042", "REL-00099"), 2, List.of());
 
         EntitlementService.EntitlementResult result = svc.checkRelationship(rm, "REL-00188");
 
@@ -279,7 +279,7 @@ class AuthzFromMembershipTest {
         EntitlementService svc = new EntitlementService();
         // Simulate membership add: REL-00188 now in book
         Principal rm = new Principal("rm_jane", List.of("relationship_manager"),
-                List.of("REL-00042", "REL-00099", "REL-00188"), 2);
+                List.of("REL-00042", "REL-00099", "REL-00188"), 2, List.of());
 
         EntitlementService.EntitlementResult result = svc.checkRelationship(rm, "REL-00188");
 

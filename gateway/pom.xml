@@ -68,7 +68,22 @@
             <artifactId>jedis</artifactId>
         </dependency>
 
-        <!-- RS256 JWT verification -->
+        <!-- Spring Security resource server — replaces hand-rolled JwtAuthFilter -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- RS256 JWT verification (still used by custom JwtDecoder in SecurityConfig) -->
         <dependency>
             <groupId>com.nimbusds</groupId>
             <artifactId>nimbus-jose-jwt</artifactId>

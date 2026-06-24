@@ -91,7 +91,7 @@ public class PrincipalStore {
             List<String> roles = parseList(fields.get("roles"));
             List<String> book  = parseList(fields.get("book"));
             int clearance      = parseInt(fields.get("clearance"), 2);
-            return new Principal(userId, roles, book, clearance);
+            return new Principal(userId, roles, book, clearance, List.of());
         } catch (Exception e) {
             log.warn("PrincipalStore.load failed for {}: {}", userId, e.getMessage());
             return Principal.anonymous();

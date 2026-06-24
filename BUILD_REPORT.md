@@ -2,6 +2,111 @@
 
 ---
 
+## PHASE 10 COMPLETE — role-based authorization + declarative org seed; 30/30 gateway tests pass; 7/7 live authz checks pass
+
+### Phase 10 — Run the test steps below, then reply "proceed to Phase 11"
+
+**Test 1 — rm_jane blocked from admin plane (expect 403)**
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8084/auth/token \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"rm_jane"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+curl -s -o /dev/null -w "HTTP %{http_code}\n" -X POST http://localhost:8080/admin/agents \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"agentId":"x","domain":"wealth-private-banking"}'
+# Expected: HTTP 403
+```
+
+**Test 2 — No token → 401 on admin plane**
+```bash
+curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:8080/admin/agents
+# Expected: HTTP 401
+```
+
+**Test 3 — da_wpb: own domain accepted, foreign domain denied**
+```bash
+DA_WPB=$(curl -s -X POST http://localhost:8084/auth/token \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"da_wpb"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+# Own domain → 400 (schema error, NOT 401/403):
+curl -s -o /dev/null -w "HTTP %{http_code}\n" -X POST http://localhost:8080/admin/agents \
+  -H "Authorization: Bearer $DA_WPB" -H "Content-Type: application/json" \
+  -d '{"agentId":"test","domain":"wealth-private-banking"}'
+# Foreign domain → 403:
+curl -s -o /dev/null -w "HTTP %{http_code}\n" -X POST http://localhost:8080/admin/agents \
+  -H "Authorization: Bearer $DA_WPB" -H "Content-Type: application/json" \
+  -d '{"agentId":"test","domain":"intl-wealth"}'
+```
+
+**Test 4 — platform_admin registers in any domain**
+```bash
+ADMIN=$(curl -s -X POST http://localhost:8084/auth/token \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"admin"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+curl -s -o /dev/null -w "HTTP %{http_code}\n" -X POST http://localhost:8080/admin/agents \
+  -H "Authorization: Bearer $ADMIN" -H "Content-Type: application/json" \
+  -d '{"agentId":"test","domain":"intl-wealth"}'
+# Expected: HTTP 400 (schema error, NOT 401/403)
+```
+
+**Test 5 — Org seed wipe-and-reset**
+```bash
+docker exec meridian-redis redis-cli flushall
+docker compose restart user-mgmt && sleep 10
+# All 8 principals reload:
+curl -s http://localhost:8084/users | python3 -c "import sys,json; print(sorted([u['id'] for u in json.load(sys.stdin)]))"
+# da_wpb has admin_domains:
+curl -s -X POST http://localhost:8084/auth/token -H "Content-Type: application/json" \
+  -d '{"user_id":"da_wpb"}' | python3 -c "import sys,json; d=json.load(sys.stdin); print('admin_domains:', d['admin_domains'])"
+# Expected: ['wealth-private-banking']
+```
+
+**Note:** After flushall, also restart the gateway (`docker compose restart gateway`) so it re-registers agents and refreshes JWKS.
+
+**Test 6 — Chat still works (no regression)**
+Type the hero prompt into LibreChat as rm_jane. Expected: streamed answer with routing across HTTP + MCP agents.
+
+---
+
+## Phase 10 — What was built
+
+### Gateway changes
+| File | Change |
+|------|--------|
+| `pom.xml` | Added `spring-boot-starter-security`, `spring-boot-starter-oauth2-resource-server`, `spring-security-test` |
+| `config/SecurityConfig.java` (NEW) | `SecurityFilterChain` with URL-rule matrix; custom `JwtDecoder` backed by `JwksClient`; `JwtAuthenticationConverter` maps `roles` → `ROLE_` authorities |
+| `domain/auth/AgentAuthorization.java` (NEW) | Fine domain-scope check: `platform_admin` bypasses; `domain_admin` must have target domain in `admin_domains` claim |
+| `domain/auth/JwtAuthFilter.java` | Removed `@Component` (Spring Security replaces it); constants kept |
+| `domain/auth/Principal.java` | Added `adminDomains` field; `fromSpringJwt(Jwt)` factory |
+| `domain/auth/PrincipalStore.java` | 5-arg constructor |
+| `infrastructure/telemetry/RequestCorrelationFilter.java` | Reads from `SecurityContextHolder` |
+| `infrastructure/identity/IdentityExtractor.java` | Reads JWT sub from `SecurityContextHolder` |
+| `admin/AgentRegistryController.java` | `AgentAuthorization` checks on POST/PUT/DELETE |
+| `test/.../RoleAuthorizationTest.java` (NEW) | 9 tests — 401, 403, domain scope |
+
+### User-mgmt changes
+| File | Change |
+|------|--------|
+| `main.py` | `admin_domains` field + Redis keys; YAML seed loading; domain admin endpoints; `admin_domains` in JWT |
+| `requirements.txt` | Added `pyyaml==6.0.2` |
+| `Dockerfile` | Added `COPY seed/ seed/` |
+| `seed/org.yaml` (NEW) | 8 principals (rm_jane, rm_okafor, rm_chen, rm_diaz, da_wpb, da_intl, da_svc, admin), 4 domains, 3 domain admin grants |
+
+### Role matrix enforced
+| Caller | `/admin/agents` | `/v1/chat/completions` |
+|--------|-----------------|------------------------|
+| No token | 401 | 200 (trusted hop) |
+| `relationship_manager` | 403 | 200 |
+| `domain_admin` (own domain) | 201/400 | 200 |
+| `domain_admin` (foreign domain) | 403 | 200 |
+| `platform_admin` | 201/400 | 200 |
+
+### Test results
+- **Gateway unit tests:** 30/30 PASS
+- **Live authz checks (curl):** 7/7 PASS
+
+---
+
 ## PHASE 9 COMPLETE — identity/authz correctness verified; all 21 gateway tests + 25 Playwright E2E tests pass
 
 ---

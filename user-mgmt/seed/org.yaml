@@ -1,0 +1,117 @@
+# Meridian Bank — Declarative Org Seed
+# Loaded idempotently at startup. Wipe Redis + restart to reset to this state.
+# Phase 10: includes domain admin grants (admin_domains JWT claim).
+
+# ── Principals ──────────────────────────────────────────────────────────────
+principals:
+
+  # Relationship managers
+  - id: rm_jane
+    name: Jane Smith
+    email: jane.smith@meridianbank.com
+    roles: [relationship_manager]
+    book: [REL-00042, REL-00099]
+    segments: [wealth]
+    clearance: 2
+    team: wealth-private-banking
+
+  - id: rm_okafor
+    name: Chidi Okafor
+    email: chidi.okafor@meridianbank.com
+    roles: [relationship_manager]
+    book: [REL-00188, REL-00200]
+    segments: [wealth]
+    clearance: 2
+    team: intl-wealth
+
+  - id: rm_chen
+    name: Emily Chen
+    email: emily.chen@meridianbank.com
+    roles: [relationship_manager]
+    book: [REL-00042]
+    segments: [wealth]
+    clearance: 2
+    team: wealth-ultra-hnw
+
+  - id: rm_diaz
+    name: Carlos Diaz
+    email: carlos.diaz@meridianbank.com
+    roles: [relationship_manager]
+    book: [REL-00300]
+    segments: [wealth, servicing]
+    clearance: 3
+    team: servicing-ops
+
+  # Domain admins
+  - id: da_wpb
+    name: Dana Whitfield
+    email: dana.whitfield@meridianbank.com
+    roles: [domain_admin]
+    book: []
+    segments: [wealth]
+    clearance: 3
+    team: wealth-private-banking
+
+  - id: da_intl
+    name: Kemi Adebayo
+    email: kemi.adebayo@meridianbank.com
+    roles: [domain_admin]
+    book: []
+    segments: [wealth]
+    clearance: 3
+    team: intl-wealth
+
+  - id: da_svc
+    name: Sam Ortiz
+    email: sam.ortiz@meridianbank.com
+    roles: [domain_admin]
+    book: []
+    segments: [servicing]
+    clearance: 3
+    team: servicing-ops
+
+  # Platform admin
+  - id: admin
+    name: Admin User
+    email: admin@meridianbank.com
+    roles: [platform_admin]
+    book: []
+    segments: [wealth, servicing]
+    clearance: 5
+    team: platform
+
+# ── Domains ─────────────────────────────────────────────────────────────────
+domains:
+
+  - id: wealth-private-banking
+    name: Wealth Private Banking
+    relationships: [REL-00042, REL-00099]
+    members: [rm_jane, rm_chen, da_wpb]
+
+  - id: intl-wealth
+    name: International Wealth
+    relationships: [REL-00188, REL-00200]
+    members: [rm_okafor, da_intl]
+
+  - id: servicing-ops
+    name: Servicing Operations
+    relationships: [REL-00300]
+    members: [rm_diaz, da_svc]
+
+  - id: admin-domain
+    name: Admin Domain
+    relationships: []
+    members: [admin]
+
+# ── Domain admin grants ──────────────────────────────────────────────────────
+# Controls the `admin_domains` JWT claim — gateway enforces via AgentAuthorization.
+domain_admins:
+
+  - user_id: da_wpb
+    domains: [wealth-private-banking]
+
+  - user_id: da_intl
+    domains: [intl-wealth]
+
+  - user_id: da_svc
+    domains: [servicing-ops]
