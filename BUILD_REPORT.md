@@ -2,6 +2,49 @@
 
 ---
 
+## INTEGRATION TEST SUITE COMPLETE — 55/55 live tests pass; 63/63 in-process tests pass; routing accuracy 95.0% F1
+
+### Test Suite — What was fixed and added
+
+**Root cause fixed: embedding mismatch in Redis vector index**
+
+The routing evaluation was at 59.6% F1 (below 75% threshold) because Redis stored hash-embedded
+vectors from an earlier container run while the gateway was now querying with remote
+sentence-transformer embeddings (cosine similarity ≈ −0.076 between the two spaces).
+
+Fix: `FT.DROPINDEX intent_idx DD` + `docker restart meridian-gateway` → gateway re-registered
+all 9 agents with RemoteEmbeddingClient (all-MiniLM-L6-v2). Routing accuracy jumped to **95.0% F1**.
+
+**OTel traces now reach Phoenix in core profile**
+
+Wired gateway OTLP export to `http://phoenix:6006/v1/traces` directly (Phoenix accepts OTLP
+natively). Previously traces only reached Phoenix via otel-collector which is in the `scale` profile.
+
+**SLF4J log format bug fixed**
+
+`AgentResolver.java` used `{:.3f}` (Python f-string syntax) in a SLF4J `log.debug()` call.
+Replaced with `String.format("%.3f", ...)` — floor/relative values now visible in debug logs.
+
+**Test suite results:**
+
+| Suite | Tests | Result |
+|-------|-------|--------|
+| In-process: wealth auth, data contracts, fault knobs, OpenAPI, cross-agent consistency | 63 | ✅ 63/63 PASS |
+| Live server: Wealth HTTP (9) + Servicing MCP (9) + Gateway (10) + Cerbos (8) + Security E2E (4) + Phoenix (4) + LibreChat (5) + Scenarios (6) | 55 | ✅ 55/55 PASS |
+| Routing accuracy eval (35 golden prompts) | 35 | ✅ 95.0% F1 (≥ 75% threshold) |
+
+**Key test coverage added (`mock-agents/tests/test_live.py`):**
+- `TestLiveWealthHttp`: Real TCP to port 8081 — all 4 endpoints, fault knobs, OpenAPI
+- `TestLiveServicingMcp`: Full SSE+POST+initialize MCP protocol with real connections to port 8082
+- `TestLiveGateway`: SSE format, hero prompt routing, follow-up context, resilience, entitlement denial
+- `TestLiveCerbos`: rm_jane ALLOW REL-00042 / DENY REL-00188; batch checks; platform_admin unrestricted
+- `TestLiveSecurityEndToEnd`: In-book returns data; out-of-book denied; independent user sessions
+- `TestLiveObservability`: Phoenix receives traces from gateway (timestamp-based detection); glass-box SSE
+- `TestLiveLibreChat`: Root, login, OIDC endpoint, API auth, custom endpoint configured
+- `TestLiveScenarios`: 5 concurrent users, edge cases (empty/long/malformed), all 3 relationships
+
+---
+
 ## PHASE 11 COMPLETE — Cerbos as authoritative PDP + JWT algorithm-confusion guards + trace persistence; 32/32 tests pass; policy-flip proven live
 
 ### Phase 11 — Run the test steps below, then reply "proceed to Phase 12"
