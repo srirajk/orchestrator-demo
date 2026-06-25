@@ -47,13 +47,25 @@ public class InputSynthesizerImpl implements InputSynthesizer {
     }
 
     @Override
+    public SynthesisResult synthesize(EntityBag preExtracted, List<AgentManifest> selected) {
+        // Pre-extracted bag from the combined intent+entity LLM call — skip extractor
+        log.debug("Skipping LLM extraction — using pre-extracted bag: relRef={}, fundRef={}, period={}",
+                preExtracted.relationshipReference(), preExtracted.fundReference(), preExtracted.period());
+        return resolveAndBind(preExtracted, selected);
+    }
+
+    @Override
     public SynthesisResult synthesize(String prompt, List<AgentManifest> selected) {
         // ── Stage 1: Extract ─────────────────────────────────────────────────
         EntityBag rawBag = extractor.extract(prompt);
         log.debug("Extracted: relRef={}, fundRef={}, tickers={}, period={}",
                 rawBag.relationshipReference(), rawBag.fundReference(),
                 rawBag.tickerReferences(), rawBag.period());
+        return resolveAndBind(rawBag, selected);
+    }
 
+    /** Shared Resolve→Bind logic used by both synthesize() overloads. */
+    private SynthesisResult resolveAndBind(EntityBag rawBag, List<AgentManifest> selected) {
         // ── Stage 2: Resolve ─────────────────────────────────────────────────
         EntityBag resolvedBag = resolver.resolve(rawBag);
         log.debug("Resolved:  relId={}, fundId={}, needsClarification={}",

@@ -1,6 +1,7 @@
 package ai.meridian.gateway.domain.intent;
 
 import ai.meridian.gateway.api.v1.chat.dto.Message;
+import ai.meridian.gateway.synthesis.input.EntityBag;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -17,6 +18,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -35,23 +37,45 @@ public class IntentClassifier {
 
     private static final Logger log = LoggerFactory.getLogger(IntentClassifier.class);
 
+    /**
+     * Combined system prompt: classifies intent AND extracts entities in a single LLM call.
+     * For FETCH_DATA, the entity fields are populated; for other intents they are null/empty.
+     * This eliminates the separate EntityExtractor LLM round-trip (~2-5s saving per request).
+     */
     private static final String SYSTEM_PROMPT = """
-            You are a routing classifier for a banking AI assistant. \
-            Given the conversation history, classify the user's latest message into exactly one intent:
+            You are a routing classifier and entity extractor for a banking AI assistant.
+            Given the conversation history, classify the user's latest message AND extract \
+            entity references in ONE JSON response.
 
+            Intents:
             FETCH_DATA  - needs fresh data from banking systems (holdings, settlements, performance, etc.)
-            FOLLOW_UP   - asks for clarification, explanation, or reformulation of data already in the conversation
-            CLARIFY     - the topic is clear but which client/fund is ambiguous; a scoped question is needed
+            FOLLOW_UP   - asks for clarification or explanation of data already shown in the conversation
+            CLARIFY     - banking topic is clear but which client/fund is ambiguous
             CHITCHAT    - general conversation unrelated to banking data
 
-            Reply with ONLY valid JSON:
-            {"intent":"FETCH_DATA","confidence":0.95,"reasoning":"user asked for holdings data"}
+            Reply with ONLY this JSON (no markdown, no prose):
+            {
+              "intent": "FETCH_DATA",
+              "confidence": 0.95,
+              "reasoning": "one-line explanation",
+              "relationship_reference": "Whitman Family Office",
+              "fund_reference": null,
+              "ticker_references": [],
+              "period": "QTD"
+            }
 
-            Rules:
-            - If the user mentions a client name or relationship (Whitman, Chen, etc.) → lean FETCH_DATA
-            - If prior assistant turn has banking data and user says "explain", "simplify", "what does X mean", \
-              "tell me more" → FOLLOW_UP
-            - If the intent is banking-related but no client is mentioned and none appeared in prior turns → CLARIFY
+            Entity extraction rules (for FETCH_DATA only — null/empty for other intents):
+            - relationship_reference: the client/relationship name EXACTLY as stated, or null
+            - fund_reference: the fund name or code EXACTLY as stated, or null
+            - ticker_references: list of stock tickers mentioned, e.g. ["AAPL","MSFT"], or []
+            - period: QTD/YTD/MTD/etc. — default "QTD" when not stated
+            - NEVER invent identifiers; copy verbatim from the user's words
+
+            Intent rules:
+            - If the user mentions a client name (Whitman, Chen, Okafor, etc.) → FETCH_DATA
+            - If prior assistant turn has banking data and user says "explain", "what does X mean", \
+              "tell me more", "simplify" → FOLLOW_UP
+            - If banking-related but no client mentioned and none in prior turns → CLARIFY
             - Greetings, "how are you", "thanks" → CHITCHAT
             """;
 
@@ -128,23 +152,18 @@ public class IntentClassifier {
                                 .put("role", "user")
                                 .put("content", conversationContext))));
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + "/chat/completions"))
-                .version(HttpClient.Version.HTTP_1_1)
-                .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer " + apiKey)
-                .timeout(Duration.ofSeconds(10))
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-                .build();
-
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = sendWithRetry(requestBody);
 
         if (response.statusCode() != 200) {
             throw new RuntimeException("LLM returned HTTP " + response.statusCode());
         }
 
         JsonNode root = mapper.readTree(response.body());
-        String content = root.path("choices").get(0).path("message").path("content").asText();
+        JsonNode choices = root.path("choices");
+        if (!choices.isArray() || choices.isEmpty()) {
+            throw new RuntimeException("LLM returned empty choices array");
+        }
+        String content = choices.path(0).path("message").path("content").asText();
 
         // The model may wrap its JSON inside markdown fences — strip them
         content = content.strip();
@@ -164,7 +183,32 @@ public class IntentClassifier {
             intent = Intent.FETCH_DATA;
         }
 
-        return new IntentResult(intent, confidence, reasoning);
+        // Extract entity fields included in the same response (FETCH_DATA only)
+        EntityBag entities = null;
+        if (intent == Intent.FETCH_DATA) {
+            String relRef = nullableText(parsed, "relationship_reference");
+            String fundRef = nullableText(parsed, "fund_reference");
+            String period = parsed.path("period").asText("QTD");
+            if (period.isBlank()) period = "QTD";
+            List<String> tickers = new ArrayList<>();
+            JsonNode tickerNode = parsed.path("ticker_references");
+            if (tickerNode.isArray()) {
+                for (JsonNode t : tickerNode) {
+                    String val = t.asText(null);
+                    if (val != null && !val.isBlank()) tickers.add(val.toUpperCase());
+                }
+            }
+            entities = EntityBag.extracted(relRef, fundRef, tickers, period);
+        }
+
+        return new IntentResult(intent, confidence, reasoning, entities);
+    }
+
+    private static String nullableText(JsonNode node, String field) {
+        JsonNode n = node.path(field);
+        if (n.isNull() || n.isMissingNode()) return null;
+        String v = n.asText(null);
+        return (v == null || v.isBlank() || "null".equalsIgnoreCase(v)) ? null : v;
     }
 
     private String buildContext(List<Message> messages) {
@@ -178,5 +222,27 @@ public class IntentClassifier {
 
     private String truncate(String s, int max) {
         return s.length() <= max ? s : s.substring(0, max) + "…";
+    }
+
+    private HttpResponse<String> sendWithRetry(String requestBody) throws Exception {
+        String endpoint = baseUrl + "/chat/completions";
+        int delayMs = 1_000;
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            // Rebuild request each attempt — BodyPublishers.ofString() is one-shot.
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(endpoint))
+                    .version(HttpClient.Version.HTTP_1_1)
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + apiKey)
+                    .timeout(Duration.ofSeconds(10))
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .build();
+            HttpResponse<String> resp = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (resp.statusCode() != 429 || attempt == 3) return resp;
+            log.warn("LLM rate limited (429), retry {}/3 in {}ms", attempt, delayMs);
+            Thread.sleep(delayMs);
+            delayMs *= 2;
+        }
+        throw new IllegalStateException("unreachable");
     }
 }

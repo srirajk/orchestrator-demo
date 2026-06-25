@@ -17,13 +17,15 @@ public interface InputSynthesizer {
 
     /**
      * Synthesizes inputs for each selected agent from the given prompt.
-     *
-     * @param prompt   the user's raw prompt
-     * @param selected agents chosen by the resolver
-     * @return a {@link SynthesisResult} containing bound inputs, dropped agents,
-     *         and any clarification needed from the user
+     * Calls the LLM to extract entity references.
      */
     SynthesisResult synthesize(String prompt, List<AgentManifest> selected);
+
+    /**
+     * Synthesizes inputs using a pre-extracted {@link EntityBag} (skips the LLM extraction call).
+     * Use this when entities were already extracted by the intent classifier in the same LLM call.
+     */
+    SynthesisResult synthesize(EntityBag preExtracted, List<AgentManifest> selected);
 
     /**
      * The result produced by the synthesis pipeline.

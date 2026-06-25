@@ -29,6 +29,7 @@ import ai.meridian.gateway.registry.model.AgentManifest;
 import ai.meridian.gateway.resolver.model.ResolverResult;
 import ai.meridian.gateway.resolver.service.AgentResolver;
 import ai.meridian.gateway.synthesis.answer.AnswerSynthesizer;
+import ai.meridian.gateway.synthesis.input.EntityBag;
 import ai.meridian.gateway.synthesis.input.InputSynthesizer;
 import ai.meridian.gateway.synthesis.input.InputSynthesizer.SynthesisResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -175,7 +176,8 @@ public class ChatService {
 
             switch (intentResult.intent()) {
                 case FETCH_DATA -> handleFetchData(request, emitter, latestPrompt,
-                        conversationId, session, userId, jwtPrincipal, requestId, requestStart, rootSpan);
+                        conversationId, session, userId, jwtPrincipal, requestId, requestStart, rootSpan,
+                        intentResult.extractedEntities());
                 case FOLLOW_UP  -> handleFollowUp(request, emitter, latestPrompt,
                         conversationId, session, userId, jwtPrincipal, requestId, requestStart, rootSpan);
                 case CLARIFY    -> handleClarify(emitter, session, userId, jwtPrincipal, requestId, requestStart);
@@ -187,8 +189,8 @@ public class ChatService {
             rootSpan.setStatus(StatusCode.ERROR, e.getMessage());
             tracePublisher.publish(TraceEvent.of("request_complete", requestId,
                     new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
-            try { streamText(emitter, "An internal error occurred. Please try again."); }
-            catch (Exception ex) { emitter.completeWithError(ex); }
+            try { streamTextAndComplete(emitter, "An internal error occurred. Please try again."); }
+            catch (Exception ex) { try { emitter.completeWithError(ex); } catch (Exception ignored) {} }
         } finally {
             rootSpan.end();
         }
@@ -198,7 +200,8 @@ public class ChatService {
                                   String latestPrompt, String conversationId,
                                   ConversationSession session, String userId,
                                   Principal jwtPrincipal,
-                                  String requestId, long requestStart, Span rootSpan) throws Exception {
+                                  String requestId, long requestStart, Span rootSpan,
+                                  EntityBag preExtracted) throws Exception {
         Span span = tracer.spanBuilder("chat.fetch_data").startSpan();
         try {
             ResolverResult resolved = resolver.resolve(latestPrompt);
@@ -215,7 +218,7 @@ public class ChatService {
                     new AgentsResolvedData(selectedRefs, skippedRefs)));
 
             if (resolved.fallback() || resolved.selected().isEmpty()) {
-                streamText(emitter, "I wasn't sure which services to consult. " +
+                streamTextAndComplete(emitter, "I wasn't sure which services to consult. " +
                         "Please mention the client name and what you need.");
                 tracePublisher.publish(TraceEvent.of("request_complete", requestId,
                         new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
@@ -233,7 +236,7 @@ public class ChatService {
                     .map(c -> c.manifest()).collect(Collectors.toList());
             List<AgentManifest> allowedManifests = entitlementService.filterAgents(principal, manifests);
             if (allowedManifests.isEmpty()) {
-                streamText(emitter, "You do not have access to any of the required services for this query.");
+                streamTextAndComplete(emitter, "You do not have access to any of the required services for this query.");
                 tracePublisher.publish(TraceEvent.of("request_complete", requestId,
                         new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
                 return;
@@ -244,14 +247,27 @@ public class ChatService {
             }
             final List<AgentManifest> finalManifests = allowedManifests;
 
-            String entityPrompt = buildEntityPrompt(latestPrompt, session);
-            SynthesisResult synthesis = inputSynthesizer.synthesize(entityPrompt, finalManifests);
+            // Use pre-extracted entities from the combined intent+entity LLM call if available.
+            // Merge session relationship context into the pre-extracted bag when it lacks a ref.
+            SynthesisResult synthesis;
+            if (preExtracted != null) {
+                EntityBag effectiveBag = preExtracted;
+                if (preExtracted.relationshipReference() == null && session.relationshipId() != null) {
+                    effectiveBag = EntityBag.extracted(
+                            session.relationshipId(), preExtracted.fundReference(),
+                            preExtracted.tickerReferences(), preExtracted.period());
+                }
+                synthesis = inputSynthesizer.synthesize(effectiveBag, finalManifests);
+            } else {
+                String entityPrompt = buildEntityPrompt(latestPrompt, session);
+                synthesis = inputSynthesizer.synthesize(entityPrompt, finalManifests);
+            }
 
             if (synthesis.needsClarification() && synthesis.inputs().isEmpty()) {
-                streamText(emitter, synthesis.clarificationMessage()); return;
+                streamTextAndComplete(emitter, synthesis.clarificationMessage()); return;
             }
             if (synthesis.inputs().isEmpty()) {
-                streamText(emitter, "Please specify the client name (e.g. 'Whitman Family Office')."); return;
+                streamTextAndComplete(emitter, "Please specify the client name (e.g. 'Whitman Family Office')."); return;
             }
 
             String resolvedRelId = extractResolvedRelId(synthesis);
@@ -263,7 +279,7 @@ public class ChatService {
                     String denialMsg = "Access denied: you are not authorized to view relationship " +
                             resolvedRelId + ". This denial has been logged.";
                     try {
-                        streamText(emitter, denialMsg);
+                        streamTextAndComplete(emitter, denialMsg);
                     } catch (Exception denialEx) {
                         log.warn("Could not stream denial message (client disconnect?): {}", denialEx.getMessage());
                         try { emitter.complete(); } catch (Exception ce) { emitter.completeWithError(ce); }
@@ -317,19 +333,23 @@ public class ChatService {
         Span span = tracer.spanBuilder("chat.follow_up").startSpan();
         try {
             if (session.hasFreshResults(RESULT_CACHE_TTL_MS)) {
-                long ok = session.lastAgentResults().stream().filter(NodeResult::isOk).count();
+                List<NodeResult> cached = session.lastAgentResults();
+                int total = cached.size();
+                long ok = cached.stream().filter(NodeResult::isOk).count();
                 tracePublisher.publish(TraceEvent.of("synthesis_start", requestId,
-                        new SynthesisStartData(session.lastAgentResults().size(), (int) ok)));
-                answerSynthesizer.synthesize(session.lastAgentResults(), latestPrompt, request.messages(), emitter);
+                        new SynthesisStartData(total, (int) ok)));
+                answerSynthesizer.synthesize(cached, latestPrompt, request.messages(), emitter);
+                tracePublisher.publish(TraceEvent.of("request_complete", requestId,
+                        new RequestCompleteData(System.currentTimeMillis() - requestStart, total, (int) ok)));
             } else if (session.relationshipId() != null) {
                 String enriched = latestPrompt + " [session_relationship_id: " + session.relationshipId() + "]";
-                handleFetchData(request, emitter, enriched, conversationId, session, userId, jwtPrincipal, requestId, requestStart, rootSpan);
+                handleFetchData(request, emitter, enriched, conversationId, session, userId, jwtPrincipal, requestId, requestStart, rootSpan, null);
                 return;
             } else {
                 answerSynthesizer.synthesizeFromHistory(request.messages(), latestPrompt, emitter);
+                tracePublisher.publish(TraceEvent.of("request_complete", requestId,
+                        new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
             }
-            tracePublisher.publish(TraceEvent.of("request_complete", requestId,
-                    new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
         } finally { span.end(); }
     }
 
@@ -354,7 +374,7 @@ public class ChatService {
         } else {
             msg.append("Which client or fund are you asking about? For example: 'Show me the holdings for Whitman Family Office'.");
         }
-        streamText(emitter, msg.toString());
+        streamTextAndComplete(emitter, msg.toString());
         tracePublisher.publish(TraceEvent.of("request_complete", requestId,
                 new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
     }
@@ -408,7 +428,8 @@ public class ChatService {
         }
     }
 
-    private void streamText(SseEmitter emitter, String text) throws Exception {
+    /** Sends text tokens as SSE deltas and calls {@code emitter.complete()}. Terminates the stream. */
+    private void streamTextAndComplete(SseEmitter emitter, String text) throws Exception {
         String id = newId(); long ts = epochSeconds();
         emitter.send(SseEmitter.event().data(roleDelta(id, ts)));
         for (String word : text.split("(?<=\\s)|(?=\\s)")) {
