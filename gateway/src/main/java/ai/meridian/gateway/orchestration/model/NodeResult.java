@@ -1,5 +1,7 @@
 package ai.meridian.gateway.orchestration.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 
 /**
@@ -9,6 +11,7 @@ import com.fasterxml.jackson.databind.JsonNode;
  * {@link #isOk()} before reading {@code data}.  A NodeResult is always produced —
  * the harness never propagates an exception to the executor.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record NodeResult(
         String nodeId,
         String agentId,
@@ -31,6 +34,7 @@ public record NodeResult(
     }
 
     /** Convenience: true when the call completed successfully with data. */
+    @JsonIgnore
     public boolean isOk() {
         return status == Status.OK;
     }

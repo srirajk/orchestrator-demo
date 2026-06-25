@@ -226,7 +226,8 @@ public class IntentClassifier {
 
     private HttpResponse<String> sendWithRetry(String requestBody) throws Exception {
         String endpoint = baseUrl + "/chat/completions";
-        int delayMs = 1_000;
+        int delayMs = 2_000;
+        Exception lastException = null;
         for (int attempt = 1; attempt <= 3; attempt++) {
             // Rebuild request each attempt — BodyPublishers.ofString() is one-shot.
             HttpRequest request = HttpRequest.newBuilder()
@@ -234,15 +235,21 @@ public class IntentClassifier {
                     .version(HttpClient.Version.HTTP_1_1)
                     .header("Content-Type", "application/json")
                     .header("Authorization", "Bearer " + apiKey)
-                    .timeout(Duration.ofSeconds(10))
+                    .timeout(Duration.ofSeconds(25))
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                     .build();
-            HttpResponse<String> resp = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            if (resp.statusCode() != 429 || attempt == 3) return resp;
-            log.warn("LLM rate limited (429), retry {}/3 in {}ms", attempt, delayMs);
+            try {
+                HttpResponse<String> resp = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                if (resp.statusCode() != 429 || attempt == 3) return resp;
+                log.warn("LLM rate limited (429), retry {}/3 in {}ms", attempt, delayMs);
+            } catch (java.net.http.HttpTimeoutException e) {
+                log.warn("LLM timeout (attempt {}/3), retrying in {}ms: {}", attempt, delayMs, e.getMessage());
+                lastException = e;
+            }
             Thread.sleep(delayMs);
             delayMs *= 2;
         }
+        if (lastException != null) throw lastException;
         throw new IllegalStateException("unreachable");
     }
 }

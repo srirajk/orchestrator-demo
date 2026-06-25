@@ -77,6 +77,12 @@ public class EntityResolver {
 
     private String resolveRelationship(String reference) {
         if (reference == null || reference.isBlank()) return null;
+
+        // Already a canonical system ID (e.g. "REL-00042" carried from the session cache)
+        if (reference.toUpperCase().matches("REL-\\d+")) {
+            return reference.toUpperCase();
+        }
+
         String lower = reference.toLowerCase();
         for (Map.Entry<String, String> entry : RELATIONSHIP_TABLE.entrySet()) {
             if (lower.contains(entry.getKey())) {
