@@ -76,8 +76,9 @@ public class AgentResolver {
                 .filter(c -> c.score() < effectiveFloor)
                 .toList();
 
-        log.debug("Resolver: prompt='{}' → {} candidates, {} selected, {} skipped (floor={:.3f}/relative={:.3f}), topScore={}",
-                prompt, candidates.size(), selected.size(), skipped.size(), confidenceFloor, effectiveFloor, topScore);
+        log.debug("Resolver: prompt='{}' → {} candidates, {} selected, {} skipped (floor={}/relative={}), topScore={}",
+                prompt, candidates.size(), selected.size(), skipped.size(),
+                String.format("%.3f", confidenceFloor), String.format("%.3f", effectiveFloor), topScore);
 
         meterRegistry.gauge("resolver.route.confidence", topScore);
         if (fallback) meterRegistry.counter("resolver.fallback").increment();

@@ -70,7 +70,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: meridian
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-changeme}
       GF_SECURITY_ADMIN_USER: admin
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
@@ -97,9 +97,9 @@ services:
       MERIDIAN_EMBEDDING_PROVIDER: remote
       MERIDIAN_EMBEDDING_REMOTE_URL: http://embeddings:8083/v1/embeddings
       MERIDIAN_EMBEDDING_DIMENSION: 384
-      # OTel export endpoint (within compose network)
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
-      MANAGEMENT_OTLP_TRACING_ENDPOINT: http://otel-collector:4318/v1/traces
+      # OTel export — send traces directly to Phoenix (core profile; otel-collector only in scale)
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://phoenix:6006
+      MANAGEMENT_OTLP_TRACING_ENDPOINT: http://phoenix:6006/v1/traces
       MANAGEMENT_OTLP_METRICS_EXPORT_URL: http://otel-collector:4318/v1/metrics
       CERBOS_HOST: cerbos
       CERBOS_HTTP_PORT: 3592
@@ -191,17 +191,38 @@ services:
       JWT_SECRET: ${JWT_SECRET:-meridian-demo-jwt-secret-change-in-production}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-meridian-demo-jwt-refresh-secret-change-in-production}
       ALLOW_REGISTRATION: "true"
-      ALLOW_SOCIAL_LOGIN: "false"
+      # OIDC SSO — "Login with Meridian" button
+      ALLOW_SOCIAL_LOGIN: "true"
+      # LibreChat uses DOMAIN_SERVER + OPENID_CALLBACK_URL to build the full callback URL.
+      # DOMAIN_CLIENT is the browser-facing URL; used as the post-OAuth redirect destination.
+      DOMAIN_CLIENT: "http://localhost:3080"
+      DOMAIN_SERVER: "http://localhost:3080"
+      OPENID_CLIENT_ID: "meridian-librechat"
+      OPENID_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-meridian-client-secret-dev}
+      # LibreChat (inside Docker) fetches discovery from user-mgmt on Docker network
+      OPENID_ISSUER: "http://user-mgmt:8084"
+      # Path only — LibreChat prepends DOMAIN_SERVER
+      OPENID_CALLBACK_URL: "/oauth/openid/callback"
+      OPENID_BUTTON_LABEL: "Login with Meridian SSO"
+      OPENID_SCOPE: "openid profile email"
+      # Required for LibreChat to configure the OIDC session store
+      OPENID_SESSION_SECRET: ${OPENID_SESSION_SECRET:-meridian-openid-session-secret-dev}
+      # Allow HTTP issuers in dev (production must use HTTPS)
+      OPENID_ALLOW_HTTP: "true"
       NO_INDEX: "true"
     volumes:
       - ./.env:/app/.env:ro
       - ./librechat/librechat.yaml:/app/librechat.yaml:ro
+      # Patch: allows HTTP OIDC issuer in dev (openid-client v6 requires HTTPS by default)
+      - ./librechat/patches/openidStrategy.js:/app/api/strategies/openidStrategy.js:ro
       - librechat-uploads:/app/uploads
       - librechat-images:/app/client/public/images
     depends_on:
       mongodb:
         condition: service_healthy
       gateway:
+        condition: service_healthy
+      user-mgmt:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3080/"]
@@ -240,7 +261,14 @@ services:
     environment:
       REDIS_HOST: redis-stack
       REDIS_PORT: 6379
-      JWT_SECRET: ${JWT_SECRET:-meridian-demo-jwt-secret-change-in-production}
+      # OIDC: issuer URL used inside Docker network (must match OPENID_ISSUER in LibreChat)
+      OIDC_ISSUER: "http://user-mgmt:8084"
+      # Browser-accessible URL for the /oauth/authorize redirect
+      OIDC_BASE_URL: "http://localhost:8084"
+      OIDC_CLIENT_ID: "meridian-librechat"
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-meridian-client-secret-dev}
+      # Demo default password for all seeded users (override to customize)
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-Meridian@2024}
     depends_on:
       redis-stack:
         condition: service_healthy
