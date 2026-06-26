@@ -65,14 +65,16 @@ public class IntentClassifier {
             }
 
             Entity extraction rules (for FETCH_DATA only — null/empty for other intents):
-            - relationship_reference: the client/relationship name EXACTLY as stated, or null
-            - fund_reference: the fund name or code EXACTLY as stated, or null
+            - relationship_reference: the client relationship name OR ID EXACTLY as stated. \
+              Examples: "Whitman Family Office", "REL-00042", "Chen Family Trust", "REL-00099". \
+              "REL-XXXXX" codes are ALWAYS relationship IDs — never fund codes. Put them here.
+            - fund_reference: a fund name or FND-XXXXX code ONLY (not REL-XXXXX codes), or null
             - ticker_references: list of stock tickers mentioned, e.g. ["AAPL","MSFT"], or []
             - period: QTD/YTD/MTD/etc. — default "QTD" when not stated
             - NEVER invent identifiers; copy verbatim from the user's words
 
             Intent rules:
-            - If the user mentions a client name (Whitman, Chen, Okafor, etc.) → FETCH_DATA
+            - If the user mentions a client name or REL-XXXXX code (Whitman, Chen, REL-00042, etc.) → FETCH_DATA
             - If prior assistant turn has banking data and user says "explain", "what does X mean", \
               "tell me more", "simplify" → FOLLOW_UP
             - If banking-related but no client mentioned and none in prior turns → CLARIFY
@@ -86,19 +88,31 @@ public class IntentClassifier {
     private final HttpClient httpClient;
     private final Timer classifyTimer;
     private final Tracer tracer;
+    private final int maxRetries;
+    private final int retryInitialDelayMs;
+    private final int retryBackoffMultiplier;
+    private final int requestTimeoutSeconds;
 
     public IntentClassifier(
             ObjectMapper mapper,
             MeterRegistry meterRegistry,
             Tracer tracer,
-            @Value("${meridian.llm.base-url:https://api.z.ai/api/paas/v4}") String baseUrl,
-            @Value("${meridian.llm.api-key:${ZAI_API_KEY:}}") String apiKey,
-            @Value("${meridian.llm.intent-model:glm-4.5-flash}") String model) {
+            @Value("${meridian.llm.intent-classifier.base-url:https://api.z.ai/api/paas/v4}") String baseUrl,
+            @Value("${meridian.llm.intent-classifier.api-key:}") String apiKey,
+            @Value("${meridian.llm.intent-classifier.model:glm-4.5-flash}") String model,
+            @Value("${meridian.llm.max-retries:3}") int maxRetries,
+            @Value("${meridian.llm.retry-initial-delay-ms:2000}") int retryInitialDelayMs,
+            @Value("${meridian.llm.retry-backoff-multiplier:2}") int retryBackoffMultiplier,
+            @Value("${meridian.llm.request-timeout-seconds:25}") int requestTimeoutSeconds) {
         this.mapper = mapper;
         this.baseUrl = baseUrl;
         this.apiKey = apiKey;
         this.model = model;
         this.tracer = tracer;
+        this.maxRetries = maxRetries;
+        this.retryInitialDelayMs = retryInitialDelayMs;
+        this.retryBackoffMultiplier = retryBackoffMultiplier;
+        this.requestTimeoutSeconds = requestTimeoutSeconds;
         this.httpClient = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1)
                 .connectTimeout(Duration.ofSeconds(5))
@@ -152,15 +166,36 @@ public class IntentClassifier {
                                 .put("role", "user")
                                 .put("content", conversationContext))));
 
-        HttpResponse<String> response = sendWithRetry(requestBody);
+        // Create a child LLM span with OpenInference attributes so Phoenix can display
+        // this as a real AI call (model name, prompt, response, token counts).
+        Span llmSpan = tracer.spanBuilder("llm.call")
+                .setAttribute("openinference.span.kind", "LLM")
+                .setAttribute("llm.model_name", model)
+                .setAttribute("llm.system", "openai")
+                .setAttribute("llm.input_messages.0.message.role", "system")
+                .setAttribute("llm.input_messages.0.message.content", SYSTEM_PROMPT)
+                .setAttribute("llm.input_messages.1.message.role", "user")
+                .setAttribute("llm.input_messages.1.message.content", truncate(conversationContext, 2000))
+                .startSpan();
+
+        HttpResponse<String> response;
+        try {
+            response = sendWithRetry(requestBody);
+        } catch (Exception e) {
+            llmSpan.recordException(e);
+            llmSpan.end();
+            throw e;
+        }
 
         if (response.statusCode() != 200) {
+            llmSpan.end();
             throw new RuntimeException("LLM returned HTTP " + response.statusCode());
         }
 
         JsonNode root = mapper.readTree(response.body());
         JsonNode choices = root.path("choices");
         if (!choices.isArray() || choices.isEmpty()) {
+            llmSpan.end();
             throw new RuntimeException("LLM returned empty choices array");
         }
         String content = choices.path(0).path("message").path("content").asText();
@@ -170,6 +205,19 @@ public class IntentClassifier {
         if (content.startsWith("```")) {
             content = content.replaceAll("```[a-z]*\\n?", "").replace("```", "").strip();
         }
+
+        // Capture token usage for Phoenix cost/perf view
+        JsonNode usage = root.path("usage");
+        if (!usage.isMissingNode()) {
+            long promptTokens = usage.path("prompt_tokens").asLong(0);
+            long completionTokens = usage.path("completion_tokens").asLong(0);
+            llmSpan.setAttribute("llm.token_count.prompt", promptTokens);
+            llmSpan.setAttribute("llm.token_count.completion", completionTokens);
+            llmSpan.setAttribute("llm.token_count.total", promptTokens + completionTokens);
+        }
+        llmSpan.setAttribute("llm.output_messages.0.message.role", "assistant");
+        llmSpan.setAttribute("llm.output_messages.0.message.content", truncate(content, 1000));
+        llmSpan.end();
 
         JsonNode parsed = mapper.readTree(content);
         String intentStr = parsed.path("intent").asText("FETCH_DATA").toUpperCase();
@@ -226,28 +274,28 @@ public class IntentClassifier {
 
     private HttpResponse<String> sendWithRetry(String requestBody) throws Exception {
         String endpoint = baseUrl + "/chat/completions";
-        int delayMs = 2_000;
+        int delayMs = retryInitialDelayMs;
         Exception lastException = null;
-        for (int attempt = 1; attempt <= 3; attempt++) {
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
             // Rebuild request each attempt — BodyPublishers.ofString() is one-shot.
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(endpoint))
                     .version(HttpClient.Version.HTTP_1_1)
                     .header("Content-Type", "application/json")
                     .header("Authorization", "Bearer " + apiKey)
-                    .timeout(Duration.ofSeconds(25))
+                    .timeout(Duration.ofSeconds(requestTimeoutSeconds))
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                     .build();
             try {
                 HttpResponse<String> resp = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-                if (resp.statusCode() != 429 || attempt == 3) return resp;
-                log.warn("LLM rate limited (429), retry {}/3 in {}ms", attempt, delayMs);
+                if (resp.statusCode() != 429 || attempt == maxRetries) return resp;
+                log.warn("LLM rate limited (429), retry {}/{} in {}ms", attempt, maxRetries, delayMs);
             } catch (java.net.http.HttpTimeoutException e) {
-                log.warn("LLM timeout (attempt {}/3), retrying in {}ms: {}", attempt, delayMs, e.getMessage());
+                log.warn("LLM timeout (attempt {}/{}), retrying in {}ms: {}", attempt, maxRetries, delayMs, e.getMessage());
                 lastException = e;
             }
             Thread.sleep(delayMs);
-            delayMs *= 2;
+            delayMs *= retryBackoffMultiplier;
         }
         if (lastException != null) throw lastException;
         throw new IllegalStateException("unreachable");

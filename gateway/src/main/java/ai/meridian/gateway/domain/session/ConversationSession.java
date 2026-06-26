@@ -33,13 +33,6 @@ public record ConversationSession(
         return (System.currentTimeMillis() - agentResultsEpochMs) < ttlMs;
     }
 
-    /** Returns a copy with incremented turn count. */
-    public ConversationSession incrementTurn() {
-        return new ConversationSession(
-                conversationId, relationshipId, fundId,
-                lastAgentResults, agentResultsEpochMs, turnCount + 1);
-    }
-
     /** Returns a copy with updated entity IDs and fresh agent results. */
     public ConversationSession withResults(String relId, String fId, List<NodeResult> results) {
         return new ConversationSession(

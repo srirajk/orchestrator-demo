@@ -49,15 +49,44 @@ meridian:
     relative-floor-factor: 0.65  # dynamic floor = max(absolute, topScore * factor); prunes long-tail matches
     top-k: 10
   llm:
-    base-url: ${MERIDIAN_LLM_BASE_URL:https://api.z.ai/api/paas/v4}
-    api-key: ${ZAI_API_KEY:}
-    # Fast/cheap model for intent classification and entity extraction (target p99 < 300ms)
-    intent-model: ${MERIDIAN_LLM_INTENT_MODEL:glm-4.5-flash}
-    extraction-model: ${MERIDIAN_LLM_EXTRACTION_MODEL:glm-4.5-flash}
-    # Quality model for answer synthesis (streamed, grounded)
-    synthesis-model: ${MERIDIAN_LLM_SYNTHESIS_MODEL:glm-4.5-flash}
-    # Set to true to stream model reasoning (chain-of-thought) as a blockquote before the answer
+    # ── Intent Classifier (classification + routing) ──────────────────────────
+    intent-classifier:
+      base-url: ${MERIDIAN_LLM_INTENT_CLASSIFIER_BASE_URL:https://api.openai.com/v1}
+      api-key: ${MERIDIAN_LLM_INTENT_CLASSIFIER_API_KEY:}
+      model: ${MERIDIAN_LLM_INTENT_CLASSIFIER_MODEL:gpt-4o-mini}
+    # ── Entity Extractor (pull relationship/fund/ticker from user prompt) ─────
+    entity-extractor:
+      base-url: ${MERIDIAN_LLM_ENTITY_EXTRACTOR_BASE_URL:https://api.openai.com/v1}
+      api-key: ${MERIDIAN_LLM_ENTITY_EXTRACTOR_API_KEY:}
+      model: ${MERIDIAN_LLM_ENTITY_EXTRACTOR_MODEL:gpt-4o-mini}
+    # ── Answer Synthesizer (grounded streaming answer) ────────────────────────
+    synthesizer:
+      base-url: ${MERIDIAN_LLM_SYNTHESIZER_BASE_URL:https://api.openai.com/v1}
+      api-key: ${MERIDIAN_LLM_SYNTHESIZER_API_KEY:}
+      model: ${MERIDIAN_LLM_SYNTHESIZER_MODEL:gpt-4o-mini}
+    # Set to true to stream the model's chain-of-thought as a blockquote before the answer
     show-reasoning: ${MERIDIAN_LLM_SHOW_REASONING:false}
+    max-retries: ${MERIDIAN_LLM_MAX_RETRIES:3}
+    retry-initial-delay-ms: ${MERIDIAN_LLM_RETRY_INITIAL_DELAY_MS:2000}
+    retry-backoff-multiplier: ${MERIDIAN_LLM_RETRY_BACKOFF_MULTIPLIER:2}
+    request-timeout-seconds: ${MERIDIAN_LLM_REQUEST_TIMEOUT_SECONDS:25}
+  orchestration:
+    fan-out-deadline-ms: ${MERIDIAN_FANOUT_DEADLINE_MS:60000}
+    harness:
+      default-sla-ms: ${MERIDIAN_HARNESS_DEFAULT_SLA_MS:5000}
+      bulkhead:
+        max-concurrent: ${MERIDIAN_HARNESS_BULKHEAD_MAX_CONCURRENT:5}
+        queue-capacity: ${MERIDIAN_HARNESS_BULKHEAD_QUEUE_CAPACITY:20}
+      circuit-breaker:
+        failure-rate-threshold: ${MERIDIAN_CB_FAILURE_RATE_THRESHOLD:50}
+        slow-call-rate-threshold: ${MERIDIAN_CB_SLOW_CALL_RATE_THRESHOLD:80}
+        slow-call-duration-seconds: ${MERIDIAN_CB_SLOW_CALL_DURATION_SECONDS:10}
+        open-wait-seconds: ${MERIDIAN_CB_OPEN_WAIT_SECONDS:30}
+        sliding-window-size: ${MERIDIAN_CB_SLIDING_WINDOW_SIZE:10}
+        min-calls: ${MERIDIAN_CB_MIN_CALLS:3}
+        half-open-permitted-calls: ${MERIDIAN_CB_HALF_OPEN_PERMITTED_CALLS:2}
+  telemetry:
+    trace-ttl-seconds: ${MERIDIAN_TELEMETRY_TRACE_TTL_SECONDS:86400}
   session:
     ttl-seconds: ${MERIDIAN_SESSION_TTL_SECONDS:1800}   # 30 min idle expiry
   cerbos:

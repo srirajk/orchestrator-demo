@@ -6,6 +6,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -163,22 +169,42 @@ public class HttpAdapter implements ProtocolAdapter {
         }
         URI uri = builder.build(true).toUri();
         log.debug("GET {}", uri);
-        String response = restTemplate.getForObject(uri, String.class);
-        return response != null ? response : "{}";
+        var response = restTemplate.exchange(uri, HttpMethod.GET,
+                new HttpEntity<>(agentHeaders()), String.class);
+        return response.getBody() != null ? response.getBody() : "{}";
     }
 
     /** POST the input JsonNode as the request body. */
     private String invokePost(String url, JsonNode input) throws Exception {
         log.debug("POST {} body={}", url, input);
         String body = input != null ? objectMapper.writeValueAsString(input) : "{}";
-        // RestTemplate sends application/json by default when given a String body
-        // via exchange; use postForObject with a plain String for simplicity.
-        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
-        headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
-        org.springframework.http.HttpEntity<String> entity =
-                new org.springframework.http.HttpEntity<>(body, headers);
-        String response = restTemplate.postForObject(url, entity, String.class);
-        return response != null ? response : "{}";
+        HttpHeaders headers = agentHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        var response = restTemplate.exchange(url, HttpMethod.POST,
+                new HttpEntity<>(body, headers), String.class);
+        return response.getBody() != null ? response.getBody() : "{}";
+    }
+
+    /**
+     * Build outbound headers, propagating the caller's JWT when present.
+     * Agents verify the signature themselves — no implicit gateway trust.
+     */
+    private HttpHeaders agentHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        String token = extractBearerToken();
+        if (token != null) {
+            headers.setBearerAuth(token);
+            log.debug("HttpAdapter: propagating JWT to agent");
+        }
+        return headers;
+    }
+
+    private String extractBearerToken() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth instanceof JwtAuthenticationToken jwtAuth) {
+            return jwtAuth.getToken().getTokenValue();
+        }
+        return null;
     }
 
     /** Lightweight value type for a matched OpenAPI operation. */

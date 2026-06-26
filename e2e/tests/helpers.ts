@@ -74,6 +74,11 @@ export async function sendMessage(page: Page, text: string): Promise<string> {
   // Confirmed selector from live inspection: #prompt-textarea (data-testid="text-input")
   const inputBox = page.locator('#prompt-textarea').first();
   await inputBox.waitFor({ state: 'visible', timeout: 30_000 });
+
+  // Also wait for #send-button to be enabled — this ensures any prior streaming reply has
+  // fully settled before we try to send the next message (important in multi-turn tests).
+  await expect(page.locator('#send-button')).toBeEnabled({ timeout: 15_000 }).catch(() => {});
+
   await inputBox.click();
   await inputBox.fill(text);
 
@@ -115,6 +120,9 @@ export async function newConversation(page: Page): Promise<void> {
   const btn = page.locator('button[aria-label="New chat"]').first();
   if (await btn.isVisible({ timeout: 5_000 }).catch(() => false)) {
     await btn.click();
-    await page.waitForTimeout(1_500);
+    // Wait for LibreChat to navigate to a new conversation URL and render the input
+    await page.waitForURL('**/c/**', { timeout: 10_000 }).catch(() => {});
+    await page.locator('#prompt-textarea').first()
+        .waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
   }
 }

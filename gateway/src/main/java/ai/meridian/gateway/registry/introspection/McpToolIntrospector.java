@@ -7,33 +7,30 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Fetches tool input schema from an MCP server via SSE + JSON-RPC.
  *
- * Protocol: POST a tools/list JSON-RPC request to the server's /messages endpoint,
- * read the response from the SSE stream, extract the named tool's inputSchema.
- *
- * The MCP SSE protocol requires:
- *   1. GET /sse to get a session endpoint URL (first event)
- *   2. POST to that session URL with the JSON-RPC payload
- *   3. Read the response event from the SSE stream
- *
- * For Phase 3 we use a simpler approach: directly POST to /messages (FastMCP supports this),
- * falling back to SSE connection if needed.
+ * <p>Uses the same virtual-thread + CompletableFuture pattern as {@link ai.meridian.gateway.adapter.mcp.McpAdapter}:
+ * keeps the SSE connection open for the full exchange (endpoint → initialize → tools/list).
  */
 @Component
 public class McpToolIntrospector {
 
     private static final Logger log = LoggerFactory.getLogger(McpToolIntrospector.class);
-    private static final Duration TIMEOUT = Duration.ofSeconds(10);
+    private static final int TIMEOUT_MS = 15_000;
 
     private final HttpClient httpClient;
     private final ObjectMapper mapper;
@@ -41,19 +38,18 @@ public class McpToolIntrospector {
     public McpToolIntrospector(ObjectMapper mapper) {
         this.mapper = mapper;
         this.httpClient = HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_1_1)  // FastMCP/uvicorn returns 421 on HTTP/2
-                .connectTimeout(TIMEOUT)
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(10))
                 .build();
     }
 
     /**
      * Fetch the JSON Schema inputSchema for a named MCP tool.
-     * Falls back to a generic {relationship_id: string} schema if introspection fails.
+     * Falls back to a generic schema if introspection fails.
      */
     public JsonNode getToolInputSchema(String serverUrl, String toolName) {
         try {
-            // MCP SSE protocol: connect to /sse first to get session endpoint
-            String baseUrl = serverUrl.replace("/sse", "");
+            String baseUrl = serverUrl.contains("/sse") ? serverUrl.substring(0, serverUrl.lastIndexOf("/sse")) : serverUrl;
             JsonNode tools = fetchToolsList(baseUrl);
 
             if (tools != null && tools.isArray()) {
@@ -75,78 +71,148 @@ public class McpToolIntrospector {
         return fallbackSchema(toolName);
     }
 
+    /**
+     * Runs the full MCP SSE handshake: connect → initialize → tools/list → result.
+     * The SSE connection stays open throughout (same pattern as McpAdapter).
+     */
     private JsonNode fetchToolsList(String baseUrl) throws Exception {
-        String id = UUID.randomUUID().toString();
-        String payload = mapper.writeValueAsString(mapper.createObjectNode()
-                .put("jsonrpc", "2.0")
-                .put("id", id)
-                .put("method", "tools/list")
-                .set("params", mapper.createObjectNode()));
+        CompletableFuture<String> endpointFuture = new CompletableFuture<>();
+        CompletableFuture<String> toolsResponseFuture = new CompletableFuture<>();
 
-        // First try direct HTTP (some MCP servers expose a /messages endpoint)
-        HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + "/messages"))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(payload))
-                .timeout(TIMEOUT)
+        HttpRequest sseRequest = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + "/sse"))
+                .version(HttpClient.Version.HTTP_1_1)
+                .header("Accept", "text/event-stream")
+                .header("Cache-Control", "no-cache")
+                .GET()
                 .build();
 
-        HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
-        if (resp.statusCode() == 200) {
-            JsonNode body = mapper.readTree(resp.body());
-            return body.path("result").path("tools");
-        }
+        CompletableFuture<HttpResponse<InputStream>> sseConn =
+                httpClient.sendAsync(sseRequest, HttpResponse.BodyHandlers.ofInputStream());
 
-        // Fallback: initiate SSE session then POST
-        return fetchViaSSE(baseUrl, payload);
+        Thread.startVirtualThread(() -> {
+            try {
+                HttpResponse<InputStream> resp = sseConn.get(TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                if (resp.statusCode() != 200) {
+                    throw new RuntimeException("SSE endpoint returned HTTP " + resp.statusCode());
+                }
+                parseSseStream(resp.body(), endpointFuture, toolsResponseFuture);
+            } catch (Exception e) {
+                endpointFuture.completeExceptionally(e);
+                toolsResponseFuture.completeExceptionally(e);
+            }
+        });
+
+        String sessionPath = endpointFuture.get(TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        String sessionUrl  = buildSessionUrl(baseUrl + "/sse", sessionPath);
+        log.debug("McpToolIntrospector session URL: {}", sessionUrl);
+
+        // Send initialize
+        String initBody = mapper.writeValueAsString(Map.of(
+                "jsonrpc", "2.0",
+                "id", UUID.randomUUID().toString(),
+                "method", "initialize",
+                "params", Map.of(
+                        "protocolVersion", "2024-11-05",
+                        "capabilities", Map.of(),
+                        "clientInfo", Map.of("name", "meridian-gateway-introspector", "version", "1.0")
+                )
+        ));
+        postJson(sessionUrl, initBody);
+
+        // Send tools/list — SSE reader skips initialize ACK and waits for this result
+        String listBody = mapper.writeValueAsString(Map.of(
+                "jsonrpc", "2.0",
+                "id", UUID.randomUUID().toString(),
+                "method", "tools/list",
+                "params", Map.of()
+        ));
+        postJson(sessionUrl, listBody);
+
+        String rawResponse = toolsResponseFuture.get(TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        JsonNode root = mapper.readTree(rawResponse);
+        return root.path("result").path("tools");
     }
 
-    private JsonNode fetchViaSSE(String baseUrl, String payload) throws Exception {
-        // GET /sse to receive the session endpoint
-        AtomicReference<String> sessionUrl = new AtomicReference<>();
+    /**
+     * Reads SSE events: endpoint → (initialize ACK skipped) → tools/list result.
+     */
+    private void parseSseStream(
+            InputStream body,
+            CompletableFuture<String> endpointFuture,
+            CompletableFuture<String> toolsResponseFuture) {
 
-        HttpRequest sseReq = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + "/sse"))
-                .header("Accept", "text/event-stream")
-                .GET()
-                .timeout(Duration.ofSeconds(5))
-                .build();
+        String currentEvent = null;
+        StringBuilder currentData = new StringBuilder();
+        int messageCount = 0;
 
-        // Read just the first event (endpoint announcement)
-        HttpResponse<java.io.InputStream> sseResp = httpClient.send(
-                sseReq, HttpResponse.BodyHandlers.ofInputStream());
-
-        try (java.io.BufferedReader reader = new java.io.BufferedReader(
-                new java.io.InputStreamReader(sseResp.body()))) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(body))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                if (line.startsWith("data:")) {
-                    String data = line.substring(5).trim();
-                    if (data.startsWith("/")) {
-                        sessionUrl.set(baseUrl + data);
-                        break;
-                    } else if (data.startsWith("http")) {
-                        sessionUrl.set(data);
-                        break;
+                if (line.startsWith("event:")) {
+                    currentEvent = line.substring("event:".length()).strip();
+                    currentData.setLength(0);
+                } else if (line.startsWith("data:")) {
+                    String part = line.substring("data:".length()).strip();
+                    if (!currentData.isEmpty()) currentData.append('\n');
+                    currentData.append(part);
+                } else if (line.isBlank()) {
+                    if (currentEvent != null && !currentData.isEmpty()) {
+                        String data = currentData.toString();
+                        switch (currentEvent) {
+                            case "endpoint" -> {
+                                log.debug("McpToolIntrospector: endpoint event = {}", data);
+                                endpointFuture.complete(data);
+                            }
+                            case "message" -> {
+                                messageCount++;
+                                if (messageCount == 1) {
+                                    log.debug("McpToolIntrospector: initialize ACK received (skipped)");
+                                } else {
+                                    log.debug("McpToolIntrospector: tools/list result received");
+                                    toolsResponseFuture.complete(data);
+                                    return;
+                                }
+                            }
+                            default -> log.debug("McpToolIntrospector: unknown event '{}': {}", currentEvent, data);
+                        }
                     }
+                    currentEvent = null;
+                    currentData.setLength(0);
                 }
+
+                if (toolsResponseFuture.isDone()) return;
             }
+            if (!toolsResponseFuture.isDone()) {
+                toolsResponseFuture.completeExceptionally(
+                        new RuntimeException("SSE stream closed before tools/list response"));
+            }
+        } catch (Exception e) {
+            endpointFuture.completeExceptionally(e);
+            toolsResponseFuture.completeExceptionally(e);
         }
+    }
 
-        if (sessionUrl.get() == null) {
-            throw new RuntimeException("No session URL received from MCP SSE endpoint");
-        }
-
-        HttpRequest postReq = HttpRequest.newBuilder()
-                .uri(URI.create(sessionUrl.get()))
+    private void postJson(String url, String body) throws Exception {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .version(HttpClient.Version.HTTP_1_1)
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(payload))
-                .timeout(TIMEOUT)
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .timeout(Duration.ofSeconds(10))
                 .build();
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() >= 400) {
+            throw new RuntimeException("POST " + url + " returned HTTP " + response.statusCode()
+                    + ": " + response.body());
+        }
+    }
 
-        HttpResponse<String> postResp = httpClient.send(postReq, HttpResponse.BodyHandlers.ofString());
-        JsonNode body = mapper.readTree(postResp.body());
-        return body.path("result").path("tools");
+    private String buildSessionUrl(String serverUrl, String sessionPath) {
+        URI serverUri = URI.create(serverUrl);
+        String origin = serverUri.getScheme() + "://" + serverUri.getAuthority();
+        return sessionPath.startsWith("/") ? origin + sessionPath
+                : serverUrl.substring(0, serverUrl.lastIndexOf('/') + 1) + sessionPath;
     }
 
     private JsonNode fallbackSchema(String toolName) {
@@ -154,7 +220,6 @@ public class McpToolIntrospector {
         schema.put("type", "object");
         ObjectNode props = schema.putObject("properties");
 
-        // nav tool uses fund_id; all others use relationship_id
         if ("get_nav".equals(toolName)) {
             props.putObject("fund_id").put("type", "string");
             schema.putArray("required").add("fund_id");

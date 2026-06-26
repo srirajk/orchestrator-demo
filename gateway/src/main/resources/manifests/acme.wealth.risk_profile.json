@@ -21,20 +21,30 @@
       "id": "get_risk_profile",
       "name": "get_risk_profile",
       "description": "Retrieve risk tolerance rating and concentration flags indicating portfolio risk exposures for a wealth relationship.",
-      "tags": ["risk", "risk-profile", "concentration", "tolerance", "wealth-management"],
+      "tags": [
+        "risk",
+        "risk-profile",
+        "concentration",
+        "tolerance",
+        "wealth-management"
+      ],
       "examples": [
         "risk profile for this client",
         "how concentrated is this portfolio",
         "risk tolerance for the relationship",
         "any concentration flags on this account"
       ],
-      "inputModes": ["application/json"],
-      "outputModes": ["application/json"]
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
     }
   ],
   "constraints": {
     "is_mutating": false,
     "data_classification": "confidential-pii",
-    "sla_timeout_ms": 2500
+    "sla_timeout_ms": 30000
   }
 }

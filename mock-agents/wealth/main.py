@@ -16,12 +16,17 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(__file__))
 
-from fastapi import FastAPI
+import logging
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from shared.fault_knobs import fault_knob_middleware
+from shared.jwt_verify import verify_bearer_token
 from holdings.handler import router as holdings_router
 from performance.handler import router as performance_router
 from goal_planning.handler import router as goal_planning_router
 from risk_profile.handler import router as risk_profile_router
+
+log = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Meridian Wealth Management Service",
@@ -35,6 +40,20 @@ app = FastAPI(
     contact={"name": "Meridian Platform Team"},
     license_info={"name": "Internal Demo"},
 )
+
+@app.middleware("http")
+async def jwt_auth_middleware(request: Request, call_next):
+    """Verify JWT on every request except /health and /openapi.json."""
+    if request.url.path in ("/health", "/openapi.json", "/docs", "/redoc"):
+        return await call_next(request)
+    auth = request.headers.get("Authorization")
+    allowed, error, claims = verify_bearer_token(auth)
+    if not allowed:
+        log.warning("wealth-http: rejected request — %s (path=%s)", error, request.url.path)
+        return JSONResponse(status_code=401, content={"detail": error})
+    if claims:
+        request.state.principal = claims.get("sub")
+    return await call_next(request)
 
 app.middleware("http")(fault_knob_middleware)
 

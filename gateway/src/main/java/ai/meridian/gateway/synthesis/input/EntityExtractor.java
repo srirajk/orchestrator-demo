@@ -43,13 +43,13 @@ public class EntityExtractor {
             "If a field is not mentioned leave it null (or empty list for tickers). " +
             "Use 'QTD' as the default period when no time period is specified.";
 
-    @Value("${meridian.llm.base-url:https://api.z.ai/api/paas/v4}")
+    @Value("${meridian.llm.entity-extractor.base-url:https://api.openai.com/v1}")
     private String baseUrl;
 
-    @Value("${meridian.llm.api-key:${ZAI_API_KEY:}}")
+    @Value("${meridian.llm.entity-extractor.api-key:}")
     private String apiKey;
 
-    @Value("${meridian.llm.extraction-model:glm-4.5-flash}")
+    @Value("${meridian.llm.entity-extractor.model:gpt-4o-mini}")
     private String model;
 
     private final RestTemplate restTemplate;

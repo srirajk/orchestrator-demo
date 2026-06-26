@@ -4,6 +4,7 @@ import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -38,6 +39,16 @@ public class JwksClient {
     private final Map<String, RSAPublicKey> keyCache = new ConcurrentHashMap<>();
     private volatile Instant cacheExpiry = Instant.MIN;
     private final ReentrantLock refreshLock = new ReentrantLock();
+
+    @PostConstruct
+    public void warmUp() {
+        try {
+            refreshKeys();
+            log.info("JwksClient: pre-loaded {} key(s) at startup", keyCache.size());
+        } catch (Exception e) {
+            log.warn("JwksClient: startup pre-load failed (will retry on first request): {}", e.getMessage());
+        }
+    }
 
     /**
      * Return the RSA public key for the given kid.

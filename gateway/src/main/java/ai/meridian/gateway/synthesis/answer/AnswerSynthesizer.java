@@ -6,6 +6,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.api.trace.Tracer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -58,18 +61,30 @@ public class AnswerSynthesizer {
     private final String model;
     private final boolean showReasoning;
     private final HttpClient httpClient;
+    private final Tracer tracer;
+    private final int maxRetries;
+    private final int retryInitialDelayMs;
+    private final int retryBackoffMultiplier;
 
     public AnswerSynthesizer(
             ObjectMapper mapper,
-            @Value("${meridian.llm.base-url:https://api.z.ai/api/paas/v4}") String baseUrl,
-            @Value("${meridian.llm.api-key:${ZAI_API_KEY:}}") String apiKey,
-            @Value("${meridian.llm.synthesis-model:glm-4.5-flash}") String model,
-            @Value("${meridian.llm.show-reasoning:false}") boolean showReasoning) {
+            Tracer tracer,
+            @Value("${meridian.llm.synthesizer.base-url:https://api.openai.com/v1}") String baseUrl,
+            @Value("${meridian.llm.synthesizer.api-key:}") String apiKey,
+            @Value("${meridian.llm.synthesizer.model:gpt-4o-mini}") String model,
+            @Value("${meridian.llm.show-reasoning:false}") boolean showReasoning,
+            @Value("${meridian.llm.max-retries:3}") int maxRetries,
+            @Value("${meridian.llm.retry-initial-delay-ms:2000}") int retryInitialDelayMs,
+            @Value("${meridian.llm.retry-backoff-multiplier:2}") int retryBackoffMultiplier) {
         this.mapper = mapper;
+        this.tracer = tracer;
         this.baseUrl = baseUrl;
         this.apiKey = apiKey;
         this.model = model;
         this.showReasoning = showReasoning;
+        this.maxRetries = maxRetries;
+        this.retryInitialDelayMs = retryInitialDelayMs;
+        this.retryBackoffMultiplier = retryBackoffMultiplier;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
@@ -83,9 +98,26 @@ public class AnswerSynthesizer {
      */
     public void synthesize(List<NodeResult> results, String originalPrompt,
                            List<Message> history, SseEmitter emitter) {
-        String completionId = "chatcmpl-" + UUID.randomUUID().toString().replace("-", "");
+        synthesize(results, originalPrompt, history, emitter, null);
+    }
+
+    public void synthesize(List<NodeResult> results, String originalPrompt,
+                           List<Message> history, SseEmitter emitter, String completionIdOverride) {
+        String completionId = completionIdOverride != null
+                ? completionIdOverride
+                : "chatcmpl-" + UUID.randomUUID().toString().replace("-", "");
         long created = System.currentTimeMillis() / 1_000L;
 
+        // OpenInference LLM span so Phoenix shows this as an AI synthesis call.
+        Span llmSpan = tracer.spanBuilder("llm.synthesize")
+                .setAttribute("openinference.span.kind", "LLM")
+                .setAttribute("llm.model_name", model)
+                .setAttribute("llm.system", "openai")
+                .setAttribute("llm.input_messages.0.message.role", "system")
+                .setAttribute("llm.input_messages.0.message.content", SYSTEM_PROMPT)
+                .startSpan();
+
+        boolean emitterDone = false;
         try {
             String userContent = buildUserContent(results);
             String requestBody = buildRequestBody(userContent, originalPrompt, history);
@@ -93,34 +125,50 @@ public class AnswerSynthesizer {
             log.debug("AnswerSynthesizer: calling {} model={} agents={}",
                     baseUrl, model, results.size());
 
-            // Send the role-delta chunk first so the client sees "assistant" immediately.
-            emitter.send(SseEmitter.event().data(roleDelta(completionId, created, mapper)));
-
-            // Stream the LLM response line by line (reasoning + content).
+            // Stream the LLM response; accumulate text for grounding check and span output.
             StringBuilder synthesizedText = new StringBuilder();
-            streamFromLlm(requestBody, emitter, completionId, created, synthesizedText, showReasoning);
+            long[] tokenCounts = new long[3]; // [prompt, completion, total]
+            streamFromLlm(requestBody, emitter, completionId, created, synthesizedText, showReasoning, tokenCounts);
+
+            // Set output and token count on span after streaming completes.
+            String output = synthesizedText.toString();
+            if (output.length() > 2000) output = output.substring(0, 2000) + "…";
+            llmSpan.setAttribute("llm.output_messages.0.message.role", "assistant");
+            llmSpan.setAttribute("llm.output_messages.0.message.content", output);
+            if (tokenCounts[2] > 0) {
+                llmSpan.setAttribute("llm.token_count.prompt", tokenCounts[0]);
+                llmSpan.setAttribute("llm.token_count.completion", tokenCounts[1]);
+                llmSpan.setAttribute("llm.token_count.total", tokenCounts[2]);
+            }
+            llmSpan.end();
 
             // Send stop chunk and [DONE].
             emitter.send(SseEmitter.event().data(stopDelta(completionId, created, mapper)));
             emitter.send(SseEmitter.event().data("[DONE]"));
             emitter.complete();
+            emitterDone = true;
 
             // Post-synthesis numeric grounding check (diagnostic only).
             checkNumericGrounding(synthesizedText.toString(), results);
 
         } catch (Exception e) {
             log.error("AnswerSynthesizer failed: {}", e.getMessage(), e);
-            try {
-                String errorMsg = "I encountered an error while synthesizing the response. " +
-                        "Please try again or contact support.";
-                emitter.send(SseEmitter.event().data(
-                        contentDelta(completionId, created, errorMsg, mapper)));
-                emitter.send(SseEmitter.event().data(stopDelta(completionId, created, mapper)));
-                emitter.send(SseEmitter.event().data("[DONE]"));
-                emitter.complete();
-            } catch (Exception inner) {
-                log.warn("Could not send error response to emitter", inner);
-                emitter.completeWithError(e);
+            llmSpan.setStatus(StatusCode.ERROR, e.getMessage());
+            llmSpan.end();
+            if (!emitterDone) {
+                try {
+                    String errorMsg = "I encountered an error while synthesizing the response. " +
+                            "Please try again or contact support.";
+                    // Role delta already sent upfront; go straight to content + stop
+                    emitter.send(SseEmitter.event().data(
+                            contentDelta(completionId, created, errorMsg, mapper)));
+                    emitter.send(SseEmitter.event().data(stopDelta(completionId, created, mapper)));
+                    emitter.send(SseEmitter.event().data("[DONE]"));
+                    emitter.complete();
+                } catch (Exception inner) {
+                    log.warn("Could not send error response to emitter", inner);
+                    try { emitter.completeWithError(e); } catch (Exception ignored) {}
+                }
             }
         }
     }
@@ -190,7 +238,14 @@ public class AnswerSynthesizer {
      */
     public void synthesizeFromHistory(List<Message> history, String latestPrompt,
                                       SseEmitter emitter) {
-        String completionId = "chatcmpl-" + UUID.randomUUID().toString().replace("-", "");
+        synthesizeFromHistory(history, latestPrompt, emitter, null);
+    }
+
+    public void synthesizeFromHistory(List<Message> history, String latestPrompt,
+                                      SseEmitter emitter, String completionIdOverride) {
+        String completionId = completionIdOverride != null
+                ? completionIdOverride
+                : "chatcmpl-" + UUID.randomUUID().toString().replace("-", "");
         long created = System.currentTimeMillis() / 1_000L;
 
         try {
@@ -218,9 +273,8 @@ public class AnswerSynthesizer {
             String requestBody = mapper.writeValueAsString(root);
             log.debug("synthesizeFromHistory: model={}", model);
 
-            emitter.send(SseEmitter.event().data(roleDelta(completionId, created, mapper)));
             streamFromLlm(requestBody, emitter, completionId, created, new StringBuilder(),
-                    showReasoning);
+                    showReasoning, new long[3]);
             emitter.send(SseEmitter.event().data(stopDelta(completionId, created, mapper)));
             emitter.send(SseEmitter.event().data("[DONE]"));
             emitter.complete();
@@ -228,6 +282,7 @@ public class AnswerSynthesizer {
         } catch (Exception e) {
             log.error("synthesizeFromHistory failed: {}", e.getMessage(), e);
             try {
+                // Role delta already sent upfront by ChatService
                 emitter.send(SseEmitter.event().data(
                         contentDelta(completionId, created,
                                 "I couldn't process that. Please rephrase.", mapper)));
@@ -235,7 +290,7 @@ public class AnswerSynthesizer {
                 emitter.send(SseEmitter.event().data("[DONE]"));
                 emitter.complete();
             } catch (Exception inner) {
-                emitter.completeWithError(e);
+                try { emitter.completeWithError(e); } catch (Exception ignored) {}
             }
         }
     }
@@ -257,25 +312,28 @@ public class AnswerSynthesizer {
             String completionId,
             long created,
             StringBuilder synthesizedText,
-            boolean emitReasoning) throws Exception {
+            boolean emitReasoning,
+            long[] tokenCounts) throws Exception {
+
+        // Inject stream_options to get a final usage chunk — needed for token count telemetry.
+        String bodyWithUsage = requestBody;
+        try {
+            JsonNode req = mapper.readTree(requestBody);
+            ((ObjectNode) req).putObject("stream_options").put("include_usage", true);
+            bodyWithUsage = mapper.writeValueAsString(req);
+        } catch (Exception ignored) { /* leave body unchanged if parse fails */ }
 
         String endpoint = baseUrl + "/chat/completions";
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(endpoint))
-                .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer " + apiKey)
-                .header("Accept", "text/event-stream")
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-                .build();
-
-        HttpResponse<java.io.InputStream> response =
-                httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+        HttpResponse<java.io.InputStream> response = sendWithRetry(endpoint, bodyWithUsage);
 
         if (response.statusCode() != 200) {
             String body = new String(response.body().readAllBytes());
             throw new RuntimeException("LLM returned HTTP " + response.statusCode() + ": " + body);
         }
+
+        // Role delta was already sent upfront by ChatService before pipeline processing began
+        // (OpenAI spec: role chunk arrives immediately so the client stream opens instantly).
 
         StringBuilder reasoningBuffer = new StringBuilder();
         boolean reasoningEmitted = false;  // have we already opened the blockquote?
@@ -289,6 +347,18 @@ public class AnswerSynthesizer {
                 String data = line.substring("data:".length()).strip();
                 if (data.equals("[DONE]")) break;
                 if (data.isBlank()) continue;
+
+                // The final usage chunk (from stream_options.include_usage) has no choices —
+                // parse it directly and capture token counts for the OpenInference span.
+                try {
+                    JsonNode raw = mapper.readTree(data);
+                    JsonNode usageNode = raw.path("usage");
+                    if (!usageNode.isMissingNode() && !usageNode.isNull()) {
+                        tokenCounts[0] = usageNode.path("prompt_tokens").asLong(0);
+                        tokenCounts[1] = usageNode.path("completion_tokens").asLong(0);
+                        tokenCounts[2] = usageNode.path("total_tokens").asLong(tokenCounts[0] + tokenCounts[1]);
+                    }
+                } catch (Exception ignored) {}
 
                 DeltaChunk chunk = parseChunk(data);
                 if (chunk == null) continue;
@@ -408,6 +478,28 @@ public class AnswerSynthesizer {
         choice.putObject("delta");
         choice.put("finish_reason", "stop");
         return m.writeValueAsString(root);
+    }
+
+    private HttpResponse<java.io.InputStream> sendWithRetry(String endpoint, String requestBody) throws Exception {
+        int delayMs = retryInitialDelayMs;
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            // Rebuild the request on each attempt — BodyPublishers.ofString() is one-shot
+            // and cannot be replayed after the first send.
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(endpoint))
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + apiKey)
+                    .header("Accept", "text/event-stream")
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .build();
+            HttpResponse<java.io.InputStream> resp =
+                    httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            if (resp.statusCode() != 429 || attempt == maxRetries) return resp;
+            log.warn("LLM rate limited (429), retry {}/{} in {}ms", attempt, maxRetries, delayMs);
+            Thread.sleep(delayMs);
+            delayMs *= retryBackoffMultiplier;
+        }
+        throw new IllegalStateException("unreachable");
     }
 
     private static ObjectNode chunkRoot(String id, long ts, ObjectMapper m) {

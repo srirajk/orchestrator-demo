@@ -8,6 +8,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -93,14 +96,21 @@ public class McpAdapter implements ProtocolAdapter {
         CompletableFuture<String> endpointFuture = new CompletableFuture<>();
         CompletableFuture<String> toolResponseFuture = new CompletableFuture<>();
 
+        // Capture the bearer token from the current security context before entering
+        // the virtual thread (SecurityContextHolder is not automatically propagated).
+        String bearerToken = extractBearerToken();
+
         // SSE request — must be HTTP/1.1; uvicorn rejects HTTP/2 with 421.
-        HttpRequest sseRequest = HttpRequest.newBuilder()
+        HttpRequest.Builder sseBuilder = HttpRequest.newBuilder()
                 .uri(URI.create(serverUrl))
                 .version(HttpClient.Version.HTTP_1_1)
                 .header("Accept", "text/event-stream")
-                .header("Cache-Control", "no-cache")
-                .GET()
-                .build();
+                .header("Cache-Control", "no-cache");
+        if (bearerToken != null) {
+            sseBuilder.header("Authorization", "Bearer " + bearerToken);
+            log.debug("McpAdapter: propagating JWT to agent SSE connection");
+        }
+        HttpRequest sseRequest = sseBuilder.GET().build();
 
         // Open SSE stream; read the response body on a virtual thread so we can
         // block on InputStream without pinning a platform thread.
@@ -138,7 +148,7 @@ public class McpAdapter implements ProtocolAdapter {
                         "clientInfo",     Map.of("name", "meridian-gateway", "version", "1.0")
                 )
         ));
-        postJson(sessionUrl, initBody);
+        postJson(sessionUrl, initBody, bearerToken);
 
         // Send tools/call — SSE reader skips the initialize ACK and waits for this result.
         String callId = UUID.randomUUID().toString();
@@ -148,7 +158,7 @@ public class McpAdapter implements ProtocolAdapter {
                 "method",  "tools/call",
                 "params",  Map.of("name", toolName, "arguments", jsonNodeToMap(input))
         ));
-        postJson(sessionUrl, callBody);
+        postJson(sessionUrl, callBody, bearerToken);
 
         // Wait for the tool-call SSE response (second message event).
         String rawResponse = toolResponseFuture.get(timeoutMs, TimeUnit.MILLISECONDS);
@@ -232,13 +242,15 @@ public class McpAdapter implements ProtocolAdapter {
 
     // ── HTTP helpers ──────────────────────────────────────────────────────────
 
-    private void postJson(String url, String body) throws Exception {
-        HttpRequest request = HttpRequest.newBuilder()
+    private void postJson(String url, String body, String bearerToken) throws Exception {
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .version(HttpClient.Version.HTTP_1_1)
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(body))
-                .build();
+                .header("Content-Type", "application/json");
+        if (bearerToken != null) {
+            builder.header("Authorization", "Bearer " + bearerToken);
+        }
+        HttpRequest request = builder.POST(HttpRequest.BodyPublishers.ofString(body)).build();
         HttpResponse<String> response =
                 httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() >= 400) {
@@ -246,6 +258,14 @@ public class McpAdapter implements ProtocolAdapter {
                     + ": " + response.body());
         }
         log.debug("POST {} → HTTP {}", url, response.statusCode());
+    }
+
+    private String extractBearerToken() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth instanceof JwtAuthenticationToken jwtAuth) {
+            return jwtAuth.getToken().getTokenValue();
+        }
+        return null;
     }
 
     /**

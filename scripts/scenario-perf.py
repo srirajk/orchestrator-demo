@@ -77,6 +77,7 @@ class ScenarioResult:
     checks: dict[str, bool] = field(default_factory=dict)
     answer_excerpt: str = ""
     error: str = ""
+    ttft_ms: float | None = None
 
     def check_summary(self):
         ok = sum(1 for v in self.checks.values() if v)
@@ -113,9 +114,10 @@ def mint_token(user_id: str) -> str:
 
 def chat(prompt: str, user_id: str, token: str = "",
          conversation_id: str = "", messages: list = None,
-         timeout_s: int = TIMEOUT_S) -> tuple[str, float]:
+         timeout_s: int = TIMEOUT_S) -> tuple[str, float, float | None]:
     """
-    Returns (answer_text, latency_ms). answer_text is the full reconstructed answer.
+    Returns (answer_text, total_latency_ms, ttft_ms).
+    ttft_ms is time-to-first-token — None if no content token arrived.
     """
     headers = {
         "Content-Type": "application/json",
@@ -133,6 +135,7 @@ def chat(prompt: str, user_id: str, token: str = "",
     }).encode()
 
     start = time.monotonic()
+    first_token_at: float | None = None
     try:
         req = urllib.request.Request(
             f"{GATEWAY_URL}/v1/chat/completions",
@@ -154,14 +157,17 @@ def chat(prompt: str, user_id: str, token: str = "",
                     obj = json.loads(val)
                     content = obj["choices"][0]["delta"].get("content")
                     if content:
+                        if first_token_at is None:
+                            first_token_at = time.monotonic()
                         parts.append(content)
                 except Exception:
                     pass
         elapsed_ms = (time.monotonic() - start) * 1000
-        return "".join(parts), elapsed_ms
+        ttft_ms = (first_token_at - start) * 1000 if first_token_at else None
+        return "".join(parts), elapsed_ms, ttft_ms
     except Exception as e:
         elapsed_ms = (time.monotonic() - start) * 1000
-        return f"__ERROR__: {e}", elapsed_ms
+        return f"__ERROR__: {e}", elapsed_ms, None
 
 
 def resolve(prompt: str, token: str) -> list[str]:
@@ -226,7 +232,7 @@ def contains_number(text: str, number, tolerance_pct: float = 20) -> bool:
 def s_holdings_detail(token: str) -> ScenarioResult:
     """Validate holdings: AAPL, MSFT, GOOGL mentioned; total value present."""
     prompt = "Show me the holdings breakdown for the Whitman Family Office — tickers, values, and asset allocation"
-    answer, latency = chat(prompt, "rm_jane", token)
+    answer, latency, ttft = chat(prompt, "rm_jane", token)
     low = answer.lower()
 
     checks = {
@@ -240,13 +246,13 @@ def s_holdings_detail(token: str) -> ScenarioResult:
     }
     passed = all(checks[k] for k in ["has_answer", "mentions_AAPL", "mentions_MSFT", "not_denied"])
     return ScenarioResult("holdings_detail", prompt, "rm_jane", latency, passed, checks,
-                          answer[:300])
+                          answer[:300], ttft_ms=ttft)
 
 
 def s_performance_detail(token: str) -> ScenarioResult:
     """Validate performance: 12.4% return, PnL 243908, alpha 2.2."""
     prompt = "What is the YTD performance for Whitman Family Office — return, P&L, alpha, and Sharpe ratio?"
-    answer, latency = chat(prompt, "rm_jane", token)
+    answer, latency, ttft = chat(prompt, "rm_jane", token)
     low = answer.lower()
 
     checks = {
@@ -260,7 +266,7 @@ def s_performance_detail(token: str) -> ScenarioResult:
     }
     passed = all(checks[k] for k in ["has_answer", "return_pct", "not_denied"])
     return ScenarioResult("performance_detail", prompt, "rm_jane", latency, passed, checks,
-                          answer[:300])
+                          answer[:300], ttft_ms=ttft)
 
 
 def s_risk_profile(token: str) -> ScenarioResult:
@@ -271,7 +277,7 @@ def s_risk_profile(token: str) -> ScenarioResult:
     answer = ""
     # Retry once if we get a clarification response (LLM entity extraction can be flaky)
     for attempt in range(2):
-        answer, latency = chat(prompt, "rm_jane", token)
+        answer, latency, ttft = chat(prompt, "rm_jane", token)
         total_latency += latency
         if "which client" not in answer.lower() and "__ERROR__" not in answer and len(answer) > 30:
             break
@@ -289,13 +295,13 @@ def s_risk_profile(token: str) -> ScenarioResult:
     }
     passed = all(checks[k] for k in ["has_answer", "risk_score_6", "moderate", "not_denied"])
     return ScenarioResult("risk_profile", prompt, "rm_jane", total_latency, passed, checks,
-                          answer[:300])
+                          answer[:300], ttft_ms=ttft)
 
 
 def s_settlements(token: str) -> ScenarioResult:
     """Validate: T-9912, MSFT, $372K, BNY Mellon, settlement date."""
     prompt = "What are the pending settlements for Whitman Family Office — trade IDs, amounts, and settlement dates?"
-    answer, latency = chat(prompt, "rm_jane", token)
+    answer, latency, ttft = chat(prompt, "rm_jane", token)
     low = answer.lower()
 
     checks = {
@@ -309,13 +315,13 @@ def s_settlements(token: str) -> ScenarioResult:
     }
     passed = all(checks[k] for k in ["has_answer", "trade_T9912", "not_denied"])
     return ScenarioResult("settlements_detail", prompt, "rm_jane", latency, passed, checks,
-                          answer[:300])
+                          answer[:300], ttft_ms=ttft)
 
 
 def s_cash_position(token: str) -> ScenarioResult:
     """Validate: $529K projected cash, USD settled $157K, unsettled linked to T-9912."""
     prompt = "What is the cash position for Whitman Family Office — settled, unsettled, and projected cash?"
-    answer, latency = chat(prompt, "rm_jane", token)
+    answer, latency, ttft = chat(prompt, "rm_jane", token)
     low = answer.lower()
 
     checks = {
@@ -329,13 +335,13 @@ def s_cash_position(token: str) -> ScenarioResult:
     }
     passed = all(checks[k] for k in ["has_answer", "projected_529k", "not_denied"])
     return ScenarioResult("cash_position", prompt, "rm_jane", latency, passed, checks,
-                          answer[:300])
+                          answer[:300], ttft_ms=ttft)
 
 
 def s_goal_planning(token: str) -> ScenarioResult:
     """Validate: Retirement Corpus, $5M target, 39.3% progress; Education Fund off-track."""
     prompt = "Show me the goal planning status for Whitman Family Office — which goals are on track?"
-    answer, latency = chat(prompt, "rm_jane", token)
+    answer, latency, ttft = chat(prompt, "rm_jane", token)
     low = answer.lower()
 
     checks = {
@@ -349,14 +355,14 @@ def s_goal_planning(token: str) -> ScenarioResult:
     }
     passed = all(checks[k] for k in ["has_answer", "retirement_corpus", "not_denied"])
     return ScenarioResult("goal_planning", prompt, "rm_jane", latency, passed, checks,
-                          answer[:300])
+                          answer[:300], ttft_ms=ttft)
 
 
 def s_hero_multi_agent(token: str) -> ScenarioResult:
     """Hero prompt — validates that holdings, settlement AND cash are all in the answer."""
     prompt = ("Give me a full portfolio overview for Whitman Family Office: "
               "current holdings, pending settlements, and cash position")
-    answer, latency = chat(prompt, "rm_jane", token, timeout_s=120)
+    answer, latency, ttft = chat(prompt, "rm_jane", token, timeout_s=120)
     low = answer.lower()
 
     checks = {
@@ -375,7 +381,7 @@ def s_hero_multi_agent(token: str) -> ScenarioResult:
     passed = (checks["has_answer"] and checks["has_holdings_data"] and
               checks["has_settlement"] and checks["not_denied"])
     return ScenarioResult("hero_multi_agent", prompt, "rm_jane", latency, passed, checks,
-                          answer[:400])
+                          answer[:400], ttft_ms=ttft)
 
 
 def s_okafor_denied(token: str) -> ScenarioResult:
@@ -387,7 +393,7 @@ def s_okafor_denied(token: str) -> ScenarioResult:
     ]
     import random
     prompt = random.choice(prompts)
-    answer, latency = chat(prompt, "rm_jane", token)
+    answer, latency, ttft = chat(prompt, "rm_jane", token)
     low = answer.lower()
 
     denial_phrases = [
@@ -406,7 +412,7 @@ def s_okafor_denied(token: str) -> ScenarioResult:
     }
     passed = checks["has_answer"] and checks["data_not_served"]
     return ScenarioResult("okafor_denied", prompt, "rm_jane", latency, passed, checks,
-                          answer[:300])
+                          answer[:300], ttft_ms=ttft)
 
 
 def s_multi_turn(token: str) -> ScenarioResult:
@@ -418,14 +424,14 @@ def s_multi_turn(token: str) -> ScenarioResult:
     conv_id = f"scenario-mt-{int(time.time())}"
 
     # Turn 1: fetch data — retry once if entity extraction fails
-    t1_answer, t1_latency = chat(
+    t1_answer, t1_latency, t1_ttft = chat(
         "Show me the Whitman Family Office holdings",
         "rm_jane", token, conversation_id=conv_id
     )
     t1_low = t1_answer.lower()
     if "which client" in t1_low or "specify" in t1_low:
         time.sleep(5)
-        t1_answer, extra_lat = chat(
+        t1_answer, extra_lat, t1_ttft = chat(
             "Show me the Whitman Family Office holdings",
             "rm_jane", token, conversation_id=conv_id
         )
@@ -434,12 +440,13 @@ def s_multi_turn(token: str) -> ScenarioResult:
     t1_ok = "aapl" in t1_low or "msft" in t1_low or "googl" in t1_low
 
     # Turn 2: follow-up using conversation context (should NOT re-fetch agents)
+    time.sleep(3)
     messages = [
         {"role": "user",      "content": "Show me the Whitman Family Office holdings"},
         {"role": "assistant", "content": t1_answer[:500]},
         {"role": "user",      "content": "You mentioned AAPL — is it above the concentration limit?"},
     ]
-    t2_answer, t2_latency = chat(
+    t2_answer, t2_latency, t2_ttft = chat(
         "You mentioned AAPL — is it above the concentration limit?",
         "rm_jane", token, conversation_id=conv_id,
         messages=messages
@@ -451,6 +458,7 @@ def s_multi_turn(token: str) -> ScenarioResult:
              or "aapl" in t2_low or "limit" in t2_low)
 
     total_latency = t1_latency + t2_latency
+    ttft = t1_ttft  # report T1 TTFT as representative for multi-turn
     checks = {
         "turn1_has_holdings":     t1_ok,
         "turn1_has_tickers":      "msft" in t1_low or "googl" in t1_low,
@@ -460,29 +468,30 @@ def s_multi_turn(token: str) -> ScenarioResult:
     }
     passed = checks["turn1_has_holdings"] and checks["turn2_has_answer"]
     return ScenarioResult("multi_turn", "2-turn: holdings → AAPL concentration", "rm_jane",
-                          total_latency, passed, checks, f"T1: {t1_answer[:150]}\nT2: {t2_answer[:150]}")
+                          total_latency, passed, checks, f"T1: {t1_answer[:150]}\nT2: {t2_answer[:150]}",
+                          ttft_ms=ttft)
 
 
 def _mt_turn(prompt: str, user_id: str, token: str, conv_id: str,
              history: list, timeout_s: int = TIMEOUT_S,
-             inter_turn_delay_s: float = 3.0) -> tuple[str, float, list]:
+             inter_turn_delay_s: float = 3.0) -> tuple[str, float, float | None, list]:
     """
     Fire one turn of a multi-turn conversation.
     Appends the new user message to `history`, sends it, appends the assistant reply.
     Sleeps `inter_turn_delay_s` before the call to avoid Z.AI rate limits across turns.
-    Returns (answer, latency_ms, updated_history).
+    Returns (answer, latency_ms, ttft_ms, updated_history).
     """
     if inter_turn_delay_s > 0 and history:  # skip delay on first turn (history empty)
         time.sleep(inter_turn_delay_s)
     history = history + [{"role": "user", "content": prompt}]
-    answer, latency = chat(
+    answer, latency, ttft = chat(
         prompt, user_id, token,
         conversation_id=conv_id,
         messages=history,
         timeout_s=timeout_s,
     )
     history = history + [{"role": "assistant", "content": answer[:600]}]
-    return answer, latency, history
+    return answer, latency, ttft, history
 
 
 def _is_clarification(answer: str) -> bool:
@@ -492,14 +501,14 @@ def _is_clarification(answer: str) -> bool:
 
 def _retry_if_clarification(prompt: str, user_id: str, token: str,
                              conv_id: str, history: list,
-                             delay_s: int = 5) -> tuple[str, float, list]:
+                             delay_s: int = 5) -> tuple[str, float, float | None, list]:
     """Fire a turn; retry once with a delay if the gateway asks for clarification."""
-    answer, latency, history = _mt_turn(prompt, user_id, token, conv_id, history)
+    answer, latency, ttft, history = _mt_turn(prompt, user_id, token, conv_id, history)
     if _is_clarification(answer):
         time.sleep(delay_s)
-        answer, extra, history = _mt_turn(prompt, user_id, token, conv_id, history[:-2])
+        answer, extra, ttft, history = _mt_turn(prompt, user_id, token, conv_id, history[:-2])
         latency += extra
-    return answer, latency, history
+    return answer, latency, ttft, history
 
 
 # ── Multi-turn scenario 1: holdings → AAPL concentration (original, improved) ─
@@ -524,13 +533,13 @@ def s_mt_wealth_to_servicing(token: str) -> ScenarioResult:
     history = []
 
     # Turn 1 — fetch holdings (wealth HTTP)
-    t1_ans, t1_lat, history = _retry_if_clarification(
+    t1_ans, t1_lat, t1_ttft, history = _retry_if_clarification(
         "Show me the Whitman Family Office holdings", "rm_jane", token, conv_id, history)
     t1_low = t1_ans.lower()
     t1_ok = "aapl" in t1_low or "msft" in t1_low or "1,967" in t1_ans or "1.97" in t1_ans
 
     # Turn 2 — pivot to servicing, NO client name in the prompt
-    t2_ans, t2_lat, history = _mt_turn(
+    t2_ans, t2_lat, t2_ttft, history = _mt_turn(
         "Are there any pending settlements for these positions?",
         "rm_jane", token, conv_id, history)
     t2_low = t2_ans.lower()
@@ -552,7 +561,7 @@ def s_mt_wealth_to_servicing(token: str) -> ScenarioResult:
         "mt_wealth_to_servicing",
         "2-turn: wealth holdings → servicing settlements (no client re-name)",
         "rm_jane", total, passed, checks,
-        f"T1: {t1_ans[:160]}\nT2: {t2_ans[:200]}"
+        f"T1: {t1_ans[:160]}\nT2: {t2_ans[:200]}", ttft_ms=t1_ttft,
     )
 
 
@@ -572,14 +581,14 @@ def s_mt_servicing_to_wealth(token: str) -> ScenarioResult:
     history = []
 
     # Turn 1 — cash position (servicing MCP)
-    t1_ans, t1_lat, history = _retry_if_clarification(
+    t1_ans, t1_lat, t1_ttft, history = _retry_if_clarification(
         "What is the cash position for Whitman Family Office?",
         "rm_jane", token, conv_id, history)
     t1_low = t1_ans.lower()
     t1_ok = "157" in t1_ans or "529" in t1_ans or "cash" in t1_low
 
     # Turn 2 — wealth goal planning pivot
-    t2_ans, t2_lat, history = _mt_turn(
+    t2_ans, t2_lat, t2_ttft, history = _mt_turn(
         "Given that cash position, will they hit their retirement goal?",
         "rm_jane", token, conv_id, history)
     t2_low = t2_ans.lower()
@@ -597,7 +606,7 @@ def s_mt_servicing_to_wealth(token: str) -> ScenarioResult:
         "mt_servicing_to_wealth",
         "2-turn: servicing cash → wealth goal planning",
         "rm_jane", total, passed, checks,
-        f"T1: {t1_ans[:160]}\nT2: {t2_ans[:200]}"
+        f"T1: {t1_ans[:160]}\nT2: {t2_ans[:200]}", ttft_ms=t1_ttft,
     )
 
 
@@ -618,14 +627,14 @@ def s_mt_3turn_numeric_chain(token: str) -> ScenarioResult:
     history = []
 
     # Turn 1 — holdings
-    t1_ans, t1_lat, history = _retry_if_clarification(
+    t1_ans, t1_lat, t1_ttft, history = _retry_if_clarification(
         "Show me all the equity positions for Whitman Family Office",
         "rm_jane", token, conv_id, history)
     t1_low = t1_ans.lower()
     t1_ok = "aapl" in t1_low or "msft" in t1_low
 
     # Turn 2 — which is the largest? (FOLLOW_UP)
-    t2_ans, t2_lat, history = _mt_turn(
+    t2_ans, t2_lat, t2_ttft, history = _mt_turn(
         "Which of those positions is the largest by value?",
         "rm_jane", token, conv_id, history)
     t2_low = t2_ans.lower()
@@ -633,7 +642,7 @@ def s_mt_3turn_numeric_chain(token: str) -> ScenarioResult:
     t2_ok = "msft" in t2_low or "microsoft" in t2_low or "372" in t2_ans
 
     # Turn 3 — concentration risk (FOLLOW_UP / cross with risk data)
-    t3_ans, t3_lat, history = _mt_turn(
+    t3_ans, t3_lat, t3_ttft, history = _mt_turn(
         "Is that position above the single-name concentration limit?",
         "rm_jane", token, conv_id, history)
     t3_low = t3_ans.lower()
@@ -655,7 +664,7 @@ def s_mt_3turn_numeric_chain(token: str) -> ScenarioResult:
         "mt_3turn_numeric_chain",
         "3-turn: holdings → largest position → concentration limit",
         "rm_jane", total, passed, checks,
-        f"T1: {t1_ans[:120]}\nT2: {t2_ans[:120]}\nT3: {t3_ans[:150]}"
+        f"T1: {t1_ans[:120]}\nT2: {t2_ans[:120]}\nT3: {t3_ans[:150]}", ttft_ms=t1_ttft,
     )
 
 
@@ -676,7 +685,7 @@ def s_mt_entitlement_pivot(token: str) -> ScenarioResult:
     history = []
 
     # Turn 1 — Whitman (allowed)
-    t1_ans, t1_lat, history = _retry_if_clarification(
+    t1_ans, t1_lat, t1_ttft, history = _retry_if_clarification(
         "What is the YTD performance for Whitman Family Office?",
         "rm_jane", token, conv_id, history)
     t1_low = t1_ans.lower()
@@ -684,7 +693,7 @@ def s_mt_entitlement_pivot(token: str) -> ScenarioResult:
             and "access denied" not in t1_low
 
     # Turn 2 — Okafor (denied or clarification; neither serves data — both are correct)
-    t2_ans, t2_lat, history = _mt_turn(
+    t2_ans, t2_lat, t2_ttft, history = _mt_turn(
         "Now show me the performance for the Okafor Family Trust",
         "rm_jane", token, conv_id, history)
     t2_low = t2_ans.lower()
@@ -699,7 +708,7 @@ def s_mt_entitlement_pivot(token: str) -> ScenarioResult:
                  or "client name" in t2_low or "relationship name" in t2_low)
 
     # Turn 3 — Back to Whitman (allowed again, no Okafor bleed)
-    t3_ans, t3_lat, history = _mt_turn(
+    t3_ans, t3_lat, t3_ttft, history = _mt_turn(
         "Go back to Whitman — what was their Sharpe ratio?",
         "rm_jane", token, conv_id, history)
     t3_low = t3_ans.lower()
@@ -720,7 +729,7 @@ def s_mt_entitlement_pivot(token: str) -> ScenarioResult:
         "mt_entitlement_pivot",
         "3-turn: Whitman allowed → Okafor denied → Whitman again (no bleed)",
         "rm_jane", total, passed, checks,
-        f"T1: {t1_ans[:120]}\nT2: {t2_ans[:120]}\nT3: {t3_ans[:150]}"
+        f"T1: {t1_ans[:120]}\nT2: {t2_ans[:120]}\nT3: {t3_ans[:150]}", ttft_ms=t1_ttft,
     )
 
 
@@ -740,14 +749,14 @@ def s_mt_settlement_cash_link(token: str) -> ScenarioResult:
     history = []
 
     # Turn 1 — settlements
-    t1_ans, t1_lat, history = _retry_if_clarification(
+    t1_ans, t1_lat, t1_ttft, history = _retry_if_clarification(
         "Show me the pending settlements for Whitman Family Office",
         "rm_jane", token, conv_id, history)
     t1_low = t1_ans.lower()
     t1_ok = "t-9912" in t1_low or "9912" in t1_ans or ("msft" in t1_low and "settlement" in t1_low)
 
     # Turn 2 — cash impact
-    t2_ans, t2_lat, history = _mt_turn(
+    t2_ans, t2_lat, t2_ttft, history = _mt_turn(
         "How does that settlement affect the available cash position?",
         "rm_jane", token, conv_id, history)
     t2_low = t2_ans.lower()
@@ -768,7 +777,7 @@ def s_mt_settlement_cash_link(token: str) -> ScenarioResult:
         "mt_settlement_cash_link",
         "2-turn: settlement T-9912 → cash impact (cross-domain linkage)",
         "rm_jane", total, passed, checks,
-        f"T1: {t1_ans[:160]}\nT2: {t2_ans[:200]}"
+        f"T1: {t1_ans[:160]}\nT2: {t2_ans[:200]}", ttft_ms=t1_ttft,
     )
 
 
@@ -789,21 +798,21 @@ def s_mt_goal_cash_advice(token: str) -> ScenarioResult:
     history = []
 
     # Turn 1 — goal planning
-    t1_ans, t1_lat, history = _retry_if_clarification(
+    t1_ans, t1_lat, t1_ttft, history = _retry_if_clarification(
         "What is the goal planning status for Whitman Family Office?",
         "rm_jane", token, conv_id, history)
     t1_low = t1_ans.lower()
     t1_ok = "retirement" in t1_low or "39" in t1_ans or "goal" in t1_low
 
     # Turn 2 — cash check
-    t2_ans, t2_lat, history = _mt_turn(
+    t2_ans, t2_lat, t2_ttft, history = _mt_turn(
         "And how much liquid cash do they have right now?",
         "rm_jane", token, conv_id, history)
     t2_low = t2_ans.lower()
     t2_ok = "cash" in t2_low or "157" in t2_ans or "529" in t2_ans
 
     # Turn 3 — synthesis advice (FOLLOW_UP, no new agent call needed)
-    t3_ans, t3_lat, history = _mt_turn(
+    t3_ans, t3_lat, t3_ttft, history = _mt_turn(
         "Which goal should they prioritise deploying that cash toward?",
         "rm_jane", token, conv_id, history)
     t3_low = t3_ans.lower()
@@ -825,7 +834,7 @@ def s_mt_goal_cash_advice(token: str) -> ScenarioResult:
         "mt_goal_cash_advice",
         "3-turn: goals (39.3%) → cash ($529K) → which goal to prioritise",
         "rm_jane", total, passed, checks,
-        f"T1: {t1_ans[:120]}\nT2: {t2_ans[:120]}\nT3: {t3_ans[:150]}"
+        f"T1: {t1_ans[:120]}\nT2: {t2_ans[:120]}\nT3: {t3_ans[:150]}", ttft_ms=t1_ttft,
     )
 
 
@@ -845,24 +854,24 @@ def s_mt_full_wealth_sweep(token: str) -> ScenarioResult:
     history = []
 
     # T1 — holdings
-    t1_ans, t1_lat, history = _retry_if_clarification(
+    t1_ans, t1_lat, t1_ttft, history = _retry_if_clarification(
         "Show me the holdings for Whitman Family Office", "rm_jane", token, conv_id, history)
     t1_ok = "aapl" in t1_ans.lower() or "msft" in t1_ans.lower()
 
     # T2 — performance (include client name to anchor intent for the LLM)
-    t2_ans, t2_lat, history = _mt_turn(
+    t2_ans, t2_lat, t2_ttft, history = _mt_turn(
         "And what is the YTD performance for Whitman?", "rm_jane", token, conv_id, history)
     t2_ok = "12.4" in t2_ans or "return" in t2_ans.lower() or "performance" in t2_ans.lower()
     t2_no_ask = not _is_clarification(t2_ans)
 
     # T3 — risk profile (include client name)
-    t3_ans, t3_lat, history = _mt_turn(
+    t3_ans, t3_lat, t3_ttft, history = _mt_turn(
         "What is the risk score for Whitman?", "rm_jane", token, conv_id, history)
     t3_ok = "6" in t3_ans and "risk" in t3_ans.lower()
     t3_no_ask = not _is_clarification(t3_ans)
 
     # T4 — goals (no client name)
-    t4_ans, t4_lat, history = _mt_turn(
+    t4_ans, t4_lat, t4_ttft, history = _mt_turn(
         "Are they on track for their retirement goal?", "rm_jane", token, conv_id, history)
     t4_ok = "retirement" in t4_ans.lower() or "39" in t4_ans or "goal" in t4_ans.lower()
     t4_no_ask = not _is_clarification(t4_ans)
@@ -882,7 +891,7 @@ def s_mt_full_wealth_sweep(token: str) -> ScenarioResult:
         "mt_full_wealth_sweep",
         "4-turn: holdings → perf → risk → goals (context through all turns)",
         "rm_jane", total, passed, checks,
-        f"T1: {t1_ans[:80]}\nT2: {t2_ans[:80]}\nT3: {t3_ans[:80]}\nT4: {t4_ans[:100]}"
+        f"T1: {t1_ans[:80]}\nT2: {t2_ans[:80]}\nT3: {t3_ans[:80]}\nT4: {t4_ans[:100]}", ttft_ms=t1_ttft,
     )
 
 
@@ -890,7 +899,7 @@ def s_routing_nav(admin_token: str) -> ScenarioResult:
     """NAV query must route to nav agent (requires fund ID, not relationship ID)."""
     prompt = "What is the NAV for fund FND-7781?"
     agents = resolve(prompt, admin_token)
-    answer, latency = chat(prompt, "rm_jane", mint_token("rm_jane"))
+    answer, latency, ttft = chat(prompt, "rm_jane", mint_token("rm_jane"))
     low = answer.lower()
 
     nav_agent_selected = any("nav" in a for a in agents)
@@ -905,14 +914,14 @@ def s_routing_nav(admin_token: str) -> ScenarioResult:
     }
     passed = checks["has_answer"] and (nav_agent_selected or len(agents) == 0)
     return ScenarioResult("routing_nav", prompt, "rm_jane", latency, passed, checks,
-                          f"agents:{agents} | {answer[:200]}")
+                          f"agents:{agents} | {answer[:200]}", ttft_ms=ttft)
 
 
 def s_chitchat_no_agents(token: str) -> ScenarioResult:
     """Chitchat should be fast (no agent fan-out) and must not expose internal agent data."""
     prompt = "Hello! What kinds of banking questions can you help me with?"
     start = time.monotonic()
-    answer, latency = chat(prompt, "rm_jane", token)
+    answer, latency, ttft = chat(prompt, "rm_jane", token)
     low = answer.lower()
 
     checks = {
@@ -925,7 +934,7 @@ def s_chitchat_no_agents(token: str) -> ScenarioResult:
     }
     passed = checks["has_answer"] and checks["no_agent_data"]
     return ScenarioResult("chitchat_no_agents", prompt, "rm_jane", latency, passed, checks,
-                          answer[:200])
+                          answer[:200], ttft_ms=ttft)
 
 
 def s_concurrent_users(tokens: dict[str, str]) -> list[ScenarioResult]:
@@ -936,8 +945,8 @@ def s_concurrent_users(tokens: dict[str, str]) -> list[ScenarioResult]:
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
         f_jane = ex.submit(chat, prompt_jane, "rm_jane", tokens.get("rm_jane",""), "conv-jane-concurrent")
         f_bob  = ex.submit(chat, prompt_bob,  "rm_bob",  tokens.get("rm_bob", ""), "conv-bob-concurrent")
-        ans_jane, lat_jane = f_jane.result()
-        ans_bob,  lat_bob  = f_bob.result()
+        ans_jane, lat_jane, ttft_jane = f_jane.result()
+        ans_bob,  lat_bob,  ttft_bob  = f_bob.result()
 
     jane_low = ans_jane.lower()
     bob_low  = ans_bob.lower()
@@ -956,7 +965,8 @@ def s_concurrent_users(tokens: dict[str, str]) -> list[ScenarioResult]:
             "jane_not_denied":      "access denied" not in jane_low,
             "jane_no_bob_context":  "rm_bob" not in jane_low,
         },
-        answer_excerpt=ans_jane[:200]
+        answer_excerpt=ans_jane[:200],
+        ttft_ms=ttft_jane,
     )
     r_bob = ScenarioResult("concurrent_users_bob", prompt_bob, "rm_bob", lat_bob,
         passed=len(ans_bob) > 20 and "__ERROR__" not in ans_bob,
@@ -965,7 +975,8 @@ def s_concurrent_users(tokens: dict[str, str]) -> list[ScenarioResult]:
             "bob_no_jane_context":  "rm_jane" not in bob_low,
             "sessions_independent": ans_jane[:30] != ans_bob[:30],
         },
-        answer_excerpt=ans_bob[:200]
+        answer_excerpt=ans_bob[:200],
+        ttft_ms=ttft_bob,
     )
     return [r_jane, r_bob]
 
@@ -975,19 +986,29 @@ def s_concurrent_users(tokens: dict[str, str]) -> list[ScenarioResult]:
 def report(results: list[ScenarioResult]):
     passed_count = sum(1 for r in results if r.passed)
 
-    print(f"\n{'='*80}")
+    print(f"\n{'='*90}")
     print(f"Meridian Gateway — Scenario Correctness Report")
-    print(f"{'='*80}")
-    print(f"{'Scenario':<25} {'Latency':>9} {'Checks':>8}  {'Result'}")
-    print(f"{'-'*80}")
+    print(f"{'='*90}")
+    print(f"{'Scenario':<25} {'E2E':>9} {'TTFT':>8} {'Checks':>8}  {'Result'}")
+    print(f"{'-'*90}")
 
     for r in results:
         flag = "✓ PASS" if r.passed else "✗ FAIL"
         failed_checks = [k for k, v in r.checks.items() if not v]
         detail = "" if r.passed else f"  failed: {', '.join(failed_checks[:3])}"
-        print(f"{r.name:<25} {r.latency_ms:>7.0f}ms {r.check_summary():>8}  {flag}{detail}")
+        ttft_str = f"{r.ttft_ms:>6.0f}ms" if r.ttft_ms is not None else "    n/a "
+        print(f"{r.name:<25} {r.latency_ms:>7.0f}ms {ttft_str} {r.check_summary():>8}  {flag}{detail}")
 
-    print(f"{'-'*80}")
+    # Summary stats
+    ttfts = [r.ttft_ms for r in results if r.ttft_ms is not None]
+    if ttfts:
+        import statistics
+        print(f"{'-'*90}")
+        print(f"  TTFT  p50={statistics.median(ttfts):.0f}ms  "
+              f"p95={sorted(ttfts)[int(len(ttfts)*0.95)]:.0f}ms  "
+              f"min={min(ttfts):.0f}ms  max={max(ttfts):.0f}ms")
+
+    print(f"{'-'*90}")
     print(f"{'TOTAL':<25} {len(results):>5} scenarios   {passed_count}/{len(results)} passed")
 
     # Show failures with answer excerpts

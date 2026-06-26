@@ -1,10 +1,58 @@
-"""NAV MCP tool."""
+"""NAV MCP tool — powered by OpenAI Agents SDK + Z.AI with guardrails."""
+import os
 import json
+import logging
+import asyncio
+import concurrent.futures
+from agents import Runner, function_tool, InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered
 from shared.canned_data import NAV
 from shared.fault_knobs import maybe_fault
 from shared.telemetry import agent_span
+from shared.agent_client import make_agent, LLM_MODEL, LLM_TIMEOUT_S
+from shared.guardrails import injection_guardrail, fund_id_guardrail, length_guardrail, make_grounding_guardrail
+
+# Per-agent LLM overrides — fall back to the service-level SERVICING_AGENT_LLM_* defaults.
+_LLM_BASE  = os.environ.get("NAV_LLM_BASE_URL") or None
+_LLM_KEY   = os.environ.get("NAV_LLM_API_KEY") or None
+_LLM_MODEL = os.environ.get("NAV_LLM_MODEL") or None
 
 AGENT_ID = "acme.servicing.nav"
+log = logging.getLogger(__name__)
+
+
+@function_tool
+def get_nav_data(fund_id: str) -> dict:
+    """Retrieve the latest Net Asset Value for a fund. Keyed by fund_id, not relationship_id."""
+    data = NAV.get(fund_id)
+    if data is None:
+        return {"error": f"Fund {fund_id!r} not found. Known funds: {list(NAV)}"}
+    return data
+
+
+async def _run_nav_agent(
+    fund_id: str,
+    raw: dict,
+    llm_base_url: str | None = None,
+    llm_api_key: str | None = None,
+    llm_model: str | None = None,
+) -> str:
+    agent = make_agent(
+        "ServicingNavAgent",
+        (
+            "You are the NAV specialist for Meridian Bank Asset Servicing. "
+            "Call get_nav_data and summarise: the NAV per unit, total AUM, "
+            "valuation date, and the day's NAV change percentage. "
+            "Be concise — 2-3 sentences."
+        ),
+        [get_nav_data],
+        input_guardrails=[injection_guardrail, fund_id_guardrail],
+        output_guardrails=[length_guardrail, make_grounding_guardrail(raw)],
+        llm_base_url=llm_base_url,
+        llm_api_key=llm_api_key,
+        llm_model=llm_model,
+    )
+    result = await Runner.run(agent, f"Retrieve and summarise NAV for fund_id={fund_id}")
+    return result.final_output
 
 
 def get_nav(fund_id: str) -> str:
@@ -16,6 +64,18 @@ def get_nav(fund_id: str) -> str:
         if data is None:
             span.set_attribute("error", True)
             return json.dumps({"error": f"Fund '{fund_id}' not found. Known funds: {list(NAV)}"})
-        span.set_attribute("result.nav", data.get("nav", 0))
-        span.set_attribute("result.aum", data.get("aum", 0))
-        return json.dumps(data)
+        span.set_attribute("result.nav_per_unit", data.get("nav", 0))
+        span.set_attribute("result.total_aum", data.get("aum", 0))
+        try:
+            try:
+                asyncio.get_running_loop()
+                with concurrent.futures.ThreadPoolExecutor() as pool:
+                    future = pool.submit(asyncio.run, _run_nav_agent(fund_id, data, _LLM_BASE, _LLM_KEY, _LLM_MODEL))
+                    narrative = future.result(timeout=LLM_TIMEOUT_S)
+            except RuntimeError:
+                narrative = asyncio.run(_run_nav_agent(fund_id, data, _LLM_BASE, _LLM_KEY, _LLM_MODEL))
+            span.set_attribute("agent.model", _LLM_MODEL or LLM_MODEL)
+            return json.dumps({**data, "agent_narrative": narrative})
+        except Exception as exc:
+            log.error("Agent LLM call failed for %s: %s", fund_id, exc)
+            return json.dumps({"error": f"llm_unavailable: {type(exc).__name__}", "agent_id": AGENT_ID})

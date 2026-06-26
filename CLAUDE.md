@@ -8,9 +8,6 @@
 
 ---
 
-find api key here at
-ZAI_API_KEY=903ed9ee018540a3bd723a0c35c41e01.qDrJqUyJIe8w0JJF
-
 ## 1. What you are building
 
 A custom **enterprise AI gateway** for an enterprise bank. A user types one

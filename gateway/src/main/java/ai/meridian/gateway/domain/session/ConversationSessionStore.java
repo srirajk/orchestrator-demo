@@ -80,19 +80,30 @@ public class ConversationSessionStore {
         String key = KEY_PREFIX + session.conversationId();
         try {
             Map<String, String> fields = new java.util.LinkedHashMap<>();
+
+            // Always write all fields — for null values, delete the Redis field so stale
+            // data from a prior turn cannot carry forward.
             if (session.relationshipId() != null) {
                 fields.put("relationship_id", session.relationshipId());
+            } else {
+                jedis.hdel(key, "relationship_id");
             }
             if (session.fundId() != null) {
                 fields.put("fund_id", session.fundId());
+            } else {
+                jedis.hdel(key, "fund_id");
             }
             if (session.lastAgentResults() != null) {
                 fields.put("agent_results", mapper.writeValueAsString(session.lastAgentResults()));
                 fields.put("agent_results_ts", String.valueOf(session.agentResultsEpochMs()));
+            } else {
+                jedis.hdel(key, "agent_results", "agent_results_ts");
             }
             fields.put("turn_count", String.valueOf(session.turnCount()));
 
-            jedis.hset(key, fields);
+            if (!fields.isEmpty()) {
+                jedis.hset(key, fields);
+            }
             jedis.expire(key, sessionTtlSeconds);
             log.debug("SessionStore.save: {} relId={} turns={}",
                     session.conversationId(), session.relationshipId(), session.turnCount());

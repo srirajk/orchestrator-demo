@@ -1,0 +1,201 @@
+{
+  "__inputs": [],
+  "__requires": [],
+  "annotations": {"list": []},
+  "description": "Meridian AI Gateway — enter a Conversation ID (or Relationship ID) to inspect the full distributed trace: intent, agent fan-out, latency, auth decisions",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "tags": ["meridian", "traces"],
+  "templating": {
+    "list": [
+      {
+        "current": {"value": "REL-00042"},
+        "description": "Relationship ID (REL-XXXXX) or Trace ID to look up",
+        "hide": 0,
+        "label": "Relationship / Trace ID",
+        "name": "entity_id",
+        "query": "REL-00042",
+        "type": "textbox"
+      }
+    ]
+  },
+  "time": {"from": "now-3h", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Meridian — Conversation Trace Explorer",
+  "uid": "meridian-trace",
+  "version": 1,
+  "panels": [
+
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
+      "id": 1,
+      "title": "Trace Search — enter Relationship ID above",
+      "type": "row"
+    },
+
+    {
+      "datasource": {"type": "tempo", "uid": "tempo"},
+      "gridPos": {"h": 12, "w": 24, "x": 0, "y": 1},
+      "id": 2,
+      "options": {
+        "frameType": "search"
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {"type": "tempo", "uid": "tempo"},
+          "limit": 20,
+          "queryType": "traceql",
+          "query": "{span.entity.relationship_id = \"$entity_id\" || resource.service.name = \"meridian-gateway\"}",
+          "tableType": "traces",
+          "refId": "A"
+        }
+      ],
+      "title": "Traces — click a row to drill into the full span waterfall",
+      "type": "traces"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 13},
+      "id": 10,
+      "title": "Agent Latency — calls in the last 3 hours",
+      "type": "row"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"lineWidth": 2},
+          "unit": "s"
+        }
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 14},
+      "id": 11,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_client_requests_seconds_bucket{job=\"meridian-gateway\"}[5m])) by (le, client_name, uri))",
+          "legendFormat": "{{client_name}} {{uri}} p95"
+        }
+      ],
+      "title": "Agent Outbound Call Latency p95",
+      "type": "timeseries"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 0.01},
+              {"color": "red", "value": 0.05}
+            ]
+          },
+          "unit": "percentunit"
+        }
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 14},
+      "id": 12,
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"]},
+        "colorMode": "background",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_client_requests_seconds_count{job=\"meridian-gateway\", outcome!=\"SUCCESS\"}[5m])) by (client_name, uri) / sum(rate(http_client_requests_seconds_count{job=\"meridian-gateway\"}[5m])) by (client_name, uri)",
+          "legendFormat": "{{client_name}} error rate"
+        }
+      ],
+      "title": "Agent Error Rate (last 5m)",
+      "type": "stat"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 22},
+      "id": 20,
+      "title": "Intent & Auth Signals",
+      "type": "row"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"lineWidth": 2},
+          "unit": "short"
+        }
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 23},
+      "id": 21,
+      "targets": [
+        {
+          "expr": "sum(increase(chat_intent_total{job=\"meridian-gateway\"}[5m])) by (intent)",
+          "legendFormat": "intent: {{intent}}"
+        }
+      ],
+      "title": "Intent Classifications (5m buckets)",
+      "type": "timeseries"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"lineWidth": 2},
+          "unit": "reqps"
+        }
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 23},
+      "id": 22,
+      "targets": [
+        {
+          "expr": "sum(rate(http_client_requests_seconds_count{job=\"meridian-gateway\", client_name=\"cerbos\"}[5m]))",
+          "legendFormat": "Cerbos ABAC checks/s"
+        },
+        {
+          "expr": "sum(rate(http_client_requests_seconds_count{job=\"meridian-gateway\", client_name=\"cerbos\", outcome!=\"SUCCESS\"}[5m]))",
+          "legendFormat": "Cerbos DENIED/s"
+        }
+      ],
+      "title": "Cerbos ABAC — Check Rate & Denials",
+      "type": "timeseries"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 31},
+      "id": 30,
+      "title": "Instructions — How to use this dashboard",
+      "type": "row"
+    },
+
+    {
+      "datasource": null,
+      "gridPos": {"h": 6, "w": 24, "x": 0, "y": 32},
+      "id": 31,
+      "options": {
+        "content": "## Conversation Trace Explorer\n\n1. **Enter a Relationship ID** (e.g. `REL-00042`) in the **Relationship / Trace ID** variable at the top.\n2. The **Trace Search** panel shows all gateway traces that touched that relationship — click any row to open the full span waterfall.\n3. The **span waterfall** shows: intent classify → entity extract → Cerbos ABAC → agent fan-out (HTTP + MCP in parallel) → answer synthesis.\n4. To look up a specific trace by ID, paste the trace ID directly in the variable box.\n5. The **Agent Latency** and **Intent/Auth** panels show aggregate signals for the selected time window.\n\n**Key span names to look for:**\n- `chat.handle` — root gateway span (total E2E time)\n- `intent.classify` — LLM routing decision\n- `entity.extract` — entity extraction (relationship ID resolution)\n- `cerbos.check` — ABAC entitlement check\n- `agent.*` — per-agent calls with `agent.id`, `agent.protocol`, `agent.model` attributes",
+        "mode": "markdown"
+      },
+      "title": "How to use",
+      "type": "text"
+    }
+  ]
+}

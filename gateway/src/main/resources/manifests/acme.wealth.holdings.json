@@ -21,20 +21,30 @@
       "id": "get_holdings",
       "name": "get_holdings",
       "description": "Retrieve current holdings, positions, and asset allocation breakdown for a wealth relationship.",
-      "tags": ["holdings", "portfolio", "positions", "allocation", "wealth-management"],
+      "tags": [
+        "holdings",
+        "portfolio",
+        "positions",
+        "allocation",
+        "wealth-management"
+      ],
       "examples": [
         "current holdings for the Whitman relationship",
         "portfolio allocation for this client",
         "what is this account invested in",
         "position breakdown for the relationship"
       ],
-      "inputModes": ["application/json"],
-      "outputModes": ["application/json"]
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
     }
   ],
   "constraints": {
     "is_mutating": false,
     "data_classification": "confidential-pii",
-    "sla_timeout_ms": 2500
+    "sla_timeout_ms": 30000
   }
 }

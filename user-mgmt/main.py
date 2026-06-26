@@ -35,11 +35,17 @@ Phase 10 — Domain admin endpoints:
   GET    /domains/{domain_id}/admins            list domain admins
 """
 
+import asyncio
 import base64
+import hashlib
+import hmac
+import html
 import json
 import math
 import os
+import secrets
 import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List, Optional
 
@@ -47,8 +53,9 @@ import redis as redis_lib
 import yaml
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-from fastapi import FastAPI, HTTPException, Path as FPath
+from fastapi import FastAPI, Form, HTTPException, Path as FPath, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, RedirectResponse
 from jose import jwt
 from pydantic import BaseModel
 
@@ -71,6 +78,43 @@ _rsa_private_key: rsa.RSAPrivateKey = None  # type: ignore[assignment]
 _private_key_pem: str = ""
 
 KEY_ID = "meridian-key-1"
+
+# ── OIDC configuration ─────────────────────────────────────────────────────────
+
+# OIDC_ISSUER must match what's set as OPENID_ISSUER in LibreChat's env.
+# Uses the Docker-internal URL so LibreChat (inside Docker) can reach it.
+OIDC_ISSUER       = os.getenv("OIDC_ISSUER",        "http://user-mgmt:8084")
+# Browser-accessible URL for the authorization_endpoint redirect.
+OIDC_BASE_URL     = os.getenv("OIDC_BASE_URL",      "http://localhost:8084")
+OIDC_CLIENT_ID    = os.getenv("OIDC_CLIENT_ID",     "meridian-librechat")
+OIDC_CLIENT_SECRET = os.getenv("OIDC_CLIENT_SECRET","meridian-client-secret")
+
+# Allowed redirect URIs for the authorization endpoint — prevents code hijacking.
+_REGISTERED_REDIRECT_URIS: set = set()
+
+
+def _init_registered_redirect_uris() -> None:
+    """Populate from env so the set is available after config is loaded."""
+    uris = {
+        os.getenv("OIDC_CLIENT_REDIRECT_URI", "http://localhost:3080/oauth/openid/callback"),
+    }
+    _REGISTERED_REDIRECT_URIS.update(uris)
+# Default password for all demo seed users (override via env in production)
+DEMO_PASSWORD     = os.getenv("DEMO_PASSWORD",      "Meridian@2024")
+PASSWORD_SALT     = os.getenv("PASSWORD_SALT",      "meridian-demo-salt")
+
+# In-memory auth code store: code → {user_id, client_id, redirect_uri, expires_utc}
+_auth_codes: dict = {}
+
+
+def _hash_password(password: str) -> str:
+    """PBKDF2-HMAC-SHA256 password hash using the global salt. Demo-grade only."""
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode(), PASSWORD_SALT.encode(), 100_000)
+    return dk.hex()
+
+
+def _verify_password(password: str, stored_hash: str) -> bool:
+    return hmac.compare_digest(_hash_password(password), stored_hash)
 
 
 def _load_or_generate_keypair() -> None:
@@ -173,20 +217,26 @@ def _seed_from_yaml(org: dict) -> None:
     for p in principals:
         uid = p["id"]
         key = KEY_PREFIX + uid
+        plain_password = p.get("password", DEMO_PASSWORD)
+        pw_hash = _hash_password(plain_password)
         if not r.exists(key):
             r.hset(key, mapping={
-                "id":        uid,
-                "name":      p.get("name", uid),
-                "email":     p.get("email", ""),
-                "roles":     json.dumps(p.get("roles", ["relationship_manager"])),
-                "book":      json.dumps(p.get("book", [])),
-                "segments":  json.dumps(p.get("segments", [])),
-                "clearance": str(p.get("clearance", 2)),
-                "team":      p.get("team", ""),
+                "id":           uid,
+                "name":         p.get("name", uid),
+                "email":        p.get("email", ""),
+                "roles":        json.dumps(p.get("roles", ["relationship_manager"])),
+                "book":         json.dumps(p.get("book", [])),
+                "segments":     json.dumps(p.get("segments", [])),
+                "clearance":    str(p.get("clearance", 2)),
+                "team":         p.get("team", ""),
+                "password_hash": pw_hash,
             })
         else:
             # Always sync roles — allows upgrading admin → platform_admin on restart
             r.hset(key, "roles", json.dumps(p.get("roles", ["relationship_manager"])))
+            # Sync password hash so env-var changes propagate
+            if not r.hget(key, "password_hash"):
+                r.hset(key, "password_hash", pw_hash)
     print(f"[user-mgmt] Seeded {len(principals)} principals from org.yaml")
 
     # Seed domains and memberships
@@ -281,19 +331,21 @@ def _seed_inline() -> None:
         },
     ]
 
+    default_hash = _hash_password(DEMO_PASSWORD)
     for p in demo_principals:
         uid = p["id"]
         key = KEY_PREFIX + uid
         if not r.exists(key):
             r.hset(key, mapping={
-                "id":        uid,
-                "name":      p.get("name", uid),
-                "email":     p.get("email", ""),
-                "roles":     json.dumps(p.get("roles", [])),
-                "book":      json.dumps(p.get("book", [])),
-                "segments":  json.dumps(p.get("segments", [])),
-                "clearance": str(p.get("clearance", 2)),
-                "team":      p.get("team", ""),
+                "id":            uid,
+                "name":          p.get("name", uid),
+                "email":         p.get("email", ""),
+                "roles":         json.dumps(p.get("roles", [])),
+                "book":          json.dumps(p.get("book", [])),
+                "segments":      json.dumps(p.get("segments", [])),
+                "clearance":     str(p.get("clearance", 2)),
+                "team":          p.get("team", ""),
+                "password_hash": default_hash,
             })
     print(f"[user-mgmt] Seeded {len(demo_principals)} demo principals (inline fallback)")
 
@@ -312,8 +364,9 @@ def _seed_inline() -> None:
 
 
 @app.on_event("startup")
-def seed():
+async def seed():
     _load_or_generate_keypair()
+    _init_registered_redirect_uris()
     org = _load_org_yaml()
     if org:
         print(f"[user-mgmt] Loading org seed from {ORG_YAML_PATH}")
@@ -321,6 +374,8 @@ def seed():
     else:
         print("[user-mgmt] No org.yaml found — using inline seed")
         _seed_inline()
+    # Start background task to purge expired auth codes.
+    asyncio.create_task(_purge_expired_auth_codes())
 
 
 # ── Models ────────────────────────────────────────────────────────────────────
@@ -406,7 +461,8 @@ def write_principal(user_id: str, p: PrincipalView):
 
 # ── RS256 JWT issuance ────────────────────────────────────────────────────────
 
-def issue_jwt(user_id: str, principal: PrincipalView, ttl_seconds: int = 3600) -> str:
+def issue_jwt(user_id: str, principal: PrincipalView, ttl_seconds: int = 3600,
+             issuer: str = "meridian-user-mgmt", audience: str = "meridian-gateway") -> str:
     """Issue a RS256 JWT containing all claim attributes.
     Book is derived from domain memberships; admin_domains from domain admin grants."""
     now = int(time.time())
@@ -416,19 +472,40 @@ def issue_jwt(user_id: str, principal: PrincipalView, ttl_seconds: int = 3600) -
     admin_domains = get_user_admin_domains(user_id)
 
     payload = {
-        "sub":          user_id,
-        "name":         principal.name,
-        "email":        principal.email,
-        "roles":        principal.roles,
-        "book":         effective_book,
-        "segments":     principal.segments,
-        "clearance":    principal.clearance,
-        "domains":      domains,
+        "sub":           user_id,
+        "name":          principal.name,
+        "email":         principal.email,
+        "roles":         principal.roles,
+        "book":          effective_book,
+        "segments":      principal.segments,
+        "clearance":     principal.clearance,
+        "domains":       domains,
         "admin_domains": admin_domains,
-        "iat":          now,
-        "exp":          now + ttl_seconds,
-        "iss":          "meridian-user-mgmt",
-        "aud":          "meridian-gateway",
+        "iat":           now,
+        "exp":           now + ttl_seconds,
+        "iss":           issuer,
+        "aud":           audience,
+    }
+    return jwt.encode(
+        payload,
+        _private_key_pem,
+        algorithm="RS256",
+        headers={"kid": KEY_ID},
+    )
+
+
+def issue_id_token(user_id: str, principal: PrincipalView,
+                   client_id: str, ttl_seconds: int = 3600) -> str:
+    """Issue an OIDC id_token for LibreChat (audience = client_id, iss = OIDC_ISSUER)."""
+    now = int(time.time())
+    payload = {
+        "sub":   user_id,
+        "name":  principal.name,
+        "email": principal.email,
+        "iat":   now,
+        "exp":   now + ttl_seconds,
+        "iss":   OIDC_ISSUER,
+        "aud":   client_id,
     }
     return jwt.encode(
         payload,
@@ -456,6 +533,249 @@ def jwks():
                 "e": _int_to_b64url(pub_numbers.e),
             }
         ]
+    }
+
+
+# ── Routes: OIDC ──────────────────────────────────────────────────────────────
+
+_LOGIN_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Meridian Bank — Sign In</title>
+  <style>
+    *{{box-sizing:border-box}}
+    body{{font-family:-apple-system,system-ui,sans-serif;background:#0a1628;
+         display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0}}
+    .card{{background:#fff;border-radius:12px;padding:40px;width:380px;
+           box-shadow:0 4px 32px rgba(0,0,0,.5)}}
+    h1{{color:#0a1628;font-size:22px;margin:0 0 4px}}
+    p{{color:#666;font-size:13px;margin:0 0 24px}}
+    input{{width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:6px;
+           font-size:14px;margin-bottom:14px;outline:none}}
+    input:focus{{border-color:#1e40af;box-shadow:0 0 0 2px rgba(30,64,175,.15)}}
+    button{{width:100%;padding:12px;background:#1e40af;color:#fff;border:none;
+            border-radius:6px;font-size:15px;font-weight:600;cursor:pointer}}
+    button:hover{{background:#1d3a9f}}
+    .err{{background:#fef2f2;border:1px solid #fca5a5;color:#dc2626;
+          border-radius:6px;padding:10px 14px;font-size:13px;margin-bottom:14px;text-align:center}}
+    .hint{{margin-top:16px;font-size:12px;color:#9ca3af;text-align:center}}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Meridian AI Gateway</h1>
+    <p>Sign in with your Meridian credentials</p>
+    {error_block}
+    <form method="POST" action="{action_url}">
+      <input type="hidden" name="client_id"    value="{client_id}">
+      <input type="hidden" name="redirect_uri" value="{redirect_uri}">
+      <input type="hidden" name="state"        value="{state}">
+      <input type="text"     name="username" placeholder="User ID  (e.g. rm_jane)" required autofocus>
+      <input type="password" name="password" placeholder="Password" required>
+      <button type="submit">Sign In</button>
+    </form>
+    <p class="hint">Demo credentials: any user ID from the org · password: <b>Meridian@2024</b></p>
+  </div>
+</body>
+</html>"""
+
+
+@app.get("/.well-known/openid-configuration")
+def openid_configuration():
+    """OIDC Discovery Document — LibreChat uses this to discover auth/token/jwks endpoints."""
+    return {
+        "issuer":                                OIDC_ISSUER,
+        "authorization_endpoint":               f"{OIDC_BASE_URL}/oauth/authorize",
+        "token_endpoint":                        f"{OIDC_ISSUER}/oauth/token",
+        "userinfo_endpoint":                     f"{OIDC_ISSUER}/oauth/userinfo",
+        "jwks_uri":                              f"{OIDC_ISSUER}/.well-known/jwks.json",
+        "response_types_supported":             ["code"],
+        "subject_types_supported":              ["public"],
+        "id_token_signing_alg_values_supported": ["RS256"],
+        "scopes_supported":                     ["openid", "profile", "email"],
+        "token_endpoint_auth_methods_supported": ["client_secret_post", "client_secret_basic"],
+        "claims_supported":                     ["sub", "name", "email", "iss", "aud", "exp", "iat"],
+    }
+
+
+async def _purge_expired_auth_codes() -> None:
+    """Background task: sweep expired authorization codes every 60 seconds."""
+    while True:
+        await asyncio.sleep(60)
+        now = datetime.now(timezone.utc)
+        expired = [c for c, v in list(_auth_codes.items()) if v["expires_utc"] < now]
+        for c in expired:
+            _auth_codes.pop(c, None)
+        if expired:
+            print(f"[user-mgmt] Purged {len(expired)} expired auth codes")
+
+
+@app.get("/oauth/authorize", response_class=HTMLResponse)
+def authorize_get(
+    response_type: str = "code",
+    client_id: str = "",
+    redirect_uri: str = "",
+    state: str = "",
+    scope: str = "openid",
+    error: str = "",
+):
+    """Show the HTML login form."""
+    error_block = f'<div class="err">{html.escape(error)}</div>' if error else ""
+    action_url = f"{OIDC_BASE_URL}/oauth/authorize"
+    return _LOGIN_HTML.format(
+        error_block=error_block,
+        action_url=action_url,
+        client_id=client_id,
+        redirect_uri=redirect_uri,
+        state=state,
+    )
+
+
+@app.post("/oauth/authorize")
+async def authorize_post(
+    username:     str = Form(...),
+    password:     str = Form(...),
+    client_id:    str = Form(...),
+    redirect_uri: str = Form(...),
+    state:        str = Form(""),
+):
+    """Validate credentials, generate auth code, redirect to LibreChat callback."""
+    # Validate redirect_uri against whitelist before processing credentials.
+    if redirect_uri not in _REGISTERED_REDIRECT_URIS:
+        raise HTTPException(status_code=400, detail="invalid redirect_uri")
+
+    # Load user
+    fields = get_redis().hgetall(KEY_PREFIX + username)
+    if not fields:
+        return RedirectResponse(
+            f"{OIDC_BASE_URL}/oauth/authorize?"
+            f"client_id={client_id}&redirect_uri={redirect_uri}&state={state}"
+            f"&error=Invalid+user+ID+or+password",
+            status_code=302,
+        )
+
+    stored_hash = fields.get("password_hash", "")
+    if not stored_hash or not _verify_password(password, stored_hash):
+        return RedirectResponse(
+            f"{OIDC_BASE_URL}/oauth/authorize?"
+            f"client_id={client_id}&redirect_uri={redirect_uri}&state={state}"
+            f"&error=Invalid+user+ID+or+password",
+            status_code=302,
+        )
+
+    # Generate a one-time auth code (valid 5 minutes)
+    code = secrets.token_urlsafe(32)
+    _auth_codes[code] = {
+        "user_id":      username,
+        "client_id":    client_id,
+        "redirect_uri": redirect_uri,
+        "expires_utc":  datetime.now(timezone.utc) + timedelta(minutes=5),
+    }
+    print(f"[user-mgmt/oidc] auth code issued for user={username} client={client_id}")
+
+    sep = "&" if "?" in redirect_uri else "?"
+    return RedirectResponse(
+        f"{redirect_uri}{sep}code={code}&state={state}",
+        status_code=302,
+    )
+
+
+@app.post("/oauth/token")
+async def token_endpoint(
+    request: Request,
+    grant_type:    str = Form("authorization_code"),
+    code:          str = Form(""),
+    redirect_uri:  str = Form(""),
+    client_id:     str = Form(""),
+    client_secret: str = Form(""),
+):
+    """Exchange authorization code for id_token + access_token."""
+    # Support client_secret_basic (Authorization header)
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Basic "):
+        try:
+            decoded = base64.b64decode(auth_header[6:]).decode()
+            client_id_h, client_secret_h = decoded.split(":", 1)
+            if not client_id:
+                client_id = client_id_h
+            if not client_secret:
+                client_secret = client_secret_h
+        except Exception:
+            pass
+
+    if grant_type != "authorization_code":
+        raise HTTPException(status_code=400, detail="unsupported_grant_type")
+
+    # Validate client
+    if client_id != OIDC_CLIENT_ID or client_secret != OIDC_CLIENT_SECRET:
+        raise HTTPException(status_code=401, detail="invalid_client")
+
+    # Consume the auth code
+    entry = _auth_codes.pop(code, None)
+    if not entry:
+        raise HTTPException(status_code=400, detail="invalid_grant: unknown code")
+    if entry["client_id"] != client_id:
+        raise HTTPException(status_code=400, detail="invalid_grant: client mismatch")
+    if entry["redirect_uri"] != redirect_uri:
+        raise HTTPException(status_code=400, detail="invalid_grant: redirect_uri mismatch")
+    if entry["expires_utc"] < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="invalid_grant: code expired")
+
+    user_id = entry["user_id"]
+    fields = get_redis().hgetall(KEY_PREFIX + user_id)
+    if not fields:
+        raise HTTPException(status_code=400, detail="invalid_grant: user not found")
+
+    principal = redis_to_principal(user_id, fields)
+
+    # id_token: OIDC identity token for LibreChat (iss=OIDC_ISSUER, aud=client_id)
+    id_token = issue_id_token(user_id, principal, client_id=client_id, ttl_seconds=3600)
+
+    # access_token: gateway JWT so the user can paste it as the API key in LibreChat endpoint settings.
+    # Uses OIDC_ISSUER so the gateway's multi-issuer list accepts it.
+    access_token = issue_jwt(
+        user_id, principal, ttl_seconds=3600,
+        issuer=OIDC_ISSUER, audience="meridian-gateway",
+    )
+
+    print(f"[user-mgmt/oidc] tokens issued for user={user_id}")
+    return {
+        "access_token": access_token,
+        "id_token":     id_token,
+        "token_type":   "Bearer",
+        "expires_in":   3600,
+    }
+
+
+@app.get("/oauth/userinfo")
+async def userinfo_endpoint(request: Request):
+    """Return user profile claims. Requires a valid Bearer token (access_token or id_token)."""
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="missing token")
+    token = auth[7:].strip()
+    try:
+        # Verify with the public key and enforce all standard claims.
+        pub_pem = _rsa_private_key.public_key().public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        ).decode()
+        claims = jwt.decode(token, pub_pem, algorithms=["RS256"],
+                            options={"verify_exp": True, "verify_aud": False})
+        user_id = claims.get("sub")
+    except Exception:
+        raise HTTPException(status_code=401, detail="invalid token")
+
+    fields = get_redis().hgetall(KEY_PREFIX + user_id)
+    if not fields:
+        raise HTTPException(status_code=404, detail="user not found")
+    p = redis_to_principal(user_id, fields)
+    return {
+        "sub":   user_id,
+        "name":  p.name,
+        "email": p.email,
+        "roles": p.roles,
     }
 
 

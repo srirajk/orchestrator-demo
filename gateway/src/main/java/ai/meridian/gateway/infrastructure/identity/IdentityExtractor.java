@@ -26,14 +26,11 @@ public class IdentityExtractor {
             if (sub != null && !sub.isBlank()) return sub;
         }
 
-        // Trusted internal hop (LibreChat → gateway with X-User-Id header)
+        // Trusted internal hop (LibreChat → gateway with X-User-Id header).
+        // Only X-User-Id is honoured — X-Forwarded-User is never set by any component in this stack.
         String userId = request.getHeader("X-User-Id");
         if (userId != null && !userId.isBlank()) {
             return userId.trim();
-        }
-        String forwarded = request.getHeader("X-Forwarded-User");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.trim();
         }
         return "anonymous";
     }

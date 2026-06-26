@@ -46,6 +46,6 @@
   "constraints": {
     "is_mutating": false,
     "data_classification": "internal",
-    "sla_timeout_ms": 10000
+    "sla_timeout_ms": 30000
   }
 }

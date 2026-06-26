@@ -3,8 +3,8 @@ OTel + OpenInference span helper for the Wealth HTTP service.
 
 Each agent wraps its work in agent_span() to produce a child span that:
   1. Shows in Tempo/Grafana (via OTel Collector)
-  2. Appears in Arize Phoenix as an AGENT span with input/output captured
-     (Phoenix uses OpenInference semantic conventions to detect agent spans)
+  2. Appears in Langfuse as an AGENT span with input/output captured
+     (Langfuse reads OpenInference semantic conventions on OTel spans)
 """
 import contextlib
 import os
@@ -34,8 +34,8 @@ def agent_span(agent_id: str, relationship_id: str = None, input_value: str = No
     """
     Context manager that creates an OpenInference AGENT span.
 
-    Phoenix uses SpanAttributes.OPENINFERENCE_SPAN_KIND = "AGENT" to display
-    the span in the agent experiments panel.
+    Langfuse reads SpanAttributes.OPENINFERENCE_SPAN_KIND = "AGENT" to group
+    agent invocations in session traces.
 
     Usage:
         with agent_span("acme.wealth.holdings", relationship_id="REL-00042",
@@ -51,7 +51,7 @@ def agent_span(agent_id: str, relationship_id: str = None, input_value: str = No
             span.set_attribute("agent.domain", "wealth")
             if relationship_id:
                 span.set_attribute("entity.relationship_id", relationship_id)
-            # OpenInference semantic conventions — Phoenix reads these
+            # OpenInference semantic conventions — Langfuse reads these
             if _OI_AVAILABLE:
                 span.set_attribute(
                     SpanAttributes.OPENINFERENCE_SPAN_KIND,

@@ -39,10 +39,8 @@ public class CerbosEntitlementAdapter {
     private static final String POLICY_VERSION    = "default";
     private static final String RESOURCE_REL      = "relationship";
     private static final String RESOURCE_AGENT    = "agent";
-    private static final String RESOURCE_DOMAIN   = "domain";
     private static final String ACTION_READ        = "read";
     private static final String ACTION_INVOKE      = "invoke";
-    private static final String ACTION_MANAGE      = "manage_members";
 
     private final RestClient   restClient;
     private final ObjectMapper mapper;

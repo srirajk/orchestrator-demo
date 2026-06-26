@@ -203,4 +203,75 @@ class RoleAuthorizationTest {
                                  "\"stream\":true}"))
                 .andExpect(status().isOk());
     }
+
+    // ── BearerTokenResolver: LibreChat apiKey="unused" must NOT cause 401 ─────
+
+    @Test
+    void bearerUnused_chat_returns200() throws Exception {
+        // LibreChat with apiKey: "unused" sends Authorization: Bearer unused.
+        // The custom BearerTokenResolver must return null for this literal value,
+        // allowing the request through to the permitAll chat endpoint.
+        mvc.perform(post("/v1/chat/completions")
+                        .header("Authorization", "Bearer unused")
+                        .header("X-User-Id", "rm_jane")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"model\":\"meridian-assistant\"," +
+                                 "\"messages\":[{\"role\":\"user\",\"content\":\"hello\"}]," +
+                                 "\"stream\":true}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void bearerEmpty_chat_returns200() throws Exception {
+        mvc.perform(post("/v1/chat/completions")
+                        .header("Authorization", "Bearer ")
+                        .header("X-User-Id", "rm_jane")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"model\":\"meridian-assistant\"," +
+                                 "\"messages\":[{\"role\":\"user\",\"content\":\"hello\"}]," +
+                                 "\"stream\":true}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void bearerNonJwt_chat_returns200() throws Exception {
+        // Any non-JWT string (no dots) must also be ignored
+        mvc.perform(post("/v1/chat/completions")
+                        .header("Authorization", "Bearer not-a-jwt-at-all")
+                        .header("X-User-Id", "rm_jane")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"model\":\"meridian-assistant\"," +
+                                 "\"messages\":[{\"role\":\"user\",\"content\":\"hello\"}]," +
+                                 "\"stream\":true}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void oidcIssuer_validJwt_accepted() throws Exception {
+        // Tokens issued by the OIDC endpoint use iss=OIDC_ISSUER ("http://user-mgmt:8084").
+        // The gateway's multi-issuer list must accept them.
+        JWTClaimsSet claims = new JWTClaimsSet.Builder()
+                .subject("rm_jane")
+                .issuer("http://user-mgmt:8084")   // OIDC issuer
+                .audience(List.of("meridian-gateway"))
+                .expirationTime(new Date(System.currentTimeMillis() + 3_600_000L))
+                .issueTime(new Date())
+                .claim("roles", List.of("relationship_manager"))
+                .claim("book", List.of())
+                .claim("admin_domains", List.of())
+                .claim("clearance", 2)
+                .build();
+        JWSHeader header = new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("role-test-key").build();
+        SignedJWT jwt = new SignedJWT(header, claims);
+        jwt.sign(new RSASSASigner((RSAPrivateKey) keyPair.getPrivate()));
+        String token = jwt.serialize();
+
+        mvc.perform(post("/v1/chat/completions")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"model\":\"meridian-assistant\"," +
+                                 "\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]," +
+                                 "\"stream\":true}"))
+                .andExpect(status().isOk());
+    }
 }

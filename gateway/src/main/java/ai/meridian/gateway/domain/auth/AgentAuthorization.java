@@ -44,7 +44,8 @@ public class AgentAuthorization {
 
         if (roles.contains("domain_admin")) {
             List<String> adminDomains = extractAdminDomains(auth);
-            if (agentDomain == null || adminDomains.contains(agentDomain)) {
+            // agentDomain must not be null — a null-domain agent requires platform_admin scope.
+            if (agentDomain != null && adminDomains.contains(agentDomain)) {
                 log.debug("AgentAuthorization: domain_admin allowed for domain={} adminDomains={}",
                         agentDomain, adminDomains);
                 return;

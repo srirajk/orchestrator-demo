@@ -21,20 +21,30 @@
       "id": "get_goal_status",
       "name": "get_goal_status",
       "description": "Retrieve financial goals, on-track status, and funding progress for a wealth management relationship.",
-      "tags": ["goals", "financial-plan", "goal-planning", "on-track", "wealth-management"],
+      "tags": [
+        "goals",
+        "financial-plan",
+        "goal-planning",
+        "on-track",
+        "wealth-management"
+      ],
       "examples": [
         "is this client on track for their goals",
         "financial plan status for the relationship",
         "are the Whitman goals funded",
         "goal progress for this account"
       ],
-      "inputModes": ["application/json"],
-      "outputModes": ["application/json"]
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
     }
   ],
   "constraints": {
     "is_mutating": false,
     "data_classification": "confidential-pii",
-    "sla_timeout_ms": 2500
+    "sla_timeout_ms": 30000
   }
 }

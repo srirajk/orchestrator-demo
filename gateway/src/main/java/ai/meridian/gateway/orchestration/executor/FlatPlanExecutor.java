@@ -6,6 +6,7 @@ import ai.meridian.gateway.orchestration.model.Plan;
 import ai.meridian.gateway.orchestration.model.PlanNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -26,19 +27,20 @@ public class FlatPlanExecutor {
 
     private static final Logger log = LoggerFactory.getLogger(FlatPlanExecutor.class);
 
-    /** Wall-clock deadline across all parallel agent calls. */
-    private static final long OVERALL_DEADLINE_MS = 30_000L;
-
     private final AgentHarness harness;
+    private final long overallDeadlineMs;
 
-    public FlatPlanExecutor(AgentHarness harness) {
+    public FlatPlanExecutor(
+            AgentHarness harness,
+            @Value("${meridian.orchestration.fan-out-deadline-ms:60000}") long overallDeadlineMs) {
         this.harness = harness;
+        this.overallDeadlineMs = overallDeadlineMs;
     }
 
     /**
      * Execute all plan nodes in parallel, returning one result per node.
      *
-     * <p>Nodes that haven't completed by {@code OVERALL_DEADLINE_MS} are represented
+     * <p>Nodes that haven't completed by {@code overallDeadlineMs} are represented
      * as {@link NodeResult.Status#TIMEOUT} results; no exception is ever thrown.
      */
     public List<NodeResult> execute(Plan plan) {
@@ -48,7 +50,7 @@ public class FlatPlanExecutor {
         }
 
         log.info("FlatPlanExecutor: fanning out {} nodes in parallel (deadline={}ms)",
-                plan.nodes().size(), OVERALL_DEADLINE_MS);
+                plan.nodes().size(), overallDeadlineMs);
 
         // One virtual thread per node — no pool starvation under load.
         var exec = Executors.newVirtualThreadPerTaskExecutor();
@@ -57,14 +59,14 @@ public class FlatPlanExecutor {
                 .map(node -> CompletableFuture.supplyAsync(() -> {
                     log.debug("Executing node {} (agent={}, protocol={})",
                             node.nodeId(), node.agent().agentId(), node.agent().protocol());
-                    return harness.execute(node);
+                    return harness.execute(node, exec);
                 }, exec))
                 .toList();
 
         // Wait for all futures up to the deadline; exceptionally() swallows the
         // TimeoutException so we can still harvest whatever has completed.
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-                .orTimeout(OVERALL_DEADLINE_MS, TimeUnit.MILLISECONDS)
+                .orTimeout(overallDeadlineMs, TimeUnit.MILLISECONDS)
                 .exceptionally(t -> null)  // swallow overall-deadline timeout
                 .join();
 
@@ -101,7 +103,7 @@ public class FlatPlanExecutor {
                 node.agent().protocol(),
                 NodeResult.Status.TIMEOUT,
                 null,
-                OVERALL_DEADLINE_MS,
-                "Did not complete within the " + OVERALL_DEADLINE_MS + "ms overall deadline");
+                overallDeadlineMs,
+                "Did not complete within the " + overallDeadlineMs + "ms overall deadline");
     }
 }

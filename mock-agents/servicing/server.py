@@ -116,10 +116,30 @@ def get_cash(relationship_id: str) -> str:
 
 
 if __name__ == "__main__":
+    import logging
     import uvicorn
     from starlette.applications import Starlette
-    from starlette.responses import JSONResponse
+    from starlette.middleware import Middleware
+    from starlette.middleware.base import BaseHTTPMiddleware
+    from starlette.requests import Request as StarletteRequest
+    from starlette.responses import JSONResponse, Response
     from starlette.routing import Route, Mount
+
+    from shared.jwt_verify import verify_bearer_token
+
+    _log = logging.getLogger(__name__)
+
+    class JwtAuthMiddleware(BaseHTTPMiddleware):
+        """Verify JWT on all endpoints except /health."""
+        async def dispatch(self, request: StarletteRequest, call_next):
+            if request.url.path == "/health":
+                return await call_next(request)
+            auth = request.headers.get("Authorization")
+            allowed, error, claims = verify_bearer_token(auth)
+            if not allowed:
+                _log.warning("servicing-mcp: rejected — %s (path=%s)", error, request.url.path)
+                return Response(content=error, status_code=401, media_type="text/plain")
+            return await call_next(request)
 
     async def health(request):
         return JSONResponse({
@@ -129,9 +149,12 @@ if __name__ == "__main__":
             "agents": ["settlements", "corporate_actions", "custody", "nav", "cash"],
         })
 
-    app = Starlette(routes=[
-        Route("/health", health),
-        Mount("/", app=mcp.sse_app()),
-    ])
+    app = Starlette(
+        routes=[
+            Route("/health", health),
+            Mount("/", app=mcp.sse_app()),
+        ],
+        middleware=[Middleware(JwtAuthMiddleware)],
+    )
 
     uvicorn.run(app, host="0.0.0.0", port=8082)

@@ -30,24 +30,29 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Phase 10 — Spring Security resource server + role-based URL authorization.
+ * Spring Security resource server + role-based URL authorization.
  *
  * <p>Authorization matrix:
  * <ul>
  *   <li>POST/PUT/DELETE/GET /admin/agents/** → platform_admin OR domain_admin (+ fine domain check)</li>
  *   <li>GET /debug/**                        → platform_admin OR domain_admin</li>
- *   <li>POST /v1/chat/completions            → permitAll (trusted internal hop from LibreChat)</li>
+ *   <li>POST /v1/chat/completions            → permitAll (identity from JWT sub or X-User-Id header)</li>
  *   <li>GET /trace/**, /v1/models, /actuator/** → permitAll</li>
  * </ul>
  *
  * <p>JWT validation uses the existing {@link JwksClient} so tests can {@code @MockBean} it.
+ * Accepts two issuers: legacy "meridian-user-mgmt" and OIDC "http://user-mgmt:8084".
  */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    private static final String EXPECTED_ISSUER  = "meridian-user-mgmt";
+    // Accept both: existing /auth/token JWTs (non-URL iss) and OIDC /oauth/token JWTs (URL iss)
+    private static final List<String> VALID_ISSUERS = List.of(
+            "meridian-user-mgmt",
+            "http://user-mgmt:8084"
+    );
     private static final String EXPECTED_AUDIENCE = "meridian-gateway";
 
     @Bean
@@ -71,6 +76,20 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2
+                // Ignore placeholder tokens (LibreChat apiKey="unused") and non-JWT strings.
+                // Real JWTs (three dot-delimited parts) are validated; everything else is null
+                // so the request proceeds as anonymous and identity falls back to X-User-Id.
+                .bearerTokenResolver(request -> {
+                    String header = request.getHeader("Authorization");
+                    if (header == null || !header.startsWith("Bearer ")) return null;
+                    String token = header.substring(7).trim();
+                    if (token.isEmpty() || "unused".equals(token)) return null;
+                    // Standard JWS has exactly two dots (header.payload.sig).
+                    // JWE (5 parts, 4 dots) must be rejected — we only accept RS256 JWS.
+                    long dots = token.chars().filter(c -> c == '.').count();
+                    if (dots != 2) return null;
+                    return token;
+                })
                 .jwt(jwt -> jwt
                     .decoder(jwtDecoder)
                     .jwtAuthenticationConverter(jwtAuthenticationConverter)
@@ -127,7 +146,12 @@ public class SecurityConfig {
                     throw new JwtException("token expired");
                 }
 
-                if (!EXPECTED_ISSUER.equals(claims.getIssuer())) {
+                Date nbf = claims.getNotBeforeTime();
+                if (nbf != null && nbf.after(new Date())) {
+                    throw new JwtException("token not yet valid (nbf=" + nbf + ")");
+                }
+
+                if (!VALID_ISSUERS.contains(claims.getIssuer())) {
                     throw new JwtException("invalid iss: " + claims.getIssuer());
                 }
 

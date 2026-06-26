@@ -11,6 +11,13 @@ interface:
 endpoints:
   custom:
     - name: "Meridian"
+      # "user_provided": each logged-in user supplies their own gateway JWT as the API key.
+      # After logging in via OIDC, users copy their access_token from
+      # http://localhost:8084/auth/token and paste it in LibreChat endpoint settings once.
+      # The gateway validates the RS256 JWT and reads the `sub` claim for identity.
+      #
+      # For the quickstart demo without OIDC, change to apiKey: "unused" — the gateway
+      # will ignore it and fall back to the X-User-Id header below.
       apiKey: "unused"
       baseURL: "http://gateway:8080/v1"
       models:
@@ -31,7 +38,7 @@ endpoints:
         - "logprobs"
       streamRate: 35
       headers:
-        # Phase 8 M15: trusted internal hop identity (upgraded to OIDC Bearer in M16)
+        # Fallback identity header — used when no valid Bearer JWT is present.
+        # Dynamically overridden by the OIDC access_token (JWT sub) when users
+        # paste their token in endpoint settings.
         X-User-Id: "rm_jane"
-        # Phase 9: forward conversation ID so gateway logs/session match LibreChat
-        X-Conversation-Id: "{{LIBRECHAT_BODY_CONVERSATIONID}}"

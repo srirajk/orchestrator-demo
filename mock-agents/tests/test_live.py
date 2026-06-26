@@ -43,7 +43,6 @@ GATEWAY_URL    = os.environ.get("GATEWAY_URL",    "http://localhost:8080")
 WEALTH_URL     = os.environ.get("WEALTH_URL",     "http://localhost:8081")
 SERVICING_URL  = os.environ.get("SERVICING_URL",  "http://localhost:8082")
 CERBOS_URL     = os.environ.get("CERBOS_URL",     "http://localhost:3594")
-PHOENIX_URL    = os.environ.get("PHOENIX_URL",    "http://localhost:6006")
 LIBRECHAT_URL  = os.environ.get("LIBRECHAT_URL",  "http://localhost:3080")
 USER_MGMT_URL  = os.environ.get("USER_MGMT_URL",  "http://localhost:8084")
 
@@ -73,14 +72,6 @@ def _cerbos_reachable() -> bool:
         return False
 
 
-def _phoenix_reachable() -> bool:
-    try:
-        r = requests.get(f"{PHOENIX_URL}/v1/projects", timeout=3)
-        return r.status_code == 200
-    except Exception:
-        return False
-
-
 def _librechat_reachable() -> bool:
     try:
         r = requests.get(f"{LIBRECHAT_URL}/", timeout=3)
@@ -101,7 +92,6 @@ needs_wealth    = pytest.mark.skipif(not _reachable(WEALTH_URL),    reason="weal
 needs_servicing = pytest.mark.skipif(not _reachable(SERVICING_URL), reason="servicing-mcp not running")
 needs_gateway   = pytest.mark.skipif(not _gateway_reachable(),      reason="gateway not running")
 needs_cerbos    = pytest.mark.skipif(not _cerbos_reachable(),       reason="cerbos not running")
-needs_phoenix   = pytest.mark.skipif(not _phoenix_reachable(),      reason="phoenix not running")
 needs_librechat = pytest.mark.skipif(not _librechat_reachable(),    reason="librechat not running")
 
 
@@ -888,88 +878,7 @@ class TestLiveSecurityEndToEnd:
 # ═════════════════════════════════════════════════════════════════════════════
 
 class TestLiveObservability:
-    """
-    Verify that OTel traces from the gateway actually land in Phoenix.
-
-    The gateway emits OTel spans to the OTel Collector, which exports them to
-    Tempo (for Grafana) and Phoenix (for AI observability). After a real request,
-    we query Phoenix to confirm a trace was recorded.
-
-    Phoenix REST API: GET /v1/projects, GET /v1/projects/{id}/traces
-    """
-
-    @needs_phoenix
-    def test_phoenix_ui_reachable(self):
-        r = requests.get(f"{PHOENIX_URL}/", timeout=TIMEOUT)
-        assert r.status_code == 200
-        assert "Phoenix" in r.text or "phoenix" in r.text.lower()
-
-    @needs_phoenix
-    def test_phoenix_has_default_project(self):
-        r = requests.get(f"{PHOENIX_URL}/v1/projects", timeout=TIMEOUT)
-        assert r.status_code == 200
-        projects = r.json().get("data", [])
-        assert len(projects) > 0, "Phoenix must have at least a default project"
-
-    @needs_phoenix
-    @needs_gateway
-    def test_gateway_request_produces_traces(self):
-        """
-        Fire a request through the gateway, then verify a trace appears in Phoenix.
-        Uses timestamp-based detection (count-based fails when paginated at max).
-        Polls for up to 30s since OTLP export is async/batched.
-        """
-        import datetime as dt
-        # Get project ID
-        r = requests.get(f"{PHOENIX_URL}/v1/projects", timeout=TIMEOUT)
-        r.raise_for_status()
-        projects = r.json().get("data", [])
-        assert projects, "No Phoenix projects"
-        project_id = projects[0]["id"]
-
-        # Record the time just before firing our request
-        before_ts = dt.datetime.now(dt.timezone.utc)
-
-        # Fire a real gateway request
-        payload = {
-            "model": "meridian-assistant",
-            "messages": [{"role": "user", "content": "Hello, what can you do?"}],
-            "stream": True
-        }
-        resp = requests.post(
-            f"{GATEWAY_URL}/v1/chat/completions",
-            json=payload,
-            headers={"Accept": "text/event-stream", "X-User-Id": "rm_jane"},
-            stream=True, timeout=30
-        )
-        _collect_sse(resp, timeout_sec=25)  # drain SSE
-
-        # Poll Phoenix for traces with start_time after our request (async export)
-        deadline = time.monotonic() + 30
-        found_recent = False
-        while time.monotonic() < deadline:
-            r = requests.get(
-                f"{PHOENIX_URL}/v1/projects/{project_id}/traces?limit=10",
-                timeout=TIMEOUT
-            )
-            if r.status_code == 200:
-                for trace in r.json().get("data", []):
-                    start = trace.get("start_time", "")
-                    if start:
-                        try:
-                            ts = dt.datetime.fromisoformat(start.replace("Z", "+00:00"))
-                            if ts >= before_ts:
-                                found_recent = True
-                                break
-                        except ValueError:
-                            pass
-            if found_recent:
-                break
-            time.sleep(2)
-
-        assert found_recent, (
-            f"No Phoenix trace with start_time >= {before_ts.isoformat()} found after gateway request"
-        )
+    """Verify that OTel traces and glass-box SSE are working."""
 
     @needs_gateway
     def test_glass_box_trace_stream_emits_on_request(self):

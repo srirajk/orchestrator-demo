@@ -1,0 +1,5 @@
+# Meridian eval dependencies (not runtime — install on dev/CI machine)
+deepeval>=2.3.0
+openai>=1.78.0
+httpx>=0.27.1
+pytest>=8.0.0

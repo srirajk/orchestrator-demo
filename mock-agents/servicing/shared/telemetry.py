@@ -2,7 +2,7 @@
 OTel + OpenInference span helper for the Asset Servicing MCP service.
 
 Each MCP tool wraps its work in agent_span() to produce an OpenInference AGENT span
-visible in both Tempo/Grafana and Arize Phoenix.
+visible in both Tempo/Grafana and Langfuse.
 """
 import contextlib
 import os
@@ -33,8 +33,7 @@ def agent_span(agent_id: str, entity_id: str = None, entity_type: str = "relatio
     """
     Context manager for an OpenInference AGENT span (MCP tool invocation).
 
-    Phoenix displays these under the agent experiments panel with input/output,
-    latency, and RAG retrieval attributes.
+    Langfuse displays these in session traces with input/output and latency.
     """
     @contextlib.contextmanager
     def _span():

@@ -11,24 +11,38 @@ processors:
     timeout: 1s
     send_batch_size: 512
 
-  # Enrich every span with service metadata
   resource:
     attributes:
       - key: environment
         value: "demo"
         action: upsert
 
+  # Drop Spring Boot actuator/health/prometheus spans before sending to Langfuse.
+  filter/drop-actuator:
+    error_mode: ignore
+    traces:
+      span:
+        - 'IsMatch(attributes["http.route"], "/actuator.*")'
+        - 'IsMatch(attributes["http.target"], "/actuator.*")'
+        - 'IsMatch(attributes["url.path"], "/actuator.*")'
+        - 'IsMatch(name, "GET /actuator.*")'
+        - 'IsMatch(name, "http get /actuator.*")'
+        - 'IsMatch(name, "http head /actuator.*")'
+        - 'IsMatch(name, "HEAD /actuator.*")'
+
 exporters:
-  # Traces → Tempo
+  # Traces → Tempo (gRPC) — full distributed trace picture incl. actuators
   otlp_grpc/tempo:
     endpoint: "tempo:4317"
     tls:
       insecure: true
 
-  # Traces + Evals → Arize Phoenix (OTLP/HTTP on port 6006)
-  # Note: otlp_http exporter appends /v1/traces — endpoint is the base URL only
-  otlp_http/phoenix:
-    endpoint: "http://phoenix:6006"
+  # Traces → Langfuse (OTLP/HTTP) — sessions, dashboards, inline evals
+  # Auth: Basic base64("pk-lf-meridian-public:sk-lf-meridian-secret")
+  otlphttp/langfuse:
+    endpoint: "http://langfuse:3000/api/public/otel"
+    headers:
+      Authorization: "Basic cGstbGYtbWVyaWRpYW4tcHVibGljOnNrLWxmLW1lcmlkaWFuLXNlY3JldA=="
     tls:
       insecure: true
 
@@ -37,16 +51,22 @@ exporters:
     endpoint: "0.0.0.0:8889"
     namespace: meridian
 
-  # Debug (structured JSON to stdout — helpful during dev)
   debug:
     verbosity: basic
 
 service:
   pipelines:
-    traces:
+    # Infrastructure traces → Tempo: full distributed picture, actuators included
+    traces/infra:
       receivers: [otlp]
       processors: [batch, resource]
-      exporters: [otlp_grpc/tempo, otlp_http/phoenix, debug]
+      exporters: [otlp_grpc/tempo]
+
+    # AI traces → Langfuse: actuator noise filtered, only gateway + LLM + agent spans
+    traces/ai:
+      receivers: [otlp]
+      processors: [batch, resource, filter/drop-actuator]
+      exporters: [otlphttp/langfuse]
 
     metrics:
       receivers: [otlp]

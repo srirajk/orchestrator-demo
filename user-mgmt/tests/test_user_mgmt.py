@@ -346,3 +346,290 @@ class TestUserCRUD:
         resp = client.delete("/users/rm_chen")
         assert resp.status_code == 200
         assert client.get("/users/rm_chen").status_code == 404
+
+
+# ── OIDC integration tests ────────────────────────────────────────────────────
+
+class TestOIDCDiscovery:
+    def test_discovery_doc_has_required_fields(self):
+        resp = client.get("/.well-known/openid-configuration")
+        assert resp.status_code == 200
+        doc = resp.json()
+        assert "issuer" in doc
+        assert "authorization_endpoint" in doc
+        assert "token_endpoint" in doc
+        assert "userinfo_endpoint" in doc
+        assert "jwks_uri" in doc
+        assert "code" in doc["response_types_supported"]
+
+    def test_discovery_issuer_matches_configured(self):
+        resp = client.get("/.well-known/openid-configuration")
+        doc = resp.json()
+        # issuer must be a non-empty string — LibreChat validates id_token.iss against this
+        assert doc["issuer"] == app_module.OIDC_ISSUER
+        assert doc["issuer"].startswith("http")
+
+    def test_discovery_jwks_uri_reachable(self):
+        """jwks_uri in discovery doc must point to a reachable JWKS endpoint."""
+        # We test this indirectly — the JWKS endpoint is already tested; just verify the path
+        resp = client.get("/.well-known/jwks.json")
+        assert resp.status_code == 200
+
+
+class TestOIDCAuthorize:
+    def test_get_authorize_returns_html_form(self):
+        resp = client.get("/oauth/authorize", params={
+            "response_type": "code",
+            "client_id":     "meridian-librechat",
+            "redirect_uri":  "http://localhost:3080/oauth/openid/callback",
+            "state":         "test-state-123",
+        }, follow_redirects=False)
+        assert resp.status_code == 200
+        assert "text/html" in resp.headers["content-type"]
+        assert "Sign In" in resp.text
+        assert "Meridian" in resp.text
+
+    def test_get_authorize_form_has_hidden_fields(self):
+        resp = client.get("/oauth/authorize", params={
+            "response_type": "code",
+            "client_id":     "meridian-librechat",
+            "redirect_uri":  "http://localhost:3080/oauth/openid/callback",
+            "state":         "xyz",
+        })
+        assert resp.status_code == 200
+        assert 'name="client_id"' in resp.text
+        assert 'name="redirect_uri"' in resp.text
+        assert 'name="state"' in resp.text
+
+    def test_post_authorize_valid_credentials_redirects_with_code(self):
+        resp = client.post("/oauth/authorize", data={
+            "username":     "rm_jane",
+            "password":     app_module.DEMO_PASSWORD,
+            "client_id":    "meridian-librechat",
+            "redirect_uri": "http://localhost:3080/oauth/openid/callback",
+            "state":        "state-abc",
+        }, follow_redirects=False)
+        assert resp.status_code == 302
+        location = resp.headers["location"]
+        assert "code=" in location
+        assert "state=state-abc" in location
+        assert "error" not in location
+
+    def test_post_authorize_wrong_password_redirects_with_error(self):
+        resp = client.post("/oauth/authorize", data={
+            "username":     "rm_jane",
+            "password":     "wrong-password",
+            "client_id":    "meridian-librechat",
+            "redirect_uri": "http://localhost:3080/oauth/openid/callback",
+            "state":        "state-def",
+        }, follow_redirects=False)
+        assert resp.status_code == 302
+        location = resp.headers["location"]
+        assert "error=" in location
+
+    def test_post_authorize_unknown_user_redirects_with_error(self):
+        resp = client.post("/oauth/authorize", data={
+            "username":     "nobody",
+            "password":     "password",
+            "client_id":    "meridian-librechat",
+            "redirect_uri": "http://localhost:3080/oauth/openid/callback",
+            "state":        "state-ghi",
+        }, follow_redirects=False)
+        assert resp.status_code == 302
+        assert "error=" in resp.headers["location"]
+
+
+class TestOIDCTokenEndpoint:
+    def _get_auth_code(self, user_id: str = "rm_jane") -> tuple[str, str]:
+        """Helper: POST to /oauth/authorize and extract the auth code from redirect."""
+        redirect_uri = "http://localhost:3080/oauth/openid/callback"
+        resp = client.post("/oauth/authorize", data={
+            "username":     user_id,
+            "password":     app_module.DEMO_PASSWORD,
+            "client_id":    "meridian-librechat",
+            "redirect_uri": redirect_uri,
+            "state":        "st",
+        }, follow_redirects=False)
+        assert resp.status_code == 302
+        location = resp.headers["location"]
+        code = [p.split("=", 1)[1] for p in location.split("?", 1)[1].split("&") if p.startswith("code=")][0]
+        return code, redirect_uri
+
+    def test_token_exchange_returns_access_and_id_token(self):
+        code, redirect_uri = self._get_auth_code("rm_jane")
+        resp = client.post("/oauth/token", data={
+            "grant_type":    "authorization_code",
+            "code":          code,
+            "client_id":     "meridian-librechat",
+            "client_secret": "meridian-client-secret",
+            "redirect_uri":  redirect_uri,
+        })
+        assert resp.status_code == 200
+        body = resp.json()
+        assert "access_token" in body
+        assert "id_token" in body
+        assert body["token_type"] == "Bearer"
+        assert body["expires_in"] == 3600
+
+    def test_access_token_audience_is_gateway(self):
+        """access_token must be verifiable by the gateway (aud=meridian-gateway)."""
+        code, redirect_uri = self._get_auth_code("rm_jane")
+        resp = client.post("/oauth/token", data={
+            "grant_type":    "authorization_code",
+            "code":          code,
+            "client_id":     "meridian-librechat",
+            "client_secret": "meridian-client-secret",
+            "redirect_uri":  redirect_uri,
+        })
+        access_token = resp.json()["access_token"]
+        from cryptography.hazmat.primitives import serialization
+        pub_pem = app_module._rsa_private_key.public_key().public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        ).decode()
+        claims = jose_jwt.decode(
+            access_token, pub_pem, algorithms=["RS256"],
+            audience="meridian-gateway",
+            options={"verify_exp": False},
+        )
+        assert claims["sub"] == "rm_jane"
+        assert claims["aud"] == "meridian-gateway"
+        assert "roles" in claims
+        assert "segments" in claims
+
+    def test_id_token_audience_is_client_id(self):
+        """id_token must be for LibreChat (aud=meridian-librechat, iss=OIDC_ISSUER)."""
+        code, redirect_uri = self._get_auth_code("rm_jane")
+        resp = client.post("/oauth/token", data={
+            "grant_type":    "authorization_code",
+            "code":          code,
+            "client_id":     "meridian-librechat",
+            "client_secret": "meridian-client-secret",
+            "redirect_uri":  redirect_uri,
+        })
+        id_token = resp.json()["id_token"]
+        from cryptography.hazmat.primitives import serialization
+        pub_pem = app_module._rsa_private_key.public_key().public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        ).decode()
+        claims = jose_jwt.decode(
+            id_token, pub_pem, algorithms=["RS256"],
+            audience="meridian-librechat",
+            options={"verify_exp": False},
+        )
+        assert claims["sub"] == "rm_jane"
+        assert claims["iss"] == app_module.OIDC_ISSUER
+        assert claims["aud"] == "meridian-librechat"
+
+    def test_auth_code_is_single_use(self):
+        """Consuming a code once must prevent replay."""
+        code, redirect_uri = self._get_auth_code("rm_jane")
+        data = {
+            "grant_type":    "authorization_code",
+            "code":          code,
+            "client_id":     "meridian-librechat",
+            "client_secret": "meridian-client-secret",
+            "redirect_uri":  redirect_uri,
+        }
+        resp1 = client.post("/oauth/token", data=data)
+        assert resp1.status_code == 200
+
+        resp2 = client.post("/oauth/token", data=data)
+        assert resp2.status_code == 400
+        assert "invalid_grant" in resp2.json()["detail"]
+
+    def test_wrong_client_secret_rejected(self):
+        code, redirect_uri = self._get_auth_code("rm_jane")
+        resp = client.post("/oauth/token", data={
+            "grant_type":    "authorization_code",
+            "code":          code,
+            "client_id":     "meridian-librechat",
+            "client_secret": "wrong-secret",
+            "redirect_uri":  redirect_uri,
+        })
+        assert resp.status_code == 401
+
+    def test_redirect_uri_mismatch_rejected(self):
+        code, redirect_uri = self._get_auth_code("rm_jane")
+        resp = client.post("/oauth/token", data={
+            "grant_type":    "authorization_code",
+            "code":          code,
+            "client_id":     "meridian-librechat",
+            "client_secret": "meridian-client-secret",
+            "redirect_uri":  "http://evil.example.com/callback",
+        })
+        assert resp.status_code == 400
+
+    def test_token_exchange_basic_auth(self):
+        """client_secret_basic: credentials in Authorization header."""
+        code, redirect_uri = self._get_auth_code("rm_jane")
+        credentials = base64.b64encode(b"meridian-librechat:meridian-client-secret").decode()
+        resp = client.post("/oauth/token",
+            data={
+                "grant_type":   "authorization_code",
+                "code":         code,
+                "redirect_uri": redirect_uri,
+            },
+            headers={"Authorization": f"Basic {credentials}"},
+        )
+        assert resp.status_code == 200
+        assert "access_token" in resp.json()
+
+
+class TestOIDCUserInfo:
+    def _get_access_token(self, user_id: str = "rm_jane") -> str:
+        redirect_uri = "http://localhost:3080/oauth/openid/callback"
+        resp1 = client.post("/oauth/authorize", data={
+            "username": user_id, "password": app_module.DEMO_PASSWORD,
+            "client_id": "meridian-librechat", "redirect_uri": redirect_uri, "state": "s",
+        }, follow_redirects=False)
+        location = resp1.headers["location"]
+        code = [p.split("=", 1)[1] for p in location.split("?", 1)[1].split("&") if p.startswith("code=")][0]
+        resp2 = client.post("/oauth/token", data={
+            "grant_type": "authorization_code", "code": code,
+            "client_id": "meridian-librechat", "client_secret": "meridian-client-secret",
+            "redirect_uri": redirect_uri,
+        })
+        return resp2.json()["access_token"]
+
+    def test_userinfo_returns_profile(self):
+        token = self._get_access_token("rm_jane")
+        resp = client.get("/oauth/userinfo", headers={"Authorization": f"Bearer {token}"})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["sub"] == "rm_jane"
+        assert body["name"] == "Jane Smith"
+        assert "email" in body
+
+    def test_userinfo_without_token_is_401(self):
+        resp = client.get("/oauth/userinfo")
+        assert resp.status_code == 401
+
+    def test_userinfo_with_bad_token_is_401(self):
+        resp = client.get("/oauth/userinfo", headers={"Authorization": "Bearer not.a.jwt"})
+        assert resp.status_code == 401
+
+
+class TestPasswordHashing:
+    def test_default_password_accepted(self):
+        """Seeded users must authenticate with DEMO_PASSWORD."""
+        resp = client.post("/oauth/authorize", data={
+            "username": "admin", "password": app_module.DEMO_PASSWORD,
+            "client_id": "meridian-librechat",
+            "redirect_uri": "http://localhost:3080/oauth/openid/callback",
+            "state": "s",
+        }, follow_redirects=False)
+        assert resp.status_code == 302
+        assert "code=" in resp.headers["location"]
+
+    def test_wrong_password_rejected_for_all_roles(self):
+        for uid in ["rm_jane", "admin", "rm_diaz"]:
+            resp = client.post("/oauth/authorize", data={
+                "username": uid, "password": "totally_wrong",
+                "client_id": "meridian-librechat",
+                "redirect_uri": "http://localhost:3080/oauth/openid/callback",
+                "state": "s",
+            }, follow_redirects=False)
+            assert resp.status_code == 302, f"Expected redirect for {uid}"
+            assert "error=" in resp.headers["location"], f"Expected error for {uid}"

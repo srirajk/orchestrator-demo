@@ -3,6 +3,7 @@ package ai.meridian.gateway.infrastructure.telemetry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import redis.clients.jedis.JedisPooled;
 
@@ -26,14 +27,18 @@ import java.util.stream.Collectors;
 public class RedisTraceStorageAdapter implements TraceStorageAdapter {
 
     private static final Logger log = LoggerFactory.getLogger(RedisTraceStorageAdapter.class);
-    private static final long TTL_SECONDS = 24 * 60 * 60L;
 
     private final JedisPooled jedis;
     private final ObjectMapper mapper;
+    private final long ttlSeconds;
 
-    public RedisTraceStorageAdapter(JedisPooled jedis, ObjectMapper mapper) {
-        this.jedis  = jedis;
-        this.mapper = mapper;
+    public RedisTraceStorageAdapter(
+            JedisPooled jedis,
+            ObjectMapper mapper,
+            @Value("${meridian.telemetry.trace-ttl-seconds:86400}") long ttlSeconds) {
+        this.jedis      = jedis;
+        this.mapper     = mapper;
+        this.ttlSeconds = ttlSeconds;
     }
 
     @Override
@@ -43,14 +48,14 @@ public class RedisTraceStorageAdapter implements TraceStorageAdapter {
             String listKey = "trace:" + event.requestId();
 
             jedis.rpush(listKey, json);
-            jedis.expire(listKey, TTL_SECONDS);
+            jedis.expire(listKey, ttlSeconds);
 
             // Also index under conversationId when present
             String convId = event.conversationId();
             if (convId != null && !convId.isBlank()) {
                 String setKey = "conv_traces:" + convId;
                 jedis.zadd(setKey, (double) event.timestamp(), event.requestId());
-                jedis.expire(setKey, TTL_SECONDS);
+                jedis.expire(setKey, ttlSeconds);
             }
         } catch (Exception e) {
             log.warn("TraceStorageAdapter: failed to persist event type={} requestId={}: {}",

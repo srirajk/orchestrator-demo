@@ -11,7 +11,7 @@ principals:
     email: jane.smith@meridianbank.com
     roles: [relationship_manager]
     book: [REL-00042, REL-00099]
-    segments: [wealth]
+    segments: [wealth, servicing]
     clearance: 2
     team: wealth-private-banking
 
