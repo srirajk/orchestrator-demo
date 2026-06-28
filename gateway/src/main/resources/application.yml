@@ -94,9 +94,9 @@ meridian:
     trace-ttl-seconds: ${MERIDIAN_TELEMETRY_TRACE_TTL_SECONDS:86400}
   session:
     ttl-seconds: ${MERIDIAN_SESSION_TTL_SECONDS:1800}   # 30 min idle expiry
-  crm:
-    wealth:
-      url: ${MERIDIAN_CRM_WEALTH_URL:http://mock-crm:8085}
+  coverage:
+    wealth-management:
+      url: ${WEALTH_COVERAGE_URL:http://wealth-coverage:8086}
   cerbos:
     host: ${CERBOS_HOST:localhost}
     http-port: ${CERBOS_HTTP_PORT:3592}

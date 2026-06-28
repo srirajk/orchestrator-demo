@@ -116,7 +116,7 @@ services:
       CERBOS_HTTP_PORT: 3592
       # Phase 8: RS256 JWKS endpoint — use direct /oauth2/jwks (no redirect hop)
       MERIDIAN_AUTH_JWKS_URL: http://iam-service:8084/oauth2/jwks
-      MERIDIAN_CRM_WEALTH_URL: http://mock-crm:8085
+      WEALTH_COVERAGE_URL: http://wealth-coverage:8086
     depends_on:
       redis-stack:
         condition: service_healthy
@@ -223,15 +223,17 @@ services:
       start_period: 15s
     restart: unless-stopped
 
-  mock-crm:
+  wealth-coverage:
     build:
-      context: ./mock-agents/crm
+      context: ./mock-agents/wealth-coverage
       dockerfile: Dockerfile
-    container_name: mock-crm
+    container_name: wealth-coverage
     ports:
-      - "8085:8085"
+      - "8086:8086"
+    environment:
+      PYTHONUNBUFFERED: "1"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8085/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8086/health')"]
       interval: 10s
       timeout: 5s
       retries: 5
