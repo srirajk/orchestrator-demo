@@ -36,7 +36,9 @@ management:
 meridian:
   auth:
     jwks-url: ${MERIDIAN_AUTH_JWKS_URL:http://user-mgmt:8084/.well-known/jwks.json}
-    required-issuer: meridian-user-mgmt
+    # Comma-separated list of accepted JWT issuers.
+    # Includes legacy "meridian-user-mgmt" + the iam-service URL variants used in dev/docker.
+    required-issuers: ${MERIDIAN_AUTH_REQUIRED_ISSUERS:meridian-user-mgmt,http://user-mgmt:8084,http://host.docker.internal:8084,http://iam-service:8084,http://localhost:8084}
     required-audience: meridian-gateway
   embedding:
     provider: ${MERIDIAN_EMBEDDING_PROVIDER:hash}   # hash | remote
@@ -89,6 +91,9 @@ meridian:
     trace-ttl-seconds: ${MERIDIAN_TELEMETRY_TRACE_TTL_SECONDS:86400}
   session:
     ttl-seconds: ${MERIDIAN_SESSION_TTL_SECONDS:1800}   # 30 min idle expiry
+  crm:
+    wealth:
+      url: ${MERIDIAN_CRM_WEALTH_URL:http://mock-crm:8085}
   cerbos:
     host: ${CERBOS_HOST:localhost}
     http-port: ${CERBOS_HTTP_PORT:3592}

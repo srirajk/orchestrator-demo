@@ -1,0 +1,17 @@
+{
+  "sub_domain_id": "custody-operations",
+  "name": "Custody Operations",
+  "parent_domain": "asset-servicing",
+  "required_context": ["relationship_id"],
+  "clarification_priority": ["relationship_id"],
+  "clarification_schema": {
+    "relationship_id": {
+      "question": "Which relationship would you like custody data for?",
+      "options_source": "principal_book"
+    }
+  },
+  "agents": [
+    "acme.servicing.custody_positions",
+    "acme.servicing.settlement_status"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "sub_domain_id": "cash-management",
+  "name": "Cash Management",
+  "parent_domain": "asset-servicing",
+  "required_context": ["relationship_id"],
+  "clarification_priority": ["relationship_id"],
+  "clarification_schema": {
+    "relationship_id": {
+      "question": "Which relationship would you like cash management data for?",
+      "options_source": "principal_book"
+    }
+  },
+  "agents": [
+    "acme.servicing.cash_management",
+    "acme.servicing.nav"
+  ]
+}

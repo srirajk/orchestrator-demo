@@ -1,0 +1,18 @@
+{
+  "domain_id": "asset-servicing",
+  "name": "Asset Servicing",
+  "entity_registry": {
+    "url": "",
+    "resolves": [],
+    "cache_ttl_seconds": 0
+  },
+  "authorization_contract": {
+    "url_template": "",
+    "allow_field": "allowed",
+    "cache_ttl_seconds": 0
+  },
+  "memory_compaction": {
+    "must_preserve": ["relationship_id", "domain"],
+    "can_drop": ["raw_agent_outputs"]
+  }
+}

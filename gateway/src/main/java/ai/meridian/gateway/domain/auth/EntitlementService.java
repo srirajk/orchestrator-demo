@@ -1,6 +1,8 @@
 package ai.meridian.gateway.domain.auth;
 
 import ai.meridian.gateway.registry.model.AgentManifest;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -27,9 +29,14 @@ public class EntitlementService {
     private static final Logger log = LoggerFactory.getLogger(EntitlementService.class);
 
     private final CerbosEntitlementAdapter cerbos;
+    private final MeterRegistry meterRegistry;
+    private final RevocationChecker revocationChecker;
 
-    public EntitlementService(CerbosEntitlementAdapter cerbos) {
+    public EntitlementService(CerbosEntitlementAdapter cerbos, MeterRegistry meterRegistry,
+                              RevocationChecker revocationChecker) {
         this.cerbos = cerbos;
+        this.meterRegistry = meterRegistry;
+        this.revocationChecker = revocationChecker;
     }
 
     /**
@@ -40,6 +47,14 @@ public class EntitlementService {
             return new EntitlementResult(true, relationshipId, principal.id(), "no-entity", "cerbos");
         }
 
+        // Revocation overlay: check Redis before trusting any cached Cerbos verdict
+        if (revocationChecker.isRevoked(principal.id(), relationshipId)) {
+            log.info("Entitlement overridden by revocation: userId={} relationship={}", principal.id(), relationshipId);
+            emitAuthzDecision("DENY", "relationship", "revocation-override");
+            return new EntitlementResult(false, relationshipId, principal.id(), "revoked", "revocation-override");
+        }
+
+        // Structural + data-aware check via Cerbos PDP
         CerbosEntitlementAdapter.BatchResult batch =
                 cerbos.checkRelationships(principal, List.of(relationshipId));
 
@@ -49,6 +64,7 @@ public class EntitlementService {
         log.info("Entitlement: userId={} relationship={} allowed={} source={} reason={}",
                 principal.id(), relationshipId, allowed, batch.source(), reason);
 
+        emitAuthzDecision(allowed ? "ALLOW" : "DENY", "relationship", batch.source());
         return new EntitlementResult(allowed, relationshipId, principal.id(), reason, batch.source());
     }
 
@@ -66,6 +82,10 @@ public class EntitlementService {
         List<String> allowed = candidateRelIds.stream()
                 .filter(batch::isAllowed)
                 .collect(Collectors.toList());
+
+        // Emit one counter per candidate relationship result
+        candidateRelIds.forEach(relId ->
+                emitAuthzDecision(batch.isAllowed(relId) ? "ALLOW" : "DENY", "relationship", batch.source()));
 
         log.debug("filterCovered: principal={} candidates={} allowed={} source={}",
                 principal.id(), candidateRelIds.size(), allowed.size(), batch.source());
@@ -86,6 +106,10 @@ public class EntitlementService {
         List<AgentManifest> allowed = manifests.stream()
                 .filter(m -> batch.isAllowed(m.agentId()))
                 .collect(Collectors.toList());
+
+        // Emit one counter per candidate agent result
+        manifests.forEach(m ->
+                emitAuthzDecision(batch.isAllowed(m.agentId()) ? "ALLOW" : "DENY", "agent", batch.source()));
 
         log.debug("filterAgents: principal={} candidates={} allowed={} source={}",
                 principal.id(), manifests.size(), allowed.size(), batch.source());
@@ -108,4 +132,15 @@ public class EntitlementService {
             String  reason,
             String  source   // "cerbos" | "local-fallback"
     ) {}
+
+    /** Emits one authorization decision counter increment. Micrometer caches the Counter by key. */
+    private void emitAuthzDecision(String decision, String resourceType, String source) {
+        Counter.builder("meridian.authz.decisions")
+                .description("Authorization decisions by outcome and source")
+                .tag("decision", decision)
+                .tag("resource_type", resourceType)
+                .tag("source", source)
+                .register(meterRegistry)
+                .increment();
+    }
 }

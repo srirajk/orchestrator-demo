@@ -7,6 +7,8 @@
     "organization": "Meridian Demo Bank"
   },
   "domain": "wealth-management",
+  "sub_domain": "private-banking",
+  "max_response_tokens": 2000,
   "protocol": "http",
   "connection": {
     "openapi_url": "http://wealth-http:8081/openapi.json",

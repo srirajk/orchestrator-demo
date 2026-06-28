@@ -58,8 +58,17 @@ public class VectorIndex {
 
     public void ensureIndex() {
         try {
-            jedis.ftInfo(INDEX_NAME);
-            log.info("Vector index '{}' already exists", INDEX_NAME);
+            var info = jedis.ftInfo(INDEX_NAME);
+            // Check if sub_domain field exists in the index
+            boolean hasSubDomain = info.values().stream()
+                    .anyMatch(v -> v != null && v.toString().contains("sub_domain"));
+            if (!hasSubDomain) {
+                log.info("Vector index '{}' missing sub_domain field — recreating", INDEX_NAME);
+                try { jedis.ftDropIndex(INDEX_NAME); } catch (Exception ignored) {}
+                createIndex();
+            } else {
+                log.info("Vector index '{}' already exists with sub_domain field", INDEX_NAME);
+            }
         } catch (Exception e) {
             createIndex();
         }
@@ -83,6 +92,7 @@ public class VectorIndex {
                         .prefix(KEY_PREFIX),
                 TagField.of("agent_id"),
                 TagField.of("domain"),
+                TagField.of("sub_domain"),
                 NumericField.of("is_mutating"),
                 VectorField.builder()
                         .fieldName("embedding")
@@ -113,6 +123,7 @@ public class VectorIndex {
             Map<String, String> stringFields = new HashMap<>();
             stringFields.put("agent_id",   manifest.agentId());
             stringFields.put("domain",     manifest.domain());
+            stringFields.put("sub_domain", manifest.subDomain() != null ? manifest.subDomain() : "");
             stringFields.put("is_mutating", manifest.constraints().isMutating() ? "1" : "0");
             jedis.hset(key, stringFields);
 

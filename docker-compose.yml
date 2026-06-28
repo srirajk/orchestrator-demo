@@ -114,8 +114,9 @@ services:
       MANAGEMENT_OTLP_METRICS_EXPORT_URL: http://otel-collector:4318/v1/metrics
       CERBOS_HOST: cerbos
       CERBOS_HTTP_PORT: 3592
-      # Phase 8: RS256 JWKS endpoint — gateway fetches public key for JWT verification
-      MERIDIAN_AUTH_JWKS_URL: http://user-mgmt:8084/.well-known/jwks.json
+      # Phase 8: RS256 JWKS endpoint — use direct /oauth2/jwks (no redirect hop)
+      MERIDIAN_AUTH_JWKS_URL: http://iam-service:8084/oauth2/jwks
+      MERIDIAN_CRM_WEALTH_URL: http://mock-crm:8085
     depends_on:
       redis-stack:
         condition: service_healthy
@@ -123,7 +124,7 @@ services:
         condition: service_healthy
       cerbos:
         condition: service_healthy
-      user-mgmt:
+      iam-service:
         condition: service_healthy
       otel-collector:
         condition: service_started
@@ -222,6 +223,20 @@ services:
       start_period: 15s
     restart: unless-stopped
 
+  mock-crm:
+    build:
+      context: ./mock-agents/crm
+      dockerfile: Dockerfile
+    container_name: mock-crm
+    ports:
+      - "8085:8085"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8085/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   # ── Chat UI (LibreChat — config + cosmetic only; no code fork) ────────────────
 
   librechat:
@@ -246,8 +261,8 @@ services:
       DOMAIN_SERVER: "http://localhost:3080"
       OPENID_CLIENT_ID: "meridian-librechat"
       OPENID_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-meridian-client-secret-dev}
-      # LibreChat (inside Docker) fetches discovery from user-mgmt on Docker network
-      OPENID_ISSUER: "http://user-mgmt:8084"
+      # Must match IAM_ISSUER_URL — LibreChat validates the JWT `iss` claim against this.
+      OPENID_ISSUER: ${IAM_ISSUER_URL:-http://host.docker.internal:8084}
       # Path only — LibreChat prepends DOMAIN_SERVER
       OPENID_CALLBACK_URL: "/oauth/openid/callback"
       OPENID_BUTTON_LABEL: "Login with Meridian SSO"
@@ -269,10 +284,10 @@ services:
         condition: service_healthy
       gateway:
         condition: service_healthy
-      user-mgmt:
+      iam-service:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3080/"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3080/"]
       interval: 15s
       timeout: 10s
       retries: 20
@@ -297,34 +312,81 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  # ── User Management Service — separate admin plane (JWT issuance + user CRUD) ─
-  user-mgmt:
+  # ── Postgres — primary data store for iam-service (principals, roles, domains) ──
+  postgres:
+    image: postgres:16-alpine
+    container_name: meridian-postgres
+    environment:
+      POSTGRES_USER: meridian
+      POSTGRES_PASSWORD: meridian_dev
+      POSTGRES_DB: meridian
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U meridian"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # ── IAM Service — Java 21 + Spring Boot 3.5 (JWT issuance + user CRUD + OIDC) ──
+  iam-service:
     build:
-      context: ./user-mgmt
+      context: ./iam-service
       dockerfile: Dockerfile
-    container_name: meridian-user-mgmt
+    image: meridian/iam-service:latest
+    container_name: meridian-iam-service
     ports:
       - "8084:8084"
     environment:
-      REDIS_HOST: redis-stack
-      REDIS_PORT: 6379
-      # OIDC: issuer URL used inside Docker network (must match OPENID_ISSUER in LibreChat)
-      OIDC_ISSUER: "http://user-mgmt:8084"
-      # Browser-accessible URL for the /oauth/authorize redirect
-      OIDC_BASE_URL: "http://localhost:8084"
-      OIDC_CLIENT_ID: "meridian-librechat"
-      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-meridian-client-secret-dev}
-      # Demo default password for all seeded users (override to customize)
-      DEMO_PASSWORD: ${DEMO_PASSWORD:-Meridian@2024}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/meridian
+      SPRING_DATASOURCE_USERNAME: meridian
+      SPRING_DATASOURCE_PASSWORD: meridian_dev
+      IAM_ISSUER_URL: ${IAM_ISSUER_URL:-http://host.docker.internal:8084}
+      IAM_ADMIN_PASSWORD: ${IAM_ADMIN_PASSWORD:-Meridian@2024}
+      CERBOS_HOST: cerbos
+      CERBOS_PORT: "3593"
+      CERBOS_AUTHZ_ENABLED: ${CERBOS_AUTHZ_ENABLED:-true}
+      IAM_SEED_ENABLED: "true"
+      ZAI_API_KEY: ${ZAI_API_KEY:-}
+      IAM_POLICY_GENERATION_ENABLED: ${IAM_POLICY_GENERATION_ENABLED:-true}
+      IAM_POLICY_GENERATION_MODEL: ${IAM_POLICY_GENERATION_MODEL:-glm-5.2}
+      # OAuth2 client registration — must match LibreChat's OPENID_CLIENT_ID/SECRET
+      IAM_LIBRECHAT_CLIENT_ID: "meridian-librechat"
+      IAM_LIBRECHAT_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-meridian-client-secret-dev}
+      IAM_LIBRECHAT_REDIRECT_URI: ${IAM_LIBRECHAT_REDIRECT_URI:-http://localhost:3080/oauth/openid/callback}
     depends_on:
-      redis-stack:
+      postgres:
+        condition: service_healthy
+      cerbos:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8084/health')"]
+      test: ["CMD","wget","--no-verbose","--tries=1","--spider","http://localhost:8084/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 60s
+    restart: unless-stopped
+
+  # ── Admin UI — React SPA for user/role management (served by nginx) ─────────
+  admin-ui:
+    build:
+      context: ./admin-ui
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8084
+    container_name: meridian-admin-ui
+    ports:
+      - "5180:80"
+    depends_on:
+      iam-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/"]
       interval: 10s
       timeout: 5s
-      retries: 10
-      start_period: 15s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
 
   # ── Glass-box live decision trace panel ───────────────────────────────────────
@@ -527,7 +589,7 @@ services:
       LANGFUSE_SECRET_KEY: sk-lf-meridian-secret
       LANGFUSE_HOST: http://langfuse:3000
       GATEWAY_HOST: http://gateway:8080
-      USER_MGMT_HOST: http://user-mgmt:8084
+      USER_MGMT_HOST: http://iam-service:8084
       ZAI_API_KEY: ${ZAI_API_KEY}
       ZAI_BASE_URL: ${ZAI_BASE_URL:-https://api.z.ai/api/paas/v4}
       ZAI_EVAL_MODEL: ${ZAI_EVAL_MODEL:-glm-4.5-flash}
@@ -556,3 +618,4 @@ volumes:
   langfuse-db-data:
   clickhouse-data:
   minio-data:
+  postgres_data:

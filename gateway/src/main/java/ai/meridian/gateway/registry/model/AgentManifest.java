@@ -23,6 +23,8 @@ public record AgentManifest(
         String version,
         Provider provider,
         String domain,
+        @JsonProperty("sub_domain")          String subDomain,
+        @JsonProperty("max_response_tokens") Integer maxResponseTokens,
         String protocol,
         Connection connection,
         Capabilities capabilities,

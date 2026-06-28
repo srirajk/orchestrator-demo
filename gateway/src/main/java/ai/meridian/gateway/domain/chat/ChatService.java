@@ -6,6 +6,8 @@ import ai.meridian.gateway.domain.auth.EntitlementService;
 import ai.meridian.gateway.domain.auth.EntitlementService.EntitlementResult;
 import ai.meridian.gateway.domain.auth.Principal;
 import ai.meridian.gateway.domain.auth.PrincipalStore;
+import ai.meridian.gateway.domain.manifest.DomainPrerequisiteValidator;
+import ai.meridian.gateway.domain.manifest.DomainPrerequisiteValidator.Verdict;
 import ai.meridian.gateway.domain.intent.Intent;
 import ai.meridian.gateway.domain.intent.IntentClassifier;
 import ai.meridian.gateway.domain.intent.IntentResult;
@@ -37,6 +39,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import io.opentelemetry.api.baggage.Baggage;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.StatusCode;
@@ -51,6 +54,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
@@ -65,6 +69,11 @@ public class ChatService {
             "name this conversation", "title for this"
     );
 
+    private static final List<String> SUMMARIZATION_TRIGGERS = List.of(
+            "summarize the above", "create a summary", "summarize this conversation",
+            "provide a summary of the conversation", "tldr"
+    );
+
     private final ObjectMapper             mapper;
     private final IntentClassifier         intentClassifier;
     private final ConversationSessionStore sessionStore;
@@ -75,7 +84,9 @@ public class ChatService {
     private final PrincipalStore           principalStore;
     private final EntitlementService       entitlementService;
     private final TraceEventPublisher      tracePublisher;
+    private final DomainPrerequisiteValidator domainValidator;
     private final Tracer                   tracer;
+    private final MeterRegistry meterRegistry;
     private final Counter intentFetchCounter;
     private final Counter intentFollowUpCounter;
     private final Counter intentClarifyCounter;
@@ -91,6 +102,7 @@ public class ChatService {
                        PrincipalStore principalStore,
                        EntitlementService entitlementService,
                        TraceEventPublisher tracePublisher,
+                       DomainPrerequisiteValidator domainValidator,
                        Tracer tracer,
                        MeterRegistry meterRegistry) {
         this.mapper              = mapper;
@@ -103,7 +115,9 @@ public class ChatService {
         this.principalStore      = principalStore;
         this.entitlementService  = entitlementService;
         this.tracePublisher      = tracePublisher;
+        this.domainValidator     = domainValidator;
         this.tracer              = tracer;
+        this.meterRegistry         = meterRegistry;
         this.intentFetchCounter    = Counter.builder("chat.intent").tag("type","FETCH_DATA").register(meterRegistry);
         this.intentFollowUpCounter = Counter.builder("chat.intent").tag("type","FOLLOW_UP").register(meterRegistry);
         this.intentClarifyCounter  = Counter.builder("chat.intent").tag("type","CLARIFY").register(meterRegistry);
@@ -116,6 +130,14 @@ public class ChatService {
                 .filter(m -> m.content() != null)
                 .map(m -> m.content().toLowerCase())
                 .anyMatch(c -> TITLE_TRIGGERS.stream().anyMatch(c::contains));
+    }
+
+    public boolean isSummarizationRequest(ChatRequest request) {
+        if (request.messages() == null) return false;
+        return request.messages().stream()
+                .filter(m -> "system".equals(m.role()) && m.content() != null)
+                .map(m -> m.content().toLowerCase())
+                .anyMatch(c -> SUMMARIZATION_TRIGGERS.stream().anyMatch(c::contains));
     }
 
     public void streamTitle(SseEmitter emitter) {
@@ -197,6 +219,12 @@ public class ChatService {
             log.debug("Session: conversationId={} relId={} turns={}", conversationId,
                     session.relationshipId(), session.turnCount());
 
+            // Gap 4: Intercept LibreChat's internal summarization call
+            if (isSummarizationRequest(request)) {
+                handleSummarization(emitter, session, requestId, requestStart, streamId);
+                return;
+            }
+
             switch (intentResult.intent()) {
                 case FETCH_DATA -> handleFetchData(request, emitter, latestPrompt,
                         conversationId, session, userId, jwtPrincipal, requestId, requestStart, rootSpan,
@@ -210,6 +238,7 @@ public class ChatService {
         } catch (Exception e) {
             log.error("Chat pipeline failed requestId={}", requestId, e);
             rootSpan.setStatus(StatusCode.ERROR, e.getMessage());
+            emitRequestOutcome("ERROR");
             tracePublisher.publish(TraceEvent.of("request_complete", requestId,
                     new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
             try { streamTextAndComplete(emitter, "An internal error occurred. Please try again."); }
@@ -242,6 +271,7 @@ public class ChatService {
                     new AgentsResolvedData(selectedRefs, skippedRefs)));
 
             if (resolved.fallback() || resolved.selected().isEmpty()) {
+                emitRequestOutcome("FAILED");
                 streamTextAndComplete(emitter, "I wasn't sure which services to consult. " +
                         "Please mention the client name and what you need.");
                 tracePublisher.publish(TraceEvent.of("request_complete", requestId,
@@ -260,6 +290,7 @@ public class ChatService {
                     .map(c -> c.manifest()).collect(Collectors.toList());
             List<AgentManifest> allowedManifests = entitlementService.filterAgents(principal, manifests);
             if (allowedManifests.isEmpty()) {
+                emitRequestOutcome("DENIED");
                 streamTextAndComplete(emitter, "You do not have access to any of the required services for this query.");
                 tracePublisher.publish(TraceEvent.of("request_complete", requestId,
                         new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
@@ -288,9 +319,11 @@ public class ChatService {
             }
 
             if (synthesis.needsClarification() && synthesis.inputs().isEmpty()) {
+                emitRequestOutcome("CLARIFIED");
                 streamTextAndComplete(emitter, synthesis.clarificationMessage()); return;
             }
             if (synthesis.inputs().isEmpty()) {
+                emitRequestOutcome("FAILED");
                 streamTextAndComplete(emitter, "Please specify the client name (e.g. 'Whitman Family Office')."); return;
             }
 
@@ -300,6 +333,7 @@ public class ChatService {
                 tracePublisher.publish(TraceEvent.of("entitlement_check", requestId,
                         new EntitlementCheckData(resolvedRelId, userId, ent.allowed(), ent.reason(), ent.source())));
                 if (!ent.allowed()) {
+                    emitRequestOutcome("DENIED");
                     String denialMsg = "Access denied: you are not authorized to view relationship " +
                             resolvedRelId + ". This denial has been logged.";
                     try {
@@ -311,6 +345,21 @@ public class ChatService {
                     tracePublisher.publish(TraceEvent.of("request_complete", requestId,
                             new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
                     return;
+                }
+
+                // Gap 3: Domain authorization_contract check (data-aware, per domain manifest)
+                String agentDomain = finalManifests.isEmpty() ? null : finalManifests.get(0).domain();
+                if (agentDomain != null) {
+                    Verdict domainVerdict = domainValidator.validate(principal, agentDomain, resolvedRelId);
+                    if (domainVerdict == Verdict.DENIED) {
+                        emitRequestOutcome("DENIED");
+                        streamTextAndComplete(emitter,
+                            "Access denied by domain authorization: you do not have access to relationship "
+                            + resolvedRelId + " in the " + agentDomain + " domain.");
+                        tracePublisher.publish(TraceEvent.of("request_complete", requestId,
+                            new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                        return;
+                    }
                 }
             }
 
@@ -324,7 +373,15 @@ public class ChatService {
             nodes.forEach(n -> tracePublisher.publish(TraceEvent.of("agent_start", requestId,
                     new AgentStartData(n.nodeId(), n.agent().protocol()))));
 
+            long fanoutStart = System.currentTimeMillis();
             List<NodeResult> results = executor.execute(new Plan(nodes));
+            long fanoutElapsedMs = System.currentTimeMillis() - fanoutStart;
+            Timer.builder("meridian.fanout.duration")
+                    .description("Time from routing decision to all agents completing")
+                    .tag("agent_count", String.valueOf(nodes.size()))
+                    .publishPercentiles(0.5, 0.95, 0.99)
+                    .register(meterRegistry)
+                    .record(fanoutElapsedMs, TimeUnit.MILLISECONDS);
 
             results.forEach(r -> {
                 String prev = r.isOk() && r.data() != null
@@ -342,6 +399,7 @@ public class ChatService {
                     new SynthesisStartData(results.size(), (int) okCount)));
 
             answerSynthesizer.synthesize(results, latestPrompt, request.messages(), emitter, streamId);
+            emitRequestOutcome("ANSWERED");
 
             tracePublisher.publish(TraceEvent.of("request_complete", requestId,
                     new RequestCompleteData(System.currentTimeMillis() - requestStart,
@@ -364,6 +422,7 @@ public class ChatService {
                 tracePublisher.publish(TraceEvent.of("synthesis_start", requestId,
                         new SynthesisStartData(total, (int) ok)));
                 answerSynthesizer.synthesize(cached, latestPrompt, request.messages(), emitter, streamId);
+                emitRequestOutcome("ANSWERED");
                 tracePublisher.publish(TraceEvent.of("request_complete", requestId,
                         new RequestCompleteData(System.currentTimeMillis() - requestStart, total, (int) ok)));
             } else if (session.relationshipId() != null) {
@@ -372,6 +431,7 @@ public class ChatService {
                 return;
             } else {
                 answerSynthesizer.synthesizeFromHistory(request.messages(), latestPrompt, emitter, streamId);
+                emitRequestOutcome("ANSWERED");
                 tracePublisher.publish(TraceEvent.of("request_complete", requestId,
                         new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
             }
@@ -397,6 +457,7 @@ public class ChatService {
         } else {
             msg.append("Which client or relationship ID are you asking about?");
         }
+        emitRequestOutcome("CLARIFIED");
         streamTextAndComplete(emitter, msg.toString());
         tracePublisher.publish(TraceEvent.of("request_complete", requestId,
                 new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
@@ -405,8 +466,27 @@ public class ChatService {
     private void handleChitchat(ChatRequest request, SseEmitter emitter,
                                  String requestId, long requestStart, String streamId) throws Exception {
         answerSynthesizer.synthesizeFromHistory(request.messages(), extractLatestUserMessage(request), emitter, streamId);
+        emitRequestOutcome("ANSWERED");
         tracePublisher.publish(TraceEvent.of("request_complete", requestId,
                 new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+    }
+
+    private void handleSummarization(SseEmitter emitter, ConversationSession session,
+                                      String requestId, long requestStart, String streamId) throws Exception {
+        StringBuilder summary = new StringBuilder();
+        summary.append("Conversation summary:\n");
+        if (session.relationshipId() != null) {
+            summary.append("- Relationship: ").append(session.relationshipId());
+            if (session.clientName() != null) summary.append(" (").append(session.clientName()).append(")");
+            summary.append("\n");
+        }
+        if (session.domain() != null) summary.append("- Domain: ").append(session.domain()).append("\n");
+        if (session.timePeriod() != null) summary.append("- Period: ").append(session.timePeriod()).append("\n");
+        summary.append("- Turns completed: ").append(session.turnCount());
+        emitRequestOutcome("ANSWERED");
+        streamTextAndComplete(emitter, summary.toString());
+        tracePublisher.publish(TraceEvent.of("request_complete", requestId,
+            new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
     }
 
     private String extractLatestUserMessage(ChatRequest request) {
@@ -490,6 +570,15 @@ public class ChatService {
         if (finishReason != null) choice.put("finish_reason", finishReason);
         else choice.putNull("finish_reason");
         return mapper.writeValueAsString(root);
+    }
+
+    /** Increments the request outcome counter. Micrometer caches the Counter by key. */
+    private void emitRequestOutcome(String outcome) {
+        Counter.builder("meridian.request.outcome")
+                .description("Request resolution outcome")
+                .tag("outcome", outcome)
+                .register(meterRegistry)
+                .increment();
     }
 
     private static String newId() { return "chatcmpl-" + UUID.randomUUID().toString().replace("-", ""); }

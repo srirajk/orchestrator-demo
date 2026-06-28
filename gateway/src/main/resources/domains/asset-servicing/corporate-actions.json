@@ -1,0 +1,16 @@
+{
+  "sub_domain_id": "corporate-actions",
+  "name": "Corporate Actions",
+  "parent_domain": "asset-servicing",
+  "required_context": ["relationship_id"],
+  "clarification_priority": ["relationship_id"],
+  "clarification_schema": {
+    "relationship_id": {
+      "question": "Which relationship would you like corporate actions for?",
+      "options_source": "principal_book"
+    }
+  },
+  "agents": [
+    "acme.servicing.corporate_actions"
+  ]
+}

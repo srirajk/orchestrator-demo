@@ -1,0 +1,18 @@
+{
+  "domain_id": "wealth-management",
+  "name": "Wealth Management",
+  "entity_registry": {
+    "url": "http://mock-crm:8085/entities/resolve",
+    "resolves": ["relationship", "fund"],
+    "cache_ttl_seconds": 300
+  },
+  "authorization_contract": {
+    "url_template": "http://mock-crm:8085/books/{principal_id}/relationships/{relationship_id}/access",
+    "allow_field": "allowed",
+    "cache_ttl_seconds": 30
+  },
+  "memory_compaction": {
+    "must_preserve": ["relationship_id", "client_name", "domain", "time_period"],
+    "can_drop": ["raw_agent_outputs", "routing_decisions"]
+  }
+}

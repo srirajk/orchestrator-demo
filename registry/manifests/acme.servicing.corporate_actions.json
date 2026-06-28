@@ -7,6 +7,8 @@
     "organization": "Meridian Demo Bank"
   },
   "domain": "asset-servicing",
+  "sub_domain": "corporate-actions",
+  "max_response_tokens": 2000,
   "protocol": "mcp",
   "connection": {
     "server_url": "http://servicing-mcp:8082/sse",

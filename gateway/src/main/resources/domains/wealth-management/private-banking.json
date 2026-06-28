@@ -1,0 +1,24 @@
+{
+  "sub_domain_id": "private-banking",
+  "name": "Private Banking",
+  "parent_domain": "wealth-management",
+  "required_context": ["relationship_id"],
+  "clarification_priority": ["relationship_id", "time_period"],
+  "clarification_schema": {
+    "relationship_id": {
+      "question": "Which UHNW client relationship are you asking about?",
+      "options_source": "principal_book"
+    },
+    "time_period": {
+      "question": "Which time period would you like to review?",
+      "options_source": "agent_derived",
+      "default_value": "QTD"
+    }
+  },
+  "agents": [
+    "acme.wealth.holdings",
+    "acme.wealth.performance",
+    "acme.wealth.risk_profile",
+    "acme.wealth.goal_planning"
+  ]
+}
