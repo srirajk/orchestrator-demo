@@ -174,12 +174,12 @@ public class InputSynthesizerImpl implements InputSynthesizer {
             return String.format(
                     "I couldn't find a relationship matching \"%s\" in your book. " +
                     "Could you clarify which client you meant? " +
-                    "Known relationships include: Whitman Family Office, Chen Family Trust, Patterson.",
+                    "Try using the full client name or a relationship ID (REL-XXXXX).",
                     raw.relationshipReference());
         }
         if (raw.relationshipReference() == null) {
             return "Which client relationship should I pull data for? " +
-                   "Please specify the relationship name (e.g. Whitman Family Office).";
+                   "Please mention the client name or relationship ID.";
         }
         return "I need a little more information to answer your question. " +
                "Could you clarify which relationship or fund you are asking about?";

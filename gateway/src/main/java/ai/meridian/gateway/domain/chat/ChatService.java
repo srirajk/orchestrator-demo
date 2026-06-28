@@ -324,7 +324,7 @@ public class ChatService {
             }
             if (synthesis.inputs().isEmpty()) {
                 emitRequestOutcome("FAILED");
-                streamTextAndComplete(emitter, "Please specify the client name (e.g. 'Whitman Family Office')."); return;
+                streamTextAndComplete(emitter, "Please specify the client name or relationship ID."); return;
             }
 
             String resolvedRelId = extractResolvedRelId(synthesis);

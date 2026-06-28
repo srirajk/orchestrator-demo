@@ -58,23 +58,23 @@ public class IntentClassifier {
               "intent": "FETCH_DATA",
               "confidence": 0.95,
               "reasoning": "one-line explanation",
-              "relationship_reference": "Whitman Family Office",
+              "relationship_reference": "<client name or REL-XXXXX exactly as stated>",
               "fund_reference": null,
               "ticker_references": [],
               "period": "QTD"
             }
 
             Entity extraction rules (for FETCH_DATA only — null/empty for other intents):
-            - relationship_reference: the client relationship name OR ID EXACTLY as stated. \
-              Examples: "Whitman Family Office", "REL-00042", "Chen Family Trust", "REL-00099". \
-              "REL-XXXXX" codes are ALWAYS relationship IDs — never fund codes. Put them here.
+            - relationship_reference: the client relationship name OR ID EXACTLY as stated by the user. \
+              "REL-XXXXX" codes are ALWAYS relationship IDs — never fund codes. Put them here. \
+              Copy verbatim — do NOT normalize, expand, or look up the name.
             - fund_reference: a fund name or FND-XXXXX code ONLY (not REL-XXXXX codes), or null
             - ticker_references: list of stock tickers mentioned, e.g. ["AAPL","MSFT"], or []
             - period: QTD/YTD/MTD/etc. — default "QTD" when not stated
             - NEVER invent identifiers; copy verbatim from the user's words
 
             Intent rules:
-            - If the user mentions a client name or REL-XXXXX code (Whitman, Chen, REL-00042, etc.) → FETCH_DATA
+            - If the user mentions a client name or REL-XXXXX code → FETCH_DATA
             - If prior assistant turn has banking data and user says "explain", "what does X mean", \
               "tell me more", "simplify" → FOLLOW_UP
             - If banking-related but no client mentioned and none in prior turns → CLARIFY

@@ -203,25 +203,17 @@ public class EntityExtractor {
     // ── Keyword fallback path ─────────────────────────────────────────────────
 
     /**
-     * Simple keyword extraction used when the LLM call fails.
-     * Looks for known relationship names and REL-/FND- patterns in the prompt.
+     * Minimal fallback extraction used when the LLM call fails.
+     * Only extracts REL-/FND- patterns and tickers verbatim from the prompt.
+     * Never maps names to strings — that is the entity registry's job.
      */
     private EntityBag extractViaKeywords(String prompt) {
         String lower = prompt.toLowerCase();
 
         String relRef = null;
-        if (lower.contains("whitman")) {
-            relRef = "Whitman Family Office";
-        } else if (lower.contains("chen")) {
-            relRef = "Chen Family Trust";
-        } else if (lower.contains("patterson")) {
-            relRef = "Patterson";
-        } else {
-            // look for a REL- code directly in prompt
-            Pattern relPat = Pattern.compile("\\bREL-\\d+\\b");
-            Matcher m = relPat.matcher(prompt);
-            if (m.find()) relRef = m.group();
-        }
+        Pattern relPat = Pattern.compile("\\bREL-\\d+\\b");
+        Matcher m = relPat.matcher(prompt);
+        if (m.find()) relRef = m.group();
 
         String fundRef = null;
         Pattern fndPat = Pattern.compile("\\bFND-\\w+\\b");
