@@ -52,20 +52,23 @@ meridian:
     top-k: 10
   llm:
     # ── Intent Classifier (classification + routing) ──────────────────────────
+    # Default: Z.AI GLM (fast flash model for low-latency classification).
+    # Override per-client via MERIDIAN_LLM_*_BASE_URL / MODEL / API_KEY env vars.
+    # To use OpenAI: set MERIDIAN_LLM_*_BASE_URL=https://api.openai.com/v1 + OPENAI_API_KEY.
     intent-classifier:
-      base-url: ${MERIDIAN_LLM_INTENT_CLASSIFIER_BASE_URL:https://api.openai.com/v1}
-      api-key: ${MERIDIAN_LLM_INTENT_CLASSIFIER_API_KEY:}
-      model: ${MERIDIAN_LLM_INTENT_CLASSIFIER_MODEL:gpt-4o-mini}
+      base-url: ${MERIDIAN_LLM_INTENT_CLASSIFIER_BASE_URL:https://api.z.ai/api/paas/v4}
+      api-key: ${MERIDIAN_LLM_INTENT_CLASSIFIER_API_KEY:${ZAI_API_KEY:}}
+      model: ${MERIDIAN_LLM_INTENT_CLASSIFIER_MODEL:glm-4.5-flash}
     # ── Entity Extractor (pull relationship/fund/ticker from user prompt) ─────
     entity-extractor:
-      base-url: ${MERIDIAN_LLM_ENTITY_EXTRACTOR_BASE_URL:https://api.openai.com/v1}
-      api-key: ${MERIDIAN_LLM_ENTITY_EXTRACTOR_API_KEY:}
-      model: ${MERIDIAN_LLM_ENTITY_EXTRACTOR_MODEL:gpt-4o-mini}
+      base-url: ${MERIDIAN_LLM_ENTITY_EXTRACTOR_BASE_URL:https://api.z.ai/api/paas/v4}
+      api-key: ${MERIDIAN_LLM_ENTITY_EXTRACTOR_API_KEY:${ZAI_API_KEY:}}
+      model: ${MERIDIAN_LLM_ENTITY_EXTRACTOR_MODEL:glm-4.5-flash}
     # ── Answer Synthesizer (grounded streaming answer) ────────────────────────
     synthesizer:
-      base-url: ${MERIDIAN_LLM_SYNTHESIZER_BASE_URL:https://api.openai.com/v1}
-      api-key: ${MERIDIAN_LLM_SYNTHESIZER_API_KEY:}
-      model: ${MERIDIAN_LLM_SYNTHESIZER_MODEL:gpt-4o-mini}
+      base-url: ${MERIDIAN_LLM_SYNTHESIZER_BASE_URL:https://api.z.ai/api/paas/v4}
+      api-key: ${MERIDIAN_LLM_SYNTHESIZER_API_KEY:${ZAI_API_KEY:}}
+      model: ${MERIDIAN_LLM_SYNTHESIZER_MODEL:glm-4.6}
     # Set to true to stream the model's chain-of-thought as a blockquote before the answer
     show-reasoning: ${MERIDIAN_LLM_SHOW_REASONING:false}
     max-retries: ${MERIDIAN_LLM_MAX_RETRIES:3}
