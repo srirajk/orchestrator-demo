@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.env.Environment;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.stereotype.Service;
@@ -13,18 +14,23 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class DomainManifestStore {
 
     private static final Logger log = LoggerFactory.getLogger(DomainManifestStore.class);
+    private static final Pattern ENV_VAR_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
 
     private final ObjectMapper mapper;
+    private final Environment env;
     private final Map<String, DomainManifest> domains = new HashMap<>();
     private final Map<String, SubDomainManifest> subDomains = new HashMap<>();
 
-    public DomainManifestStore(ObjectMapper mapper) {
+    public DomainManifestStore(ObjectMapper mapper, Environment env) {
         this.mapper = mapper;
+        this.env = env;
     }
 
     @PostConstruct
@@ -47,12 +53,47 @@ public class DomainManifestStore {
         for (Resource r : resources) {
             try {
                 DomainManifest d = mapper.readValue(r.getInputStream(), DomainManifest.class);
+                // Resolve environment variable placeholders in Coverage URL fields
+                d = resolveEnvVarsInCoverage(d);
                 domains.put(d.domainId(), d);
                 log.debug("Loaded domain: {}", d.domainId());
             } catch (Exception e) {
                 throw new IllegalStateException("Failed to parse domain manifest " + r.getFilename() + ": " + e.getMessage(), e);
             }
         }
+    }
+
+    /**
+     * Resolves ${VAR_NAME} placeholders in all Coverage URL fields using Spring Environment.
+     */
+    private DomainManifest resolveEnvVarsInCoverage(DomainManifest d) {
+        if (d.coverage() == null) return d;
+        DomainManifest.Coverage c = d.coverage();
+        String discoverUrl = resolveEnvVars(c.discoverUrl());
+        String checkUrl    = resolveEnvVars(c.checkUrl());
+        String resolveUrl  = resolveEnvVars(c.resolveUrl());
+        if (equalsAll(c.discoverUrl(), discoverUrl, c.checkUrl(), checkUrl, c.resolveUrl(), resolveUrl)) {
+            return d; // nothing changed
+        }
+        DomainManifest.Coverage resolved = new DomainManifest.Coverage(discoverUrl, checkUrl, resolveUrl, c.cacheTtlSeconds());
+        return new DomainManifest(d.domainId(), d.displayName(), resolved, d.memoryCompaction());
+    }
+
+    private String resolveEnvVars(String template) {
+        if (template == null) return null;
+        Matcher m = ENV_VAR_PATTERN.matcher(template);
+        StringBuffer sb = new StringBuffer();
+        while (m.find()) {
+            String varName = m.group(1);
+            String value = env.getProperty(varName);
+            m.appendReplacement(sb, value != null ? Matcher.quoteReplacement(value) : m.group(0));
+        }
+        m.appendTail(sb);
+        return sb.toString();
+    }
+
+    private boolean equalsAll(String a1, String a2, String b1, String b2, String c1, String c2) {
+        return java.util.Objects.equals(a1, a2) && java.util.Objects.equals(b1, b2) && java.util.Objects.equals(c1, c2);
     }
 
     private void loadSubDomains() throws IOException {
@@ -69,7 +110,8 @@ public class DomainManifestStore {
                 SubDomainManifest sd = mapper.readValue(r.getInputStream(), SubDomainManifest.class);
                 if (sd.subDomainId() == null) continue; // skip domain-level files that were matched
                 subDomains.put(sd.subDomainId(), sd);
-                log.debug("Loaded sub-domain: {} (parent: {})", sd.subDomainId(), sd.parentDomain());
+                log.debug("Loaded sub-domain: {} (parent: {}) resourceScoped={}",
+                    sd.subDomainId(), sd.parentDomain(), sd.resourceScoped());
             } catch (Exception e) {
                 log.debug("Skipping non-subdomain file {}: {}", r.getFilename(), e.getMessage());
             }
@@ -81,6 +123,17 @@ public class DomainManifestStore {
             if (sd.parentDomain() != null && !domains.containsKey(sd.parentDomain())) {
                 throw new IllegalStateException(
                     "Sub-domain '" + sd.subDomainId() + "' references unknown parent domain '" + sd.parentDomain() + "'");
+            }
+            // FAIL FAST: resource-scoped sub-domain must have a parent domain with coverage.discoverUrl
+            if (sd.resourceScoped()) {
+                DomainManifest parent = sd.parentDomain() != null ? domains.get(sd.parentDomain()) : null;
+                if (parent == null || parent.coverage() == null
+                        || parent.coverage().discoverUrl() == null
+                        || parent.coverage().discoverUrl().isBlank()) {
+                    throw new IllegalStateException(
+                        "Sub-domain '" + sd.subDomainId() + "' is resource_scoped=true but its parent domain '"
+                        + sd.parentDomain() + "' has no coverage.discover_url configured.");
+                }
             }
         }
         log.info("DomainManifestStore validation passed");

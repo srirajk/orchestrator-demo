@@ -7,6 +7,7 @@ import ai.meridian.gateway.registry.model.AgentManifest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -81,6 +82,8 @@ class AgentHarnessResilienceIT {
                 "1.0",                    // version
                 null,                     // provider
                 "wealth",                 // domain
+                null,                     // subDomain
+                null,                     // maxResponseTokens
                 protocol,                 // protocol
                 null,                     // connection
                 null,                     // capabilities
@@ -101,6 +104,7 @@ class AgentHarnessResilienceIT {
     /** Construct a harness with sensible test defaults for all config values. */
     private AgentHarness harness(List<ProtocolAdapter> adapters) {
         return new AgentHarness(adapters, cbReg,
+                new SimpleMeterRegistry(), // meterRegistry
                 5_000, // defaultSlaMs
                 5,     // bulkheadMaxConcurrent
                 20,    // bulkheadQueueCapacity

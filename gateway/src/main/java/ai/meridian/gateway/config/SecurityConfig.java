@@ -5,6 +5,7 @@ import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.crypto.RSASSAVerifier;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -24,6 +25,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -48,11 +50,11 @@ import java.util.Map;
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    // Accept both: existing /auth/token JWTs (non-URL iss) and OIDC /oauth/token JWTs (URL iss)
-    private static final List<String> VALID_ISSUERS = List.of(
-            "meridian-user-mgmt",
-            "http://user-mgmt:8084"
-    );
+    // Comma-separated list of accepted JWT issuers — injected from meridian.auth.required-issuers.
+    // Includes legacy token issuers and the iam-service URL variants used in dev/docker.
+    @Value("${meridian.auth.required-issuers:meridian-user-mgmt,http://user-mgmt:8084,http://host.docker.internal:8084,http://iam-service:8084,http://localhost:8084}")
+    private String requiredIssuersRaw;
+
     private static final String EXPECTED_AUDIENCE = "meridian-gateway";
 
     @Bean
@@ -71,6 +73,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/v1/chat/completions").permitAll()
                 // Admin plane — requires domain_admin or platform_admin role
                 .requestMatchers("/admin/agents/**").hasAnyRole("domain_admin", "platform_admin")
+                .requestMatchers("/admin/domains/**").hasAnyRole("domain_admin", "platform_admin")
                 .requestMatchers("/debug/**").hasAnyRole("domain_admin", "platform_admin")
                 // Everything else needs at least a valid token
                 .anyRequest().authenticated()
@@ -151,7 +154,8 @@ public class SecurityConfig {
                     throw new JwtException("token not yet valid (nbf=" + nbf + ")");
                 }
 
-                if (!VALID_ISSUERS.contains(claims.getIssuer())) {
+                List<String> validIssuers = Arrays.asList(requiredIssuersRaw.split(","));
+                if (claims.getIssuer() == null || validIssuers.stream().noneMatch(i -> i.trim().equals(claims.getIssuer()))) {
                     throw new JwtException("invalid iss: " + claims.getIssuer());
                 }
 

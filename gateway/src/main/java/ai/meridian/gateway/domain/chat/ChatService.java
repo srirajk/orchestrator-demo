@@ -6,11 +6,16 @@ import ai.meridian.gateway.domain.auth.EntitlementService;
 import ai.meridian.gateway.domain.auth.EntitlementService.EntitlementResult;
 import ai.meridian.gateway.domain.auth.Principal;
 import ai.meridian.gateway.domain.auth.PrincipalStore;
-import ai.meridian.gateway.domain.manifest.DomainPrerequisiteValidator;
-import ai.meridian.gateway.domain.manifest.DomainPrerequisiteValidator.Verdict;
+import ai.meridian.gateway.domain.coverage.CoverageCheckResult;
+import ai.meridian.gateway.domain.coverage.CoverageClient;
+import ai.meridian.gateway.domain.coverage.CoverageResolveResult;
+import ai.meridian.gateway.domain.coverage.CoverageResource;
 import ai.meridian.gateway.domain.intent.Intent;
 import ai.meridian.gateway.domain.intent.IntentClassifier;
 import ai.meridian.gateway.domain.intent.IntentResult;
+import ai.meridian.gateway.domain.manifest.DomainManifest;
+import ai.meridian.gateway.domain.manifest.DomainManifestStore;
+import ai.meridian.gateway.domain.manifest.EffectiveManifest;
 import ai.meridian.gateway.domain.session.ConversationSession;
 import ai.meridian.gateway.domain.session.ConversationSessionStore;
 import ai.meridian.gateway.infrastructure.telemetry.TraceEvent;
@@ -84,7 +89,8 @@ public class ChatService {
     private final PrincipalStore           principalStore;
     private final EntitlementService       entitlementService;
     private final TraceEventPublisher      tracePublisher;
-    private final DomainPrerequisiteValidator domainValidator;
+    private final CoverageClient           coverageClient;
+    private final DomainManifestStore      manifestStore;
     private final Tracer                   tracer;
     private final MeterRegistry meterRegistry;
     private final Counter intentFetchCounter;
@@ -102,7 +108,8 @@ public class ChatService {
                        PrincipalStore principalStore,
                        EntitlementService entitlementService,
                        TraceEventPublisher tracePublisher,
-                       DomainPrerequisiteValidator domainValidator,
+                       CoverageClient coverageClient,
+                       DomainManifestStore manifestStore,
                        Tracer tracer,
                        MeterRegistry meterRegistry) {
         this.mapper              = mapper;
@@ -115,7 +122,8 @@ public class ChatService {
         this.principalStore      = principalStore;
         this.entitlementService  = entitlementService;
         this.tracePublisher      = tracePublisher;
-        this.domainValidator     = domainValidator;
+        this.coverageClient      = coverageClient;
+        this.manifestStore       = manifestStore;
         this.tracer              = tracer;
         this.meterRegistry         = meterRegistry;
         this.intentFetchCounter    = Counter.builder("chat.intent").tag("type","FETCH_DATA").register(meterRegistry);
@@ -177,18 +185,12 @@ public class ChatService {
         rootSpan.setAttribute("meridian.request.id", requestId);
 
         // ── W3C Baggage: propagates outward on every downstream HTTP call ─────
-        // Any service the gateway calls (wealth-http, servicing-mcp, embeddings)
-        // receives these as a `baggage:` header automatically — no extra wiring.
-        // When those services are instrumented, their spans also carry session.id
-        // and user.id, so Tempo's service map shows the conversation context end-to-end.
         String effectiveUserId = userId != null ? userId : "anonymous";
         Baggage baggage = Baggage.current().toBuilder()
                 .put("session.id", conversationId)
                 .put("user.id", effectiveUserId)
                 .put("meridian.request.id", requestId)
                 .build();
-        // makeCurrent() attaches baggage to the active OTel context for this thread.
-        // The scope MUST be closed — we do so in the finally block below.
         Scope baggageScope = baggage.storeInContext(Context.current()).makeCurrent();
 
         log.info("handleChat requestId={} userId={} conversationId={} prompt='{}'",
@@ -256,6 +258,9 @@ public class ChatService {
                                   String requestId, long requestStart, Span rootSpan,
                                   EntityBag preExtracted, String streamId) throws Exception {
         Span span = tracer.spanBuilder("chat.fetch_data").startSpan();
+        // coverageRelId is set by the coverage pipeline before synthesis;
+        // it takes priority over the synthesis-extracted relationship ID when saving the session.
+        String coverageRelId = null;
         try {
             ResolverResult resolved = resolver.resolve(latestPrompt);
 
@@ -302,6 +307,139 @@ public class ChatService {
             }
             final List<AgentManifest> finalManifests = allowedManifests;
 
+            // ── COVERAGE CHECK ──────────────────────────────────────────────────────
+            // Find the first agent whose sub-domain is resource_scoped=true.
+            // If found, run DISCOVER/RESOLVE/CHECK before synthesis so we never
+            // waste agent calls on a relationship the RM doesn't cover.
+            AgentManifest resourceScopedAgent = finalManifests.stream()
+                .filter(m -> {
+                    EffectiveManifest em = manifestStore.getEffective(
+                        m.agentId(), m.domain(), m.subDomain());
+                    return em.resourceScoped();
+                })
+                .findFirst().orElse(null);
+
+            if (resourceScopedAgent != null) {
+                EffectiveManifest em = manifestStore.getEffective(
+                    resourceScopedAgent.agentId(),
+                    resourceScopedAgent.domain(),
+                    resourceScopedAgent.subDomain());
+                DomainManifest.Coverage coverage = em.coverage();
+                String tenantId = jwtPrincipal != null ? jwtPrincipal.tenantId() : "default";
+                String principalId = principal.id();
+
+                if (coverage != null) {
+                    try {
+                        if (session.relationshipId() != null) {
+                            // Session already carries a verified relationship — just re-check.
+                            CoverageCheckResult check = coverageClient.check(
+                                principalId, tenantId, session.relationshipId(), coverage);
+                            if (!check.allowed()) {
+                                emitRequestOutcome("DENIED");
+                                streamTextAndComplete(emitter, mapDenialReason(check.reason()));
+                                tracePublisher.publish(TraceEvent.of("request_complete", requestId,
+                                    new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                                return;
+                            }
+                            coverageRelId = session.relationshipId();
+
+                        } else if (preExtracted != null && preExtracted.relationshipReference() != null) {
+                            // RM named a client — resolve the text to a canonical relationship ID.
+                            CoverageResolveResult resolveResult = coverageClient.resolve(
+                                preExtracted.relationshipReference(), "relationship", principalId, coverage);
+
+                            if (resolveResult.resolved()) {
+                                coverageRelId = resolveResult.id();
+                                CoverageCheckResult check = coverageClient.check(
+                                    principalId, tenantId, coverageRelId, coverage);
+                                if (!check.allowed()) {
+                                    emitRequestOutcome("DENIED");
+                                    streamTextAndComplete(emitter, mapDenialReason(check.reason()));
+                                    tracePublisher.publish(TraceEvent.of("request_complete", requestId,
+                                        new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                                    return;
+                                }
+
+                            } else if (resolveResult.isAmbiguous()) {
+                                // Multiple matches — discover what's in RM's coverage and intersect.
+                                List<CoverageResource> discovered = coverageClient.discover(
+                                    principalId, tenantId, coverage);
+                                List<CoverageResolveResult.ResolveCandidate> filtered =
+                                    resolveResult.candidates().stream()
+                                        .filter(c -> discovered.stream()
+                                            .anyMatch(d -> d.id().equals(c.id())))
+                                        .collect(Collectors.toList());
+                                String question = buildClarificationQuestion(em, filtered, discovered);
+                                emitRequestOutcome("CLARIFIED");
+                                streamTextAndComplete(emitter, question);
+                                tracePublisher.publish(TraceEvent.of("request_complete", requestId,
+                                    new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                                return;
+
+                            } else {
+                                // Not found in coverage at all.
+                                emitRequestOutcome("CLARIFIED");
+                                streamTextAndComplete(emitter,
+                                    "I could not find a client relationship matching \""
+                                    + preExtracted.relationshipReference()
+                                    + "\". Please provide the relationship ID or a more specific name.");
+                                tracePublisher.publish(TraceEvent.of("request_complete", requestId,
+                                    new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                                return;
+                            }
+
+                        } else {
+                            // No reference at all — discover what this RM covers.
+                            List<CoverageResource> discovered = coverageClient.discover(
+                                principalId, tenantId, coverage);
+
+                            if (discovered.isEmpty()) {
+                                emitRequestOutcome("DENIED");
+                                streamTextAndComplete(emitter,
+                                    "You have no client relationships in your coverage.");
+                                tracePublisher.publish(TraceEvent.of("request_complete", requestId,
+                                    new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                                return;
+
+                            } else if (discovered.size() == 1) {
+                                coverageRelId = discovered.get(0).id();
+                                CoverageCheckResult check = coverageClient.check(
+                                    principalId, tenantId, coverageRelId, coverage);
+                                if (!check.allowed()) {
+                                    emitRequestOutcome("DENIED");
+                                    streamTextAndComplete(emitter, mapDenialReason(check.reason()));
+                                    tracePublisher.publish(TraceEvent.of("request_complete", requestId,
+                                        new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                                    return;
+                                }
+                                // Single relationship auto-selected — will be persisted in session via finalRelId.
+                                log.info("Coverage: auto-selected single relationship={} for principal={}",
+                                    coverageRelId, principalId);
+
+                            } else {
+                                // Multiple relationships — ask the RM to choose.
+                                String question = buildClarificationQuestion(em, List.of(), discovered);
+                                emitRequestOutcome("CLARIFIED");
+                                streamTextAndComplete(emitter, question);
+                                tracePublisher.publish(TraceEvent.of("request_complete", requestId,
+                                    new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                                return;
+                            }
+                        }
+
+                    } catch (CoverageClient.CoverageUnavailableException e) {
+                        log.error("Coverage service unavailable for principal={}: {}", principal.id(), e.getMessage());
+                        emitRequestOutcome("FAILED");
+                        streamTextAndComplete(emitter,
+                            "I am unable to process your request right now. Please try again shortly.");
+                        tracePublisher.publish(TraceEvent.of("request_complete", requestId,
+                            new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                        return;
+                    }
+                }
+            }
+            // ── END COVERAGE CHECK ──────────────────────────────────────────────────
+
             // Use pre-extracted entities from the combined intent+entity LLM call if available.
             // Merge session relationship context into the pre-extracted bag when it lacks a ref.
             SynthesisResult synthesis;
@@ -346,21 +484,6 @@ public class ChatService {
                             new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
                     return;
                 }
-
-                // Gap 3: Domain authorization_contract check (data-aware, per domain manifest)
-                String agentDomain = finalManifests.isEmpty() ? null : finalManifests.get(0).domain();
-                if (agentDomain != null) {
-                    Verdict domainVerdict = domainValidator.validate(principal, agentDomain, resolvedRelId);
-                    if (domainVerdict == Verdict.DENIED) {
-                        emitRequestOutcome("DENIED");
-                        streamTextAndComplete(emitter,
-                            "Access denied by domain authorization: you do not have access to relationship "
-                            + resolvedRelId + " in the " + agentDomain + " domain.");
-                        tracePublisher.publish(TraceEvent.of("request_complete", requestId,
-                            new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
-                        return;
-                    }
-                }
             }
 
             List<PlanNode> nodes = synthesis.inputs().entrySet().stream()
@@ -393,7 +516,9 @@ public class ChatService {
             long okCount = results.stream().filter(NodeResult::isOk).count();
             log.info("Fan-out complete {}/{} ok", okCount, results.size());
 
-            sessionStore.save(session.withResults(resolvedRelId, extractResolvedFundId(synthesis), results));
+            // Prefer the coverage-verified relationship ID over the synthesis-extracted one.
+            String finalRelId = coverageRelId != null ? coverageRelId : extractResolvedRelId(synthesis);
+            sessionStore.save(session.withResults(finalRelId, extractResolvedFundId(synthesis), results));
 
             tracePublisher.publish(TraceEvent.of("synthesis_start", requestId,
                     new SynthesisStartData(results.size(), (int) okCount)));
@@ -488,6 +613,55 @@ public class ChatService {
         tracePublisher.publish(TraceEvent.of("request_complete", requestId,
             new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
     }
+
+    // ── Coverage helper methods ────────────────────────────────────────────────
+
+    /**
+     * Maps a machine-readable denial reason code from the coverage service to a
+     * human-readable message suitable for streaming to the end user.
+     */
+    private String mapDenialReason(String reason) {
+        if (reason == null) return "Access denied for this client relationship.";
+        return switch (reason) {
+            case "not-covered"           -> "That client is not in your coverage.";
+            case "coverage-transferred"  -> "Coverage for that client has been transferred.";
+            case "relationship-closed"   -> "That client relationship is no longer active.";
+            default                      -> "Access denied for this client relationship.";
+        };
+    }
+
+    /**
+     * Builds a clarification question presenting the RM with a numbered list of
+     * client relationships to choose from.
+     *
+     * @param em         the effective manifest (provides the question template from clarification schema)
+     * @param candidates resolve candidates already known (may be empty — falls back to discovered)
+     * @param discovered full discovered list for this RM
+     */
+    private String buildClarificationQuestion(EffectiveManifest em,
+                                               List<? extends Object> candidates,
+                                               List<CoverageResource> discovered) {
+        ai.meridian.gateway.domain.manifest.ClarificationSchema cs = em.relationshipClarification();
+        String questionText = (cs != null && cs.question() != null && !cs.question().isBlank())
+            ? cs.question()
+            : "Which client relationship are you asking about?";
+
+        // Use discovered list when candidates is empty or no match narrowing was done.
+        List<CoverageResource> options = discovered.isEmpty()
+            ? discovered
+            : (candidates.isEmpty() ? discovered : discovered); // always show full discovered list
+
+        StringBuilder sb = new StringBuilder(questionText).append("\n");
+        int i = 1;
+        for (CoverageResource r : options) {
+            sb.append(i++).append(". ").append(r.label())
+              .append(" (").append(r.id()).append(")").append("\n");
+        }
+        sb.append("\nReply with the number or relationship ID.");
+        return sb.toString();
+    }
+
+    // ── Private utilities ─────────────────────────────────────────────────────
 
     private String extractLatestUserMessage(ChatRequest request) {
         if (request.messages() == null || request.messages().isEmpty()) return "";

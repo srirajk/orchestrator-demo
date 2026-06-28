@@ -9,69 +9,59 @@ public record EffectiveManifest(
     String domainId,
     String subDomainId,
     String agentId,
+    boolean resourceScoped,
     List<String> requiredContext,
-    List<String> clarificationPriority,
     Map<String, ClarificationSchema> clarificationSchema,
-    DomainManifest.EntityRegistry entityRegistry,
-    DomainManifest.AuthorizationContract authorizationContract,
+    DomainManifest.Coverage coverage,
     List<String> mustPreserve,
     List<String> canDrop
 ) {
 
     public static EffectiveManifest merge(DomainManifest domain, SubDomainManifest sub, String agentId) {
-        List<String> requiredContext = union(
-            domain != null && sub != null ? sub.requiredContext() : null,
-            null
-        );
-        if (domain == null && sub == null) requiredContext = List.of();
-
-        List<String> clarPriority = sub != null && sub.clarificationPriority() != null
-            ? sub.clarificationPriority() : List.of();
+        List<String> requiredContext = new ArrayList<>();
+        if (sub != null && sub.requiredContext() != null) {
+            requiredContext.addAll(sub.requiredContext());
+        }
 
         Map<String, ClarificationSchema> schema = new LinkedHashMap<>();
         if (sub != null && sub.clarificationSchema() != null) {
             schema.putAll(sub.clarificationSchema());
         }
 
-        DomainManifest.EntityRegistry registry = mostSpecific(
-            sub != null ? sub.entityRegistry() : null,
-            domain != null ? domain.entityRegistry() : null
-        );
+        boolean resourceScoped = sub != null && sub.resourceScoped();
 
-        DomainManifest.AuthorizationContract contract = mostSpecific(
-            sub != null ? sub.authorizationContract() : null,
-            domain != null ? domain.authorizationContract() : null
-        );
+        DomainManifest.Coverage coverage = domain != null ? domain.coverage() : null;
 
         List<String> mustPreserve = new ArrayList<>();
         List<String> canDrop = new ArrayList<>();
         if (domain != null && domain.memoryCompaction() != null) {
-            if (domain.memoryCompaction().mustPreserve() != null) mustPreserve.addAll(domain.memoryCompaction().mustPreserve());
-            if (domain.memoryCompaction().canDrop() != null) canDrop.addAll(domain.memoryCompaction().canDrop());
+            if (domain.memoryCompaction().mustPreserve() != null)
+                mustPreserve.addAll(domain.memoryCompaction().mustPreserve());
+            if (domain.memoryCompaction().canDrop() != null)
+                canDrop.addAll(domain.memoryCompaction().canDrop());
         }
 
         return new EffectiveManifest(
             domain != null ? domain.domainId() : null,
             sub != null ? sub.subDomainId() : null,
             agentId,
+            resourceScoped,
             requiredContext,
-            clarPriority,
             schema,
-            registry,
-            contract,
+            coverage,
             mustPreserve,
             canDrop
         );
     }
 
-    private static List<String> union(List<String> a, List<String> b) {
-        List<String> result = new ArrayList<>();
-        if (a != null) result.addAll(a);
-        if (b != null) b.stream().filter(x -> !result.contains(x)).forEach(result::add);
-        return result;
+    /** Returns true if this effective manifest requires a relationship_id in context. */
+    public boolean requiresRelationship() {
+        return requiredContext != null && requiredContext.contains("relationship_id");
     }
 
-    private static <T> T mostSpecific(T subLevel, T domainLevel) {
-        return subLevel != null ? subLevel : domainLevel;
+    /** Returns the ClarificationSchema for relationship_id, or null if not configured. */
+    public ClarificationSchema relationshipClarification() {
+        if (clarificationSchema == null) return null;
+        return clarificationSchema.get("relationship_id");
     }
 }

@@ -1,0 +1,115 @@
+"""
+Seed data for the wealth-coverage service.
+
+RELATIONSHIPS maps relationship_id → metadata.
+BOOKS maps principal_id → set of relationship_ids they own / may access.
+"""
+
+RELATIONSHIPS: dict[str, dict] = {
+    "REL-00042": {
+        "id": "REL-00042",
+        "label": "Whitman Family Office",
+        "canonical_name": "Whitman Family Office",
+        "sub_domain": "private-banking",
+        "owning_rm": "rm_jane",
+        "aliases": ["whitman", "whitman family", "whitman family office", "the whitman relationship",
+                    "whitman account", "whitman portfolio"],
+    },
+    "REL-00099": {
+        "id": "REL-00099",
+        "label": "Calderon Trust",
+        "canonical_name": "Calderon Trust",
+        "sub_domain": "private-banking",
+        "owning_rm": "rm_jane",
+        "aliases": ["calderon", "calderon trust", "the calderon trust", "calderon account"],
+    },
+    "REL-00188": {
+        "id": "REL-00188",
+        "label": "Okafor Family Trust",
+        "canonical_name": "Okafor Family Trust",
+        "sub_domain": "private-banking",
+        "owning_rm": "rm_ken",
+        "aliases": ["okafor", "okafor family", "okafor family trust", "the okafor account",
+                    "okafor account"],
+    },
+}
+
+# Book = the set of relationship_ids a principal may access.
+BOOKS: dict[str, set[str]] = {
+    "rm_jane": {"REL-00042", "REL-00099"},
+    "rm_ken":  {"REL-00188"},
+    "admin":   set(RELATIONSHIPS.keys()),   # platform admin sees all
+}
+
+
+def discover(principal_id: str) -> list[dict]:
+    """Return all resources in principal's book."""
+    ids = BOOKS.get(principal_id, set())
+    result = []
+    for rel_id in ids:
+        rel = RELATIONSHIPS.get(rel_id)
+        if rel:
+            result.append({
+                "id": rel["id"],
+                "label": rel["label"],
+                "sub_domain": rel["sub_domain"],
+            })
+    return result
+
+
+def check(principal_id: str, resource_id: str) -> dict:
+    """Return allowed/denied for a specific resource."""
+    book = BOOKS.get(principal_id, set())
+    if resource_id not in RELATIONSHIPS:
+        return {"allowed": False, "reason": "unknown-resource"}
+    if resource_id in book:
+        return {"allowed": True, "reason": "in-book"}
+    return {"allowed": False, "reason": "not-in-book"}
+
+
+def resolve(reference: str, entity_type: str, principal_id: str) -> dict:
+    """
+    Resolve a free-text reference to a canonical relationship ID.
+
+    Returns:
+      resolved=True, id=..., canonical_name=..., candidates=None  — unambiguous
+      resolved=False, id=None, canonical_name=None, candidates=[...] — ambiguous
+      resolved=False, id=None, canonical_name=None, candidates=[]  — not found
+    """
+    ref_lower = reference.lower().strip()
+    book = BOOKS.get(principal_id, set())
+
+    # Restrict search to principal's visible set (security: never reveal others)
+    matches = []
+    for rel_id, rel in RELATIONSHIPS.items():
+        if rel_id not in book:
+            continue
+        if rel_id.lower() == ref_lower:
+            matches.append(rel)
+            continue
+        for alias in rel.get("aliases", []):
+            if alias in ref_lower or ref_lower in alias:
+                matches.append(rel)
+                break
+
+    if len(matches) == 1:
+        rel = matches[0]
+        return {
+            "resolved": True,
+            "id": rel["id"],
+            "canonical_name": rel["canonical_name"],
+            "candidates": None,
+        }
+    if len(matches) > 1:
+        return {
+            "resolved": False,
+            "id": None,
+            "canonical_name": None,
+            "candidates": [{"id": r["id"], "name": r["canonical_name"]} for r in matches],
+        }
+    return {
+        "resolved": False,
+        "id": None,
+        "canonical_name": None,
+        "candidates": [],
+    }

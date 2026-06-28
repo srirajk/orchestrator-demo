@@ -9,6 +9,10 @@ import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,6 +20,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -47,6 +52,10 @@ public class AgentHarness {
 
     private final List<ProtocolAdapter> adapters;
     private final CircuitBreakerRegistry cbRegistry;
+    private final MeterRegistry meterRegistry;
+
+    // ── Gauge registration guard: track which agentIds already have gauges ────
+    private final Set<String> registeredGauges = ConcurrentHashMap.newKeySet();
 
     // ── Per-agent bulkhead: dual-semaphore + virtual-thread executor ──────────
     // One virtual thread per agent call. Semaphores control concurrency and queue depth
@@ -71,6 +80,7 @@ public class AgentHarness {
     public AgentHarness(
             List<ProtocolAdapter> adapters,
             CircuitBreakerRegistry cbRegistry,
+            MeterRegistry meterRegistry,
             @Value("${meridian.orchestration.harness.default-sla-ms:5000}") int defaultSlaMs,
             @Value("${meridian.orchestration.harness.bulkhead.max-concurrent:5}") int bulkheadMaxConcurrent,
             @Value("${meridian.orchestration.harness.bulkhead.queue-capacity:20}") int bulkheadQueueCapacity,
@@ -83,6 +93,7 @@ public class AgentHarness {
             @Value("${meridian.orchestration.harness.circuit-breaker.half-open-permitted-calls:2}") int cbHalfOpenPermittedCalls) {
         this.adapters = adapters;
         this.cbRegistry = cbRegistry;
+        this.meterRegistry = meterRegistry;
         this.defaultSlaMs = defaultSlaMs;
         this.bulkheadMaxConcurrent = bulkheadMaxConcurrent;
         this.bulkheadQueueCapacity = bulkheadQueueCapacity;
@@ -122,8 +133,11 @@ public class AgentHarness {
         if (adapter == null) {
             long latency = System.currentTimeMillis() - start;
             log.warn("No adapter found for protocol '{}' (agent={})", agent.protocol(), agentId);
-            return failed(node, latency,
+            NodeResult noAdapterResult = failed(node, latency,
                     "No ProtocolAdapter registered for protocol: " + agent.protocol());
+            emitCallCounter(agentId, agent.protocol(), noAdapterResult.status().name());
+            emitLatencyTimer(agentId, agent.protocol(), latency);
+            return noAdapterResult;
         }
 
         CircuitBreaker cb   = circuitBreaker(agentId);
@@ -132,11 +146,18 @@ public class AgentHarness {
         Semaphore queued    = queueSlots.computeIfAbsent(agentId,
                 k -> new Semaphore(bulkheadQueueCapacity));
 
+        // Register gauges exactly once per agentId — Gauge holds a weak ref to the semaphore
+        // so the semaphore instance must be stable (computeIfAbsent guarantees that).
+        if (registeredGauges.add(agentId)) {
+            registerGauges(agentId, cb, executing, queued);
+        }
+
         // Reject immediately if the queue is full — no blocking here.
         if (!queued.tryAcquire()) {
             long latency = System.currentTimeMillis() - start;
             log.warn("Agent {} QUEUE FULL — max-concurrent={} queue-capacity={}",
                     agentId, bulkheadMaxConcurrent, bulkheadQueueCapacity);
+            emitCallCounter(agentId, agent.protocol(), "QUEUE_FULL");
             return failed(node, latency, "Bulkhead queue full (" + bulkheadQueueCapacity + " max)");
         }
 
@@ -163,25 +184,34 @@ public class AgentHarness {
             JsonNode data = future.get(slaMs, TimeUnit.MILLISECONDS);
             long latency = System.currentTimeMillis() - start;
             log.debug("Agent {} OK in {}ms", agentId, latency);
-            return new NodeResult(node.nodeId(), agentId, agent.protocol(),
+            NodeResult okResult = new NodeResult(node.nodeId(), agentId, agent.protocol(),
                     NodeResult.Status.OK, data, latency, null);
+            emitCallCounter(agentId, agent.protocol(), okResult.status().name());
+            emitLatencyTimer(agentId, agent.protocol(), latency);
+            return okResult;
 
         } catch (TimeoutException e) {
             future.cancel(true);
             long latency = System.currentTimeMillis() - start;
             log.warn("Agent {} TIMEOUT after {}ms (sla={}ms)", agentId, latency, slaMs);
-            return new NodeResult(node.nodeId(), agentId, agent.protocol(),
+            NodeResult timeoutResult = new NodeResult(node.nodeId(), agentId, agent.protocol(),
                     NodeResult.Status.TIMEOUT, null, latency,
                     "Agent timed out after " + latency + "ms");
+            emitCallCounter(agentId, agent.protocol(), timeoutResult.status().name());
+            emitLatencyTimer(agentId, agent.protocol(), latency);
+            return timeoutResult;
 
         } catch (ExecutionException e) {
             long latency = System.currentTimeMillis() - start;
             Throwable cause = e.getCause();
             if (cause instanceof CallNotPermittedException) {
                 log.warn("Circuit breaker OPEN for agent {}", agentId);
-                return new NodeResult(node.nodeId(), agentId, agent.protocol(),
+                NodeResult breakerResult = new NodeResult(node.nodeId(), agentId, agent.protocol(),
                         NodeResult.Status.BREAKER_OPEN, null, latency,
                         "Circuit breaker is open: " + cause.getMessage());
+                emitCallCounter(agentId, agent.protocol(), breakerResult.status().name());
+                emitLatencyTimer(agentId, agent.protocol(), latency);
+                return breakerResult;
             }
             // queued.release() already ran inside the VT (line after executing.acquire()).
             // The only exception: if executing.acquire() itself was interrupted before
@@ -192,12 +222,18 @@ public class AgentHarness {
             log.warn("Agent {} FAILED: {}", agentId, cause != null ? cause.getMessage() : "unknown", cause);
             String msg = cause != null && cause.getMessage() != null
                     ? cause.getMessage() : e.getClass().getSimpleName();
-            return failed(node, latency, msg);
+            NodeResult failedResult = failed(node, latency, msg);
+            emitCallCounter(agentId, agent.protocol(), failedResult.status().name());
+            emitLatencyTimer(agentId, agent.protocol(), latency);
+            return failedResult;
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             long latency = System.currentTimeMillis() - start;
-            return failed(node, latency, "Interrupted while waiting for agent " + agentId);
+            NodeResult interruptedResult = failed(node, latency, "Interrupted while waiting for agent " + agentId);
+            emitCallCounter(agentId, agent.protocol(), interruptedResult.status().name());
+            emitLatencyTimer(agentId, agent.protocol(), latency);
+            return interruptedResult;
         }
     }
 
@@ -242,5 +278,63 @@ public class AgentHarness {
                 null,
                 latencyMs,
                 message);
+    }
+
+    // ── Metric helpers ───────────────────────────────────────────────────────
+
+    /** Increments the per-agent call counter. Micrometer caches the Counter by key. */
+    private void emitCallCounter(String agentId, String protocol, String status) {
+        Counter.builder("meridian.agent.calls")
+                .description("Total agent invocations by outcome")
+                .tag("agentId", agentId)
+                .tag("protocol", protocol)
+                .tag("status", status)
+                .register(meterRegistry)
+                .increment();
+    }
+
+    /** Records the per-agent call latency. Micrometer caches the Timer by key. */
+    private void emitLatencyTimer(String agentId, String protocol, long latencyMs) {
+        Timer.builder("meridian.agent.latency")
+                .description("Agent response time distribution")
+                .tag("agentId", agentId)
+                .tag("protocol", protocol)
+                .publishPercentiles(0.5, 0.95, 0.99)
+                .publishPercentileHistogram()
+                .register(meterRegistry)
+                .record(latencyMs, TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * Registers the three per-agent gauges exactly once (called inside
+     * {@code registeredGauges.add(agentId)} guard so it fires only on the first
+     * call per agent).  Gauges hold weak references to the semaphore/CB instances,
+     * which are stable because they live in {@link #executingSlots} /
+     * {@link #queueSlots} / {@link #cbRegistry} maps.
+     */
+    private void registerGauges(String agentId, CircuitBreaker cb,
+                                 Semaphore executing, Semaphore queued) {
+        Gauge.builder("meridian.circuit.breaker.state", cb,
+                        c -> switch (c.getState()) {
+                            case CLOSED    -> 0.0;
+                            case HALF_OPEN -> 1.0;
+                            case OPEN      -> 2.0;
+                            default        -> -1.0;
+                        })
+                .description("Circuit breaker state: 0=CLOSED 1=HALF_OPEN 2=OPEN")
+                .tag("agentId", agentId)
+                .register(meterRegistry);
+
+        Gauge.builder("meridian.bulkhead.executing", executing,
+                        s -> (double) (bulkheadMaxConcurrent - s.availablePermits()))
+                .description("Currently executing calls (0 to max-concurrent)")
+                .tag("agentId", agentId)
+                .register(meterRegistry);
+
+        Gauge.builder("meridian.bulkhead.queued", queued,
+                        s -> (double) (bulkheadQueueCapacity - s.availablePermits()))
+                .description("Calls waiting for execution slot (0 to queue-capacity)")
+                .tag("agentId", agentId)
+                .register(meterRegistry);
     }
 }

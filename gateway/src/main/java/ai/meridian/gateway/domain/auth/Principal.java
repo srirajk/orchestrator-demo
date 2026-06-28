@@ -10,6 +10,7 @@ import java.util.List;
  *
  * <p>Fields:
  * <ul>
+ *   <li>{@code tenantId} — tenant scope for coverage checks (from JWT {@code tenant_id} claim)</li>
  *   <li>{@code roles} — coarse RBAC roles (relationship_manager, domain_admin, platform_admin)</li>
  *   <li>{@code book} — relationship IDs this caller may read (entitlement check)</li>
  *   <li>{@code clearance} — numeric data-classification clearance level (1–5)</li>
@@ -22,6 +23,7 @@ import java.util.List;
  */
 public record Principal(
         String       id,
+        String       tenantId,
         List<String> roles,
         List<String> book,
         int          clearance,
@@ -31,7 +33,7 @@ public record Principal(
 ) {
     /** Fallback for unauthenticated / anonymous callers — no data access. */
     public static Principal anonymous() {
-        return new Principal("anonymous", List.of("relationship_manager"),
+        return new Principal("anonymous", "default", List.of("relationship_manager"),
                 List.of(), 2, List.of(), List.of(), List.of());
     }
 
@@ -42,6 +44,9 @@ public record Principal(
     @SuppressWarnings("unchecked")
     public static Principal fromSpringJwt(Jwt jwt) {
         String sub = jwt.getSubject();
+
+        String tenantId = jwt.getClaimAsString("tenant_id");
+        if (tenantId == null) tenantId = "default";
 
         List<String> roles = jwt.getClaimAsStringList("roles");
         if (roles == null) roles = List.of("relationship_manager");
@@ -61,7 +66,7 @@ public record Principal(
         List<String> domains = jwt.getClaimAsStringList("domains");
         if (domains == null) domains = List.of();
 
-        return new Principal(sub, roles, book, clearance, adminDomains, segments, domains);
+        return new Principal(sub, tenantId, roles, book, clearance, adminDomains, segments, domains);
     }
 
     /**
@@ -70,6 +75,9 @@ public record Principal(
     @SuppressWarnings("unchecked")
     public static Principal fromJwtClaims(JWTClaimsSet claims) {
         String sub = claims.getSubject();
+
+        Object rawTenantId = claims.getClaim("tenant_id");
+        String tenantId = rawTenantId instanceof String s ? s : "default";
 
         Object rawRoles = claims.getClaim("roles");
         List<String> roles = rawRoles instanceof List<?> l ? (List<String>) l : List.of("relationship_manager");
@@ -89,6 +97,6 @@ public record Principal(
         Object rawDomains = claims.getClaim("domains");
         List<String> domains = rawDomains instanceof List<?> l ? (List<String>) l : List.of();
 
-        return new Principal(sub, roles, book, clearance, adminDomains, segments, domains);
+        return new Principal(sub, tenantId, roles, book, clearance, adminDomains, segments, domains);
     }
 }

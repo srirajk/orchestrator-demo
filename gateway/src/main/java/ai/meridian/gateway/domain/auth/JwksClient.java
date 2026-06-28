@@ -34,6 +34,7 @@ public class JwksClient {
 
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(5))
+            .followRedirects(java.net.http.HttpClient.Redirect.NORMAL)
             .build();
 
     private final Map<String, RSAPublicKey> keyCache = new ConcurrentHashMap<>();

@@ -282,7 +282,7 @@ class AuthzFromMembershipTest {
     void entitlementService_adminRole_grantsAccessRegardlessOfBook() {
         // platform_admin/admin: Cerbos returns ALLOW (policy has no book condition for admin roles).
         // We stub the adapter to return ALLOW — the point is EntitlementService honours the verdict.
-        Principal admin = new Principal("admin", List.of("platform_admin"), List.of(), 5, List.of(), List.of(), List.of());
+        Principal admin = new Principal("admin", "default", List.of("platform_admin"), List.of(), 5, List.of(), List.of(), List.of());
         when(cerbosAdapter.checkRelationships(any(), any()))
                 .thenReturn(new CerbosEntitlementAdapter.BatchResult(Map.of("REL-00188", true), "cerbos"));
 
@@ -295,7 +295,7 @@ class AuthzFromMembershipTest {
     @Test
     void entitlementService_rmWithoutRelInBook_denied() {
         // Cerbos denies REL-00188 because it's not in rm_jane's book.
-        Principal rm = new Principal("rm_jane", List.of("relationship_manager"),
+        Principal rm = new Principal("rm_jane", "default", List.of("relationship_manager"),
                 List.of("REL-00042", "REL-00099"), 2, List.of(), List.of("wealth"), List.of("wealth-private-banking"));
         when(cerbosAdapter.checkRelationships(any(), any()))
                 .thenReturn(new CerbosEntitlementAdapter.BatchResult(Map.of("REL-00188", false), "cerbos"));
@@ -309,7 +309,7 @@ class AuthzFromMembershipTest {
     @Test
     void entitlementService_rmWithRelInBook_allowed() {
         // Cerbos allows REL-00188 because rm_jane's book now contains it.
-        Principal rm = new Principal("rm_jane", List.of("relationship_manager"),
+        Principal rm = new Principal("rm_jane", "default", List.of("relationship_manager"),
                 List.of("REL-00042", "REL-00099", "REL-00188"), 2, List.of(), List.of("wealth"), List.of("wealth-private-banking"));
         when(cerbosAdapter.checkRelationships(any(), any()))
                 .thenReturn(new CerbosEntitlementAdapter.BatchResult(Map.of("REL-00188", true), "cerbos"));

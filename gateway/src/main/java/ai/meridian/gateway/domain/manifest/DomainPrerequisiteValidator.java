@@ -1,13 +1,18 @@
 package ai.meridian.gateway.domain.manifest;
 
 import ai.meridian.gateway.domain.auth.Principal;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+/**
+ * @deprecated Authorization contract checks have been migrated to the DISCOVER/CHECK/RESOLVE
+ *             coverage pipeline ({@link ai.meridian.gateway.domain.coverage.CoverageClient}).
+ *             This validator is retained for backwards compatibility but always returns
+ *             {@link Verdict#SKIPPED}; remove in a future cleanup pass.
+ */
+@Deprecated
 @Service
 public class DomainPrerequisiteValidator {
 
@@ -24,37 +29,12 @@ public class DomainPrerequisiteValidator {
     }
 
     /**
-     * Validates whether principal may access relationshipId according to the domain's authorization_contract.
-     * Returns SKIPPED when no authorization_contract is configured.
-     * Fails open on HTTP errors (logs loudly, returns AUTHORIZED to not block demo).
+     * Always returns {@link Verdict#SKIPPED}.  Coverage validation is now performed by
+     * {@link ai.meridian.gateway.domain.coverage.CoverageClient} before input synthesis.
      */
     public Verdict validate(Principal principal, String domainId, String relationshipId) {
-        if (relationshipId == null || domainId == null) return Verdict.SKIPPED;
-
-        var domain = manifestStore.getDomain(domainId).orElse(null);
-        if (domain == null || domain.authorizationContract() == null
-                || domain.authorizationContract().urlTemplate() == null
-                || domain.authorizationContract().urlTemplate().isBlank()) {
-            return Verdict.SKIPPED;
-        }
-
-        String url = domain.authorizationContract().urlTemplate()
-            .replace("{principal_id}", principal.id())
-            .replace("{relationship_id}", relationshipId);
-
-        try {
-            var response = restTemplate.getForObject(url, AuthzResponse.class);
-            boolean allowed = response != null && Boolean.TRUE.equals(response.allowed());
-            log.info("Domain authz: domain={} principal={} relId={} allowed={}",
-                domainId, principal.id(), relationshipId, allowed);
-            return allowed ? Verdict.AUTHORIZED : Verdict.DENIED;
-        } catch (Exception e) {
-            log.error("Domain authz contract call failed for domain={} principal={} relId={}: {} — failing open",
-                domainId, principal.id(), relationshipId, e.getMessage());
-            return Verdict.AUTHORIZED;
-        }
+        log.debug("DomainPrerequisiteValidator.validate: skipped (migrated to coverage pipeline) "
+            + "domain={} principal={} relId={}", domainId, principal.id(), relationshipId);
+        return Verdict.SKIPPED;
     }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record AuthzResponse(Boolean allowed, String reason) {}
 }

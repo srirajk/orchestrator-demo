@@ -60,7 +60,7 @@ public class PrincipalStore {
             List<String> segments     = parseList(fields.get("segments"));
             List<String> domains      = parseList(fields.get("domains"));
             List<String> adminDomains = parseList(fields.get("adminDomains"));
-            return new Principal(userId, roles, book, clearance, adminDomains, segments, domains);
+            return new Principal(userId, "default", roles, book, clearance, adminDomains, segments, domains);
         } catch (Exception e) {
             log.warn("PrincipalStore.load failed for {}: {}", userId, e.getMessage());
             return Principal.anonymous();

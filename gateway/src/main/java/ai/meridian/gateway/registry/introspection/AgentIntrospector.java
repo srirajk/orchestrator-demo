@@ -169,7 +169,8 @@ public class AgentIntrospector {
             AgentManifest.ResolvedConnection resolved) {
         return new AgentManifest(
                 s.agentId(), s.name(), s.description(), s.version(), s.provider(),
-                s.domain(), s.protocol(), s.connection(), s.capabilities(), s.skills(),
+                s.domain(), s.subDomain(), s.maxResponseTokens(), s.protocol(),
+                s.connection(), s.capabilities(), s.skills(),
                 s.constraints(),
                 inputSchema, outputSchema, resolved, false, null
         );

@@ -146,6 +146,8 @@ public class AgentRegistry {
                 manifest.version(),
                 manifest.provider(),
                 manifest.domain(),
+                manifest.subDomain(),
+                manifest.maxResponseTokens(),
                 manifest.protocol(),
                 manifest.connection(),
                 manifest.capabilities(),
