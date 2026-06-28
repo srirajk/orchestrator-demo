@@ -17,16 +17,16 @@ export const HERO_PROMPT =
 export const OKAFOR_PROMPT =
   'Show me the complete portfolio details and holdings for the Okafor Family Trust REL-00188';
 
-/** Obtain a real RS256 JWT from the user-mgmt service */
+/** Obtain a real RS256 JWT from the iam-service */
 export async function getJwt(userId: string): Promise<string> {
   const resp = await fetch(`${USER_MGMT_URL}/auth/token`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ user_id: userId }),
+    body:    JSON.stringify({ username: userId, password: 'Meridian@2024' }),
   });
-  if (!resp.ok) throw new Error(`user-mgmt /auth/token returned ${resp.status}`);
+  if (!resp.ok) throw new Error(`iam-service /auth/token returned ${resp.status}`);
   const data = await resp.json();
-  return data.access_token as string;
+  return data.accessToken as string;
 }
 
 /** Register then login, or just login if account already exists. */

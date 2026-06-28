@@ -30,10 +30,15 @@ test.describe('Domain-scoped ABAC (Phase 11)', () => {
     });
     expect(resp.status()).toBe(200);
     const raw = await resp.text();
-    // Must not get the "no access to required services" denial
-    expect(raw.toLowerCase()).not.toContain('do not have access to any of the required');
-    // Must contain grounded wealth data
     const lower = raw.toLowerCase();
+    // Must not get any form of blanket denial (old Cerbos message OR new coverage message)
+    const isDenied = (
+      lower.includes('do not have access to any of the required') ||
+      lower.includes('not in your coverage')                      ||
+      lower.includes('access denied')
+    );
+    expect(isDenied).toBe(false);
+    // Must contain grounded wealth data
     const hasWealthData = (
       lower.includes('holdings')    ||
       lower.includes('performance') ||
@@ -59,8 +64,14 @@ test.describe('Domain-scoped ABAC (Phase 11)', () => {
     });
     expect(resp.status()).toBe(200);
     const raw = await resp.text();
-    // Wealth data should appear (wealth agents allowed)
     const lower = raw.toLowerCase();
+    // Must not be a blanket denial (old Cerbos message OR new coverage message)
+    const isDenied = (
+      lower.includes('do not have access to any of the required') ||
+      lower.includes('not in your coverage')
+    );
+    expect(isDenied).toBe(false);
+    // Wealth data should appear (wealth agents allowed)
     const hasWealthContent = (
       lower.includes('whitman')  ||
       lower.includes('holdings') ||
@@ -86,8 +97,13 @@ test.describe('Domain-scoped ABAC (Phase 11)', () => {
     });
     expect(resp.status()).toBe(200);
     const raw = await resp.text();
-    // Must not get the "no access" blanket denial
-    expect(raw.toLowerCase()).not.toContain('do not have access to any of the required');
+    const lower = raw.toLowerCase();
+    // Must not get any blanket denial (old Cerbos message OR new coverage message)
+    const isBlankDenied = (
+      lower.includes('do not have access to any of the required') ||
+      lower.includes('not in your coverage')
+    );
+    expect(isBlankDenied).toBe(false);
     expect(raw).toMatch(/data:\s*\[DONE\]/);
   });
 
@@ -106,7 +122,14 @@ test.describe('Domain-scoped ABAC (Phase 11)', () => {
     });
     expect(resp.status()).toBe(200);
     const raw = await resp.text();
-    expect(raw.toLowerCase()).not.toContain('do not have access to any of the required');
+    const lower = raw.toLowerCase();
+    // Admin must never be hit by any blanket denial (old Cerbos OR new coverage message)
+    const isDenied = (
+      lower.includes('do not have access to any of the required') ||
+      lower.includes('not in your coverage')                      ||
+      lower.includes('access denied')
+    );
+    expect(isDenied).toBe(false);
     expect(raw).toMatch(/data:\s*\[DONE\]/);
   });
 
@@ -230,11 +253,11 @@ test.describe('Domain-scoped ABAC (Phase 11)', () => {
 
   test('rm_jane JWT contains segments=["wealth"]', async ({ request }) => {
     const resp = await request.post(`${USER_MGMT_URL}/auth/token`, {
-      data: { user_id: 'rm_jane' },
+      data: { username: 'rm_jane', password: 'Meridian@2024' },
     });
     expect(resp.status()).toBe(200);
     const body = await resp.json();
-    const token: string = body.access_token;
+    const token: string = body.accessToken;
 
     // Decode JWT payload (base64url middle section)
     const parts = token.split('.');
@@ -250,11 +273,11 @@ test.describe('Domain-scoped ABAC (Phase 11)', () => {
 
   test('rm_diaz JWT contains segments=["wealth","servicing"] (dual-segment RM)', async ({ request }) => {
     const resp = await request.post(`${USER_MGMT_URL}/auth/token`, {
-      data: { user_id: 'rm_diaz' },
+      data: { username: 'rm_diaz', password: 'Meridian@2024' },
     });
     expect(resp.status()).toBe(200);
     const body = await resp.json();
-    const token: string = body.access_token;
+    const token: string = body.accessToken;
 
     const parts = token.split('.');
     const payload = Buffer.from(parts[1], 'base64').toString('utf8');
