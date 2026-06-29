@@ -199,6 +199,20 @@ public class DomainManifestStore {
     }
 
     /**
+     * The entity_types declared by ONE specific sub-domain, in declaration order, or an empty
+     * list when the sub-domain is unknown. Unlike {@link #entityTypes()} — which unions
+     * entity_types across ALL loaded sub-domains — this is scoped to a single routed sub-domain.
+     * Once more than one domain is loaded the union is ambiguous (e.g. it would surface both a
+     * wealth and an insurance required entity); callers that already know the routed sub-domain
+     * use this so coverage/secondary entity selection picks the entity that belongs to it.
+     */
+    public List<EntityType> entityTypesFor(String subDomainId) {
+        SubDomainManifest sd = (subDomainId != null) ? subDomains.get(subDomainId) : null;
+        if (sd == null || sd.entityTypes() == null) return List.of();
+        return List.copyOf(sd.entityTypes());
+    }
+
+    /**
      * The clarification schema declared for an entity key, searched across all sub-domains,
      * or null when none is declared.
      */

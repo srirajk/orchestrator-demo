@@ -284,6 +284,12 @@ public class ChatService {
         // manifest declaration (sub-domain required_context), NOT a Java rule. The coverage
         // pipeline below clarifies when this required resolvable entity is unresolved — that is
         // the generic `required ∩ resolved = ∅ → CLARIFY` check, manifest-declared.
+        //
+        // These start from the cross-domain UNION (global fallback). Once resolution identifies
+        // the routed sub-domain (its EffectiveManifest), they are RE-SCOPED to that sub-domain's
+        // required_context/entity_types below — so a multi-domain registry gates on the right
+        // entity (e.g. the insurance required entity for an insurance query) rather than the
+        // union's first key. They are plain locals (captured by no lambda) so reassignment is safe.
         EntityType coverageEntity = coverageEntityType();
         EntityType secondaryEntity = secondaryEntityType();
         // Session-carried coverage id (resolved in a prior turn), keyed by manifest entity key.
@@ -352,6 +358,18 @@ public class ChatService {
                     resourceScopedAgent.agentId(),
                     resourceScopedAgent.domain(),
                     resourceScopedAgent.subDomain());
+
+                // RE-SCOPE the coverage/secondary entity to the ROUTED sub-domain. Up to here
+                // these held the cross-domain union's first key (wrong once >1 domain is loaded);
+                // now that `em` names the matched sub-domain we derive them from ITS
+                // required_context/entity_types, and re-read the session-carried id for the
+                // re-scoped key. Everything downstream (resolve/check/bind, entitlement, session
+                // save) uses these re-scoped values. Manifest-declared, domain-agnostic.
+                coverageEntity = coverageEntityType(em);
+                secondaryEntity = secondaryEntityType(em);
+                carriedCoverageId = coverageEntity != null
+                        ? session.resolvedEntity(coverageEntity.key()) : null;
+
                 DomainManifest.Coverage coverage = em.coverage();
                 String tenantId = jwtPrincipal != null ? jwtPrincipal.tenantId() : "default";
                 String principalId = principal.id();
@@ -598,7 +616,7 @@ public class ChatService {
                 tracePublisher.publish(TraceEvent.of("request_complete", requestId,
                         new RequestCompleteData(System.currentTimeMillis() - requestStart, total, (int) ok)));
             } else if (sessionCoverageEntity(session) != null) {
-                EntityType cov = coverageEntityType();
+                EntityType cov = carriedCoverageEntityType(session);
                 String enriched = latestPrompt + " [session_" + cov.key() + ": "
                         + session.resolvedEntity(cov.key()) + "]";
                 handleFetchData(request, emitter, enriched, conversationId, session, userId, jwtPrincipal, requestId, requestStart, rootSpan, null, streamId);
@@ -647,7 +665,7 @@ public class ChatService {
         summary.append("Conversation summary:\n");
         String covId = sessionCoverageEntity(session);
         if (covId != null) {
-            EntityType cov = coverageEntityType();
+            EntityType cov = carriedCoverageEntityType(session);
             String label = (cov != null && cov.display() != null && !cov.display().isBlank())
                     ? cov.display() : "Entity";
             summary.append("- ").append(label).append(": ").append(covId);
@@ -760,9 +778,63 @@ public class ChatService {
                 .findFirst().orElse(null);
     }
 
+    /**
+     * The coverage (required, resolvable) entity for a SPECIFIC routed sub-domain — the entity a
+     * coverage/entitlement check gates on. Scoped to the sub-domain's own {@code required_context}
+     * and {@code entity_types}, so a multi-domain registry selects the entity that belongs to the
+     * routed sub-domain (e.g. the insurance required entity for an insurance query) instead of the
+     * cross-domain union's first key. Manifest-declared, never hardcoded. Falls back to the global
+     * no-arg selection when the effective manifest or its sub-domain entity_types are unavailable.
+     */
+    private EntityType coverageEntityType(EffectiveManifest em) {
+        if (em == null) return coverageEntityType();
+        java.util.List<String> requiredKeys = em.requiredContext();
+        java.util.List<EntityType> scoped = manifestStore.entityTypesFor(em.subDomainId());
+        if (scoped.isEmpty()) return coverageEntityType();
+        return scoped.stream()
+                .filter(EntityType::isResolvable)
+                .filter(et -> requiredKeys != null && requiredKeys.contains(et.key()))
+                .findFirst().orElse(null);
+    }
+
+    /**
+     * The first non-required resolvable entity (a secondary lookup) within a SPECIFIC routed
+     * sub-domain, or null. Scoped to that sub-domain's {@code entity_types} so the secondary is
+     * the one declared by the routed sub-domain, not a sibling domain's. Manifest-declared.
+     */
+    private EntityType secondaryEntityType(EffectiveManifest em) {
+        if (em == null) return secondaryEntityType();
+        java.util.List<String> requiredKeys = em.requiredContext();
+        java.util.List<EntityType> scoped = manifestStore.entityTypesFor(em.subDomainId());
+        if (scoped.isEmpty()) return secondaryEntityType();
+        return scoped.stream()
+                .filter(EntityType::isResolvable)
+                .filter(et -> requiredKeys == null || !requiredKeys.contains(et.key()))
+                .findFirst().orElse(null);
+    }
+
+    /**
+     * The coverage EntityType whose resolved id the session is carrying from a prior turn — found
+     * by scanning the manifest's required-context resolvable entities for the one the session
+     * actually holds a value for. Domain-agnostic: the carried key itself identifies which
+     * sub-domain the prior turn resolved, so a multi-domain registry carries forward the correct
+     * entity (e.g. the wealth required entity for a wealth conversation, the insurance one for an
+     * insurance conversation) without scoping by a (frequently unset) session domain. Returns null
+     * when the session carries no required entity.
+     */
+    private EntityType carriedCoverageEntityType(ConversationSession session) {
+        if (session == null) return null;
+        java.util.List<String> requiredKeys = manifestStore.requiredContextKeys();
+        return manifestStore.entityTypes().stream()
+                .filter(EntityType::isResolvable)
+                .filter(et -> requiredKeys.contains(et.key()))
+                .filter(et -> session.resolvedEntity(et.key()) != null)
+                .findFirst().orElse(null);
+    }
+
     /** The session-carried resolved id for the coverage entity, or null. */
     private String sessionCoverageEntity(ConversationSession session) {
-        EntityType ce = coverageEntityType();
+        EntityType ce = carriedCoverageEntityType(session);
         return ce != null ? session.resolvedEntity(ce.key()) : null;
     }
 
