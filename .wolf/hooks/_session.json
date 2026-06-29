@@ -148,7 +148,7 @@
       "first_read": "2026-06-29T14:46:12.672Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityExtractor.java": {
-      "count": 1,
+      "count": 3,
       "tokens": 2699,
       "first_read": "2026-06-29T14:46:13.324Z"
     },
@@ -203,12 +203,12 @@
       "first_read": "2026-06-29T14:46:33.401Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java": {
-      "count": 2,
+      "count": 4,
       "tokens": 3874,
       "first_read": "2026-06-29T14:46:35.450Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/synthesis/answer/AnswerSynthesizer.java": {
-      "count": 3,
+      "count": 5,
       "tokens": 6780,
       "first_read": "2026-06-29T14:46:39.738Z"
     },
@@ -238,7 +238,7 @@
       "first_read": "2026-06-29T16:09:57.705Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/eval/eval_deepeval.py": {
-      "count": 2,
+      "count": 3,
       "tokens": 5358,
       "first_read": "2026-06-29T16:09:58.716Z"
     },
@@ -248,7 +248,7 @@
       "first_read": "2026-06-29T16:10:00.311Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/eval/langfuse_continuous.py": {
-      "count": 2,
+      "count": 3,
       "tokens": 5808,
       "first_read": "2026-06-29T16:10:03.109Z"
     },
@@ -441,6 +441,36 @@
       "count": 1,
       "tokens": 1093,
       "first_read": "2026-06-29T16:33:50.862Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/eval/prompts/intent_classifier_contract.md": {
+      "count": 1,
+      "tokens": 2400,
+      "first_read": "2026-06-29T16:41:43.086Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/01_prompt_contract_framework_COMPLETE_v4.md": {
+      "count": 15,
+      "tokens": 0,
+      "first_read": "2026-06-29T16:41:44.146Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/eval/prompts/entity_extractor_contract.md": {
+      "count": 1,
+      "tokens": 2200,
+      "first_read": "2026-06-29T16:41:52.775Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/eval/prompts/answer_synthesizer_contract.md": {
+      "count": 1,
+      "tokens": 2600,
+      "first_read": "2026-06-29T16:42:03.706Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/eval/prompts/llm_judge_deepeval_contract.md": {
+      "count": 1,
+      "tokens": 2300,
+      "first_read": "2026-06-29T16:42:14.704Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/eval/prompts/llm_judge_continuous_contract.md": {
+      "count": 1,
+      "tokens": 2200,
+      "first_read": "2026-06-29T16:42:19.254Z"
     }
   },
   "files_written": [
@@ -587,6 +617,36 @@
       "action": "edit",
       "tokens": 138,
       "at": "2026-06-29T16:35:18.136Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java",
+      "action": "edit",
+      "tokens": 142,
+      "at": "2026-06-29T16:47:34.101Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityExtractor.java",
+      "action": "edit",
+      "tokens": 293,
+      "at": "2026-06-29T16:47:44.929Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/synthesis/answer/AnswerSynthesizer.java",
+      "action": "edit",
+      "tokens": 322,
+      "at": "2026-06-29T16:47:55.886Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/docs/PROMPT-AUDIT.md",
+      "action": "create",
+      "tokens": 2115,
+      "at": "2026-06-29T16:48:44.842Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/docs/PROMPT-AUDIT.md",
+      "action": "edit",
+      "tokens": 207,
+      "at": "2026-06-29T16:50:25.640Z"
     }
   ],
   "edit_counts": {
@@ -603,11 +663,15 @@
     "scripts/verify-telemetry-e2e.sh": 1,
     "gateway/src/main/resources/agent-manifest.schema.json": 1,
     "gateway/src/main/java/ai/meridian/gateway/registry/loader/RegistryBootstrapLoader.java": 2,
-    "gateway/src/main/java/ai/meridian/gateway/domain/manifest/DomainManifestStore.java": 4
+    "gateway/src/main/java/ai/meridian/gateway/domain/manifest/DomainManifestStore.java": 4,
+    "gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java": 1,
+    "gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityExtractor.java": 1,
+    "gateway/src/main/java/ai/meridian/gateway/synthesis/answer/AnswerSynthesizer.java": 1,
+    "docs/PROMPT-AUDIT.md": 2
   },
-  "anatomy_hits": 83,
-  "anatomy_misses": 5,
-  "repeated_reads_warned": 40,
+  "anatomy_hits": 88,
+  "anatomy_misses": 6,
+  "repeated_reads_warned": 62,
   "cerebrum_warnings": 0,
-  "stop_count": 13
+  "stop_count": 16
 }

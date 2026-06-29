@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-29T16:35:18.130Z
-> Files: 593 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-29T16:50:25.633Z
+> Files: 594 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/
 
@@ -205,6 +205,7 @@
 - `input-synthesis-deep-spec.md` — Input Synthesis — Deep Spec (the one unproven piece) (~1951 tok)
 - `master-build-plan-consolidated.md` — Enterprise Intelligence Platform — Master Build Plan (Meridian) (~3833 tok)
 - `platform-vision-and-maturity-path.md` — Enterprise Intelligence Platform — Vision & Maturity Path (~1324 tok)
+- `PROMPT-AUDIT.md` — Prompt Contract Audit — every production prompt vs the 9-element framework (~1931 tok)
 - `technical-architecture-clear-boundaries.md` — Technical Architecture — Clear Boundaries (~1990 tok)
 - `WORLD-B-LOCKDOWN.md` — Meridian — World B Architecture Lockdown (~8836 tok)
 
@@ -432,7 +433,7 @@
 ## gateway/src/main/java/ai/meridian/gateway/domain/intent/
 
 - `Intent.java` — Routing label produced by {@link IntentClassifier}. (~186 tok)
-- `IntentClassifier.java` — Stage A of the request pipeline: classifies the user's intent before routing. (~3874 tok)
+- `IntentClassifier.java` — Stage A of the request pipeline: classifies the user's intent before routing. (~3979 tok)
 - `IntentResult.java` — Output of {@link IntentClassifier}. (~310 tok)
 
 ## gateway/src/main/java/ai/meridian/gateway/domain/manifest/
@@ -531,12 +532,12 @@
 
 ## gateway/src/main/java/ai/meridian/gateway/synthesis/answer/
 
-- `AnswerSynthesizer.java` — Synthesizes a grounded, streamed answer from agent outputs using Z.AI GLM. (~6780 tok)
+- `AnswerSynthesizer.java` — Synthesizes a grounded, streamed answer from agent outputs using Z.AI GLM. (~6928 tok)
 
 ## gateway/src/main/java/ai/meridian/gateway/synthesis/input/
 
 - `EntityBag.java` — EntityBag: EntityCandidate, extracted, withResolved, withCandidates (~376 tok)
-- `EntityExtractor.java` — Stage 1 — Extract. (~2699 tok)
+- `EntityExtractor.java` — Stage 1 — Extract. (~2874 tok)
 - `EntityResolver.java` — Service: EntityResolver (~962 tok)
 - `InputSynthesizer.java` — Input synthesis pipeline: Extract → Resolve → Bind. (~496 tok)
 - `InputSynthesizerImpl.java` — Stage 3 — Bind, and orchestrates the full Extract → Resolve → Bind pipeline. (~2225 tok)

@@ -947,3 +947,11 @@
 | 12:34 | Edited gateway/src/main/java/ai/meridian/gateway/domain/manifest/DomainManifestStore.java | modified catch() | ~67 |
 | 12:34 | Edited gateway/src/main/java/ai/meridian/gateway/domain/manifest/DomainManifestStore.java | modified catch() | ~59 |
 | 12:35 | Edited docker-compose.yml | 4→9 lines | ~138 |
+| 12:42 | Session end: 24 writes across 14 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 94 reads | ~171989 tok |
+| 12:44 | Session end: 24 writes across 14 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 94 reads | ~171989 tok |
+| 12:45 | Session end: 24 writes across 14 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 94 reads | ~171989 tok |
+| 12:47 | Edited gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java | 2→7 lines | ~133 |
+| 12:47 | Edited gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityExtractor.java | expanded (+7 lines) | ~274 |
+| 12:47 | Edited gateway/src/main/java/ai/meridian/gateway/synthesis/answer/AnswerSynthesizer.java | modified HIERARCHY() | ~301 |
+| 12:48 | Created docs/PROMPT-AUDIT.md | — | ~1974 |
+| 12:50 | Edited docs/PROMPT-AUDIT.md | 2→2 lines | ~193 |

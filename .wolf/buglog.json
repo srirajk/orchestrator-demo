@@ -1685,6 +1685,38 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-06-29T16:34:13.298Z"
+    },
+    {
+      "id": "bug-105",
+      "timestamp": "2026-06-29T16:47:44.930Z",
+      "error_message": "Significant refactor of ",
+      "file": "gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityExtractor.java",
+      "root_cause": "3 lines replaced/restructured",
+      "fix": "Rewrote 5→12 lines (3 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T16:47:44.930Z"
+    },
+    {
+      "id": "bug-106",
+      "timestamp": "2026-06-29T16:47:55.887Z",
+      "error_message": "Significant refactor of ",
+      "file": "gateway/src/main/java/ai/meridian/gateway/synthesis/answer/AnswerSynthesizer.java",
+      "root_cause": "6 lines replaced/restructured",
+      "fix": "Rewrote 7→13 lines (6 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T16:47:55.887Z"
     }
   ]
 }
