@@ -360,7 +360,10 @@ services:
       IAM_SEED_ENABLED: "true"
       ZAI_API_KEY: ${ZAI_API_KEY:-}
       IAM_POLICY_GENERATION_ENABLED: ${IAM_POLICY_GENERATION_ENABLED:-true}
-      IAM_POLICY_GENERATION_MODEL: ${IAM_POLICY_GENERATION_MODEL:-glm-5.2}
+      # Quality tier: policy drafting is rare + human-approved, so a strong (not max)
+      # model is right. Reconciled to glm-4.6 to match the Java default and the
+      # model-selection guide; override to a stronger model when one is available.
+      IAM_POLICY_GENERATION_MODEL: ${IAM_POLICY_GENERATION_MODEL:-glm-4.6}
       # OAuth2 client registration — must match LibreChat's OPENID_CLIENT_ID/SECRET
       IAM_LIBRECHAT_CLIENT_ID: "meridian-librechat"
       IAM_LIBRECHAT_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-meridian-client-secret-dev}

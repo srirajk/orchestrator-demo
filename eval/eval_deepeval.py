@@ -44,8 +44,11 @@ def configure_judge_model() -> str:
     zai_key = os.getenv("ZAI_API_KEY", "")
     if zai_key:
         os.environ["OPENAI_API_KEY"] = zai_key
-    os.environ["OPENAI_BASE_URL"] = "https://api.z.ai/api/paas/v4"
-    return "glm-4.6"
+    os.environ["OPENAI_BASE_URL"] = os.getenv("MERIDIAN_LLM_JUDGE_BASE_URL", "https://api.z.ai/api/paas/v4")
+    # Release-gate judge = MAX tier. This judge BLOCKS deploys, so use the strongest
+    # available reasoning model (cost is irrelevant offline). Env-overridable per the
+    # model-selection guide (docs/MODEL-SELECTION.md).
+    return os.getenv("DEEPEVAL_JUDGE_MODEL", "glm-4.6")
 
 
 # ── PartialHonestyMetric ──────────────────────────────────────────────────────
