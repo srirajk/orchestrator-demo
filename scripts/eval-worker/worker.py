@@ -40,10 +40,10 @@ GATEWAY_HOST        = os.environ.get("GATEWAY_HOST", "http://gateway:8080")
 ZAI_API_KEY         = os.environ["ZAI_API_KEY"]
 ZAI_BASE_URL        = os.environ.get("ZAI_BASE_URL", "https://api.z.ai/api/paas/v4")
 ZAI_EVAL_MODEL      = os.environ.get("ZAI_EVAL_MODEL", "glm-4.6")
-POLL_INTERVAL       = int(os.environ.get("EVAL_POLL_INTERVAL_SECONDS", "60"))
+POLL_INTERVAL       = int(os.environ.get("EVAL_POLL_INTERVAL_SECONDS", "300"))
 USER_MGMT_HOST      = os.environ.get("USER_MGMT_HOST", "http://user-mgmt:8084")
 EVAL_USER_ID        = "rm_jane"
-EVAL_USER_PASS      = "rm_jane"
+EVAL_USER_PASS      = os.environ.get("EVAL_USER_PASS", "Meridian@2024")
 
 _cached_token: str | None = None
 _token_expiry: float = 0.0
@@ -56,13 +56,16 @@ def get_bearer_token() -> str:
     try:
         resp = httpx.post(
             f"{USER_MGMT_HOST}/auth/token",
-            json={"user_id": EVAL_USER_ID},
+            json={"username": EVAL_USER_ID, "password": EVAL_USER_PASS},
             timeout=10,
         )
+        resp.raise_for_status()
         data = resp.json()
-        _cached_token = data["access_token"]
-        _token_expiry = time.time() + data.get("expires_in", 3600)
-        log.info("Fetched JWT for %s (expires in %ds)", EVAL_USER_ID, data.get("expires_in", 3600))
+        # IAM service returns camelCase "accessToken"
+        _cached_token = data["accessToken"]
+        expires_in = data.get("expiresIn", data.get("expires_in", 3600))
+        _token_expiry = time.time() + expires_in
+        log.info("Fetched JWT for %s (expires in %ds)", EVAL_USER_ID, expires_in)
         return _cached_token
     except Exception as e:
         log.warning("Failed to fetch JWT: %s — proceeding without auth", e)

@@ -595,7 +595,7 @@ services:
       ZAI_API_KEY: ${ZAI_API_KEY}
       ZAI_BASE_URL: ${ZAI_BASE_URL:-https://api.z.ai/api/paas/v4}
       ZAI_EVAL_MODEL: ${ZAI_EVAL_MODEL:-glm-4.5-flash}
-      EVAL_POLL_INTERVAL_SECONDS: ${EVAL_POLL_INTERVAL_SECONDS:-60}
+      EVAL_POLL_INTERVAL_SECONDS: ${EVAL_POLL_INTERVAL_SECONDS:-300}
     restart: unless-stopped
 
   # ── k6 load test — Phase 7 only (scale profile) ───────────────────────────────
