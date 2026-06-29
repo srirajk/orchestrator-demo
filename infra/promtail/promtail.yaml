@@ -16,14 +16,20 @@ scrape_configs:
       - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
         target_label: service
     pipeline_stages:
+      # Path 1 — structured (JSON) loggers (e.g. some node services). Non-JSON lines
+      # (like the gateway's plain-text logs) simply skip this stage without dropping.
       - json:
           expressions:
             traceId: traceId
             convId: convId
             userId: userId
             level: level
+      # Path 2 — gateway plain-text logs. Console pattern (application.yml):
+      #   HH:mm:ss.SSS [thread] LEVEL logger [rid=.. cid=.. uid=..] - msg
+      # Extract the MDC ids + level so they're available; only `level` is promoted to
+      # a label (cid/uid are high-cardinality — query them via line filter |= "cid=").
+      - regex:
+          expression: '^\d{2}:\d{2}:\d{2}\.\d{3} \[[^\]]*\] (?P<level>\w+) .*\[rid=(?P<requestId>[^ ]*) cid=(?P<conversationId>[^ ]*) uid=(?P<userId>[^\]]*)\]'
+      # Low-cardinality label only. `container` + `service` are already set via relabel.
       - labels:
-          traceId:
-          convId:
-          userId:
           level:

@@ -1115,3 +1115,21 @@
 | 14:46 | Edited docker-compose.yml | expanded (+34 lines) | ~400 |
 | 14:46 | Session end: 167 writes across 60 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 136 reads | ~268003 tok |
 | 14:47 | World B insurance domain: 2 FastAPI agents + coverage svc + 4 manifests + compose wiring | mock-agents/insurance*, registry/*insurance*, docker-compose.yml | 20/20 coverage tests pass, JSON+compose valid, schema fails only on domain enum (flagged) | ~9000 |
+| 14:48 | Edited gateway/src/main/resources/agent-manifest.schema.json | 4→4 lines | ~94 |
+| 14:49 | Edited registry/agent-manifest.schema.json | 5→5 lines | ~96 |
+| 14:55 | Session end: 169 writes across 60 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 136 reads | ~269272 tok |
+| 14:56 | Edited gateway/src/main/java/ai/meridian/gateway/domain/manifest/DomainManifestStore.java | added 1 condition(s) | ~269 |
+| 14:56 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | added 4 condition(s) | ~658 |
+| 14:56 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | modified CLARIFY() | ~322 |
+| 14:56 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | modified if() | ~307 |
+| 14:57 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | added 1 condition(s) | ~381 |
+| 14:58 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | coverageEntityType() → carriedCoverageEntityType() | ~75 |
+| 14:58 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | coverageEntityType() → carriedCoverageEntityType() | ~65 |
+| 15:02 | Session end: 176 writes across 60 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 137 reads | ~272162 tok |
+| 15:31 | Session end: 176 writes across 60 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 140 reads | ~272965 tok |
+| 15:32 | Edited docker-compose.yml | expanded (+51 lines) | ~512 |
+| 15:32 | Edited docker-compose.yml | 3→4 lines | ~18 |
+| 15:32 | Edited infra/prometheus.yml | 3→7 lines | ~46 |
+| 15:32 | Edited infra/promtail/promtail.yaml | modified pattern() | ~274 |
+| 15:33 | Created infra/grafana/provisioning/dashboards/resource-usage.json | — | ~1597 |
+| 15:33 | wire Loki+Promtail+cAdvisor into compose, prom scrape, resource dashboard | docker-compose.yml, infra/promtail/promtail.yaml, infra/prometheus.yml, infra/grafana/.../resource-usage.json | compose config OK, YAML/JSON valid | ~6k |
