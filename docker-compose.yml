@@ -117,6 +117,10 @@ services:
       # Phase 8: RS256 JWKS endpoint — use direct /oauth2/jwks (no redirect hop)
       MERIDIAN_AUTH_JWKS_URL: http://iam-service:8084/oauth2/jwks
       WEALTH_COVERAGE_URL: http://wealth-coverage:8086
+      # World B: second domain (insurance) onboarded by manifests + services only —
+      # no gateway code change. The insurance domain manifest references these URLs.
+      INSURANCE_HTTP_URL: http://insurance-http:8087
+      INSURANCE_COVERAGE_URL: http://insurance-coverage:8088
       # World B: agent + domain manifests are read from the mounted ./registry volume,
       # NOT baked into the image. Onboard a domain by dropping JSON here + restart.
       MERIDIAN_REGISTRY_LOCATION: file:/registry/
@@ -130,6 +134,10 @@ services:
       cerbos:
         condition: service_healthy
       iam-service:
+        condition: service_healthy
+      insurance-http:
+        condition: service_healthy
+      insurance-coverage:
         condition: service_healthy
       otel-collector:
         condition: service_started
@@ -239,6 +247,40 @@ services:
       PYTHONUNBUFFERED: "1"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8086/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── World B: second domain (Insurance) — onboarded by manifests + services only ──
+
+  insurance-http:
+    build:
+      context: ./mock-agents/insurance
+      dockerfile: Dockerfile
+    container_name: meridian-insurance-http
+    ports:
+      - "8087:8087"
+    environment:
+      PYTHONUNBUFFERED: "1"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8087/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  insurance-coverage:
+    build:
+      context: ./mock-agents/insurance-coverage
+      dockerfile: Dockerfile
+    container_name: insurance-coverage
+    ports:
+      - "8088:8088"
+    environment:
+      PYTHONUNBUFFERED: "1"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8088/health')"]
       interval: 10s
       timeout: 5s
       retries: 5

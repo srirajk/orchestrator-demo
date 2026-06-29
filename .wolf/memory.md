@@ -1063,3 +1063,55 @@
 | 14:14 | Edited gateway/src/main/resources/application.yml | expanded (+8 lines) | ~165 |
 | 14:14 | Edited gateway/src/main/resources/application.yml | 4→7 lines | ~143 |
 | 14:15 | World B steps 6/2/5/9: manifest-driven LLM prompts + clarification/denial copy + deterministic CLARIFY + generic resolve URL | IntentClassifier, AnswerSynthesizer, ChatService, EffectiveManifest, DomainManifestStore, SubDomainManifest, EntityResolver, manifests, application.yml | CRITICAL 43→9, 49/49 tests green | ~45k |
+| 14:20 | Session end: 119 writes across 42 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 127 reads | ~240111 tok |
+| 14:22 | Created gateway/src/main/java/ai/meridian/gateway/domain/session/ConversationSession.java | — | ~1909 |
+| 14:22 | Edited gateway/src/main/java/ai/meridian/gateway/domain/session/ConversationSessionStore.java | 7781() → field() | ~661 |
+| 14:23 | Edited gateway/src/main/java/ai/meridian/gateway/domain/session/ConversationSessionStore.java | added 2 condition(s) | ~298 |
+| 14:23 | Edited gateway/src/main/java/ai/meridian/gateway/domain/session/ConversationSessionStore.java | 5→7 lines | ~92 |
+| 14:23 | Edited gateway/src/main/java/ai/meridian/gateway/domain/session/ConversationSessionStore.java | added 3 condition(s) | ~355 |
+| 14:23 | Edited gateway/src/main/java/ai/meridian/gateway/domain/session/ConversationSessionStore.java | relationshipId() → resolvedEntities() | ~44 |
+| 14:23 | Edited gateway/src/main/java/ai/meridian/gateway/domain/auth/RevocationChecker.java | "relationship_id" → "entity_id" | ~15 |
+| 14:23 | Edited gateway/src/main/java/ai/meridian/gateway/registry/introspection/McpToolIntrospector.java | modified fallbackSchema() | ~183 |
+| 14:24 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | modified coverageEntityType() | ~425 |
+| 14:24 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | 9→5 lines | ~92 |
+| 14:24 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | modified if() | ~233 |
+| 14:24 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | 4→4 lines | ~69 |
+| 14:24 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | added 3 condition(s) | ~198 |
+| 14:24 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | relationshipId() → resolvedEntities() | ~43 |
+| 14:25 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | 4→6 lines | ~120 |
+| 14:25 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | relationshipId() → sessionCoverageEntity() | ~88 |
+| 14:25 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | modified if() | ~148 |
+| 14:25 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | modified buildEntityPrompt() | ~172 |
+| 14:25 | Edited gateway/src/test/java/ai/meridian/gateway/domain/session/ConversationSessionTest.java | modified emptySessionHasNullFields() | ~146 |
+| 14:25 | Edited gateway/src/test/java/ai/meridian/gateway/domain/session/ConversationSessionTest.java | modified withResults_incrementsTurnCount() | ~244 |
+| 14:30 | Edited scripts/verify.sh | expanded (+9 lines) | ~200 |
+| 14:30 | Edited docs/WORLD-B-LOCKDOWN.md | 3→6 lines | ~143 |
+| 14:37 | Session end: 141 writes across 47 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 135 reads | ~253416 tok |
+| 14:42 | Created mock-agents/insurance/__init__.py | — | ~0 |
+| 14:42 | Created mock-agents/insurance/shared/__init__.py | — | ~0 |
+| 14:42 | Created mock-agents/insurance/policy_details/__init__.py | — | ~0 |
+| 14:42 | Created mock-agents/insurance/claim_status/__init__.py | — | ~0 |
+| 14:42 | Created mock-agents/insurance/shared/error_schema.py | — | ~294 |
+| 14:42 | Created mock-agents/insurance/shared/fault_knobs.py | — | ~270 |
+| 14:42 | Created mock-agents/insurance/shared/jwt_verify.py | — | ~1103 |
+| 14:42 | Created mock-agents/insurance/shared/telemetry.py | — | ~1284 |
+| 14:43 | Created mock-agents/insurance/shared/canned_data.py | — | ~995 |
+| 14:43 | Created mock-agents/insurance/policy_details/handler.py | — | ~496 |
+| 14:43 | Created mock-agents/insurance/claim_status/handler.py | — | ~733 |
+| 14:43 | Created mock-agents/insurance/main.py | — | ~846 |
+| 14:43 | Created mock-agents/insurance/requirements.txt | — | ~86 |
+| 14:43 | Created mock-agents/insurance/Dockerfile | — | ~102 |
+| 14:44 | Created mock-agents/insurance-coverage/data.py | — | ~1326 |
+| 14:44 | Created mock-agents/insurance-coverage/main.py | — | ~1078 |
+| 14:44 | Created mock-agents/insurance-coverage/requirements.txt | — | ~30 |
+| 14:44 | Created mock-agents/insurance-coverage/Dockerfile | — | ~59 |
+| 14:44 | Created mock-agents/insurance-coverage/tests/test_coverage.py | — | ~1562 |
+| 14:45 | Created registry/domains/insurance.json | — | ~138 |
+| 14:45 | Created registry/domains/insurance/claims-servicing.json | — | ~664 |
+| 14:45 | Created registry/manifests/acme.insurance.policy_details.json | — | ~470 |
+| 14:45 | Created registry/manifests/acme.insurance.claim_status.json | — | ~461 |
+| 14:45 | Edited docker-compose.yml | 2→6 lines | ~122 |
+| 14:45 | Edited docker-compose.yml | 6→10 lines | ~102 |
+| 14:46 | Edited docker-compose.yml | expanded (+34 lines) | ~400 |
+| 14:46 | Session end: 167 writes across 60 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 136 reads | ~268003 tok |
+| 14:47 | World B insurance domain: 2 FastAPI agents + coverage svc + 4 manifests + compose wiring | mock-agents/insurance*, registry/*insurance*, docker-compose.yml | 20/20 coverage tests pass, JSON+compose valid, schema fails only on domain enum (flagged) | ~9000 |

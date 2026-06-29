@@ -1,0 +1,54 @@
+{
+  "agent_id": "acme.insurance.policy_details",
+  "name": "Insurance Policy Details",
+  "description": "Returns the policy record for a commercial insurance policy: line of business, premium, coverage limit, deductible, status, and effective date. Accepts policy_id as the primary key.",
+  "version": "1.0.0",
+  "provider": {
+    "organization": "Meridian Demo Bank"
+  },
+  "domain": "insurance",
+  "sub_domain": "claims-servicing",
+  "max_response_tokens": 2000,
+  "protocol": "http",
+  "connection": {
+    "openapi_url": "http://insurance-http:8087/openapi.json",
+    "operation_id": "get_policy_details"
+  },
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false
+  },
+  "skills": [
+    {
+      "id": "get_policy_details",
+      "name": "get_policy_details",
+      "description": "Retrieve policy details — line of business, premium, coverage limit, deductible, status, and effective date — for a commercial insurance policy.",
+      "tags": [
+        "policy",
+        "policy-details",
+        "premium",
+        "coverage-limit",
+        "underwriting",
+        "insurance"
+      ],
+      "examples": [
+        "show me the policy details for the Continental Freight policy",
+        "what is the coverage limit for this policy",
+        "what is the premium for POL-77001",
+        "what line of business is this policy",
+        "is this policy active"
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    }
+  ],
+  "constraints": {
+    "is_mutating": false,
+    "data_classification": "confidential-pii",
+    "sla_timeout_ms": 30000
+  }
+}

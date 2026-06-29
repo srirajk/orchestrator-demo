@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-29T18:14:23.505Z
-> Files: 619 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-29T18:46:00.799Z
+> Files: 642 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/
 
@@ -23,7 +23,7 @@
 - `agent-manifest.schema.json` (~1558 tok)
 - `BUILD_REPORT.md` — Build Report — Meridian AI Gateway (~15724 tok)
 - `CLAUDE.md` — OpenWolf (~6447 tok)
-- `docker-compose.yml` — Docker Compose services (~7234 tok)
+- `docker-compose.yml` — Docker Compose services (~7624 tok)
 - `README.md` — Project documentation (~4696 tok)
 - `z.ai-tiers.md` — Declares Model (~778 tok)
 
@@ -255,7 +255,7 @@
 - `platform-vision-and-maturity-path.md` — Enterprise Intelligence Platform — Vision & Maturity Path (~1324 tok)
 - `PROMPT-AUDIT.md` — Prompt Contract Audit — every production prompt vs the 9-element framework (~1931 tok)
 - `technical-architecture-clear-boundaries.md` — Technical Architecture — Clear Boundaries (~1990 tok)
-- `WORLD-B-LOCKDOWN.md` — Meridian — World B Architecture Lockdown (~8836 tok)
+- `WORLD-B-LOCKDOWN.md` — Meridian — World B Architecture Lockdown (~8919 tok)
 
 ## e2e/
 
@@ -465,11 +465,11 @@
 - `Principal.java` — A caller's verified identity + structural attributes used for authorization checks. (~1053 tok)
 - `PrincipalStore.java` — Loads principal attributes from Redis. (~788 tok)
 - `RequestContext.java` — Per-request context stored in a ThreadLocal. (~279 tok)
-- `RevocationChecker.java` — Returns true if the authorization for this principal+relationship has been revoked. (~522 tok)
+- `RevocationChecker.java` — Returns true if the authorization for this principal+relationship has been revoked. (~520 tok)
 
 ## gateway/src/main/java/ai/meridian/gateway/domain/chat/
 
-- `ChatService.java` — Entry point from the controller — called on a virtual thread after the async boundary. (~12713 tok)
+- `ChatService.java` — Entry point from the controller — called on a virtual thread after the async boundary. (~13210 tok)
 
 ## gateway/src/main/java/ai/meridian/gateway/domain/coverage/
 
@@ -496,8 +496,8 @@
 
 ## gateway/src/main/java/ai/meridian/gateway/domain/session/
 
-- `ConversationSession.java` — Snapshot of conversation state persisted per {@code conversation_id} in Redis. (~1408 tok)
-- `ConversationSessionStore.java` — Persists {@link ConversationSession} state in Redis. (~2187 tok)
+- `ConversationSession.java` — Snapshot of conversation state persisted per {@code conversation_id} in Redis. (~1909 tok)
+- `ConversationSessionStore.java` — Persists {@link ConversationSession} state in Redis. (~2863 tok)
 
 ## gateway/src/main/java/ai/meridian/gateway/infrastructure/identity/
 
@@ -555,7 +555,7 @@
 ## gateway/src/main/java/ai/meridian/gateway/registry/introspection/
 
 - `AgentIntrospector.java` — Derives input/output schemas and resolved connection from agent specs. (~2007 tok)
-- `McpToolIntrospector.java` — Fetches tool input schema from an MCP server via SSE + JSON-RPC. (~2830 tok)
+- `McpToolIntrospector.java` — Fetches tool input schema from an MCP server via SSE + JSON-RPC. (~2675 tok)
 
 ## gateway/src/main/java/ai/meridian/gateway/registry/loader/
 
@@ -641,7 +641,7 @@
 
 ## gateway/src/test/java/ai/meridian/gateway/domain/session/
 
-- `ConversationSessionTest.java` — Class: ConversationSessionTest (~578 tok)
+- `ConversationSessionTest.java` — Class: ConversationSessionTest (~766 tok)
 
 ## gateway/src/test/java/ai/meridian/gateway/orchestration/harness/
 
@@ -877,6 +877,43 @@
 - `main.py` — API: GET, POST (2 endpoints) (~601 tok)
 - `requirements.txt` — Python dependencies (~18 tok)
 
+## mock-agents/insurance-coverage/
+
+- `data.py` — discover, check, resolve (~1326 tok)
+- `Dockerfile` — Docker container definition (~59 tok)
+- `main.py` — API: 4 endpoints (~1078 tok)
+- `requirements.txt` — Python dependencies (~28 tok)
+
+## mock-agents/insurance-coverage/tests/
+
+- `test_coverage.py` — TestDiscover: test_uw_sam_sees_his_two_policies, test_uw_dana_sees_zenith, test_unknown_principal_ge (~1562 tok)
+
+## mock-agents/insurance/
+
+- `__init__.py` (~0 tok)
+- `Dockerfile` — Docker container definition (~102 tok)
+- `main.py` — API: 1 endpoints (~846 tok)
+- `requirements.txt` — Python dependencies (~81 tok)
+
+## mock-agents/insurance/claim_status/
+
+- `__init__.py` (~0 tok)
+- `handler.py` — Claim Status agent — GET /claim-status (~733 tok)
+
+## mock-agents/insurance/policy_details/
+
+- `__init__.py` (~0 tok)
+- `handler.py` — Policy Details agent — GET /policy-details (~496 tok)
+
+## mock-agents/insurance/shared/
+
+- `__init__.py` (~0 tok)
+- `canned_data.py` — claims_for_policy (~995 tok)
+- `error_schema.py` — ErrorResponse: error_response (~294 tok)
+- `fault_knobs.py` — fault_knob_middleware (~270 tok)
+- `jwt_verify.py` — verify_bearer_token (~1103 tok)
+- `telemetry.py` — setup_telemetry, agent_span (~1284 tok)
+
 ## mock-agents/servicing/
 
 - `__init__.py` (~0 tok)
@@ -1015,11 +1052,19 @@
 - `PHASE-8.md` — Phase 8 — Identity, Domains & End-to-End Authorization (~1741 tok)
 - `PHASE-9.md` — Next Test Run — Verify Identity, Authorization & Correlation Are *Real* (~2254 tok)
 
+## registry/domains/
+
+- `insurance.json` (~138 tok)
+
 ## registry/domains/asset-servicing/
 
 - `cash-management.json` (~243 tok)
 - `corporate-actions.json` (~281 tok)
 - `custody-operations.json` (~274 tok)
+
+## registry/domains/insurance/
+
+- `claims-servicing.json` (~664 tok)
 
 ## registry/domains/wealth-management/
 
@@ -1027,6 +1072,8 @@
 
 ## registry/manifests/
 
+- `acme.insurance.claim_status.json` (~461 tok)
+- `acme.insurance.policy_details.json` (~470 tok)
 - `acme.servicing.cash_management.json` (~414 tok)
 - `acme.servicing.corporate_actions.json` (~451 tok)
 - `acme.servicing.custody_positions.json` (~427 tok)
@@ -1051,7 +1098,7 @@
 - `seed-users.sh` — seed-users.sh — Idempotently seed demo principals into Redis. (~875 tok)
 - `seed-users.sh` — seed-users.sh — Idempotently seed demo principals into Redis. (~910 tok)
 - `verify-telemetry-e2e.sh` — ───────────────────────────────────────────────────────────────────────────── (~1151 tok)
-- `verify.sh` — Full verification script — runs after each phase to confirm acceptance criteria. (~583 tok)
+- `verify.sh` — Full verification script — runs after each phase to confirm acceptance criteria. (~713 tok)
 - `wait-for-healthy.sh` — Wait until all core docker-compose services report healthy, then exit 0. (~323 tok)
 - `world-b-check.sh` — ───────────────────────────────────────────────────────────────────────────── (~1272 tok)
 
@@ -1107,3 +1154,25 @@
 ## user-mgmt/tests/
 
 - `test_user_mgmt.py` — Tests: jwks_has_correct_structure, jwks_e_is_65537, jwks_n_length, issue_token_returns_rs256_jwt + 20 more (~7203 tok)
+
+## mock-agents/insurance/ (World B — second domain, FastAPI, port 8087)
+
+- `main.py` — Insurance HTTP service; mounts policy_details + claim_status routers, JWT + fault-knob middleware, /health, OTel. (~0.4k tok)
+- `shared/canned_data.py` — POLICIES (POL-77001 Continental Freight, POL-77002 Aurora, POL-88003 Zenith) + CLAIMS (CLM-5501, CLM-5502); claims_for_policy(). (~0.6k tok)
+- `shared/{error_schema,fault_knobs,jwt_verify,telemetry}.py` — Meridian agent-contract shared modules (copied/adapted from wealth). (~1.5k tok)
+- `policy_details/handler.py` — GET /policy-details?policy_id (operation_id get_policy_details); returns canned policy JSON. (~0.3k tok)
+- `claim_status/handler.py` — GET /claim-status?claim_id|policy_id (operation_id get_claim_status); multi-entity. (~0.4k tok)
+- `Dockerfile`, `requirements.txt` — python:3.12-slim, no openai-agents (deterministic mock, no in-agent LLM).
+
+## mock-agents/insurance-coverage/ (World B — DISCOVER/CHECK/RESOLVE, port 8088)
+
+- `main.py` — coverage endpoints (discover/check/resolve, principal-agnostic resolve). (~0.5k tok)
+- `data.py` — POLICIES + BOOKS (uw_sam={POL-77001,POL-77002}; POL-88003 owned by uw_dana = denial case). (~0.6k tok)
+- `tests/test_coverage.py` — 20 tests (discover/check/resolve, uw_sam allowed, Zenith denied). (~1.3k tok)
+- `Dockerfile`, `requirements.txt`.
+
+## registry — insurance manifests (World B onboarding artifacts)
+
+- `domains/insurance.json` — coverage block (${INSURANCE_COVERAGE_URL}) + memory_compaction (policy_id/claim_id/domain).
+- `domains/insurance/claims-servicing.json` — resource_scoped sub-domain; entity_types policy_id(req)/claim_id(opt)/period; clarification + messages.
+- `manifests/acme.insurance.{policy_details,claim_status}.json` — http agent manifests, domain "insurance" (NOTE: fails bundled schema enum — see BUILD flag).
