@@ -4,6 +4,11 @@ import ai.meridian.gateway.orchestration.harness.AgentHarness;
 import ai.meridian.gateway.orchestration.model.NodeResult;
 import ai.meridian.gateway.orchestration.model.Plan;
 import ai.meridian.gateway.orchestration.model.PlanNode;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.context.Scope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,12 +33,15 @@ public class FlatPlanExecutor {
     private static final Logger log = LoggerFactory.getLogger(FlatPlanExecutor.class);
 
     private final AgentHarness harness;
+    private final Tracer tracer;
     private final long overallDeadlineMs;
 
     public FlatPlanExecutor(
             AgentHarness harness,
+            Tracer tracer,
             @Value("${meridian.orchestration.fan-out-deadline-ms:60000}") long overallDeadlineMs) {
         this.harness = harness;
+        this.tracer = tracer;
         this.overallDeadlineMs = overallDeadlineMs;
     }
 
@@ -55,11 +63,36 @@ public class FlatPlanExecutor {
         // One virtual thread per node — no pool starvation under load.
         var exec = Executors.newVirtualThreadPerTaskExecutor();
 
+        // Capture the request's OTel context on the calling thread (where the
+        // `chat.handle` span is current). CompletableFuture.supplyAsync does NOT
+        // propagate OTel context into the worker threads, so we carry it manually:
+        // each per-agent span is parented to this context, and made current inside
+        // the VT so the outbound traceparent nests the agent's own (Python) span.
+        final Context parentContext = Context.current();
+
         List<CompletableFuture<NodeResult>> futures = plan.nodes().stream()
                 .map(node -> CompletableFuture.supplyAsync(() -> {
                     log.debug("Executing node {} (agent={}, protocol={})",
                             node.nodeId(), node.agent().agentId(), node.agent().protocol());
-                    return harness.execute(node, exec);
+                    // One `agent.invoke` span per node — completes the trace tree:
+                    // request → agent.invoke → (downstream agent span via traceparent).
+                    Span span = tracer.spanBuilder("agent.invoke")
+                            .setParent(parentContext)
+                            .startSpan();
+                    span.setAttribute("openinference.span.kind", "AGENT");
+                    span.setAttribute("agent.id", node.agent().agentId());
+                    span.setAttribute("agent.protocol", node.agent().protocol());
+                    try (Scope ignored = span.makeCurrent()) {
+                        NodeResult result = harness.execute(node, exec);
+                        span.setAttribute("agent.status", result.status().name());
+                        span.setAttribute("agent.latency_ms", result.latencyMs());
+                        if (!result.isOk()) {
+                            span.setStatus(StatusCode.ERROR, result.status().name());
+                        }
+                        return result;
+                    } finally {
+                        span.end();
+                    }
                 }, exec))
                 .toList();
 

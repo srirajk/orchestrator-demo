@@ -188,6 +188,17 @@ public class ChatService {
         rootSpan.setAttribute("user.id", userId != null ? userId : "anonymous");
         rootSpan.setAttribute("meridian.request.id", requestId);
 
+        // ── Langfuse session/trace mapping ──────────────────────────────────────
+        // Langfuse's OTLP ingestion reads the `langfuse.*` span attributes. Mapping
+        // the conversationId to langfuse.session.id makes every turn of a conversation
+        // group under ONE Langfuse session, with each turn its own trace. This is the
+        // conversationId → many-traces hierarchy: session = conversation, trace = turn,
+        // observations = the stage/agent spans below. user.id ties traces to the principal.
+        rootSpan.setAttribute("langfuse.session.id", conversationId);
+        rootSpan.setAttribute("langfuse.user.id", userId != null ? userId : "anonymous");
+        rootSpan.setAttribute("langfuse.trace.name", "chat-turn");
+        rootSpan.setAttribute("langfuse.trace.input", latestPrompt);
+
         // ── W3C Baggage: propagates outward on every downstream HTTP call ─────
         String effectiveUserId = userId != null ? userId : "anonymous";
         Baggage baggage = Baggage.current().toBuilder()
