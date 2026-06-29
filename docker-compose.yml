@@ -719,14 +719,16 @@ services:
       LANGFUSE_SECRET_KEY: ${LANGFUSE_PROJECT_SECRET_KEY:-sk-lf-meridian-secret}
       LANGFUSE_HOST: http://langfuse:3000
       ZAI_API_KEY: ${ZAI_API_KEY}
-      JUDGE_MODEL: ${ZAI_EVAL_MODEL:-glm-4.5-flash}
-      # Async/background judge stays on GLM (cheap) but funnels its calls under the plan's
-      # rate limit: pace between calls + exponential backoff on 429. Override JUDGE_BASE_URL/
-      # JUDGE_API_KEY to point at OpenAI if ever needed.
-      JUDGE_BASE_URL: ${JUDGE_BASE_URL:-https://api.z.ai/api/paas/v4}
-      JUDGE_API_KEY: ${JUDGE_API_KEY:-${ZAI_API_KEY}}
-      EVAL_JUDGE_THROTTLE_MS: ${EVAL_JUDGE_THROTTLE_MS:-1500}
-      EVAL_JUDGE_MAX_RETRIES: ${EVAL_JUDGE_MAX_RETRIES:-5}
+      # Async/background judge. It is sequential + low-volume (a handful of calls per
+      # interval) — NOT concurrent load — so it runs on OpenAI for reliable structured
+      # output. The funnel (throttle + exponential backoff) is retained for whichever
+      # provider is set. To run it on GLM instead, point JUDGE_* at the Z.AI values.
+      JUDGE_BASE_URL: ${JUDGE_BASE_URL:-https://api.openai.com/v1}
+      JUDGE_API_KEY: ${JUDGE_API_KEY:-${MERIDIAN_LLM_SYNTHESIZER_API_KEY}}
+      JUDGE_MODEL: ${JUDGE_MODEL:-gpt-4o-mini}
+      EVAL_TRACE_NAME: ${EVAL_TRACE_NAME:-chat-turn}
+      EVAL_JUDGE_THROTTLE_MS: ${EVAL_JUDGE_THROTTLE_MS:-300}
+      EVAL_JUDGE_MAX_RETRIES: ${EVAL_JUDGE_MAX_RETRIES:-4}
       EVAL_INTERVAL_SECONDS: ${EVAL_INTERVAL_SECONDS:-300}
       EVAL_LOOKBACK_HOURS: ${EVAL_LOOKBACK_HOURS:-24}
       EVAL_TRACE_LIMIT: ${EVAL_TRACE_LIMIT:-50}
