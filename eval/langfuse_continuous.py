@@ -26,6 +26,7 @@ import json
 import logging
 import os
 import re
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -43,9 +44,19 @@ LANGFUSE_PUBLIC_KEY: str = os.environ.get("LANGFUSE_PUBLIC_KEY", "")
 LANGFUSE_SECRET_KEY: str = os.environ.get("LANGFUSE_SECRET_KEY", "")
 LANGFUSE_HOST: str = os.environ.get("LANGFUSE_HOST", "http://localhost:3000")
 
-ZAI_API_KEY: str = os.environ.get("ZAI_API_KEY", "")
-ZAI_BASE_URL: str = "https://api.z.ai/api/paas/v4"
+# The continuous judge is ASYNC/background — it never gates a request, so it can stay on
+# GLM (cheaper) and "funnel" its calls under the plan's rate limit rather than switch to a
+# concurrency-grade provider. Base URL/key are still overridable for flexibility.
+JUDGE_BASE_URL: str = os.environ.get("JUDGE_BASE_URL", "https://api.z.ai/api/paas/v4")
+JUDGE_API_KEY: str = os.environ.get("JUDGE_API_KEY", os.environ.get("ZAI_API_KEY", ""))
 JUDGE_MODEL: str = os.environ.get("JUDGE_MODEL", "glm-4.6")
+# Rate-limit funneling: pace + back off so GLM 429s don't poison scores. Latency is irrelevant
+# for async scoring, so waiting is free.
+JUDGE_THROTTLE_MS: int = int(os.environ.get("EVAL_JUDGE_THROTTLE_MS", "1200"))
+JUDGE_MAX_RETRIES: int = int(os.environ.get("EVAL_JUDGE_MAX_RETRIES", "4"))
+# Back-compat aliases (older code/log lines referenced these names).
+ZAI_API_KEY: str = JUDGE_API_KEY
+ZAI_BASE_URL: str = JUDGE_BASE_URL
 
 EVAL_LOOKBACK_HOURS: int = int(os.environ.get("EVAL_LOOKBACK_HOURS", "24"))
 EVAL_TRACE_LIMIT: int = int(os.environ.get("EVAL_TRACE_LIMIT", "50"))
@@ -235,25 +246,37 @@ def llm_judge(user_question: str, ai_answer: str) -> dict:
 
     user_message = f"USER_QUESTION: {user_question}\n\nAI_ANSWER: {ai_answer}"
 
-    try:
-        with httpx.Client(timeout=30.0) as client:
-            resp = client.post(
-                f"{ZAI_BASE_URL}/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {ZAI_API_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": JUDGE_MODEL,
-                    "messages": [
-                        {"role": "system", "content": CONTINUOUS_JUDGE_SYSTEM_PROMPT},
-                        {"role": "user", "content": user_message},
-                    ],
-                    "temperature": 0.0,
-                    "max_tokens": 300,
-                    "response_format": {"type": "json_object"},
-                },
-            )
+    # Funnel under the rate limit: retry 429s (and transient 5xx) with exponential backoff.
+    # This is async/background scoring, so waiting is free — never poison scores with a 0.5
+    # fallback when the cause is merely a transient rate limit.
+    last_err = "unknown error"
+    for attempt in range(JUDGE_MAX_RETRIES):
+        try:
+            with httpx.Client(timeout=30.0) as client:
+                resp = client.post(
+                    f"{JUDGE_BASE_URL}/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {JUDGE_API_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": JUDGE_MODEL,
+                        "messages": [
+                            {"role": "system", "content": CONTINUOUS_JUDGE_SYSTEM_PROMPT},
+                            {"role": "user", "content": user_message},
+                        ],
+                        "temperature": 0.0,
+                        "max_tokens": 300,
+                        "response_format": {"type": "json_object"},
+                    },
+                )
+            if resp.status_code == 429 or resp.status_code >= 500:
+                last_err = f"HTTP {resp.status_code}"
+                wait = (2 ** attempt) * (JUDGE_THROTTLE_MS / 1000.0)
+                logger.warning("Judge rate-limited/transient (%s, attempt %d/%d) — backing off %.1fs",
+                               last_err, attempt + 1, JUDGE_MAX_RETRIES, wait)
+                time.sleep(wait)
+                continue
             resp.raise_for_status()
             raw_content = resp.json()["choices"][0]["message"]["content"]
             result = json.loads(raw_content)
@@ -266,14 +289,20 @@ def llm_judge(user_question: str, ai_answer: str) -> dict:
             result["relevance"] = max(0.0, min(1.0, float(result["relevance"])))
             result["safety"] = max(0.0, min(1.0, float(result["safety"])))
             return result
-    except Exception as exc:
-        logger.error("LLM judge call failed: %s", exc)
-        return {
-            "relevance": 0.5,
-            "safety": 0.5,
-            "relevance_reason": f"Judge error: {exc}",
-            "safety_reason": f"Judge error: {exc}",
-        }
+        except Exception as exc:
+            last_err = str(exc)
+            wait = (2 ** attempt) * (JUDGE_THROTTLE_MS / 1000.0)
+            logger.warning("Judge call error (attempt %d/%d): %s — retry in %.1fs",
+                           attempt + 1, JUDGE_MAX_RETRIES, exc, wait)
+            time.sleep(wait)
+
+    logger.error("LLM judge exhausted %d retries: %s", JUDGE_MAX_RETRIES, last_err)
+    return {
+        "relevance": 0.5,
+        "safety": 0.5,
+        "relevance_reason": f"Judge error after retries: {last_err}",
+        "safety_reason": f"Judge error after retries: {last_err}",
+    }
 
 
 # ── Trace data extraction ──────────────────────────────────────────────────────
@@ -476,6 +505,11 @@ def run_continuous_eval() -> None:
             relevance_score,
             safety_score,
         )
+
+        # Funnel: pace judge calls so a rate-limited plan (e.g. GLM) doesn't 429.
+        # Async/background scoring — the wait costs nothing.
+        if JUDGE_THROTTLE_MS > 0:
+            time.sleep(JUDGE_THROTTLE_MS / 1000.0)
 
         summary.append(
             {
