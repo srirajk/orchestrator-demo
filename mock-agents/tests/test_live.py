@@ -715,25 +715,33 @@ class TestLiveCerbos:
         )
 
     @needs_cerbos
-    def test_rm_jane_denied_okafor(self):
-        """REL-00188 is NOT in rm_jane's book → DENY."""
+    def test_rm_jane_okafor_structural_allow(self):
+        """WORLD-B three-layer authz: Cerbos is the STRUCTURAL gate — the
+        relationship_manager role may read relationship resources, so REL-00188
+        returns ALLOW at the PDP. The book-of-business (Okafor is NOT in rm_jane's
+        book) is enforced DOWNSTREAM by the wealth-coverage service, never by Cerbos
+        (the principal no longer carries a book). The end-to-end denial is verified by
+        TestLiveSecurityEndToEnd::test_out_of_book_relationship_denied_via_gateway."""
         result = self._check("rm_jane", ["relationship_manager"], [REL_IN_BOOK],
                              [self._rel_resource(REL_OUT_BOOK)])
         actions = result["results"][0]["actions"]
-        assert actions["read"] == "EFFECT_DENY", (
-            f"rm_jane should be DENIED on REL-00188 (out of book), got: {actions}"
+        assert actions["read"] == "EFFECT_ALLOW", (
+            f"Cerbos structural gate should ALLOW the relationship_manager role; "
+            f"book-deny is enforced at the coverage service, got: {actions}"
         )
 
     @needs_cerbos
-    def test_batch_allow_and_deny(self):
-        """Single PDP call returns allow for in-book and deny for out-of-book."""
+    def test_batch_structural_allow_for_role(self):
+        """Single PDP call: the relationship_manager role is structurally ALLOWed on
+        every relationship resource (in-book and out-of-book alike). Book enforcement
+        is the coverage service's job in the WORLD-B model — not Cerbos."""
         result = self._check("rm_jane", ["relationship_manager"], [REL_IN_BOOK], [
             self._rel_resource(REL_IN_BOOK),
             self._rel_resource(REL_OUT_BOOK),
         ])
         by_id = {r["resource"]["id"]: r["actions"] for r in result["results"]}
         assert by_id[REL_IN_BOOK]["read"] == "EFFECT_ALLOW"
-        assert by_id[REL_OUT_BOOK]["read"] == "EFFECT_DENY"
+        assert by_id[REL_OUT_BOOK]["read"] == "EFFECT_ALLOW"
 
     @needs_cerbos
     def test_platform_admin_unrestricted(self):
@@ -746,13 +754,16 @@ class TestLiveCerbos:
         )
 
     @needs_cerbos
-    def test_empty_book_denies_all(self):
-        """An RM with an empty book is denied every relationship."""
+    def test_structural_role_gate_independent_of_book(self):
+        """WORLD-B: Cerbos structurally ALLOWs a relationship_manager regardless of book
+        contents (even an empty book) — the data-aware book check moved OUT of Cerbos to
+        the coverage service. So an RM with an empty book is ALLOWed at the PDP and denied
+        downstream by coverage when the relationship isn't covered."""
         result = self._check("rm_new", ["relationship_manager"], [],
                              [self._rel_resource(REL_IN_BOOK)])
         actions = result["results"][0]["actions"]
-        assert actions["read"] == "EFFECT_DENY", (
-            f"RM with empty book should be denied, got: {actions}"
+        assert actions["read"] == "EFFECT_ALLOW", (
+            f"Cerbos structural gate is book-independent; coverage enforces the book, got: {actions}"
         )
 
     @needs_cerbos
