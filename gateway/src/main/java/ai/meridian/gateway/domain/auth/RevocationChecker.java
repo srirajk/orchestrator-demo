@@ -35,7 +35,7 @@ public class RevocationChecker {
                 log.warn("Revocation detected: userId={} relationshipId={}", userId, relationshipId);
                 Counter.builder("meridian.authz.revocations")
                     .description("Revocations detected from revocation overlay")
-                    .tag("relationship_id", relationshipId)
+                    .tag("entity_id", relationshipId)
                     .register(meterRegistry)
                     .increment();
             }

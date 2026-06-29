@@ -11,16 +11,16 @@ import redis.clients.jedis.JedisPooled;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Persists {@link ConversationSession} state in Redis.
  *
  * <p>Storage layout — Redis Hash keyed by {@code session:{conversationId}}:
  * <pre>
- *   relationship_id           REL-00042
- *   fund_id                   FND-7781          (may be absent)
- *   client_name               "Whitman Capital"  (may be absent)
- *   time_period               "Q1 2025"          (may be absent)
+ *   resolved_entities         {JSON map}          (entity-key → resolved id; may be absent)
+ *   client_name               "..."               (may be absent)
+ *   time_period               "Q1 2025"           (may be absent)
  *   domain                    "wealth"            (may be absent)
  *   agent_results             {JSON array}        (may be absent)
  *   agent_results_ts          1782309000000       (epoch ms)
@@ -30,6 +30,12 @@ import java.util.Map;
  *   deferred_clarifications   {JSON map}          (may be absent)
  * </pre>
  *
+ * <p><b>World B:</b> resolved entities live inside the generic {@code resolved_entities}
+ * sub-map keyed by manifest entity-type key — the gateway never writes a per-entity Redis
+ * field literal. The load path also folds any legacy top-level field (older sessions wrote
+ * each entity as its own hash field) into the map by its data key, so live sessions written
+ * before this refactor keep carrying forward.
+ *
  * <p>Each key has a configurable TTL (default 30 minutes) reset on every write so idle
  * sessions expire automatically.
  */
@@ -38,6 +44,17 @@ public class ConversationSessionStore {
 
     private static final Logger log = LoggerFactory.getLogger(ConversationSessionStore.class);
     private static final String KEY_PREFIX = "session:";
+    private static final String RESOLVED_ENTITIES_FIELD = "resolved_entities";
+
+    /**
+     * Top-level hash fields the store owns. Any OTHER top-level field is treated as a legacy
+     * per-entity field (written by a pre-refactor build) and folded into resolvedEntities by
+     * its key — no entity-field literal is hardcoded here.
+     */
+    private static final Set<String> RESERVED_FIELDS = Set.of(
+            RESOLVED_ENTITIES_FIELD, "client_name", "time_period", "domain",
+            "agent_results", "agent_results_ts", "turn_count",
+            "domain_workflow_state", "authorization_cache", "deferred_clarifications");
 
     private static final TypeReference<List<NodeResult>>    NODE_RESULT_LIST = new TypeReference<>() {};
     private static final TypeReference<Map<String, String>> STRING_MAP       = new TypeReference<>() {};
@@ -64,8 +81,20 @@ public class ConversationSessionStore {
                 return ConversationSession.empty(conversationId);
             }
 
-            String relId      = fields.get("relationship_id");
-            String fundId     = fields.get("fund_id");
+            // Resolved entities: read the generic sub-map, then fold in any legacy top-level
+            // entity fields (older sessions) by their data key for backward compatibility.
+            Map<String, String> resolvedEntities = new java.util.LinkedHashMap<>();
+            String reJson = fields.get(RESOLVED_ENTITIES_FIELD);
+            if (reJson != null && !reJson.isBlank()) {
+                resolvedEntities.putAll(mapper.readValue(reJson, STRING_MAP));
+            }
+            for (Map.Entry<String, String> e : fields.entrySet()) {
+                if (!RESERVED_FIELDS.contains(e.getKey())
+                        && e.getValue() != null && !e.getValue().isBlank()) {
+                    resolvedEntities.putIfAbsent(e.getKey(), e.getValue());
+                }
+            }
+
             String clientName = fields.get("client_name");
             String timePeriod = fields.get("time_period");
             String domain     = fields.get("domain");
@@ -97,7 +126,9 @@ public class ConversationSessionStore {
             }
 
             return new ConversationSession(
-                    conversationId, relId, fundId, clientName, timePeriod, domain,
+                    conversationId,
+                    resolvedEntities.isEmpty() ? null : resolvedEntities,
+                    clientName, timePeriod, domain,
                     results, ts, turns,
                     domainWorkflowState, authorizationCache, deferredClarifications
             );
@@ -117,10 +148,25 @@ public class ConversationSessionStore {
         try {
             Map<String, String> fields = new java.util.LinkedHashMap<>();
 
+            // Purge any legacy per-entity top-level fields written by a pre-refactor build so
+            // they cannot shadow or stale-carry against the generic resolved_entities sub-map.
+            Set<String> existing = jedis.hkeys(key);
+            if (existing != null) {
+                for (String f : existing) {
+                    if (!RESERVED_FIELDS.contains(f)) jedis.hdel(key, f);
+                }
+            }
+
+            // Resolved entities → one generic JSON sub-map (no per-entity field literal).
+            Map<String, String> resolvedEntities = session.resolvedEntities();
+            if (resolvedEntities != null && !resolvedEntities.isEmpty()) {
+                fields.put(RESOLVED_ENTITIES_FIELD, mapper.writeValueAsString(resolvedEntities));
+            } else {
+                jedis.hdel(key, RESOLVED_ENTITIES_FIELD);
+            }
+
             // Always write all fields — for null values, delete the Redis field so stale
             // data from a prior turn cannot carry forward.
-            putOrDelete(fields, key, "relationship_id", session.relationshipId());
-            putOrDelete(fields, key, "fund_id",          session.fundId());
             putOrDelete(fields, key, "client_name",      session.clientName());
             putOrDelete(fields, key, "time_period",      session.timePeriod());
             putOrDelete(fields, key, "domain",            session.domain());
@@ -156,8 +202,8 @@ public class ConversationSessionStore {
                 jedis.hset(key, fields);
             }
             jedis.expire(key, sessionTtlSeconds);
-            log.debug("SessionStore.save: {} relId={} turns={}",
-                    session.conversationId(), session.relationshipId(), session.turnCount());
+            log.debug("SessionStore.save: {} entities={} turns={}",
+                    session.conversationId(), session.resolvedEntities(), session.turnCount());
         } catch (Exception e) {
             log.warn("SessionStore.save failed for {}: {}", session.conversationId(), e.getMessage());
         }

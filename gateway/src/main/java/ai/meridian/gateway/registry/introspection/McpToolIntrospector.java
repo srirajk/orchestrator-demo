@@ -215,18 +215,17 @@ public class McpToolIntrospector {
                 : serverUrl.substring(0, serverUrl.lastIndexOf('/') + 1) + sessionPath;
     }
 
+    /**
+     * Domain-neutral fallback used only when an MCP server returns no usable inputSchema.
+     * The gateway holds no domain knowledge, so it cannot invent the tool's field names here
+     * (World B). It returns a permissive empty-properties object schema; binding then relies on
+     * the manifest's declared entity types rather than a gateway-hardcoded shape.
+     */
     private JsonNode fallbackSchema(String toolName) {
+        log.debug("Using domain-neutral fallback schema for MCP tool '{}'", toolName);
         ObjectNode schema = mapper.createObjectNode();
         schema.put("type", "object");
-        ObjectNode props = schema.putObject("properties");
-
-        if ("get_nav".equals(toolName)) {
-            props.putObject("fund_id").put("type", "string");
-            schema.putArray("required").add("fund_id");
-        } else {
-            props.putObject("relationship_id").put("type", "string");
-            schema.putArray("required").add("relationship_id");
-        }
+        schema.putObject("properties");
         return schema;
     }
 }

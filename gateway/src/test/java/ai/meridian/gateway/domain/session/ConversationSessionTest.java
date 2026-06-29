@@ -2,6 +2,8 @@ package ai.meridian.gateway.domain.session;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ConversationSessionTest {
@@ -10,7 +12,8 @@ class ConversationSessionTest {
     void emptySessionHasNullFields() {
         var s = ConversationSession.empty("conv-123");
         assertThat(s.conversationId()).isEqualTo("conv-123");
-        assertThat(s.relationshipId()).isNull();
+        assertThat(s.resolvedEntities()).isNull();
+        assertThat(s.resolvedEntity("relationship_id")).isNull();
         assertThat(s.domainWorkflowState()).isNull();
         assertThat(s.authorizationCache()).isNull();
     }
@@ -37,9 +40,20 @@ class ConversationSessionTest {
     @Test
     void withResults_incrementsTurnCount() {
         var s = ConversationSession.empty("conv-123");
-        var updated = s.withResults("REL-00042", null, null);
+        var updated = s.withResults(Map.of("relationship_id", "REL-00042"), null);
         assertThat(updated.turnCount()).isEqualTo(1);
-        assertThat(updated.relationshipId()).isEqualTo("REL-00042");
+        assertThat(updated.resolvedEntity("relationship_id")).isEqualTo("REL-00042");
+    }
+
+    @Test
+    void withResults_carriesForwardPriorEntitiesWhenAbsent() {
+        var s = ConversationSession.empty("conv-123")
+            .withResults(Map.of("relationship_id", "REL-00042"), null);
+        // A later turn that resolves only a secondary entity must not drop the prior one.
+        var next = s.withResults(Map.of("fund_id", "FND-7781"), null);
+        assertThat(next.resolvedEntity("relationship_id")).isEqualTo("REL-00042");
+        assertThat(next.resolvedEntity("fund_id")).isEqualTo("FND-7781");
+        assertThat(next.turnCount()).isEqualTo(2);
     }
 
     @Test

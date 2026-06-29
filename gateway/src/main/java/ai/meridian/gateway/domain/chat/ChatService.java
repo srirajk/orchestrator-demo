@@ -237,8 +237,8 @@ public class ChatService {
                             intentResult.confidence(), intentResult.reasoning())));
 
             ConversationSession session = sessionStore.load(conversationId);
-            log.debug("Session: conversationId={} relId={} turns={}", conversationId,
-                    session.relationshipId(), session.turnCount());
+            log.debug("Session: conversationId={} entities={} turns={}", conversationId,
+                    session.resolvedEntities(), session.turnCount());
 
             // Gap 4: Intercept LibreChat's internal summarization call
             if (isSummarizationRequest(request)) {
@@ -284,15 +284,11 @@ public class ChatService {
         // manifest declaration (sub-domain required_context), NOT a Java rule. The coverage
         // pipeline below clarifies when this required resolvable entity is unresolved — that is
         // the generic `required ∩ resolved = ∅ → CLARIFY` check, manifest-declared.
-        java.util.List<String> requiredKeys = manifestStore.requiredContextKeys();
-        EntityType coverageEntity = manifestStore.entityTypes().stream()
-                .filter(EntityType::isResolvable)
-                .filter(et -> requiredKeys.contains(et.key()))
-                .findFirst().orElse(null);
-        EntityType secondaryEntity = manifestStore.entityTypes().stream()
-                .filter(EntityType::isResolvable)
-                .filter(et -> !requiredKeys.contains(et.key()))
-                .findFirst().orElse(null);
+        EntityType coverageEntity = coverageEntityType();
+        EntityType secondaryEntity = secondaryEntityType();
+        // Session-carried coverage id (resolved in a prior turn), keyed by manifest entity key.
+        String carriedCoverageId = coverageEntity != null
+                ? session.resolvedEntity(coverageEntity.key()) : null;
         try {
             ResolverResult resolved = resolver.resolve(latestPrompt);
 
@@ -362,10 +358,10 @@ public class ChatService {
 
                 if (coverage != null) {
                     try {
-                        if (session.relationshipId() != null) {
+                        if (carriedCoverageId != null) {
                             // Session already carries a verified relationship — just re-check.
                             CoverageCheckResult check = coverageClient.check(
-                                principalId, tenantId, session.relationshipId(), coverage);
+                                principalId, tenantId, carriedCoverageId, coverage);
                             if (!check.allowed()) {
                                 emitRequestOutcome("DENIED");
                                 streamTextAndComplete(emitter, mapDenialReason(check.reason()));
@@ -373,7 +369,7 @@ public class ChatService {
                                     new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
                                 return;
                             }
-                            coverageRelId = session.relationshipId();
+                            coverageRelId = carriedCoverageId;
 
                         } else if (coverageEntity != null && preExtracted != null
                                 && preExtracted.reference(coverageEntity.extractAs()) != null) {
@@ -488,8 +484,8 @@ public class ChatService {
                         // the resolver short-circuits via its id_pattern (no external lookup).
                         effectiveBag = preExtracted.withReference(covExtractAs, coverageRelId);
                     } else if (preExtracted.reference(covExtractAs) == null
-                            && session.relationshipId() != null) {
-                        effectiveBag = preExtracted.withReference(covExtractAs, session.relationshipId());
+                            && carriedCoverageId != null) {
+                        effectiveBag = preExtracted.withReference(covExtractAs, carriedCoverageId);
                     }
                 }
                 synthesis = inputSynthesizer.synthesize(effectiveBag, finalManifests);
@@ -561,7 +557,15 @@ public class ChatService {
 
             // Prefer the coverage-verified relationship ID over the synthesis-extracted one.
             String finalRelId = coverageRelId != null ? coverageRelId : extractResolvedId(synthesis, coverageEntity);
-            sessionStore.save(session.withResults(finalRelId, extractResolvedId(synthesis, secondaryEntity), results));
+            Map<String, String> resolvedEntities = new java.util.HashMap<>();
+            if (coverageEntity != null && finalRelId != null) {
+                resolvedEntities.put(coverageEntity.key(), finalRelId);
+            }
+            if (secondaryEntity != null) {
+                String secId = extractResolvedId(synthesis, secondaryEntity);
+                if (secId != null) resolvedEntities.put(secondaryEntity.key(), secId);
+            }
+            sessionStore.save(session.withResults(resolvedEntities, results));
 
             tracePublisher.publish(TraceEvent.of("synthesis_start", requestId,
                     new SynthesisStartData(results.size(), (int) okCount)));
@@ -593,8 +597,10 @@ public class ChatService {
                 emitRequestOutcome("ANSWERED");
                 tracePublisher.publish(TraceEvent.of("request_complete", requestId,
                         new RequestCompleteData(System.currentTimeMillis() - requestStart, total, (int) ok)));
-            } else if (session.relationshipId() != null) {
-                String enriched = latestPrompt + " [session_relationship_id: " + session.relationshipId() + "]";
+            } else if (sessionCoverageEntity(session) != null) {
+                EntityType cov = coverageEntityType();
+                String enriched = latestPrompt + " [session_" + cov.key() + ": "
+                        + session.resolvedEntity(cov.key()) + "]";
                 handleFetchData(request, emitter, enriched, conversationId, session, userId, jwtPrincipal, requestId, requestStart, rootSpan, null, streamId);
                 return;
             } else {
@@ -612,10 +618,11 @@ public class ChatService {
         Principal principal = (jwtPrincipal != null) ? jwtPrincipal : principalStore.load(userId);
 
         String message;
-        if (session.relationshipId() != null) {
+        String covId = sessionCoverageEntity(session);
+        if (covId != null) {
             message = msg("followup_clarification",
                     "Could you clarify what you'd like to know about {entity}? Please add more detail.")
-                    .replace("{entity}", session.relationshipId());
+                    .replace("{entity}", covId);
         } else {
             message = msg("missing_entity_question",
                     "Which resource are you asking about? Please provide its identifier to continue.");
@@ -638,8 +645,12 @@ public class ChatService {
                                       String requestId, long requestStart, String streamId) throws Exception {
         StringBuilder summary = new StringBuilder();
         summary.append("Conversation summary:\n");
-        if (session.relationshipId() != null) {
-            summary.append("- Relationship: ").append(session.relationshipId());
+        String covId = sessionCoverageEntity(session);
+        if (covId != null) {
+            EntityType cov = coverageEntityType();
+            String label = (cov != null && cov.display() != null && !cov.display().isBlank())
+                    ? cov.display() : "Entity";
+            summary.append("- ").append(label).append(": ").append(covId);
             if (session.clientName() != null) summary.append(" (").append(session.clientName()).append(")");
             summary.append("\n");
         }
@@ -716,13 +727,43 @@ public class ChatService {
     }
 
     private String buildEntityPrompt(String latestPrompt, ConversationSession session) {
-        if (session.relationshipId() == null && session.fundId() == null) return latestPrompt;
+        if (!session.hasResolvedEntities()) return latestPrompt;
         StringBuilder sb = new StringBuilder(latestPrompt);
-        if (session.relationshipId() != null)
-            sb.append(" [session_relationship_id: ").append(session.relationshipId()).append("]");
-        if (session.fundId() != null)
-            sb.append(" [session_fund_id: ").append(session.fundId()).append("]");
+        // Emit one [session_<entityKey>: <id>] hint per carried entity. The token name is the
+        // manifest entity key (data), so adding an entity type needs no gateway change.
+        session.resolvedEntities().forEach((k, v) -> {
+            if (k != null && v != null) {
+                sb.append(" [session_").append(k).append(": ").append(v).append("]");
+            }
+        });
         return sb.toString();
+    }
+
+    /**
+     * The manifest-declared, resource-scoped (required) resolvable entity type — the one a
+     * coverage/entitlement check gates on. Derived from the manifest, never hardcoded.
+     */
+    private EntityType coverageEntityType() {
+        java.util.List<String> requiredKeys = manifestStore.requiredContextKeys();
+        return manifestStore.entityTypes().stream()
+                .filter(EntityType::isResolvable)
+                .filter(et -> requiredKeys.contains(et.key()))
+                .findFirst().orElse(null);
+    }
+
+    /** The first non-required resolvable entity type (e.g. a secondary lookup), or null. */
+    private EntityType secondaryEntityType() {
+        java.util.List<String> requiredKeys = manifestStore.requiredContextKeys();
+        return manifestStore.entityTypes().stream()
+                .filter(EntityType::isResolvable)
+                .filter(et -> !requiredKeys.contains(et.key()))
+                .findFirst().orElse(null);
+    }
+
+    /** The session-carried resolved id for the coverage entity, or null. */
+    private String sessionCoverageEntity(ConversationSession session) {
+        EntityType ce = coverageEntityType();
+        return ce != null ? session.resolvedEntity(ce.key()) : null;
     }
 
     /**
