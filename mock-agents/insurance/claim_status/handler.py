@@ -11,6 +11,7 @@ from fastapi import APIRouter, Query
 from shared.canned_data import CLAIMS, claims_for_policy
 from shared.telemetry import agent_span
 from shared.error_schema import error_response
+from shared.validators import validate_claim_id, validate_policy_id
 
 router = APIRouter(prefix="/claim-status", tags=["claim_status"])
 AGENT_ID = "acme.insurance.claim_status"
@@ -38,6 +39,9 @@ async def get_claim_status(
     with agent_span(AGENT_ID, claim_id or policy_id) as span:
         # Single-claim lookup takes precedence.
         if claim_id:
+            err = validate_claim_id(claim_id, AGENT_ID)
+            if err is not None:
+                return err
             claim = CLAIMS.get(claim_id)
             if claim is None:
                 span.set_attribute("error", True)
@@ -53,6 +57,9 @@ async def get_claim_status(
 
         # Otherwise list claims for the policy.
         if policy_id:
+            err = validate_policy_id(policy_id, AGENT_ID)
+            if err is not None:
+                return err
             claims = claims_for_policy(policy_id)
             span.set_attribute("result.claim_count", len(claims))
             return {

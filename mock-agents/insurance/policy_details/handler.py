@@ -11,6 +11,7 @@ from fastapi import APIRouter, Query
 from shared.canned_data import POLICIES
 from shared.telemetry import agent_span
 from shared.error_schema import error_response
+from shared.validators import validate_policy_id
 
 router = APIRouter(prefix="/policy-details", tags=["policy_details"])
 AGENT_ID = "acme.insurance.policy_details"
@@ -30,6 +31,9 @@ async def get_policy_details(
     policy_id: str = Query(..., description="Policy identifier, e.g. POL-77001"),
 ):
     with agent_span(AGENT_ID, policy_id) as span:
+        err = validate_policy_id(policy_id, AGENT_ID)
+        if err is not None:
+            return err
         policy = POLICIES.get(policy_id)
         if policy is None:
             span.set_attribute("error", True)

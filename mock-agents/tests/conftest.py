@@ -14,6 +14,12 @@ import logging
 import pytest
 from unittest.mock import AsyncMock
 
+# test_concurrent_multiturn.py is a standalone load-test script (run via
+# `python tests/test_concurrent_multiturn.py --concurrency ...`), not a pytest
+# module — it calls parser.parse_args() at import time, which aborts pytest
+# collection of the whole directory. Skip it during collection.
+collect_ignore = ["test_concurrent_multiturn.py"]
+
 _SERVICING_PATH = os.path.join(os.path.dirname(__file__), "../servicing")
 _WEALTH_PATH    = os.path.join(os.path.dirname(__file__), "../wealth")
 
