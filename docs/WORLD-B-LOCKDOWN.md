@@ -509,9 +509,12 @@ anyone re-explaining it.
 **`scripts/world-b-check.sh`** greps `gateway/src/main/java` for domain coupling and prints
 every violation as a file:line worklist, with a CRITICAL count.
 
-- **Today it FAILS by design** — the code is mid-refactor. The violation list *is* the World
-  B worklist, and the CRITICAL count is the progress metric. Baseline at lockdown:
-  **68 CRITICAL + 5 REVIEW.**
+- **Status — ACHIEVED 2026-06-29: CRITICAL 0, REVIEW 0 ("gateway carries no domain
+  knowledge").** Countdown: 68 → 67 (Wave 1) → 43 (entity pipeline) → 9 (prompts/CLARIFY/copy)
+  → **0** (storage cleanup). Each pass validated live: routing held **95.0% F1** throughout,
+  multi-turn carry-forward + telemetry trace tree intact. The check is now a hard gate in
+  `scripts/verify.sh`, so domain knowledge cannot silently re-enter the gateway.
+- The violation list *was* the World B worklist; the CRITICAL count *was* the progress metric.
 - **Every build-plan step (§7) must drive the count down.** A step that claims to remove a
   violation class (e.g. step 4 = entity-extraction field names) must take that class to 0.
 - **No change may increase the count.** That is the one hard rule even while the total is

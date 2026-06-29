@@ -45,6 +45,15 @@ echo "   ✅  POST /v1/chat/completions → SSE stream contains [DONE]"
 echo "$STREAM" | grep -q '"chat.completion.chunk"'
 echo "   ✅  POST /v1/chat/completions → chunks have correct object type"
 
+# ── World B gate: the gateway must carry zero domain knowledge ───────────────
+# Hard gate (the refactor reached CRITICAL 0). Fails the build if any domain
+# name / client name / entity-field literal / REL-/FND- pattern / domain copy
+# re-enters gateway/src/main/java. See docs/WORLD-B-LOCKDOWN.md.
+echo ""
+echo "▶  [world-b] checking the gateway carries no domain knowledge..."
+"$ROOT/scripts/world-b-check.sh" --quiet
+echo "   ✅  World B clean — no domain knowledge in the gateway."
+
 # ── Optional: eval release gate (set RUN_EVAL=1 to include) ──────────────────
 if [[ "${RUN_EVAL:-0}" == "1" ]]; then
   echo ""
