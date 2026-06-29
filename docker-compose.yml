@@ -94,15 +94,15 @@ services:
     ports:
       - "8080:8080"
     environment:
-      MERIDIAN_LLM_INTENT_CLASSIFIER_BASE_URL: ${MERIDIAN_LLM_INTENT_CLASSIFIER_BASE_URL:-https://api.openai.com/v1}
+      MERIDIAN_LLM_INTENT_CLASSIFIER_BASE_URL: ${MERIDIAN_LLM_INTENT_CLASSIFIER_BASE_URL:-https://api.z.ai/api/paas/v4}
       MERIDIAN_LLM_INTENT_CLASSIFIER_API_KEY: ${MERIDIAN_LLM_INTENT_CLASSIFIER_API_KEY:-}
-      MERIDIAN_LLM_INTENT_CLASSIFIER_MODEL: ${MERIDIAN_LLM_INTENT_CLASSIFIER_MODEL:-gpt-4o-mini}
-      MERIDIAN_LLM_ENTITY_EXTRACTOR_BASE_URL: ${MERIDIAN_LLM_ENTITY_EXTRACTOR_BASE_URL:-https://api.openai.com/v1}
+      MERIDIAN_LLM_INTENT_CLASSIFIER_MODEL: ${MERIDIAN_LLM_INTENT_CLASSIFIER_MODEL:-glm-4.5-flash}
+      MERIDIAN_LLM_ENTITY_EXTRACTOR_BASE_URL: ${MERIDIAN_LLM_ENTITY_EXTRACTOR_BASE_URL:-https://api.z.ai/api/paas/v4}
       MERIDIAN_LLM_ENTITY_EXTRACTOR_API_KEY: ${MERIDIAN_LLM_ENTITY_EXTRACTOR_API_KEY:-}
-      MERIDIAN_LLM_ENTITY_EXTRACTOR_MODEL: ${MERIDIAN_LLM_ENTITY_EXTRACTOR_MODEL:-gpt-4o-mini}
-      MERIDIAN_LLM_SYNTHESIZER_BASE_URL: ${MERIDIAN_LLM_SYNTHESIZER_BASE_URL:-https://api.openai.com/v1}
+      MERIDIAN_LLM_ENTITY_EXTRACTOR_MODEL: ${MERIDIAN_LLM_ENTITY_EXTRACTOR_MODEL:-glm-4.5-flash}
+      MERIDIAN_LLM_SYNTHESIZER_BASE_URL: ${MERIDIAN_LLM_SYNTHESIZER_BASE_URL:-https://api.z.ai/api/paas/v4}
       MERIDIAN_LLM_SYNTHESIZER_API_KEY: ${MERIDIAN_LLM_SYNTHESIZER_API_KEY:-}
-      MERIDIAN_LLM_SYNTHESIZER_MODEL: ${MERIDIAN_LLM_SYNTHESIZER_MODEL:-gpt-4o-mini}
+      MERIDIAN_LLM_SYNTHESIZER_MODEL: ${MERIDIAN_LLM_SYNTHESIZER_MODEL:-glm-4.6}
       SPRING_DATA_REDIS_HOST: redis-stack
       SPRING_DATA_REDIS_PORT: 6379
       MERIDIAN_EMBEDDING_PROVIDER: remote
@@ -274,6 +274,9 @@ services:
       # Allow HTTP issuers in dev (production must use HTTPS)
       OPENID_ALLOW_HTTP: "true"
       NO_INDEX: "true"
+      # Increase rate limits for E2E test environment — many rapid login attempts
+      LOGIN_MAX: "200"
+      LOGIN_WINDOW: "1"
     volumes:
       - ./.env:/app/.env:ro
       - ./librechat/librechat.yaml:/app/librechat.yaml:ro
@@ -320,7 +323,7 @@ services:
     container_name: meridian-postgres
     environment:
       POSTGRES_USER: meridian
-      POSTGRES_PASSWORD: meridian_dev
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-meridian_dev}
       POSTGRES_DB: meridian
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -343,7 +346,7 @@ services:
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/meridian
       SPRING_DATASOURCE_USERNAME: meridian
-      SPRING_DATASOURCE_PASSWORD: meridian_dev
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-meridian_dev}
       IAM_ISSUER_URL: ${IAM_ISSUER_URL:-http://host.docker.internal:8084}
       IAM_ADMIN_PASSWORD: ${IAM_ADMIN_PASSWORD:-Meridian@2024}
       CERBOS_HOST: cerbos
@@ -412,8 +415,8 @@ services:
     container_name: meridian-minio
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: minio
-      MINIO_ROOT_PASSWORD: miniosecret
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-miniosecret}
     volumes:
       - minio-data:/data
     healthcheck:
@@ -432,7 +435,7 @@ services:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-      mc alias set local http://minio:9000 minio miniosecret &&
+      mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minio} ${MINIO_ROOT_PASSWORD:-miniosecret} &&
       mc mb --ignore-existing local/langfuse-events &&
       mc mb --ignore-existing local/langfuse-media &&
       echo 'MinIO buckets ready'
@@ -443,8 +446,8 @@ services:
     image: clickhouse/clickhouse-server:24.3.3
     container_name: meridian-clickhouse
     environment:
-      CLICKHOUSE_USER: clickhouse
-      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-clickhouse}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhouse}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
     volumes:
       - clickhouse-data:/var/lib/clickhouse
@@ -460,8 +463,8 @@ services:
     image: postgres:16-alpine
     container_name: meridian-langfuse-db
     environment:
-      POSTGRES_USER: langfuse
-      POSTGRES_PASSWORD: langfuse
+      POSTGRES_USER: ${LANGFUSE_DB_USER:-langfuse}
+      POSTGRES_PASSWORD: ${LANGFUSE_DB_PASSWORD:-langfuse}
       POSTGRES_DB: langfuse
     volumes:
       - langfuse-db-data:/var/lib/postgresql/data
@@ -487,33 +490,33 @@ services:
     ports:
       - "3030:3000"
     environment:
-      DATABASE_URL: postgresql://langfuse:langfuse@langfuse-db:5432/langfuse
-      NEXTAUTH_SECRET: meridian-langfuse-nextauth-secret
+      DATABASE_URL: postgresql://${LANGFUSE_DB_USER:-langfuse}:${LANGFUSE_DB_PASSWORD:-langfuse}@langfuse-db:5432/langfuse
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-meridian-langfuse-nextauth-secret}
       NEXTAUTH_URL: http://localhost:3030
-      SALT: meridian-langfuse-salt-changeme
-      ENCRYPTION_KEY: fb53c0e05d8044c734a1b20044e89f6c33783e489635b6e4bba69b231ce47bd8
+      SALT: ${LANGFUSE_SALT:-meridian-langfuse-salt-changeme}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-fb53c0e05d8044c734a1b20044e89f6c33783e489635b6e4bba69b231ce47bd8}
       TELEMETRY_ENABLED: "false"
       LANGFUSE_LOG_LEVEL: warn
       LANGFUSE_WORKER_HOST: http://langfuse-worker:3030
       # ClickHouse — columnar trace store (required in v3)
-      CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:clickhouse@clickhouse:9000
+      CLICKHOUSE_MIGRATION_URL: clickhouse://${CLICKHOUSE_USER:-clickhouse}:${CLICKHOUSE_PASSWORD:-clickhouse}@clickhouse:9000
       CLICKHOUSE_URL: http://clickhouse:8123
-      CLICKHOUSE_USER: clickhouse
-      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-clickhouse}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhouse}
       # MinIO — S3-compatible blob store for event/media uploads
       LANGFUSE_S3_EVENT_UPLOAD_ENABLED: "true"
       LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse-events
       LANGFUSE_S3_EVENT_UPLOAD_REGION: us-east-1
       LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
-      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
-      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: miniosecret
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-miniosecret}
       LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
       LANGFUSE_S3_MEDIA_UPLOAD_ENABLED: "true"
       LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse-media
       LANGFUSE_S3_MEDIA_UPLOAD_REGION: us-east-1
       LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://minio:9000
-      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: minio
-      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: miniosecret
+      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-miniosecret}
       LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
       LANGFUSE_S3_BATCH_EXPORT_ENABLED: "false"
       # Redis — required for OTLP ingestion queue (BullMQ)
@@ -525,11 +528,11 @@ services:
       LANGFUSE_INIT_ORG_NAME: "Meridian Bank"
       LANGFUSE_INIT_PROJECT_ID: meridian-gateway
       LANGFUSE_INIT_PROJECT_NAME: "Meridian AI Gateway"
-      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: pk-lf-meridian-public
-      LANGFUSE_INIT_PROJECT_SECRET_KEY: sk-lf-meridian-secret
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_PROJECT_PUBLIC_KEY:-pk-lf-meridian-public}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_PROJECT_SECRET_KEY:-sk-lf-meridian-secret}
       LANGFUSE_INIT_USER_EMAIL: admin@meridian.bank
       LANGFUSE_INIT_USER_NAME: Admin
-      LANGFUSE_INIT_USER_PASSWORD: changeme
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_ADMIN_PASSWORD:-changeme}
     restart: unless-stopped
 
   langfuse-worker:
@@ -545,30 +548,30 @@ services:
       redis-stack:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://langfuse:langfuse@langfuse-db:5432/langfuse
-      NEXTAUTH_SECRET: meridian-langfuse-nextauth-secret
-      SALT: meridian-langfuse-salt-changeme
-      ENCRYPTION_KEY: fb53c0e05d8044c734a1b20044e89f6c33783e489635b6e4bba69b231ce47bd8
+      DATABASE_URL: postgresql://${LANGFUSE_DB_USER:-langfuse}:${LANGFUSE_DB_PASSWORD:-langfuse}@langfuse-db:5432/langfuse
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-meridian-langfuse-nextauth-secret}
+      SALT: ${LANGFUSE_SALT:-meridian-langfuse-salt-changeme}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-fb53c0e05d8044c734a1b20044e89f6c33783e489635b6e4bba69b231ce47bd8}
       PORT: "3030"
       LANGFUSE_LOG_LEVEL: warn
       TELEMETRY_ENABLED: "false"
-      CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:clickhouse@clickhouse:9000
+      CLICKHOUSE_MIGRATION_URL: clickhouse://${CLICKHOUSE_USER:-clickhouse}:${CLICKHOUSE_PASSWORD:-clickhouse}@clickhouse:9000
       CLICKHOUSE_URL: http://clickhouse:8123
-      CLICKHOUSE_USER: clickhouse
-      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-clickhouse}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhouse}
       LANGFUSE_S3_EVENT_UPLOAD_ENABLED: "true"
       LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse-events
       LANGFUSE_S3_EVENT_UPLOAD_REGION: us-east-1
       LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
-      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
-      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: miniosecret
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-miniosecret}
       LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
       LANGFUSE_S3_MEDIA_UPLOAD_ENABLED: "true"
       LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse-media
       LANGFUSE_S3_MEDIA_UPLOAD_REGION: us-east-1
       LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://minio:9000
-      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: minio
-      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: miniosecret
+      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-miniosecret}
       LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
       LANGFUSE_S3_BATCH_EXPORT_ENABLED: "false"
       REDIS_HOST: redis-stack
@@ -587,8 +590,8 @@ services:
       - langfuse
       - gateway
     environment:
-      LANGFUSE_PUBLIC_KEY: pk-lf-meridian-public
-      LANGFUSE_SECRET_KEY: sk-lf-meridian-secret
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PROJECT_PUBLIC_KEY:-pk-lf-meridian-public}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_PROJECT_SECRET_KEY:-sk-lf-meridian-secret}
       LANGFUSE_HOST: http://langfuse:3000
       GATEWAY_HOST: http://gateway:8080
       USER_MGMT_HOST: http://iam-service:8084

@@ -142,16 +142,35 @@ test.describe('Coverage flow (Phase 11)', () => {
     // Stream must end cleanly
     expect(raw).toMatch(/data:\s*\[DONE\]/);
 
-    // Content must indicate a denial
-    const lower = raw.toLowerCase();
+    // Assemble content from SSE chunks — each word is a separate delta chunk,
+    // so multi-word phrases won't match in the raw SSE text.
+    const assembled = raw
+      .split('\n')
+      .filter(l => l.startsWith('data:') && !l.includes('[DONE]'))
+      .map(l => {
+        try {
+          const parsed = JSON.parse(l.replace(/^data:\s*/, ''));
+          return parsed?.choices?.[0]?.delta?.content ?? '';
+        } catch { return ''; }
+      })
+      .join('');
+    const lower = assembled.toLowerCase();
+
+    // Content must indicate denial — either explicit ("denied", "not authorized") or
+    // opaque ("could not find") which the coverage service uses deliberately
+    // to avoid leaking that Okafor exists but is out-of-book for rm_jane.
     const isDenied = (
-      lower.includes('coverage')     ||
-      lower.includes('denied')       ||
-      lower.includes('not authorized') ||
-      lower.includes('not authoriz')  ||
-      lower.includes('not in your')   ||
-      lower.includes('do not have access') ||
-      lower.includes('not allowed')
+      lower.includes('coverage')          ||
+      lower.includes('denied')            ||
+      lower.includes('not authorized')    ||
+      lower.includes('not in your')       ||
+      lower.includes('do not have access')||
+      lower.includes('not allowed')       ||
+      lower.includes('could not find')    ||
+      lower.includes('cannot find')       ||
+      lower.includes('no relationship')   ||
+      lower.includes('not found')         ||
+      lower.includes('not available')
     );
     expect(isDenied).toBe(true);
   });

@@ -56,6 +56,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -175,9 +176,12 @@ public class ChatService {
                 ? rootSpan.getSpanContext().getTraceId()
                 : TraceEventPublisher.newRequestId();
         String latestPrompt = extractLatestUserMessage(request);
+        // When LibreChat doesn't send X-Conversation-Id, derive a stable ID from
+        // userId + first user message — LibreChat always includes full history so
+        // the first message is the same across all turns of the same conversation.
         String conversationId = (headerConvId != null && !headerConvId.isBlank())
                 ? headerConvId
-                : ("conv-" + UUID.randomUUID());
+                : deriveConversationId(userId, request);
 
         // ── Span attributes: visible on this span in Phoenix / Tempo ────────────
         rootSpan.setAttribute("session.id", conversationId);
@@ -758,4 +762,26 @@ public class ChatService {
 
     private static String newId() { return "chatcmpl-" + UUID.randomUUID().toString().replace("-", ""); }
     private static long epochSeconds() { return System.currentTimeMillis() / 1_000L; }
+
+    /**
+     * Derives a stable conversation ID when LibreChat does not send X-Conversation-Id.
+     *
+     * LibreChat includes the full message history in every request, so messages[0]
+     * (the first user message) is constant across all turns of the same conversation.
+     * Hashing userId + firstUserMessage gives a consistent key for session lookup.
+     */
+    private static String deriveConversationId(String userId, ChatRequest request) {
+        if (request.messages() != null && !request.messages().isEmpty()) {
+            String firstUserContent = request.messages().stream()
+                    .filter(m -> "user".equals(m.role()) && m.content() != null)
+                    .map(Message::content)
+                    .findFirst()
+                    .orElse("");
+            if (!firstUserContent.isBlank()) {
+                String key = (userId != null ? userId : "anon") + ":" + firstUserContent;
+                return "conv-" + UUID.nameUUIDFromBytes(key.getBytes(StandardCharsets.UTF_8));
+            }
+        }
+        return "conv-" + UUID.randomUUID();
+    }
 }

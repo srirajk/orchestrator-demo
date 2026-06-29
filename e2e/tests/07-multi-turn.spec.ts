@@ -21,6 +21,7 @@ test.describe('Multi-turn conversation', () => {
   // ── UI path: full login → two-turn conversation ───────────────────────────
 
   test('second turn in LibreChat retains client context', async ({ page }) => {
+    test.setTimeout(240_000);  // two full LLM turns can take up to 2 min each
     await registerOrLogin(page);
     await newConversation(page);
 
@@ -45,7 +46,7 @@ test.describe('Multi-turn conversation', () => {
   });
 
   test('three-turn conversation — data then follow-up then comparison', async ({ page }) => {
-    test.setTimeout(240_000);  // three turns × ~60s each
+    test.setTimeout(360_000);  // three turns × ~60s each + LibreChat UI overhead
     await registerOrLogin(page);
     await newConversation(page);
 
@@ -66,6 +67,7 @@ test.describe('Multi-turn conversation', () => {
   });
 
   test('new conversation resets client context', async ({ page }) => {
+    test.setTimeout(300_000);  // two conversations, two turns each
     await registerOrLogin(page);
 
     // First conversation — talk about Whitman
