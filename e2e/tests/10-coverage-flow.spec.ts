@@ -19,6 +19,14 @@ import {
  *  2. Named in-book client → grounded answer (no coverage denial)
  *  3. Out-of-book client (Okafor REL-00188) → coverage denial message
  *  4. Multi-turn: follow-up after establishing client context → no re-clarification
+ *
+ * NOTE on test 3 and 5 (Okafor denial):
+ *   RESOLVE is principal-agnostic — it now finds Okafor in the global entity set.
+ *   CHECK then denies it (REL-00188 is not in rm_jane's book).  The gateway must
+ *   surface a real COVERAGE-DENIAL phrase, not an opaque "not found" message.
+ *   "not found" / "could not find" / "unable to find" are deliberately excluded:
+ *   those were fallback phrases from when RESOLVE silently filtered by book and
+ *   returned empty; they are no longer correct gateway behavior for this path.
  */
 test.describe('Coverage flow (Phase 11)', () => {
 
@@ -78,26 +86,18 @@ test.describe('Coverage flow (Phase 11)', () => {
 
     const lower = reply.toLowerCase();
 
-    // The response must indicate access is not granted — accept any phrase that means
-    // "denied", "not found" (security: don't reveal that relationship exists to unentitled
-    // user), or "cannot access". All of these are correct gateway behavior for rm_jane
-    // asking about REL-00188 (not in her book).
+    // RESOLVE now finds Okafor in the global entity set; CHECK denies it because
+    // REL-00188 is not in rm_jane's book.  The response MUST contain a real
+    // coverage-denial phrase — opaque "not found" language is no longer correct
+    // here and is explicitly excluded from this assertion.
     const isDenied = (
-      lower.includes('coverage')          ||
-      lower.includes('denied')            ||
-      lower.includes('not authorized')    ||
-      lower.includes('not authoriz')      ||
-      lower.includes('not in your')       ||
-      lower.includes('do not have access')||
-      lower.includes('not allowed')       ||
-      lower.includes('could not find')    ||
-      lower.includes('cannot find')       ||
-      lower.includes('no relationship')   ||
-      lower.includes('not found')         ||
-      lower.includes('not available')     ||
-      lower.includes('unable to find')    ||
-      lower.includes('provide the relationship') ||
-      lower.includes('more specific')
+      lower.includes('coverage')           ||
+      lower.includes('denied')             ||
+      lower.includes('not authorized')     ||
+      lower.includes('not authoriz')       ||
+      lower.includes('not in your')        ||
+      lower.includes('do not have access') ||
+      lower.includes('not allowed')
     );
     expect(isDenied).toBe(true);
   });
@@ -167,21 +167,16 @@ test.describe('Coverage flow (Phase 11)', () => {
       .join('');
     const lower = assembled.toLowerCase();
 
-    // Content must indicate denial — either explicit ("denied", "not authorized") or
-    // opaque ("could not find") which the coverage service uses deliberately
-    // to avoid leaking that Okafor exists but is out-of-book for rm_jane.
+    // RESOLVE finds Okafor globally; CHECK denies it for rm_jane.  The gateway
+    // must surface a real coverage-denial phrase.  Opaque "not found" language
+    // is no longer correct behavior for this path and is excluded below.
     const isDenied = (
-      lower.includes('coverage')          ||
-      lower.includes('denied')            ||
-      lower.includes('not authorized')    ||
-      lower.includes('not in your')       ||
-      lower.includes('do not have access')||
-      lower.includes('not allowed')       ||
-      lower.includes('could not find')    ||
-      lower.includes('cannot find')       ||
-      lower.includes('no relationship')   ||
-      lower.includes('not found')         ||
-      lower.includes('not available')
+      lower.includes('coverage')           ||
+      lower.includes('denied')             ||
+      lower.includes('not authorized')     ||
+      lower.includes('not in your')        ||
+      lower.includes('do not have access') ||
+      lower.includes('not allowed')
     );
     expect(isDenied).toBe(true);
   });

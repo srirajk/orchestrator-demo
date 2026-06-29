@@ -83,11 +83,13 @@ class TestResolve:
         assert result["id"] is None
         assert result["candidates"] == []
 
-    def test_okafor_not_visible_to_rm_jane(self):
-        # rm_jane should NOT see Okafor even if she searches for it
+    def test_okafor_resolves_for_anyone_but_check_denies_rm_jane(self):
+        # RESOLVE is principal-agnostic: it finds Okafor regardless of the caller's book.
         result = resolve("okafor", "relationship", "rm_jane")
-        assert result["resolved"] is False
-        assert result["id"] is None
+        assert result["resolved"] is True
+        assert result["id"] == "REL-00188"
+        # CHECK is the gate: rm_jane is NOT entitled to Okafor (not in her book).
+        assert check("rm_jane", "REL-00188")["allowed"] is False
 
 
 # ── HTTP integration tests: FastAPI layer ─────────────────────────────────────

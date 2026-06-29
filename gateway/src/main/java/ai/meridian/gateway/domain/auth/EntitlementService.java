@@ -5,6 +5,7 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -32,6 +33,10 @@ public class EntitlementService {
     private final MeterRegistry meterRegistry;
     private final RevocationChecker revocationChecker;
 
+    /** Cerbos resource kind — domain-declared via config; must match meridian.authz.resource-type. */
+    @Value("${meridian.authz.resource-type:relationship}")
+    private String resourceType;
+
     public EntitlementService(CerbosEntitlementAdapter cerbos, MeterRegistry meterRegistry,
                               RevocationChecker revocationChecker) {
         this.cerbos = cerbos;
@@ -50,7 +55,7 @@ public class EntitlementService {
         // Revocation overlay: check Redis before trusting any cached Cerbos verdict
         if (revocationChecker.isRevoked(principal.id(), relationshipId)) {
             log.info("Entitlement overridden by revocation: userId={} relationship={}", principal.id(), relationshipId);
-            emitAuthzDecision("DENY", "relationship", "revocation-override");
+            emitAuthzDecision("DENY", resourceType, "revocation-override");
             return new EntitlementResult(false, relationshipId, principal.id(), "revoked", "revocation-override");
         }
 
@@ -64,7 +69,7 @@ public class EntitlementService {
         log.info("Entitlement: userId={} relationship={} allowed={} source={} reason={}",
                 principal.id(), relationshipId, allowed, batch.source(), reason);
 
-        emitAuthzDecision(allowed ? "ALLOW" : "DENY", "relationship", batch.source());
+        emitAuthzDecision(allowed ? "ALLOW" : "DENY", resourceType, batch.source());
         return new EntitlementResult(allowed, relationshipId, principal.id(), reason, batch.source());
     }
 
@@ -85,7 +90,7 @@ public class EntitlementService {
 
         // Emit one counter per candidate relationship result
         candidateRelIds.forEach(relId ->
-                emitAuthzDecision(batch.isAllowed(relId) ? "ALLOW" : "DENY", "relationship", batch.source()));
+                emitAuthzDecision(batch.isAllowed(relId) ? "ALLOW" : "DENY", resourceType, batch.source()));
 
         log.debug("filterCovered: principal={} candidates={} allowed={} source={}",
                 principal.id(), candidateRelIds.size(), allowed.size(), batch.source());

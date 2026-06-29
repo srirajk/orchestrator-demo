@@ -3,7 +3,33 @@
   "display_name": "Cash Management",
   "parent_domain": "asset-servicing",
   "resource_scoped": false,
+
+  "entity_types": [
+    {
+      "key": "fund_id",
+      "display": "fund or portfolio",
+      "id_pattern": "FND-\\w+",
+      "resolve_type": "fund",
+      "required": false
+    },
+    {
+      "key": "account_id",
+      "display": "cash account",
+      "id_pattern": "ACCT-\\w+",
+      "resolve_type": "account",
+      "required": false
+    },
+    {
+      "key": "currency",
+      "display": "currency",
+      "id_pattern": "[A-Z]{3}",
+      "resolve_type": "currency",
+      "required": false
+    }
+  ],
+
   "required_context": [],
+
   "agents": [
     "acme.servicing.cash_management"
   ]

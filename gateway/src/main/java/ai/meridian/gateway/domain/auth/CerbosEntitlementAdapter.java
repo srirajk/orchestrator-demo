@@ -37,7 +37,6 @@ public class CerbosEntitlementAdapter {
     private static final Logger log = LoggerFactory.getLogger(CerbosEntitlementAdapter.class);
 
     private static final String POLICY_VERSION    = "default";
-    private static final String RESOURCE_REL      = "relationship";
     private static final String RESOURCE_AGENT    = "agent";
     private static final String ACTION_READ        = "read";
     private static final String ACTION_INVOKE      = "invoke";
@@ -45,21 +44,27 @@ public class CerbosEntitlementAdapter {
     private final RestClient   restClient;
     private final ObjectMapper mapper;
     private final String       failMode;  // "closed" | "local"
+    // Cerbos resource kind for entity-level checks — domain-declared via config,
+    // never a hardcoded domain literal (World B).
+    private final String       resourceType;
 
     public CerbosEntitlementAdapter(
             RestClient.Builder restClientBuilder,
             ObjectMapper mapper,
             @Value("${meridian.cerbos.host:localhost}") String host,
             @Value("${meridian.cerbos.http-port:3592}") int httpPort,
-            @Value("${meridian.cerbos.fail-mode:closed}") String failMode) {
+            @Value("${meridian.cerbos.fail-mode:closed}") String failMode,
+            @Value("${meridian.authz.resource-type:relationship}") String resourceType) {
 
         this.mapper   = mapper;
         this.failMode = failMode;
+        this.resourceType = resourceType;
         this.restClient = restClientBuilder
                 .baseUrl("http://" + host + ":" + httpPort)
                 .defaultHeader("Content-Type", MediaType.APPLICATION_JSON_VALUE)
                 .build();
-        log.info("CerbosEntitlementAdapter: PDP=http://{}:{} fail-mode={}", host, httpPort, failMode);
+        log.info("CerbosEntitlementAdapter: PDP=http://{}:{} fail-mode={} resource-type={}",
+                host, httpPort, failMode, resourceType);
     }
 
     /**
@@ -76,7 +81,7 @@ public class CerbosEntitlementAdapter {
             return new BatchResult(Map.of(), "cerbos");
         }
         try {
-            String requestBody = buildResourceRequest(principal, RESOURCE_REL, ACTION_READ,
+            String requestBody = buildResourceRequest(principal, resourceType, ACTION_READ,
                     relationshipIds, Map.of());
             String responseBody = post(requestBody);
             Map<String, Boolean> results = parseResponse(responseBody, ACTION_READ, relationshipIds);
@@ -85,7 +90,7 @@ public class CerbosEntitlementAdapter {
             return new BatchResult(results, "cerbos");
 
         } catch (Exception e) {
-            return handleFailure(e, principal, relationshipIds, "relationship");
+            return handleFailure(e, principal, relationshipIds, resourceType);
         }
     }
 

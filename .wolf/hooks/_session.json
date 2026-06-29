@@ -18,7 +18,7 @@
       "first_read": "2026-06-29T07:06:43.658Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/docs/domain-onboarding-standard.md": {
-      "count": 1,
+      "count": 2,
       "tokens": 4115,
       "first_read": "2026-06-29T12:16:16.478Z"
     },
@@ -28,7 +28,7 @@
       "first_read": "2026-06-29T12:16:16.906Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/docs/gateway-domain-architecture.md": {
-      "count": 2,
+      "count": 3,
       "tokens": 7276,
       "first_read": "2026-06-29T12:16:17.366Z"
     },
@@ -88,7 +88,7 @@
       "first_read": "2026-06-29T14:45:46.478Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/resources/application.yml": {
-      "count": 4,
+      "count": 5,
       "tokens": 1481,
       "first_read": "2026-06-29T14:45:46.925Z"
     },
@@ -113,7 +113,7 @@
       "first_read": "2026-06-29T14:46:01.116Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/mock-agents/wealth-coverage/data.py": {
-      "count": 1,
+      "count": 2,
       "tokens": 1091,
       "first_read": "2026-06-29T14:46:02.092Z"
     },
@@ -123,12 +123,12 @@
       "first_read": "2026-06-29T14:46:02.526Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/auth/CerbosEntitlementAdapter.java": {
-      "count": 1,
-      "tokens": 3037,
+      "count": 3,
+      "tokens": 3114,
       "first_read": "2026-06-29T14:46:03.878Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/auth/EntitlementService.java": {
-      "count": 1,
+      "count": 2,
       "tokens": 1733,
       "first_read": "2026-06-29T14:46:07.049Z"
     },
@@ -471,6 +471,121 @@
       "count": 1,
       "tokens": 2200,
       "first_read": "2026-06-29T16:42:19.254Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-a32957dd9f9ee5dfd/mock-agents/wealth-coverage/data.py": {
+      "count": 1,
+      "tokens": 0,
+      "first_read": "2026-06-29T17:08:41.475Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-acd21fbd8fbefdaf5/gateway/src/main/java/ai/meridian/gateway/domain/auth/CerbosEntitlementAdapter.java": {
+      "count": 1,
+      "tokens": 3037,
+      "first_read": "2026-06-29T17:08:50.799Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-acd21fbd8fbefdaf5/gateway/src/main/java/ai/meridian/gateway/domain/auth/EntitlementService.java": {
+      "count": 1,
+      "tokens": 1733,
+      "first_read": "2026-06-29T17:08:52.303Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-acd21fbd8fbefdaf5/gateway/src/main/resources/application.yml": {
+      "count": 1,
+      "tokens": 1481,
+      "first_read": "2026-06-29T17:08:52.704Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-a1caf25dcb0ab3d39/docs/WORLD-B-LOCKDOWN.md": {
+      "count": 1,
+      "tokens": 0,
+      "first_read": "2026-06-29T17:09:01.586Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/docs/WORLD-B-LOCKDOWN.md": {
+      "count": 1,
+      "tokens": 8836,
+      "first_read": "2026-06-29T17:09:11.872Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/registry/domains/wealth-management.json": {
+      "count": 1,
+      "tokens": 0,
+      "first_read": "2026-06-29T17:09:50.002Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/registry/domains/wealth-management/private-banking.json": {
+      "count": 1,
+      "tokens": 0,
+      "first_read": "2026-06-29T17:09:50.343Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/registry/domains/asset-servicing.json": {
+      "count": 1,
+      "tokens": 0,
+      "first_read": "2026-06-29T17:09:52.586Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/registry/domains/asset-servicing/custody-operations.json": {
+      "count": 1,
+      "tokens": 0,
+      "first_read": "2026-06-29T17:09:52.945Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/registry/domains/asset-servicing/corporate-actions.json": {
+      "count": 1,
+      "tokens": 0,
+      "first_read": "2026-06-29T17:09:56.967Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/registry/domains/asset-servicing/cash-management.json": {
+      "count": 1,
+      "tokens": 0,
+      "first_read": "2026-06-29T17:09:57.145Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/test/resources/domains/wealth-management.json": {
+      "count": 1,
+      "tokens": 0,
+      "first_read": "2026-06-29T17:10:01.380Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/test/resources/domains/wealth-management/private-banking.json": {
+      "count": 1,
+      "tokens": 0,
+      "first_read": "2026-06-29T17:10:01.961Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/test/resources/domains/asset-servicing.json": {
+      "count": 1,
+      "tokens": 0,
+      "first_read": "2026-06-29T17:10:04.621Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/test/resources/domains/asset-servicing/custody-operations.json": {
+      "count": 1,
+      "tokens": 0,
+      "first_read": "2026-06-29T17:10:04.770Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/test/resources/domains/asset-servicing/corporate-actions.json": {
+      "count": 1,
+      "tokens": 0,
+      "first_read": "2026-06-29T17:10:07.964Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/test/resources/domains/asset-servicing/cash-management.json": {
+      "count": 1,
+      "tokens": 0,
+      "first_read": "2026-06-29T17:10:08.208Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/wf_ba56dc76-986-1/mock-agents/wealth-coverage/data.py": {
+      "count": 1,
+      "tokens": 944,
+      "first_read": "2026-06-29T17:10:33.036Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/e2e/tests/10-coverage-flow.spec.ts": {
+      "count": 1,
+      "tokens": 2278,
+      "first_read": "2026-06-29T17:11:05.525Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-a1caf25dcb0ab3d39/registry/manifests/acme.wealth.goal_planning.json": {
+      "count": 1,
+      "tokens": 434,
+      "first_read": "2026-06-29T17:11:22.639Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-a1caf25dcb0ab3d39/registry/manifests/acme.wealth.holdings.json": {
+      "count": 1,
+      "tokens": 422,
+      "first_read": "2026-06-29T17:11:22.643Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/mock-agents/wealth-coverage/tests/test_coverage.py": {
+      "count": 1,
+      "tokens": 1457,
+      "first_read": "2026-06-29T17:23:11.413Z"
     }
   },
   "files_written": [
@@ -647,6 +762,180 @@
       "action": "edit",
       "tokens": 207,
       "at": "2026-06-29T16:50:25.640Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-acd21fbd8fbefdaf5/gateway/src/main/java/ai/meridian/gateway/domain/auth/CerbosEntitlementAdapter.java",
+      "action": "edit",
+      "tokens": 326,
+      "at": "2026-06-29T17:10:00.250Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-acd21fbd8fbefdaf5/gateway/src/main/java/ai/meridian/gateway/domain/auth/CerbosEntitlementAdapter.java",
+      "action": "edit",
+      "tokens": 43,
+      "at": "2026-06-29T17:10:04.685Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-acd21fbd8fbefdaf5/gateway/src/main/java/ai/meridian/gateway/domain/auth/CerbosEntitlementAdapter.java",
+      "action": "edit",
+      "tokens": 174,
+      "at": "2026-06-29T17:10:12.206Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-acd21fbd8fbefdaf5/gateway/src/main/java/ai/meridian/gateway/domain/auth/EntitlementService.java",
+      "action": "edit",
+      "tokens": 86,
+      "at": "2026-06-29T17:10:17.514Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-acd21fbd8fbefdaf5/gateway/src/main/java/ai/meridian/gateway/domain/auth/EntitlementService.java",
+      "action": "edit",
+      "tokens": 125,
+      "at": "2026-06-29T17:10:22.316Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-acd21fbd8fbefdaf5/gateway/src/main/java/ai/meridian/gateway/domain/auth/EntitlementService.java",
+      "action": "edit",
+      "tokens": 50,
+      "at": "2026-06-29T17:10:27.333Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-acd21fbd8fbefdaf5/gateway/src/main/resources/application.yml",
+      "action": "edit",
+      "tokens": 156,
+      "at": "2026-06-29T17:10:34.877Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-a1caf25dcb0ab3d39/registry/domains/wealth-management.json",
+      "action": "create",
+      "tokens": 147,
+      "at": "2026-06-29T17:12:35.667Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-a1caf25dcb0ab3d39/registry/domains/asset-servicing.json",
+      "action": "create",
+      "tokens": 50,
+      "at": "2026-06-29T17:12:39.919Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-a1caf25dcb0ab3d39/registry/domains/asset-servicing.json",
+      "action": "create",
+      "tokens": 50,
+      "at": "2026-06-29T17:12:54.257Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-a1caf25dcb0ab3d39/registry/domains/wealth-management/private-banking.json",
+      "action": "create",
+      "tokens": 378,
+      "at": "2026-06-29T17:13:11.541Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-a32957dd9f9ee5dfd/mock-agents/wealth-coverage/data.py",
+      "action": "create",
+      "tokens": 1200,
+      "at": "2026-06-29T17:13:14.943Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-a1caf25dcb0ab3d39/registry/domains/asset-servicing/custody-operations.json",
+      "action": "create",
+      "tokens": 240,
+      "at": "2026-06-29T17:13:16.529Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-a1caf25dcb0ab3d39/registry/domains/asset-servicing/corporate-actions.json",
+      "action": "create",
+      "tokens": 246,
+      "at": "2026-06-29T17:13:22.018Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-a1caf25dcb0ab3d39/registry/domains/asset-servicing/cash-management.json",
+      "action": "create",
+      "tokens": 210,
+      "at": "2026-06-29T17:13:26.329Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-a1caf25dcb0ab3d39/gateway/src/test/resources/domains/wealth-management.json",
+      "action": "create",
+      "tokens": 147,
+      "at": "2026-06-29T17:13:32.813Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-a1caf25dcb0ab3d39/gateway/src/test/resources/domains/asset-servicing.json",
+      "action": "create",
+      "tokens": 50,
+      "at": "2026-06-29T17:13:35.244Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-a1caf25dcb0ab3d39/gateway/src/test/resources/domains/wealth-management/private-banking.json",
+      "action": "create",
+      "tokens": 378,
+      "at": "2026-06-29T17:13:42.281Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-a1caf25dcb0ab3d39/gateway/src/test/resources/domains/asset-servicing/custody-operations.json",
+      "action": "create",
+      "tokens": 240,
+      "at": "2026-06-29T17:13:46.787Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-a1caf25dcb0ab3d39/gateway/src/test/resources/domains/asset-servicing/corporate-actions.json",
+      "action": "create",
+      "tokens": 246,
+      "at": "2026-06-29T17:13:52.727Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-a1caf25dcb0ab3d39/gateway/src/test/resources/domains/asset-servicing/cash-management.json",
+      "action": "create",
+      "tokens": 210,
+      "at": "2026-06-29T17:13:56.430Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-a32957dd9f9ee5dfd/e2e/tests/10-coverage-flow.spec.ts",
+      "action": "create",
+      "tokens": 2256,
+      "at": "2026-06-29T17:14:06.028Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/auth/CerbosEntitlementAdapter.java",
+      "action": "edit",
+      "tokens": 421,
+      "at": "2026-06-29T17:21:40.259Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/auth/CerbosEntitlementAdapter.java",
+      "action": "edit",
+      "tokens": 40,
+      "at": "2026-06-29T17:21:56.732Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/auth/CerbosEntitlementAdapter.java",
+      "action": "edit",
+      "tokens": 23,
+      "at": "2026-06-29T17:22:11.116Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/auth/EntitlementService.java",
+      "action": "edit",
+      "tokens": 91,
+      "at": "2026-06-29T17:22:22.388Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/auth/EntitlementService.java",
+      "action": "edit",
+      "tokens": 184,
+      "at": "2026-06-29T17:22:33.236Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/resources/application.yml",
+      "action": "edit",
+      "tokens": 125,
+      "at": "2026-06-29T17:22:58.242Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/mock-agents/wealth-coverage/tests/test_coverage.py",
+      "action": "edit",
+      "tokens": 130,
+      "at": "2026-06-29T17:23:24.560Z"
     }
   ],
   "edit_counts": {
@@ -667,11 +956,32 @@
     "gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java": 1,
     "gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityExtractor.java": 1,
     "gateway/src/main/java/ai/meridian/gateway/synthesis/answer/AnswerSynthesizer.java": 1,
-    "docs/PROMPT-AUDIT.md": 2
+    "docs/PROMPT-AUDIT.md": 2,
+    ".claude/worktrees/agent-acd21fbd8fbefdaf5/gateway/src/main/java/ai/meridian/gateway/domain/auth/CerbosEntitlementAdapter.java": 3,
+    ".claude/worktrees/agent-acd21fbd8fbefdaf5/gateway/src/main/java/ai/meridian/gateway/domain/auth/EntitlementService.java": 3,
+    ".claude/worktrees/agent-acd21fbd8fbefdaf5/gateway/src/main/resources/application.yml": 1,
+    ".claude/worktrees/agent-a1caf25dcb0ab3d39/registry/domains/wealth-management.json": 1,
+    ".claude/worktrees/agent-a1caf25dcb0ab3d39/registry/domains/asset-servicing.json": 2,
+    ".claude/worktrees/agent-a1caf25dcb0ab3d39/registry/domains/wealth-management/private-banking.json": 1,
+    ".claude/worktrees/agent-a32957dd9f9ee5dfd/mock-agents/wealth-coverage/data.py": 1,
+    ".claude/worktrees/agent-a1caf25dcb0ab3d39/registry/domains/asset-servicing/custody-operations.json": 1,
+    ".claude/worktrees/agent-a1caf25dcb0ab3d39/registry/domains/asset-servicing/corporate-actions.json": 1,
+    ".claude/worktrees/agent-a1caf25dcb0ab3d39/registry/domains/asset-servicing/cash-management.json": 1,
+    ".claude/worktrees/agent-a1caf25dcb0ab3d39/gateway/src/test/resources/domains/wealth-management.json": 1,
+    ".claude/worktrees/agent-a1caf25dcb0ab3d39/gateway/src/test/resources/domains/asset-servicing.json": 1,
+    ".claude/worktrees/agent-a1caf25dcb0ab3d39/gateway/src/test/resources/domains/wealth-management/private-banking.json": 1,
+    ".claude/worktrees/agent-a1caf25dcb0ab3d39/gateway/src/test/resources/domains/asset-servicing/custody-operations.json": 1,
+    ".claude/worktrees/agent-a1caf25dcb0ab3d39/gateway/src/test/resources/domains/asset-servicing/corporate-actions.json": 1,
+    ".claude/worktrees/agent-a1caf25dcb0ab3d39/gateway/src/test/resources/domains/asset-servicing/cash-management.json": 1,
+    ".claude/worktrees/agent-a32957dd9f9ee5dfd/e2e/tests/10-coverage-flow.spec.ts": 1,
+    "gateway/src/main/java/ai/meridian/gateway/domain/auth/CerbosEntitlementAdapter.java": 3,
+    "gateway/src/main/java/ai/meridian/gateway/domain/auth/EntitlementService.java": 2,
+    "gateway/src/main/resources/application.yml": 1,
+    "mock-agents/wealth-coverage/tests/test_coverage.py": 1
   },
-  "anatomy_hits": 88,
-  "anatomy_misses": 6,
-  "repeated_reads_warned": 62,
+  "anatomy_hits": 99,
+  "anatomy_misses": 18,
+  "repeated_reads_warned": 69,
   "cerebrum_warnings": 0,
-  "stop_count": 16
+  "stop_count": 22
 }

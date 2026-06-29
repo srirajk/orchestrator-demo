@@ -94,6 +94,10 @@ meridian:
     trace-ttl-seconds: ${MERIDIAN_TELEMETRY_TRACE_TTL_SECONDS:86400}
   session:
     ttl-seconds: ${MERIDIAN_SESSION_TTL_SECONDS:1800}   # 30 min idle expiry
+  authz:
+    # Cerbos resource kind for entity-level checks (e.g. relationship, account, deal).
+    # Domain teams declare this; the gateway carries no hardcoded domain literal (World B).
+    resource-type: ${MERIDIAN_AUTHZ_RESOURCE_TYPE:relationship}
   coverage:
     wealth-management:
       url: ${WEALTH_COVERAGE_URL:http://wealth-coverage:8086}

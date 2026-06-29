@@ -2,7 +2,7 @@
   "domain_id": "asset-servicing",
   "display_name": "Asset Servicing",
   "memory_compaction": {
-    "must_preserve": ["relationship_id", "domain"],
+    "must_preserve": ["domain"],
     "can_drop": ["raw_agent_outputs"]
   }
 }

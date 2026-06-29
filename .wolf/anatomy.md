@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-29T16:50:25.633Z
-> Files: 594 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-29T17:23:24.554Z
+> Files: 611 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/
 
@@ -57,6 +57,44 @@
 
 - `verify.py` — Verify scaffolding-openai-agents skill structure. (~331 tok)
 
+## .claude/worktrees/agent-a1caf25dcb0ab3d39/gateway/src/test/resources/domains/
+
+- `asset-servicing.json` (~50 tok)
+- `wealth-management.json` (~147 tok)
+
+## .claude/worktrees/agent-a1caf25dcb0ab3d39/gateway/src/test/resources/domains/asset-servicing/
+
+- `cash-management.json` (~210 tok)
+- `corporate-actions.json` (~246 tok)
+- `custody-operations.json` (~240 tok)
+
+## .claude/worktrees/agent-a1caf25dcb0ab3d39/gateway/src/test/resources/domains/wealth-management/
+
+- `private-banking.json` (~378 tok)
+
+## .claude/worktrees/agent-a1caf25dcb0ab3d39/registry/domains/
+
+- `asset-servicing.json` (~50 tok)
+- `wealth-management.json` (~147 tok)
+
+## .claude/worktrees/agent-a1caf25dcb0ab3d39/registry/domains/asset-servicing/
+
+- `cash-management.json` (~210 tok)
+- `corporate-actions.json` (~246 tok)
+- `custody-operations.json` (~240 tok)
+
+## .claude/worktrees/agent-a1caf25dcb0ab3d39/registry/domains/wealth-management/
+
+- `private-banking.json` (~378 tok)
+
+## .claude/worktrees/agent-a32957dd9f9ee5dfd/e2e/tests/
+
+- `10-coverage-flow.spec.ts` — Coverage-flow E2E tests (Phase 11+). (~2256 tok)
+
+## .claude/worktrees/agent-a32957dd9f9ee5dfd/mock-agents/wealth-coverage/
+
+- `data.py` — discover, check, resolve (~1200 tok)
+
 ## .claude/worktrees/agent-a3c0915360f71cbe6/
 
 - `docker-compose.yml` — Docker Compose services (~6184 tok)
@@ -83,6 +121,15 @@
 - `conftest.py` — reset_db, app_client (~1052 tok)
 - `test_integration.py` — TestBankScenario: test_rm_jane_exists_with_correct_book, test_rm_jane_has_wealth_segment, test_rm_ja (~6065 tok)
 - `test_user_mgmt.py` — TestJWKS: test_jwks_has_correct_structure, test_jwks_e_is_65537, test_jwks_n_length, test_issue_toke (~7518 tok)
+
+## .claude/worktrees/agent-acd21fbd8fbefdaf5/gateway/src/main/java/ai/meridian/gateway/domain/auth/
+
+- `CerbosEntitlementAdapter.java` — Batch-calls the Cerbos PDP for relationship entitlement checks. (~3134 tok)
+- `EntitlementService.java` — Enforces relationship-level entitlements by delegating to the Cerbos PDP. (~1278 tok)
+
+## .claude/worktrees/agent-acd21fbd8fbefdaf5/gateway/src/main/resources/
+
+- `application.yml` (~1359 tok)
 
 ## .claude/worktrees/wf_ba56dc76-986-1/mock-agents/wealth-coverage/
 
@@ -411,8 +458,8 @@
 ## gateway/src/main/java/ai/meridian/gateway/domain/auth/
 
 - `AgentAuthorization.java` — Fine-grained (resource-level) authorization check for agent registration. (~1058 tok)
-- `CerbosEntitlementAdapter.java` — Batch-calls the Cerbos PDP for relationship entitlement checks. (~3037 tok)
-- `EntitlementService.java` — Enforces relationship-level entitlements by delegating to the Cerbos PDP. (~1733 tok)
+- `CerbosEntitlementAdapter.java` — Batch-calls the Cerbos PDP for relationship entitlement checks. (~3113 tok)
+- `EntitlementService.java` — Enforces relationship-level entitlements by delegating to the Cerbos PDP. (~1801 tok)
 - `JwksClient.java` — Fetches and caches the JWKS (public key set) from the user-mgmt service. (~879 tok)
 - `Principal.java` — A caller's verified identity + structural attributes used for authorization checks. (~1053 tok)
 - `PrincipalStore.java` — Loads principal attributes from Redis. (~788 tok)
@@ -545,7 +592,7 @@
 ## gateway/src/main/resources/
 
 - `agent-manifest.schema.json` (~1677 tok)
-- `application.yml` (~1481 tok)
+- `application.yml` (~1553 tok)
 
 ## gateway/src/main/resources/domains/
 
@@ -893,7 +940,7 @@
 
 ## mock-agents/wealth-coverage/tests/
 
-- `test_coverage.py` — TestDiscover: test_rm_jane_sees_her_two_relationships, test_rm_ken_sees_okafor, test_unknown_princip (~1457 tok)
+- `test_coverage.py` — TestDiscover: test_rm_jane_sees_her_two_relationships, test_rm_ken_sees_okafor, test_unknown_princip (~1514 tok)
 
 ## mock-agents/wealth/
 

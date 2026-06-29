@@ -1717,6 +1717,70 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-06-29T16:47:55.887Z"
+    },
+    {
+      "id": "bug-107",
+      "timestamp": "2026-06-29T17:10:04.686Z",
+      "error_message": "Incorrect value in code",
+      "file": ".claude/worktrees/agent-acd21fbd8fbefdaf5/gateway/src/main/java/ai/meridian/gateway/domain/auth/CerbosEntitlementAdapter.java",
+      "root_cause": "Had \"CerbosEntitlementAdapter: PDP=http://{}:{} fail-m",
+      "fix": "Changed to \"CerbosEntitlementAdapter: PDP=http://{}:{} fail-m",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T17:10:04.686Z"
+    },
+    {
+      "id": "bug-108",
+      "timestamp": "2026-06-29T17:10:27.334Z",
+      "error_message": "Incorrect value in code",
+      "file": ".claude/worktrees/agent-acd21fbd8fbefdaf5/gateway/src/main/java/ai/meridian/gateway/domain/auth/EntitlementService.java",
+      "root_cause": "Had \"Entitlement: userId={} relationship={} allowed={}",
+      "fix": "Changed to \"Entitlement: userId={} {}={} allowed={} source={}",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T17:10:27.334Z"
+    },
+    {
+      "id": "bug-109",
+      "timestamp": "2026-06-29T17:21:56.733Z",
+      "error_message": "Wrong reference: RESOURCE_REL should be resourceType",
+      "file": "gateway/src/main/java/ai/meridian/gateway/domain/auth/CerbosEntitlementAdapter.java",
+      "root_cause": "Used \"RESOURCE_REL\" instead of \"resourceType\"",
+      "fix": "Changed RESOURCE_REL → resourceType",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-06-29T17:22:11.117Z"
+    },
+    {
+      "id": "bug-110",
+      "timestamp": "2026-06-29T17:23:24.561Z",
+      "error_message": "Significant refactor of ",
+      "file": "mock-agents/wealth-coverage/tests/test_coverage.py",
+      "root_cause": "4 lines replaced/restructured",
+      "fix": "Rewrote 5→7 lines (4 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "py"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T17:23:24.561Z"
     }
   ]
 }

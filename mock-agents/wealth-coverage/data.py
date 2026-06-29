@@ -71,22 +71,27 @@ def resolve(reference: str, entity_type: str, principal_id: str) -> dict:
     """
     Resolve a free-text reference to a canonical relationship ID.
 
-    Returns:
-      resolved=True, id=..., canonical_name=..., candidates=None  — unambiguous
-      resolved=False, id=None, canonical_name=None, candidates=[...] — ambiguous
-      resolved=False, id=None, canonical_name=None, candidates=[]  — not found
+    RESOLVE is principal-agnostic: it searches ALL entities regardless of the
+    caller's book.  principal_id is accepted for audit/logging only — it must
+    NOT be used to filter candidates.  CHECK is the sole authorization gate.
+
+    Returns one of:
+      {"resolved": True,  "id": "...", "canonical_name": "...", "candidates": None}
+      {"resolved": False, "id": None,  "canonical_name": None,  "candidates": [...]}  (ambiguous)
+      {"resolved": False, "id": None,  "canonical_name": None,  "candidates": []}    (not found)
     """
     ref_lower = reference.lower().strip()
-    book = BOOKS.get(principal_id, set())
+    if not ref_lower:
+        return {"resolved": False, "id": None, "canonical_name": None, "candidates": []}
 
-    # Restrict search to principal's visible set (security: never reveal others)
+    # Search ALL entities — principal_id is for audit only, not a filter.
     matches = []
     for rel_id, rel in RELATIONSHIPS.items():
-        if rel_id not in book:
-            continue
+        # Exact canonical-ID match
         if rel_id.lower() == ref_lower:
             matches.append(rel)
             continue
+        # Alias match (substring in either direction)
         for alias in rel.get("aliases", []):
             if alias in ref_lower or ref_lower in alias:
                 matches.append(rel)

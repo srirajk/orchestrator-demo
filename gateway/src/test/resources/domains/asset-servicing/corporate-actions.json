@@ -3,7 +3,34 @@
   "display_name": "Corporate Actions",
   "parent_domain": "asset-servicing",
   "resource_scoped": false,
+
+  "entity_types": [
+    {
+      "key": "fund_id",
+      "display": "fund or portfolio",
+      "id_pattern": "FND-\\w+",
+      "resolve_type": "fund",
+      "required": false
+    },
+    {
+      "key": "security_id",
+      "display": "security or ISIN",
+      "id_pattern": "[A-Z]{2}[A-Z0-9]{10}|[A-Z]{2,5}",
+      "resolve_type": "security",
+      "required": false
+    },
+    {
+      "key": "valuation_date",
+      "display": "valuation or NAV date",
+      "id_pattern": "\\d{4}-\\d{2}-\\d{2}",
+      "resolve_type": "date",
+      "required": false,
+      "default": "latest available"
+    }
+  ],
+
   "required_context": [],
+
   "agents": [
     "acme.servicing.corporate_actions",
     "acme.servicing.nav"
