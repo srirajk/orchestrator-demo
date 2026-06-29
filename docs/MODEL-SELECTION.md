@@ -85,6 +85,41 @@ procurement/risk committee wants to see.
 
 ---
 
+## Provider allocation — reference deployment profiles
+
+Tier (Fast/Quality/Max) is *what kind* of model; **provider** is *whose*. Both are per-call-site
+config. Two recommended profiles:
+
+### Profile A — "Brand + SLA on the critical path" (recommended default)
+Isolate providers by component so one vendor's outage degrades, not kills.
+
+| Component | Provider | Models |
+|---|---|---|
+| **Gateway** (routing + synthesis) | **OpenAI** | `gpt-4o-mini` (routing/extraction) · `gpt-4o`/`gpt-4.1` (synthesis) |
+| **Domain agents** | **GLM (Z.AI)** | `glm-4.5-flash` (in prod: domain team's choice) |
+| **Axiom / IAM policy gen** | **GLM (Z.AI)** | `glm-4.6` |
+| **Eval (DeepEval / Langfuse)** | **GLM (Z.AI)** | `glm-4.6` / flash |
+
+Why: the gateway is the user-facing critical path — OpenAI's instruction-following + grounding
+on the answer the RM reads, plus a single SLA / key / failure mode on the path that must always
+work. Cost-tiering stays *within* OpenAI (mini for routing, full for synthesis). GLM economy
+lives downstream where a provider blip degrades but doesn't black out the request.
+
+**Caveat:** OpenAI on every turn's routing costs more than GLM-flash. If synthesis is on OpenAI,
+add a **provider fallback** (OpenAI primary → `glm-4.6` on failure) so an OpenAI outage degrades
+gracefully. The per-call-site `*_BASE_URL`/`*_API_KEY` already exists; the fallback is a small
+try-primary-then-secondary seam (roadmap).
+
+### Profile B — "Cost-first / single vendor"
+Whole stack on GLM (Z.AI): gateway routing `glm-4.5-flash`, synthesis `glm-4.6`, agents flash,
+Axiom `glm-4.6`. Cheapest, one vendor, one key — at the cost of the OpenAI brand/quality signal
+on the user-facing answer. This is the current default in `application.yml`.
+
+> Both profiles are **zero code change** — only `*_BASE_URL` + `*_MODEL` + `*_API_KEY` per call
+> site. That swappability is the platform property; the profile is a deployment decision.
+
+---
+
 ## Quick reference — environment overrides
 
 ```bash
