@@ -1,20 +1,34 @@
 # Model Selection Guide — Meridian AI Gateway
 
 > **Status:** Recommended configuration, 2026-06-29.
-> **Principle:** No single model for everything. Each LLM call site is matched to a **tier**
-> by its real constraints — latency budget, request volume, whether it blocks, and whether a
-> human reads the output. Every call site is **independently model- and provider-swappable
-> via config** (no code change), so a customer can dial cost/latency/quality per task.
+> **Principle:** No single model for everything — because **each task is bound on a different
+> performance axis, and one model cannot be optimal on all of them.** Routing is *latency*-bound,
+> synthesis is *quality/TTFT*-bound, the release gate is *accuracy*-bound, drift monitoring is
+> *throughput*-bound. We match each call site to the model whose performance profile fits its
+> binding constraint. Every call site is **independently model- and provider-swappable via
+> config** (no code change), so the profile is a deployment decision, not a rebuild.
 
 ---
 
+## The performance axes (why we tier — not economics)
+
+| Task | **Bound on** | Consequence of the wrong model |
+|---|---|---|
+| Routing + entity extraction | **Latency** — runs every turn, before any data moves; bounded task | A frontier model adds seconds to TTFT for *zero* accuracy gain (flash already saturates a bounded task), and bottlenecks p99 under concurrency |
+| Answer synthesis | **Quality + TTFT** — open generative, user-facing, streamed | A weak model caps grounding-adherence + fluency on the answer the user judges you by |
+| Release-gate judge | **Accuracy** — offline, *blocking* a deploy | A weak judge passes bad releases; latency is irrelevant, so use the strongest |
+| Drift monitoring | **Throughput** — async stream of live traces | Must keep pace with traffic *without* adding latency to any request |
+
+You physically cannot win latency, quality, accuracy, and throughput with one model. Tiering
+puts each task on the model that fits the axis it's bound on.
+
 ## The tiers
 
-| Tier | Use when | Optimize for | Default (GLM family) |
+| Tier | Use when | **Optimize for** | Default (GLM family) |
 |---|---|---|---|
-| **Fast** | High volume, on the latency-critical path, bounded task (classify/extract), or async non-blocking monitoring | Latency + cost | `glm-4.5-flash` |
-| **Quality** | User-facing output, or rare-but-quality-critical drafting | Faithfulness + fluency | `glm-4.6` |
-| **Max** | A **blocking gate** where a wrong call is expensive and volume is tiny | Reasoning rigor (cost irrelevant) | strongest available (today `glm-4.6`) |
+| **Fast** | High volume, on the latency-critical path, bounded task (classify/extract), or async non-blocking monitoring | **Latency / throughput** | `glm-4.5-flash` |
+| **Quality** | User-facing generative output, or rare quality-critical drafting | **Grounding-adherence + TTFT** | `glm-4.6` |
+| **Max** | A **blocking gate** where a wrong call is expensive and volume is tiny | **Judgment accuracy** (latency irrelevant) | strongest available (today `glm-4.6`) |
 
 ---
 
@@ -58,9 +72,12 @@
 
 > **Using one heavy model (`gpt-5.x`, `glm-5.x`) for everything.**
 
-It would (a) blow the p99 latency budget on routing — which runs on every turn — and
-(b) cost ~10× on bounded tasks for no quality gain. The gateway tiers instead: flash for
-routing/extraction, a strong model for synthesis, the strongest only where it blocks a gate.
+It would **blow the p99 latency budget on routing** — which runs on every turn, on the
+critical path, for a bounded task that a flash model already answers at the accuracy ceiling.
+Adding frontier-model latency there raises time-to-first-token for *every* request and
+bottlenecks concurrency under load — pure latency tax, no quality return. The gateway tiers
+instead: flash for routing/extraction (latency-bound), a strong model for synthesis
+(quality-bound), the strongest only where it blocks a gate (accuracy-bound).
 
 > *Fixed 2026-06-29:* IAM policy generation defaulted to an unverified `glm-5.2` that
 > disagreed with its own Java default — reconciled to `glm-4.6` (the documented strong
