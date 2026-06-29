@@ -66,7 +66,23 @@ export async function registerOrLogin(page: Page): Promise<void> {
   }
 
   await page.click('button[type="submit"]');
-  await page.waitForURL(/\/(c\/|login)/, { timeout: 20_000 });
+  // Wait for either success (/c/...) or redirect back to /login (if email already exists).
+  try {
+    await page.waitForURL('**/c/**', { timeout: 20_000 });
+    return;  // registration succeeded
+  } catch {
+    // Registration may have failed (e.g., email already registered).
+    // Fall through to a final login attempt.
+  }
+
+  // Last resort — the account may already exist (created in a prior test run).
+  // Try logging in one more time before giving up.
+  await page.goto('/login', { waitUntil: 'load', timeout: 30_000 });
+  await page.waitForSelector('#email', { state: 'visible', timeout: 15_000 });
+  await page.fill('#email', TEST_EMAIL);
+  await page.fill('#password', TEST_PASSWORD);
+  await page.click('button[type="submit"]');
+  await page.waitForURL('**/c/**', { timeout: 20_000 });
 }
 
 /** Send a message in the currently open conversation and wait for the reply. */

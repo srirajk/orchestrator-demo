@@ -200,14 +200,13 @@ public class ChatService {
         tracePublisher.publish(TraceEvent.of("request_start", requestId, conversationId,
                 new RequestStartData(userId, latestPrompt)));
 
-        // ── OpenAI spec: emit the role delta immediately so the client gets
-        // first bytes within ~100ms and the stream appears alive while the
-        // pipeline (intent classification + agent fan-out) runs.
+        // streamId is set here and passed to all handlers so that every SSE chunk
+        // in this request carries the same completion ID.  The role delta is now emitted
+        // by the synthesizer (or streamTextAndComplete) rather than up-front, because
+        // sending a role delta here and a second one inside streamTextAndComplete caused
+        // LibreChat to track two separate in-flight completions — leaving the send button
+        // disabled after short denial/clarification responses.
         String streamId = "chatcmpl-" + requestId.replace("-", "").substring(0, 32);
-        long   streamTs = System.currentTimeMillis() / 1000;
-        try {
-            emitter.send(SseEmitter.event().data(roleDelta(streamId, streamTs)));
-        } catch (Exception ignored) { /* client disconnected early */ }
 
         try {
             IntentResult intentResult = intentClassifier.classify(request.messages());
@@ -441,11 +440,18 @@ public class ChatService {
             // ── END COVERAGE CHECK ──────────────────────────────────────────────────
 
             // Use pre-extracted entities from the combined intent+entity LLM call if available.
-            // Merge session relationship context into the pre-extracted bag when it lacks a ref.
+            // Priority: coverage-resolved ID > session carry-forward > raw reference (needs EntityResolver).
+            // When coverageRelId is set, the coverage pipeline already resolved the name to a canonical ID
+            // (e.g. "Whitman Family Office" → "REL-00042"). Injecting the ID here makes EntityResolver
+            // short-circuit via its REL-\d+ pattern match — no call to the external resolve endpoint needed.
             SynthesisResult synthesis;
             if (preExtracted != null) {
                 EntityBag effectiveBag = preExtracted;
-                if (preExtracted.relationshipReference() == null && session.relationshipId() != null) {
+                if (coverageRelId != null) {
+                    effectiveBag = EntityBag.extracted(
+                            coverageRelId, preExtracted.fundReference(),
+                            preExtracted.tickerReferences(), preExtracted.period());
+                } else if (preExtracted.relationshipReference() == null && session.relationshipId() != null) {
                     effectiveBag = EntityBag.extracted(
                             session.relationshipId(), preExtracted.fundReference(),
                             preExtracted.tickerReferences(), preExtracted.period());

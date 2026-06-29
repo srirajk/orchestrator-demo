@@ -119,6 +119,14 @@ public class AnswerSynthesizer {
 
         boolean emitterDone = false;
         try {
+            // Emit the role delta immediately so the browser stream appears alive while
+            // the LLM call is in flight. This replaces the former up-front emit in
+            // ChatService.handleChat which caused a duplicate-ID issue when
+            // streamTextAndComplete also sent its own role delta.
+            try {
+                emitter.send(SseEmitter.event().data(roleDelta(completionId, created, mapper)));
+            } catch (Exception ignored) { /* client disconnected before synthesis */ }
+
             String userContent = buildUserContent(results);
             String requestBody = buildRequestBody(userContent, originalPrompt, history);
 
@@ -159,7 +167,7 @@ public class AnswerSynthesizer {
                 try {
                     String errorMsg = "I encountered an error while synthesizing the response. " +
                             "Please try again or contact support.";
-                    // Role delta already sent upfront; go straight to content + stop
+                    // Role delta was sent at start of synthesize(); go straight to content + stop.
                     emitter.send(SseEmitter.event().data(
                             contentDelta(completionId, created, errorMsg, mapper)));
                     emitter.send(SseEmitter.event().data(stopDelta(completionId, created, mapper)));
@@ -249,6 +257,11 @@ public class AnswerSynthesizer {
         long created = System.currentTimeMillis() / 1_000L;
 
         try {
+            // Role delta first — same pattern as synthesize() to avoid duplicate-ID issues.
+            try {
+                emitter.send(SseEmitter.event().data(roleDelta(completionId, created, mapper)));
+            } catch (Exception ignored) { /* client disconnected */ }
+
             ObjectNode root = mapper.createObjectNode();
             root.put("model", model);
             root.put("stream", true);
@@ -282,7 +295,7 @@ public class AnswerSynthesizer {
         } catch (Exception e) {
             log.error("synthesizeFromHistory failed: {}", e.getMessage(), e);
             try {
-                // Role delta already sent upfront by ChatService
+                // Role delta was sent at start of synthesizeFromHistory(); go straight to content + stop.
                 emitter.send(SseEmitter.event().data(
                         contentDelta(completionId, created,
                                 "I couldn't process that. Please rephrase.", mapper)));
@@ -332,8 +345,9 @@ public class AnswerSynthesizer {
             throw new RuntimeException("LLM returned HTTP " + response.statusCode() + ": " + body);
         }
 
-        // Role delta was already sent upfront by ChatService before pipeline processing began
-        // (OpenAI spec: role chunk arrives immediately so the client stream opens instantly).
+        // Role delta was already sent by the calling synthesize/synthesizeFromHistory method
+        // before streamFromLlm was invoked, so any role chunk from the LLM response is skipped
+        // (parseChunk only extracts content/reasoning_content, not role).
 
         StringBuilder reasoningBuffer = new StringBuilder();
         boolean reasoningEmitted = false;  // have we already opened the blockquote?
