@@ -586,6 +586,7 @@ services:
       context: ./scripts/eval-worker
       dockerfile: Dockerfile
     container_name: meridian-eval-worker
+    profiles: [eval]
     depends_on:
       - langfuse
       - gateway
@@ -599,6 +600,28 @@ services:
       ZAI_BASE_URL: ${ZAI_BASE_URL:-https://api.z.ai/api/paas/v4}
       ZAI_EVAL_MODEL: ${ZAI_EVAL_MODEL:-glm-4.5-flash}
       EVAL_POLL_INTERVAL_SECONDS: ${EVAL_POLL_INTERVAL_SECONDS:-300}
+    restart: unless-stopped
+
+  # Continuous trace scorer: fetches recent Langfuse traces on a loop and posts
+  # grounding / partial-honesty / relevance / safety scores back (eval/langfuse_continuous.py).
+  # Passive (does not drive the gateway). Eval profile only — never starts with `core`.
+  eval-worker:
+    build:
+      context: ./eval
+      dockerfile: Dockerfile
+    container_name: meridian-eval-continuous
+    profiles: [eval]
+    depends_on:
+      - langfuse
+    environment:
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PROJECT_PUBLIC_KEY:-pk-lf-meridian-public}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_PROJECT_SECRET_KEY:-sk-lf-meridian-secret}
+      LANGFUSE_HOST: http://langfuse:3000
+      ZAI_API_KEY: ${ZAI_API_KEY}
+      JUDGE_MODEL: ${ZAI_EVAL_MODEL:-glm-4.6}
+      EVAL_INTERVAL_SECONDS: ${EVAL_INTERVAL_SECONDS:-300}
+      EVAL_LOOKBACK_HOURS: ${EVAL_LOOKBACK_HOURS:-24}
+      EVAL_TRACE_LIMIT: ${EVAL_TRACE_LIMIT:-50}
     restart: unless-stopped
 
   # ── k6 load test — Phase 7 only (scale profile) ───────────────────────────────

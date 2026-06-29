@@ -45,6 +45,14 @@ echo "   ✅  POST /v1/chat/completions → SSE stream contains [DONE]"
 echo "$STREAM" | grep -q '"chat.completion.chunk"'
 echo "   ✅  POST /v1/chat/completions → chunks have correct object type"
 
+# ── Optional: eval release gate (set RUN_EVAL=1 to include) ──────────────────
+if [[ "${RUN_EVAL:-0}" == "1" ]]; then
+  echo ""
+  echo "▶  [eval] RUN_EVAL=1 — running the eval release gate..."
+  "$ROOT/scripts/eval-gate.sh"
+  echo "   ✅  Eval gate passed."
+fi
+
 echo ""
 echo "═══════════════════════════════════════════════════════════════════════"
 echo "  All Phase 1 checks passed ✅"
