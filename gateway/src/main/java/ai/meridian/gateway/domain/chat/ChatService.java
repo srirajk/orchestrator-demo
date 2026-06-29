@@ -341,6 +341,21 @@ public class ChatService {
             }
             final List<AgentManifest> finalManifests = allowedManifests;
 
+            // ── Domain tag on root span — cost-by-domain in Langfuse / Grafana ────
+            // Value is read from manifest.domain() — never hardcoded (WORLD-B §5).
+            // Uses the first allowed agent's domain; comma-joins when >1 domain is present.
+            if (!finalManifests.isEmpty()) {
+                String resolvedDomain = finalManifests.stream()
+                        .map(AgentManifest::domain)
+                        .filter(d -> d != null && !d.isBlank())
+                        .distinct()
+                        .collect(Collectors.joining(","));
+                if (!resolvedDomain.isBlank()) {
+                    rootSpan.setAttribute("langfuse.metadata.domain", resolvedDomain);
+                    rootSpan.setAttribute("meridian.domain", resolvedDomain);
+                }
+            }
+
             // ── COVERAGE CHECK ──────────────────────────────────────────────────────
             // Find the first agent whose sub-domain is resource_scoped=true.
             // If found, run DISCOVER/RESOLVE/CHECK before synthesis so we never
