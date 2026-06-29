@@ -31,6 +31,7 @@ Distributed Tracing Note (MCP limitation):
 import sys
 import os
 import logging
+
 sys.path.insert(0, os.path.dirname(__file__))
 
 _log = logging.getLogger(__name__)
@@ -47,11 +48,21 @@ _log.warning(
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
+from starlette.applications import Starlette
+from starlette.middleware import Middleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
+from starlette.responses import JSONResponse, Response
+from starlette.routing import Route, Mount
+
 from settlements.tool import get_settlements as _get_settlements
 from corporate_actions.tool import get_corporate_actions as _get_corporate_actions
 from custody.tool import get_custody_positions as _get_custody_positions
 from nav.tool import get_nav as _get_nav
 from cash.tool import get_cash as _get_cash
+
+from shared.jwt_verify import verify_bearer_token
+from shared.error_schema import mcp_error_dict
 
 # Disable DNS-rebinding protection: this server runs inside Docker and is only
 # reachable by the gateway service — cross-container Host headers (e.g.
@@ -139,46 +150,55 @@ def get_cash(relationship_id: str) -> str:
     return _get_cash(relationship_id)
 
 
-if __name__ == "__main__":
-    import logging
-    import uvicorn
-    from starlette.applications import Starlette
-    from starlette.middleware import Middleware
-    from starlette.middleware.base import BaseHTTPMiddleware
-    from starlette.requests import Request as StarletteRequest
-    from starlette.responses import JSONResponse, Response
-    from starlette.routing import Route, Mount
+# ── HTTP middleware — lives at module scope so it applies whenever the app is
+#    imported or run (not only when started via __main__). ────────────────────
 
-    from shared.jwt_verify import verify_bearer_token
-
-    _log = logging.getLogger(__name__)
-
-    class JwtAuthMiddleware(BaseHTTPMiddleware):
-        """Verify JWT on all endpoints except /health."""
-        async def dispatch(self, request: StarletteRequest, call_next):
-            if request.url.path == "/health":
-                return await call_next(request)
-            auth = request.headers.get("Authorization")
-            allowed, error, claims = verify_bearer_token(auth)
-            if not allowed:
-                _log.warning("servicing-mcp: rejected — %s (path=%s)", error, request.url.path)
-                return Response(content=error, status_code=401, media_type="text/plain")
+class JwtAuthMiddleware(BaseHTTPMiddleware):
+    """Verify JWT on all endpoints except /health."""
+    async def dispatch(self, request: StarletteRequest, call_next):
+        if request.url.path == "/health":
             return await call_next(request)
+        auth = request.headers.get("Authorization")
+        allowed, error, claims = verify_bearer_token(auth)
+        if not allowed:
+            _log.warning("servicing-mcp: rejected — %s (path=%s)", error, request.url.path)
+            return JSONResponse(
+                status_code=401,
+                content=mcp_error_dict(error, "acme.servicing.gateway", 401),
+            )
+        return await call_next(request)
 
-    async def health(request):
-        return JSONResponse({
-            "status": "ok",
-            "service": "servicing-mcp",
-            "version": "0.3.0",
-            "agents": ["settlements", "corporate_actions", "custody", "nav", "cash"],
-        })
 
-    app = Starlette(
+async def _health(request: StarletteRequest) -> JSONResponse:
+    return JSONResponse({
+        "status": "ok",
+        "service": "servicing-mcp",
+        "version": "0.3.0",
+        "agents": ["settlements", "corporate_actions", "custody", "nav", "cash"],
+    })
+
+
+def create_app() -> Starlette:
+    """
+    Create and return the ASGI application (importable for testing and ASGI runners).
+
+    The JWT middleware is always applied — regardless of whether the server is
+    started via __main__ (uvicorn directly) or imported by a test harness / ASGI
+    server like gunicorn.
+    """
+    return Starlette(
         routes=[
-            Route("/health", health),
+            Route("/health", _health),
             Mount("/", app=mcp.sse_app()),
         ],
         middleware=[Middleware(JwtAuthMiddleware)],
     )
 
+
+# Module-scope app — importable by tests, ASGI runners, and __main__.
+app = create_app()
+
+
+if __name__ == "__main__":
+    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8082)

@@ -6,6 +6,7 @@ import asyncio
 import concurrent.futures
 from agents import Runner, function_tool, InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered
 from shared.canned_data import CASH
+from shared.error_schema import mcp_error_json
 from shared.fault_knobs import maybe_fault
 from shared.telemetry import agent_span
 from shared.agent_client import make_agent, LLM_MODEL, LLM_TIMEOUT_S
@@ -62,7 +63,7 @@ def get_cash(relationship_id: str) -> str:
         data = CASH.get(relationship_id)
         if data is None:
             span.set_attribute("error", True)
-            return json.dumps({"error": f"Relationship '{relationship_id}' not found."})
+            return mcp_error_json(f"Relationship '{relationship_id}' not found.", AGENT_ID, 404)
         projected_usd = data.get("projected_cash_usd", 0)
         span.set_attribute("result.total_available_usd", projected_usd)
         span.set_attribute("result.currency_count", len(data.get("balances", [])))
@@ -78,4 +79,4 @@ def get_cash(relationship_id: str) -> str:
             return json.dumps({**data, "agent_narrative": narrative})
         except Exception as exc:
             log.error("Agent LLM call failed for %s: %s", relationship_id, exc)
-            return json.dumps({"error": f"llm_unavailable: {type(exc).__name__}", "agent_id": AGENT_ID})
+            return mcp_error_json(f"llm_unavailable: {type(exc).__name__}", AGENT_ID, 503)
