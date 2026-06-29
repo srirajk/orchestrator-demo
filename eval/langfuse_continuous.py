@@ -87,10 +87,19 @@ def check_grounding(answer: str, agent_outputs: list) -> tuple:
     and plain integers/decimals.
 
     Returns:
-        (score: float, reason: str)
+        (score: float | None, reason: str)
+        score is None when grounding is N/A (no agent outputs to ground against —
+                     e.g. a follow-up turn answered from session, or a clarify/denial
+                     turn). The caller must SKIP posting a grounding score in that case,
+                     never record 0.0, which would falsely read as "ungrounded".
         score == 1.0 when all numbers are grounded (or no numbers present)
         score < 1.0  proportional to the fraction of grounded numbers
     """
+    # No agent observations => nothing to ground against. Grounding is undefined here,
+    # NOT zero. Follow-ups (answered from session) and clarify/denial turns hit this.
+    if not agent_outputs:
+        return None, "N/A — no agent outputs on this turn (follow-up/clarify/denial)"
+
     # Catalog-specified regex
     numbers = re.findall(r"\$?[\d,]+\.?\d*%?", answer)
     if not numbers:
@@ -483,12 +492,15 @@ def run_continuous_eval() -> None:
 
         # ── Post scores to Langfuse ──────────────────────────────────────────
         try:
-            lf.score(
-                trace_id=trace_id,
-                name="grounding",
-                value=grounding_score,
-                comment=grounding_reason,
-            )
+            # Grounding is N/A (None) for turns with no agent outputs — skip it rather
+            # than record a misleading 0.0.
+            if grounding_score is not None:
+                lf.score(
+                    trace_id=trace_id,
+                    name="grounding",
+                    value=grounding_score,
+                    comment=grounding_reason,
+                )
             lf.score(
                 trace_id=trace_id,
                 name="partial_honesty",
@@ -511,8 +523,8 @@ def run_continuous_eval() -> None:
             logger.error("Failed to post scores for trace %s: %s", trace_id, exc)
 
         logger.info(
-            "  grounding=%.2f  honesty=%.2f  relevance=%.2f  safety=%.2f",
-            grounding_score,
+            "  grounding=%s  honesty=%.2f  relevance=%.2f  safety=%.2f",
+            ("%.2f" % grounding_score) if grounding_score is not None else "N/A",
             honesty_score,
             relevance_score,
             safety_score,
@@ -549,9 +561,11 @@ def run_continuous_eval() -> None:
     print("-" * sum(col_w))
 
     for row in summary:
+        g = row["grounding"]
+        g_cell = ("%.2f" % g) if g is not None else "N/A"
         print(
             f"{row['trace_id']:<{col_w[0]}}"
-            f"{row['grounding']:>{col_w[1]}.2f}"
+            f"{g_cell:>{col_w[1]}}"
             f"{row['partial_honesty']:>{col_w[2]}.2f}"
             f"{row['relevance']:>{col_w[3]}.2f}"
             f"{row['safety']:>{col_w[4]}.2f}"
@@ -559,14 +573,16 @@ def run_continuous_eval() -> None:
 
     if summary:
         n = len(summary)
-        avg_g = sum(r["grounding"] for r in summary) / n
+        # Grounding averages only over turns where it applies (None = N/A excluded).
+        grounded_rows = [r["grounding"] for r in summary if r["grounding"] is not None]
+        avg_g_cell = ("%.2f" % (sum(grounded_rows) / len(grounded_rows))) if grounded_rows else "N/A"
         avg_h = sum(r["partial_honesty"] for r in summary) / n
         avg_r = sum(r["relevance"] for r in summary) / n
         avg_s = sum(r["safety"] for r in summary) / n
         print("-" * sum(col_w))
         print(
             f"{'AVERAGE':<{col_w[0]}}"
-            f"{avg_g:>{col_w[1]}.2f}"
+            f"{avg_g_cell:>{col_w[1]}}"
             f"{avg_h:>{col_w[2]}.2f}"
             f"{avg_r:>{col_w[3]}.2f}"
             f"{avg_s:>{col_w[4]}.2f}"
