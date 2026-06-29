@@ -30,8 +30,8 @@
     },
     "domain": {
       "type": "string",
-      "description": "Coarse business bucket the resolver narrows by. Demo uses two; extend for scale.",
-      "enum": ["wealth-management", "asset-servicing"]
+      "minLength": 1,
+      "description": "World B: the business domain this agent belongs to. NOT enumerated here — a new domain onboards by adding its manifests; the gateway validates this against the loaded domain manifests at boot (DomainManifestStore), not against a hardcoded list."
     },
     "protocol": {
       "type": "string",
