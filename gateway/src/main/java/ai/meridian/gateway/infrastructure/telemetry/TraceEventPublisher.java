@@ -1,6 +1,8 @@
 package ai.meridian.gateway.infrastructure.telemetry;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -9,6 +11,9 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * In-memory pub/sub bus for glass-box trace events.
@@ -26,13 +31,46 @@ public class TraceEventPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(TraceEventPublisher.class);
 
+    /** Heartbeat cadence. The glass-box client reconnects if it sees silence; a periodic
+     *  SSE comment keeps an idle connection alive so it doesn't miss the next request's burst. */
+    private static final long HEARTBEAT_SECONDS = 15L;
+
     private final ConcurrentHashMap<String, SseEmitter> subscribers = new ConcurrentHashMap<>();
     private final ObjectMapper mapper;
     private final TraceStorageAdapter storage;
+    private ScheduledExecutorService heartbeat;
 
     public TraceEventPublisher(ObjectMapper mapper, TraceStorageAdapter storage) {
         this.mapper  = mapper;
         this.storage = storage;
+    }
+
+    @PostConstruct
+    void startHeartbeat() {
+        heartbeat = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "glassbox-heartbeat");
+            t.setDaemon(true);
+            return t;
+        });
+        heartbeat.scheduleAtFixedRate(this::sendHeartbeat,
+                HEARTBEAT_SECONDS, HEARTBEAT_SECONDS, TimeUnit.SECONDS);
+    }
+
+    @PreDestroy
+    void stopHeartbeat() {
+        if (heartbeat != null) heartbeat.shutdownNow();
+    }
+
+    /** Send an SSE comment (`:hb`) to every subscriber so idle connections stay live. */
+    private void sendHeartbeat() {
+        if (subscribers.isEmpty()) return;
+        subscribers.forEach((clientId, emitter) -> {
+            try {
+                emitter.send(SseEmitter.event().comment("hb"));
+            } catch (Exception e) {
+                subscribers.remove(clientId);
+            }
+        });
     }
 
     /**
@@ -42,6 +80,15 @@ public class TraceEventPublisher {
     public SseEmitter subscribe(String clientId) {
         SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
         subscribers.put(clientId, emitter);
+        // Flush an immediate comment so the browser's EventSource fires `onopen` right away
+        // (otherwise it sits in CONNECTING until the first real event and the client may
+        // give up and reconnect, churning past the next request's events).
+        try {
+            emitter.send(SseEmitter.event().comment("connected"));
+        } catch (Exception e) {
+            subscribers.remove(clientId);
+            emitter.completeWithError(e);
+        }
         log.debug("Glass-box subscriber connected: {} (total={})", clientId, subscribers.size());
         return emitter;
     }

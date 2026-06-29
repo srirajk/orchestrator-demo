@@ -19,8 +19,12 @@ import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.security.interfaces.RSAPublicKey;
 import java.time.Instant;
@@ -58,12 +62,19 @@ public class SecurityConfig {
     @Value("${meridian.auth.required-audience:meridian-gateway}")
     private String expectedAudience;
 
+    // Browser origins allowed to read the glass-box SSE stream cross-origin (the glass-box
+    // page is served from its own host/port). Comma-separated; "*" allows any. Configurable
+    // so it can be locked down per environment.
+    @Value("${meridian.glassbox.allowed-origins:*}")
+    private String glassboxAllowedOrigins;
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
             JwtDecoder jwtDecoder,
             JwtAuthenticationConverter jwtAuthenticationConverter) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
+            .cors(Customizer.withDefaults())   // applies corsConfigurationSource() bean
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 // Public endpoints — no auth required
@@ -113,6 +124,25 @@ public class SecurityConfig {
                 })
             );
         return http.build();
+    }
+
+    /**
+     * CORS for browser clients. The glass-box page loads from its own origin and opens an
+     * {@code EventSource} to {@code /trace/**}; without an {@code Access-Control-Allow-Origin}
+     * header the browser blocks the stream (the connection fires onerror and the client churns
+     * on reconnect). Scoped to {@code /trace/**} (read-only telemetry); origins are configurable.
+     */
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration cfg = new CorsConfiguration();
+        for (String origin : glassboxAllowedOrigins.split(",")) {
+            cfg.addAllowedOriginPattern(origin.trim());
+        }
+        cfg.addAllowedMethod("GET");
+        cfg.addAllowedHeader("*");
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/trace/**", cfg);
+        return source;
     }
 
     /**
