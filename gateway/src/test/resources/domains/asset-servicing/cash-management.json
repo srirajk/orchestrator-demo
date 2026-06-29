@@ -1,0 +1,10 @@
+{
+  "sub_domain_id": "cash-management",
+  "display_name": "Cash Management",
+  "parent_domain": "asset-servicing",
+  "resource_scoped": false,
+  "required_context": [],
+  "agents": [
+    "acme.servicing.cash_management"
+  ]
+}

@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-29T06:03:08.710Z
-> Files: 586 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-29T16:35:18.130Z
+> Files: 593 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/
 
@@ -23,7 +23,7 @@
 - `agent-manifest.schema.json` (~1558 tok)
 - `BUILD_REPORT.md` — Build Report — Meridian AI Gateway (~15724 tok)
 - `CLAUDE.md` — OpenWolf (~6447 tok)
-- `docker-compose.yml` — Docker Compose services (~6815 tok)
+- `docker-compose.yml` — Docker Compose services (~7163 tok)
 - `README.md` — Project documentation (~4696 tok)
 - `z.ai-tiers.md` — Declares Model (~778 tok)
 
@@ -35,6 +35,7 @@
 ## .claude/rules/
 
 - `openwolf.md` (~313 tok)
+- `world-b.md` — World B — non-negotiable invariants for gateway code (~611 tok)
 
 ## .claude/skills/fastapi-pro/
 
@@ -205,6 +206,7 @@
 - `master-build-plan-consolidated.md` — Enterprise Intelligence Platform — Master Build Plan (Meridian) (~3833 tok)
 - `platform-vision-and-maturity-path.md` — Enterprise Intelligence Platform — Vision & Maturity Path (~1324 tok)
 - `technical-architecture-clear-boundaries.md` — Technical Architecture — Clear Boundaries (~1990 tok)
+- `WORLD-B-LOCKDOWN.md` — Meridian — World B Architecture Lockdown (~8836 tok)
 
 ## e2e/
 
@@ -326,6 +328,8 @@
 
 - `cerbos_golden_dataset.json` (~5722 tok)
 - `cerbos_policy_eval.py` — check, run (~1465 tok)
+- `continuous_loop.py` — main (~501 tok)
+- `Dockerfile` — Docker container definition (~86 tok)
 - `eval_deepeval.py` — PartialHonestyMetric: configure_judge_model, measure, a_measure, is_successful + 7 more (~5358 tok)
 - `golden-prompts.json` (~3317 tok)
 - `langfuse_continuous.py` — check_grounding, check_partial_honesty, llm_judge, extract_trace_data (~5808 tok)
@@ -416,7 +420,7 @@
 
 ## gateway/src/main/java/ai/meridian/gateway/domain/chat/
 
-- `ChatService.java` — Entry point from the controller — called on a virtual thread after the async boundary. (~11953 tok)
+- `ChatService.java` — Entry point from the controller — called on a virtual thread after the async boundary. (~12274 tok)
 
 ## gateway/src/main/java/ai/meridian/gateway/domain/coverage/
 
@@ -435,7 +439,7 @@
 
 - `ClarificationSchema.java` — Class: ClarificationSchema (~112 tok)
 - `DomainManifest.java` — DomainManifest: Coverage, MemoryCompaction (~272 tok)
-- `DomainManifestStore.java` — Resolves ${VAR_NAME} placeholders in all Coverage URL fields using Spring Environment. (~2240 tok)
+- `DomainManifestStore.java` — Resolves ${VAR_NAME} placeholders in all Coverage URL fields using Spring Environment. (~2317 tok)
 - `DomainPrerequisiteValidator.java` — Service: DomainPrerequisiteValidator (~439 tok)
 - `EffectiveManifest.java` — Returns true if this effective manifest requires a relationship_id in context. (~643 tok)
 - `SubDomainManifest.java` — Class: SubDomainManifest (~188 tok)
@@ -479,7 +483,7 @@
 
 ## gateway/src/main/java/ai/meridian/gateway/orchestration/executor/
 
-- `FlatPlanExecutor.java` — Flat plan executor: fans out all {@link PlanNode}s in parallel on virtual threads (~1332 tok)
+- `FlatPlanExecutor.java` — Flat plan executor: fans out all {@link PlanNode}s in parallel on virtual threads (~1741 tok)
 
 ## gateway/src/main/java/ai/meridian/gateway/orchestration/harness/
 
@@ -505,7 +509,7 @@
 
 ## gateway/src/main/java/ai/meridian/gateway/registry/loader/
 
-- `RegistryBootstrapLoader.java` — Loads all bundled manifests from classpath:/manifests/*.json at startup. (~1093 tok)
+- `RegistryBootstrapLoader.java` — Loads agent manifests from the external registry location at startup. (~1210 tok)
 
 ## gateway/src/main/java/ai/meridian/gateway/registry/model/
 
@@ -539,7 +543,7 @@
 
 ## gateway/src/main/resources/
 
-- `agent-manifest.schema.json` (~1558 tok)
+- `agent-manifest.schema.json` (~1677 tok)
 - `application.yml` (~1481 tok)
 
 ## gateway/src/main/resources/domains/
@@ -968,6 +972,7 @@
 ## scripts/
 
 - `eval_agents.py` — TestHoldingsAgent: call_wealth, build_metrics, test_holdings_faithfulness, test_performance_faithfulness + 5 more (~3259 tok)
+- `eval-gate.sh` — Eval release gate — seeds Langfuse datasets, then runs the DeepEval routing (~753 tok)
 - `eval-routing.py` — mint_admin_token, load_prompts, resolve, f1 + 1 more (~1675 tok)
 - `integration-test.sh` — Curl-based integration tests against the running gateway. (~1352 tok)
 - `requirements-eval.txt` — Meridian eval dependencies (not runtime — install on dev/CI machine) (~33 tok)
@@ -977,8 +982,10 @@
 - `seed-demo.sh` — Meridian Gateway — Phoenix/Tempo demo seed (~176 tok)
 - `seed-users.sh` — seed-users.sh — Idempotently seed demo principals into Redis. (~875 tok)
 - `seed-users.sh` — seed-users.sh — Idempotently seed demo principals into Redis. (~910 tok)
-- `verify.sh` — Full verification script — runs after each phase to confirm acceptance criteria. (~550 tok)
+- `verify-telemetry-e2e.sh` — ───────────────────────────────────────────────────────────────────────────── (~1151 tok)
+- `verify.sh` — Full verification script — runs after each phase to confirm acceptance criteria. (~583 tok)
 - `wait-for-healthy.sh` — Wait until all core docker-compose services report healthy, then exit 0. (~323 tok)
+- `world-b-check.sh` — ───────────────────────────────────────────────────────────────────────────── (~1272 tok)
 
 ## scripts/eval-worker/
 

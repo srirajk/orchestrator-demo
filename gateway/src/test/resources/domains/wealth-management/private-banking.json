@@ -1,0 +1,26 @@
+{
+  "sub_domain_id": "private-banking",
+  "display_name": "Private Banking",
+  "parent_domain": "wealth-management",
+  "resource_scoped": true,
+  "required_context": ["relationship_id"],
+  "clarification_schema": {
+    "relationship_id": {
+      "question": "Which client relationship are you asking about?",
+      "options_source": "discover",
+      "priority": 1
+    },
+    "time_period": {
+      "question": "Which period would you like to review?",
+      "options_source": "agent_derived",
+      "default": "most recent quarter",
+      "priority": 2
+    }
+  },
+  "agents": [
+    "acme.wealth.holdings",
+    "acme.wealth.performance",
+    "acme.wealth.risk_profile",
+    "acme.wealth.goal_planning"
+  ]
+}

@@ -1653,6 +1653,38 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-06-29T04:41:41.766Z"
+    },
+    {
+      "id": "bug-103",
+      "timestamp": "2026-06-29T16:02:52.746Z",
+      "error_message": "Missing error handling in unknown",
+      "file": "docs/WORLD-B-LOCKDOWN.md",
+      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
+      "fix": "Added try/catch block",
+      "tags": [
+        "auto-detected",
+        "error-handling",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T16:02:52.746Z"
+    },
+    {
+      "id": "bug-104",
+      "timestamp": "2026-06-29T16:34:13.298Z",
+      "error_message": "Significant refactor of ",
+      "file": "gateway/src/main/java/ai/meridian/gateway/registry/loader/RegistryBootstrapLoader.java",
+      "root_cause": "7 lines replaced/restructured",
+      "fix": "Rewrote 37→45 lines (7 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T16:34:13.298Z"
     }
   ]
 }

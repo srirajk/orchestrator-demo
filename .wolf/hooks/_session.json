@@ -78,22 +78,22 @@
       "first_read": "2026-06-29T14:45:43.084Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/manifest/DomainManifestStore.java": {
-      "count": 2,
+      "count": 4,
       "tokens": 2240,
       "first_read": "2026-06-29T14:45:46.056Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/docker-compose.yml": {
-      "count": 2,
-      "tokens": 6815,
+      "count": 10,
+      "tokens": 7087,
       "first_read": "2026-06-29T14:45:46.478Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/resources/application.yml": {
-      "count": 3,
+      "count": 4,
       "tokens": 1481,
       "first_read": "2026-06-29T14:45:46.925Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java": {
-      "count": 1,
+      "count": 3,
       "tokens": 11953,
       "first_read": "2026-06-29T14:45:46.976Z"
     },
@@ -203,21 +203,411 @@
       "first_read": "2026-06-29T14:46:33.401Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java": {
-      "count": 1,
+      "count": 2,
       "tokens": 3874,
       "first_read": "2026-06-29T14:46:35.450Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/synthesis/answer/AnswerSynthesizer.java": {
-      "count": 1,
+      "count": 3,
       "tokens": 6780,
       "first_read": "2026-06-29T14:46:39.738Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/infrastructure/telemetry/TraceEvent.java": {
+      "count": 1,
+      "tokens": 642,
+      "first_read": "2026-06-29T16:09:56.111Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/.env.example": {
+      "count": 3,
+      "tokens": 0,
+      "first_read": "2026-06-29T16:09:56.125Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/infrastructure/telemetry/TraceEventPublisher.java": {
+      "count": 1,
+      "tokens": 986,
+      "first_read": "2026-06-29T16:09:56.729Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/api/v1/trace/TraceStreamController.java": {
+      "count": 1,
+      "tokens": 835,
+      "first_read": "2026-06-29T16:09:57.169Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/infrastructure/telemetry/RequestCorrelationFilter.java": {
+      "count": 1,
+      "tokens": 1093,
+      "first_read": "2026-06-29T16:09:57.705Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/eval/eval_deepeval.py": {
+      "count": 2,
+      "tokens": 5358,
+      "first_read": "2026-06-29T16:09:58.716Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/infrastructure/web/BaggagePropagationFilter.java": {
+      "count": 1,
+      "tokens": 220,
+      "first_read": "2026-06-29T16:10:00.311Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/eval/langfuse_continuous.py": {
+      "count": 2,
+      "tokens": 5808,
+      "first_read": "2026-06-29T16:10:03.109Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/eval/langfuse_seed_datasets.py": {
+      "count": 2,
+      "tokens": 3565,
+      "first_read": "2026-06-29T16:10:07.512Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/orchestration/harness/AgentHarness.java": {
+      "count": 4,
+      "tokens": 5300,
+      "first_read": "2026-06-29T16:10:08.047Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/eval/langfuse_run_experiment.py": {
+      "count": 1,
+      "tokens": 4132,
+      "first_read": "2026-06-29T16:10:11.169Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/eval/cerbos_policy_eval.py": {
+      "count": 1,
+      "tokens": 1465,
+      "first_read": "2026-06-29T16:10:17.372Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/infra/otel-collector.yaml": {
+      "count": 2,
+      "tokens": 627,
+      "first_read": "2026-06-29T16:10:18.159Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/scripts/eval-routing.py": {
+      "count": 1,
+      "tokens": 1675,
+      "first_read": "2026-06-29T16:10:20.769Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/infrastructure/telemetry/TraceStorageAdapter.java": {
+      "count": 1,
+      "tokens": 306,
+      "first_read": "2026-06-29T16:10:21.331Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/infrastructure/telemetry/RedisTraceStorageAdapter.java": {
+      "count": 1,
+      "tokens": 1073,
+      "first_read": "2026-06-29T16:10:21.432Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/scripts/eval_agents.py": {
+      "count": 1,
+      "tokens": 3259,
+      "first_read": "2026-06-29T16:10:24.609Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/infrastructure/telemetry/event/RequestStartData.java": {
+      "count": 1,
+      "tokens": 36,
+      "first_read": "2026-06-29T16:10:25.823Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/infrastructure/telemetry/event/IntentClassifiedData.java": {
+      "count": 1,
+      "tokens": 44,
+      "first_read": "2026-06-29T16:10:26.317Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/infrastructure/telemetry/event/AgentStartData.java": {
+      "count": 1,
+      "tokens": 36,
+      "first_read": "2026-06-29T16:10:26.906Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/infrastructure/telemetry/event/AgentCompleteData.java": {
+      "count": 1,
+      "tokens": 47,
+      "first_read": "2026-06-29T16:10:27.304Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/eval/golden-prompts.json": {
+      "count": 1,
+      "tokens": 3317,
+      "first_read": "2026-06-29T16:10:28.770Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/adapter/http/HttpAdapter.java": {
+      "count": 1,
+      "tokens": 2486,
+      "first_read": "2026-06-29T16:10:30.056Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/adapter/mcp/McpAdapter.java": {
+      "count": 1,
+      "tokens": 4375,
+      "first_read": "2026-06-29T16:10:32.323Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/config/AppConfig.java": {
+      "count": 1,
+      "tokens": 296,
+      "first_read": "2026-06-29T16:10:32.851Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/eval/cerbos_golden_dataset.json": {
+      "count": 1,
+      "tokens": 5722,
+      "first_read": "2026-06-29T16:10:35.372Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/pom.xml": {
+      "count": 1,
+      "tokens": 1494,
+      "first_read": "2026-06-29T16:10:39.124Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/scripts/verify.sh": {
+      "count": 2,
+      "tokens": 550,
+      "first_read": "2026-06-29T16:10:42.678Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/mock-agents/wealth/shared/telemetry.py": {
+      "count": 2,
+      "tokens": 1312,
+      "first_read": "2026-06-29T16:10:47.969Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/mock-agents/servicing/shared/telemetry.py": {
+      "count": 1,
+      "tokens": 591,
+      "first_read": "2026-06-29T16:10:48.376Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/infrastructure/telemetry/event/AgentsResolvedData.java": {
+      "count": 1,
+      "tokens": 91,
+      "first_read": "2026-06-29T16:10:51.522Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/infrastructure/telemetry/event/SynthesisStartData.java": {
+      "count": 1,
+      "tokens": 38,
+      "first_read": "2026-06-29T16:10:52.150Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/eval/requirements.txt": {
+      "count": 2,
+      "tokens": 41,
+      "first_read": "2026-06-29T16:10:52.565Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/infrastructure/telemetry/event/EntitlementCheckData.java": {
+      "count": 1,
+      "tokens": 76,
+      "first_read": "2026-06-29T16:10:52.658Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/infrastructure/telemetry/event/RequestCompleteData.java": {
+      "count": 1,
+      "tokens": 42,
+      "first_read": "2026-06-29T16:10:53.182Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/synthesis/input/InputSynthesizer.java": {
+      "count": 1,
+      "tokens": 496,
+      "first_read": "2026-06-29T16:11:01.774Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/GatewayApplication.java": {
+      "count": 1,
+      "tokens": 93,
+      "first_read": "2026-06-29T16:11:04.173Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/orchestration/executor/FlatPlanExecutor.java": {
+      "count": 2,
+      "tokens": 1332,
+      "first_read": "2026-06-29T16:11:17.843Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/scripts/eval-worker/worker.py": {
+      "count": 2,
+      "tokens": 3311,
+      "first_read": "2026-06-29T16:11:45.631Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/scripts/eval-worker/golden_datasets.py": {
+      "count": 1,
+      "tokens": 1812,
+      "first_read": "2026-06-29T16:11:47.853Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/harness/AgentHarness.java": {
+      "count": 1,
+      "tokens": 0,
+      "first_read": "2026-06-29T16:15:16.147Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/scripts/wait-for-healthy.sh": {
+      "count": 1,
+      "tokens": 323,
+      "first_read": "2026-06-29T16:15:20.698Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/scripts/eval-worker/Dockerfile": {
+      "count": 1,
+      "tokens": 41,
+      "first_read": "2026-06-29T16:15:34.980Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/scripts/eval-worker/requirements.txt": {
+      "count": 1,
+      "tokens": 16,
+      "first_read": "2026-06-29T16:15:35.593Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/resources/agent-manifest.schema.json": {
+      "count": 2,
+      "tokens": 1558,
+      "first_read": "2026-06-29T16:32:35.227Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/registry/loader/RegistryBootstrapLoader.java": {
+      "count": 1,
+      "tokens": 1093,
+      "first_read": "2026-06-29T16:33:50.862Z"
     }
   },
-  "files_written": [],
-  "edit_counts": {},
-  "anatomy_hits": 39,
-  "anatomy_misses": 3,
-  "repeated_reads_warned": 9,
+  "files_written": [
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/docs/WORLD-B-LOCKDOWN.md",
+      "action": "create",
+      "tokens": 8824,
+      "at": "2026-06-29T15:57:54.608Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/scripts/world-b-check.sh",
+      "action": "create",
+      "tokens": 1290,
+      "at": "2026-06-29T16:00:52.046Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/scripts/world-b-check.sh",
+      "action": "create",
+      "tokens": 1362,
+      "at": "2026-06-29T16:01:51.803Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/rules/world-b.md",
+      "action": "create",
+      "tokens": 699,
+      "at": "2026-06-29T16:02:23.479Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/docs/WORLD-B-LOCKDOWN.md",
+      "action": "edit",
+      "tokens": 1312,
+      "at": "2026-06-29T16:02:52.746Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
+      "action": "edit",
+      "tokens": 318,
+      "at": "2026-06-29T16:16:13.275Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/orchestration/executor/FlatPlanExecutor.java",
+      "action": "edit",
+      "tokens": 225,
+      "at": "2026-06-29T16:17:09.964Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/orchestration/executor/FlatPlanExecutor.java",
+      "action": "edit",
+      "tokens": 122,
+      "at": "2026-06-29T16:17:16.202Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/orchestration/executor/FlatPlanExecutor.java",
+      "action": "edit",
+      "tokens": 608,
+      "at": "2026-06-29T16:17:30.567Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/eval/continuous_loop.py",
+      "action": "create",
+      "tokens": 501,
+      "at": "2026-06-29T16:18:00.466Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/eval/Dockerfile",
+      "action": "create",
+      "tokens": 92,
+      "at": "2026-06-29T16:18:02.157Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/scripts/eval-gate.sh",
+      "action": "create",
+      "tokens": 807,
+      "at": "2026-06-29T16:18:17.230Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/scripts/verify.sh",
+      "action": "edit",
+      "tokens": 150,
+      "at": "2026-06-29T16:18:24.154Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/docker-compose.yml",
+      "action": "edit",
+      "tokens": 486,
+      "at": "2026-06-29T16:18:39.954Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/scripts/verify-telemetry-e2e.sh",
+      "action": "create",
+      "tokens": 1233,
+      "at": "2026-06-29T16:21:06.165Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
+      "action": "edit",
+      "tokens": 134,
+      "at": "2026-06-29T16:25:24.477Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/resources/agent-manifest.schema.json",
+      "action": "edit",
+      "tokens": 131,
+      "at": "2026-06-29T16:33:21.659Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/registry/loader/RegistryBootstrapLoader.java",
+      "action": "edit",
+      "tokens": 608,
+      "at": "2026-06-29T16:34:13.297Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/registry/loader/RegistryBootstrapLoader.java",
+      "action": "edit",
+      "tokens": 77,
+      "at": "2026-06-29T16:34:17.873Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/manifest/DomainManifestStore.java",
+      "action": "edit",
+      "tokens": 123,
+      "at": "2026-06-29T16:34:36.428Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/manifest/DomainManifestStore.java",
+      "action": "edit",
+      "tokens": 244,
+      "at": "2026-06-29T16:34:45.872Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/manifest/DomainManifestStore.java",
+      "action": "edit",
+      "tokens": 72,
+      "at": "2026-06-29T16:34:50.538Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/manifest/DomainManifestStore.java",
+      "action": "edit",
+      "tokens": 63,
+      "at": "2026-06-29T16:34:54.831Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/docker-compose.yml",
+      "action": "edit",
+      "tokens": 138,
+      "at": "2026-06-29T16:35:18.136Z"
+    }
+  ],
+  "edit_counts": {
+    "docs/WORLD-B-LOCKDOWN.md": 2,
+    "scripts/world-b-check.sh": 2,
+    ".claude/rules/world-b.md": 1,
+    "gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java": 2,
+    "gateway/src/main/java/ai/meridian/gateway/orchestration/executor/FlatPlanExecutor.java": 3,
+    "eval/continuous_loop.py": 1,
+    "eval/Dockerfile": 1,
+    "scripts/eval-gate.sh": 1,
+    "scripts/verify.sh": 1,
+    "docker-compose.yml": 2,
+    "scripts/verify-telemetry-e2e.sh": 1,
+    "gateway/src/main/resources/agent-manifest.schema.json": 1,
+    "gateway/src/main/java/ai/meridian/gateway/registry/loader/RegistryBootstrapLoader.java": 2,
+    "gateway/src/main/java/ai/meridian/gateway/domain/manifest/DomainManifestStore.java": 4
+  },
+  "anatomy_hits": 83,
+  "anatomy_misses": 5,
+  "repeated_reads_warned": 40,
   "cerebrum_warnings": 0,
-  "stop_count": 8
+  "stop_count": 13
 }

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
@@ -25,15 +26,18 @@ public class DomainManifestStore {
 
     private final ObjectMapper mapper;
     private final Environment env;
+    private final String registryLocation;
     private final Map<String, DomainManifest>    domains          = new HashMap<>();
     private final Map<String, SubDomainManifest> subDomains       = new HashMap<>();
     // Reverse map: agentId → subDomainId — built from sub-domain agents[] lists at load time.
     // Used as fallback when the AgentManifest in Redis lacks sub_domain (Jackson/record issue).
     private final Map<String, String>            agentToSubDomain = new HashMap<>();
 
-    public DomainManifestStore(ObjectMapper mapper, Environment env) {
+    public DomainManifestStore(ObjectMapper mapper, Environment env,
+                               @Value("${meridian.registry.location:classpath:}") String registryLocation) {
         this.mapper = mapper;
         this.env = env;
+        this.registryLocation = registryLocation;
     }
 
     @PostConstruct
@@ -48,9 +52,9 @@ public class DomainManifestStore {
         var resolver = new PathMatchingResourcePatternResolver();
         Resource[] resources;
         try {
-            resources = resolver.getResources("classpath:domains/*.json");
+            resources = resolver.getResources(registryLocation + "domains/*.json");
         } catch (IOException e) {
-            log.warn("No domain manifests found at classpath:domains/*.json");
+            log.warn("No domain manifests found at {}domains/*.json", registryLocation);
             return;
         }
         for (Resource r : resources) {
@@ -106,7 +110,7 @@ public class DomainManifestStore {
         var resolver = new PathMatchingResourcePatternResolver();
         Resource[] resources;
         try {
-            resources = resolver.getResources("classpath:domains/**/*.json");
+            resources = resolver.getResources(registryLocation + "domains/**/*.json");
         } catch (IOException e) {
             log.warn("No sub-domain manifests found");
             return;

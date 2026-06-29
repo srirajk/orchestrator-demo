@@ -206,7 +206,11 @@ public class ChatService {
                 .put("user.id", effectiveUserId)
                 .put("meridian.request.id", requestId)
                 .build();
-        Scope baggageScope = baggage.storeInContext(Context.current()).makeCurrent();
+        // Make `chat.handle` the ACTIVE span for the whole request AND attach baggage in
+        // one scope. Without `.with(rootSpan)` the root is never current, so every stage
+        // span (intent.classify, llm.synthesize) and the fan-out's agent.invoke spans root
+        // their own orphan traces instead of nesting — breaking the one-trace-per-turn tree.
+        Scope baggageScope = baggage.storeInContext(Context.current().with(rootSpan)).makeCurrent();
 
         log.info("handleChat requestId={} userId={} conversationId={} prompt='{}'",
                 requestId, userId, conversationId,

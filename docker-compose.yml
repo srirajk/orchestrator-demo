@@ -117,6 +117,11 @@ services:
       # Phase 8: RS256 JWKS endpoint — use direct /oauth2/jwks (no redirect hop)
       MERIDIAN_AUTH_JWKS_URL: http://iam-service:8084/oauth2/jwks
       WEALTH_COVERAGE_URL: http://wealth-coverage:8086
+      # World B: agent + domain manifests are read from the mounted ./registry volume,
+      # NOT baked into the image. Onboard a domain by dropping JSON here + restart.
+      MERIDIAN_REGISTRY_LOCATION: file:/registry/
+    volumes:
+      - ./registry:/registry:ro
     depends_on:
       redis-stack:
         condition: service_healthy

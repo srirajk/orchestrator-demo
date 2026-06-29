@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.io.Resource;
@@ -14,13 +15,17 @@ import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.stereotype.Component;
 
 /**
- * Loads all bundled manifests from classpath:/manifests/*.json at startup.
- * Uses the same registration pipeline as the live POST /admin/agents endpoint —
- * no special bootstrap code path.
+ * Loads agent manifests from the external registry location at startup.
  *
- * Waits for the embedding service to be ready before starting registration,
- * retrying up to PROBE_RETRIES times with PROBE_DELAY_MS intervals.
- * Invalid manifests are logged and skipped; they do not abort startup.
+ * <p>World B: manifests are a domain team's deliverable, NOT gateway code. The location is
+ * configurable via {@code meridian.registry.location} — defaulting to {@code classpath:}
+ * (bundled, for tests/local) and overridden to {@code file:/registry/} in the container,
+ * where {@code ./registry} is mounted as a volume. Onboarding a domain = drop JSON in that
+ * folder and restart; no image rebuild.
+ *
+ * <p>Uses the same registration pipeline as the live POST /admin/agents endpoint —
+ * no special bootstrap code path. Waits for the embedding service to be ready before
+ * registration. Invalid manifests are logged and skipped; they do not abort startup.
  */
 @Component
 public class RegistryBootstrapLoader {
@@ -34,13 +39,16 @@ public class RegistryBootstrapLoader {
     private final VectorIndex    vectorIndex;
     private final EmbeddingClient embedding;
     private final ObjectMapper   mapper;
+    private final String         registryLocation;
 
     public RegistryBootstrapLoader(AgentRegistry registry, VectorIndex vectorIndex,
-                                   EmbeddingClient embedding, ObjectMapper mapper) {
+                                   EmbeddingClient embedding, ObjectMapper mapper,
+                                   @Value("${meridian.registry.location:classpath:}") String registryLocation) {
         this.registry  = registry;
         this.vectorIndex = vectorIndex;
         this.embedding = embedding;
         this.mapper    = mapper;
+        this.registryLocation = registryLocation;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -52,8 +60,10 @@ public class RegistryBootstrapLoader {
         int failed = 0;
 
         try {
+            String pattern = registryLocation + "manifests/*.json";
+            log.info("Loading agent manifests from {}", pattern);
             Resource[] resources = new PathMatchingResourcePatternResolver()
-                    .getResources("classpath:manifests/*.json");
+                    .getResources(pattern);
 
             for (Resource resource : resources) {
                 String filename = resource.getFilename();

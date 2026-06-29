@@ -1,0 +1,11 @@
+{
+  "sub_domain_id": "corporate-actions",
+  "display_name": "Corporate Actions",
+  "parent_domain": "asset-servicing",
+  "resource_scoped": false,
+  "required_context": [],
+  "agents": [
+    "acme.servicing.corporate_actions",
+    "acme.servicing.nav"
+  ]
+}
