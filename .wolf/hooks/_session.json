@@ -73,13 +73,13 @@
       "first_read": "2026-06-29T14:45:41.582Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityResolver.java": {
-      "count": 1,
-      "tokens": 962,
+      "count": 3,
+      "tokens": 1241,
       "first_read": "2026-06-29T14:45:43.084Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/manifest/DomainManifestStore.java": {
-      "count": 4,
-      "tokens": 2240,
+      "count": 6,
+      "tokens": 2687,
       "first_read": "2026-06-29T14:45:46.056Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/docker-compose.yml": {
@@ -88,17 +88,17 @@
       "first_read": "2026-06-29T14:45:46.478Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/resources/application.yml": {
-      "count": 5,
-      "tokens": 1481,
+      "count": 6,
+      "tokens": 1553,
       "first_read": "2026-06-29T14:45:46.925Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java": {
-      "count": 3,
-      "tokens": 11953,
+      "count": 5,
+      "tokens": 12562,
       "first_read": "2026-06-29T14:45:46.976Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/session/ConversationSession.java": {
-      "count": 1,
+      "count": 2,
       "tokens": 1408,
       "first_read": "2026-06-29T14:45:54.274Z"
     },
@@ -108,7 +108,7 @@
       "first_read": "2026-06-29T14:45:59.970Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/manifest/EffectiveManifest.java": {
-      "count": 1,
+      "count": 3,
       "tokens": 643,
       "first_read": "2026-06-29T14:46:01.116Z"
     },
@@ -133,23 +133,23 @@
       "first_read": "2026-06-29T14:46:07.049Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/synthesis/input/InputSynthesizerImpl.java": {
-      "count": 1,
+      "count": 3,
       "tokens": 2225,
       "first_read": "2026-06-29T14:46:09.991Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/manifest/DomainManifest.java": {
-      "count": 2,
+      "count": 3,
       "tokens": 272,
       "first_read": "2026-06-29T14:46:12.483Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/manifest/SubDomainManifest.java": {
-      "count": 2,
-      "tokens": 188,
+      "count": 4,
+      "tokens": 408,
       "first_read": "2026-06-29T14:46:12.672Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityExtractor.java": {
-      "count": 3,
-      "tokens": 2699,
+      "count": 5,
+      "tokens": 2874,
       "first_read": "2026-06-29T14:46:13.324Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/registry/model/AgentManifest.java": {
@@ -158,12 +158,12 @@
       "first_read": "2026-06-29T14:46:16.985Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityBag.java": {
-      "count": 1,
+      "count": 3,
       "tokens": 376,
       "first_read": "2026-06-29T14:46:17.450Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/coverage/CoverageClient.java": {
-      "count": 1,
+      "count": 2,
       "tokens": 1847,
       "first_read": "2026-06-29T14:46:26.001Z"
     },
@@ -203,13 +203,13 @@
       "first_read": "2026-06-29T14:46:33.401Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java": {
-      "count": 4,
-      "tokens": 3874,
+      "count": 6,
+      "tokens": 4135,
       "first_read": "2026-06-29T14:46:35.450Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/synthesis/answer/AnswerSynthesizer.java": {
-      "count": 5,
-      "tokens": 6780,
+      "count": 6,
+      "tokens": 6928,
       "first_read": "2026-06-29T14:46:39.738Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/infrastructure/telemetry/TraceEvent.java": {
@@ -218,7 +218,7 @@
       "first_read": "2026-06-29T16:09:56.111Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/.env.example": {
-      "count": 3,
+      "count": 4,
       "tokens": 0,
       "first_read": "2026-06-29T16:09:56.125Z"
     },
@@ -238,7 +238,7 @@
       "first_read": "2026-06-29T16:09:57.705Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/eval/eval_deepeval.py": {
-      "count": 3,
+      "count": 4,
       "tokens": 5358,
       "first_read": "2026-06-29T16:09:58.716Z"
     },
@@ -388,7 +388,7 @@
       "first_read": "2026-06-29T16:10:53.182Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/synthesis/input/InputSynthesizer.java": {
-      "count": 1,
+      "count": 2,
       "tokens": 496,
       "first_read": "2026-06-29T16:11:01.774Z"
     },
@@ -498,7 +498,7 @@
       "first_read": "2026-06-29T17:09:01.586Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/docs/WORLD-B-LOCKDOWN.md": {
-      "count": 1,
+      "count": 2,
       "tokens": 8836,
       "first_read": "2026-06-29T17:09:11.872Z"
     },
@@ -508,7 +508,7 @@
       "first_read": "2026-06-29T17:09:50.002Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/registry/domains/wealth-management/private-banking.json": {
-      "count": 1,
+      "count": 3,
       "tokens": 0,
       "first_read": "2026-06-29T17:09:50.343Z"
     },
@@ -518,17 +518,17 @@
       "first_read": "2026-06-29T17:09:52.586Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/registry/domains/asset-servicing/custody-operations.json": {
-      "count": 1,
+      "count": 2,
       "tokens": 0,
       "first_read": "2026-06-29T17:09:52.945Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/registry/domains/asset-servicing/corporate-actions.json": {
-      "count": 1,
+      "count": 2,
       "tokens": 0,
       "first_read": "2026-06-29T17:09:56.967Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/registry/domains/asset-servicing/cash-management.json": {
-      "count": 1,
+      "count": 2,
       "tokens": 0,
       "first_read": "2026-06-29T17:09:57.145Z"
     },
@@ -538,7 +538,7 @@
       "first_read": "2026-06-29T17:10:01.380Z"
     },
     "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/test/resources/domains/wealth-management/private-banking.json": {
-      "count": 1,
+      "count": 2,
       "tokens": 0,
       "first_read": "2026-06-29T17:10:01.961Z"
     },
@@ -586,6 +586,56 @@
       "count": 1,
       "tokens": 1457,
       "first_read": "2026-06-29T17:23:11.413Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/.claude/rules/world-b.md": {
+      "count": 1,
+      "tokens": 611,
+      "first_read": "2026-06-29T17:36:49.174Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentResult.java": {
+      "count": 1,
+      "tokens": 310,
+      "first_read": "2026-06-29T17:36:59.758Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/session/ConversationSessionStore.java": {
+      "count": 1,
+      "tokens": 2187,
+      "first_read": "2026-06-29T17:37:00.695Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/scripts/world-b-check.sh": {
+      "count": 2,
+      "tokens": 1272,
+      "first_read": "2026-06-29T17:37:25.563Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/manifest/ClarificationSchema.java": {
+      "count": 2,
+      "tokens": 112,
+      "first_read": "2026-06-29T17:38:25.388Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/test/java/ai/meridian/gateway/domain/manifest/EffectiveManifestTest.java": {
+      "count": 2,
+      "tokens": 906,
+      "first_read": "2026-06-29T17:41:14.851Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/test/java/ai/meridian/gateway/domain/manifest/EffectiveManifestMergeTest.java": {
+      "count": 2,
+      "tokens": 1250,
+      "first_read": "2026-06-29T17:41:15.676Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/manifest/EntityType.java": {
+      "count": 1,
+      "tokens": 528,
+      "first_read": "2026-06-29T18:03:41.938Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/registry/introspection/McpToolIntrospector.java": {
+      "count": 1,
+      "tokens": 2830,
+      "first_read": "2026-06-29T18:04:25.459Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/auth/RevocationChecker.java": {
+      "count": 1,
+      "tokens": 522,
+      "first_read": "2026-06-29T18:04:26.885Z"
     }
   },
   "files_written": [
@@ -936,26 +986,392 @@
       "action": "edit",
       "tokens": 130,
       "at": "2026-06-29T17:23:24.560Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/eval/eval_deepeval.py",
+      "action": "edit",
+      "tokens": 142,
+      "at": "2026-06-29T17:46:53.817Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/registry/domains/wealth-management/private-banking.json",
+      "action": "create",
+      "tokens": 468,
+      "at": "2026-06-29T17:46:59.474Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/registry/domains/asset-servicing/cash-management.json",
+      "action": "create",
+      "tokens": 243,
+      "at": "2026-06-29T17:47:12.083Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/registry/domains/asset-servicing/corporate-actions.json",
+      "action": "create",
+      "tokens": 281,
+      "at": "2026-06-29T17:47:20.301Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/registry/domains/asset-servicing/custody-operations.json",
+      "action": "create",
+      "tokens": 274,
+      "at": "2026-06-29T17:47:30.125Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/docker-compose.yml",
+      "action": "edit",
+      "tokens": 114,
+      "at": "2026-06-29T17:47:41.064Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/manifest/EntityType.java",
+      "action": "create",
+      "tokens": 565,
+      "at": "2026-06-29T17:47:47.727Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/manifest/SubDomainManifest.java",
+      "action": "create",
+      "tokens": 437,
+      "at": "2026-06-29T17:47:55.111Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/manifest/DomainManifestStore.java",
+      "action": "edit",
+      "tokens": 424,
+      "at": "2026-06-29T17:48:06.777Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/docs/MODEL-SELECTION.md",
+      "action": "create",
+      "tokens": 1643,
+      "at": "2026-06-29T17:48:15.231Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityBag.java",
+      "action": "create",
+      "tokens": 914,
+      "at": "2026-06-29T17:48:22.575Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityExtractor.java",
+      "action": "create",
+      "tokens": 3732,
+      "at": "2026-06-29T17:49:03.110Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityResolver.java",
+      "action": "create",
+      "tokens": 1330,
+      "at": "2026-06-29T17:49:44.340Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/synthesis/input/InputSynthesizerImpl.java",
+      "action": "edit",
+      "tokens": 173,
+      "at": "2026-06-29T17:49:52.088Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/synthesis/input/InputSynthesizerImpl.java",
+      "action": "edit",
+      "tokens": 514,
+      "at": "2026-06-29T17:50:10.070Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/synthesis/input/InputSynthesizerImpl.java",
+      "action": "edit",
+      "tokens": 536,
+      "at": "2026-06-29T17:50:27.043Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentResult.java",
+      "action": "edit",
+      "tokens": 67,
+      "at": "2026-06-29T17:50:31.973Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java",
+      "action": "edit",
+      "tokens": 442,
+      "at": "2026-06-29T17:50:43.732Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
+      "action": "edit",
+      "tokens": 69,
+      "at": "2026-06-29T17:50:53.486Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
+      "action": "edit",
+      "tokens": 248,
+      "at": "2026-06-29T17:51:28.093Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
+      "action": "edit",
+      "tokens": 154,
+      "at": "2026-06-29T17:51:34.170Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
+      "action": "edit",
+      "tokens": 118,
+      "at": "2026-06-29T17:51:39.042Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
+      "action": "edit",
+      "tokens": 282,
+      "at": "2026-06-29T17:51:48.371Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
+      "action": "edit",
+      "tokens": 35,
+      "at": "2026-06-29T17:51:52.570Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
+      "action": "edit",
+      "tokens": 95,
+      "at": "2026-06-29T17:51:59.330Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
+      "action": "edit",
+      "tokens": 214,
+      "at": "2026-06-29T17:52:07.243Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/docs/MODEL-SELECTION.md",
+      "action": "edit",
+      "tokens": 565,
+      "at": "2026-06-29T17:52:54.943Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/test/java/ai/meridian/gateway/synthesis/input/EntityBagTest.java",
+      "action": "create",
+      "tokens": 897,
+      "at": "2026-06-29T17:53:27.706Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/docs/MODEL-SELECTION.md",
+      "action": "edit",
+      "tokens": 618,
+      "at": "2026-06-29T17:54:56.594Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/docs/MODEL-SELECTION.md",
+      "action": "edit",
+      "tokens": 149,
+      "at": "2026-06-29T17:55:08.603Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/registry/domains/wealth-management/private-banking.json",
+      "action": "edit",
+      "tokens": 322,
+      "at": "2026-06-29T18:08:56.471Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/test/resources/domains/wealth-management/private-banking.json",
+      "action": "edit",
+      "tokens": 322,
+      "at": "2026-06-29T18:09:12.850Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/manifest/SubDomainManifest.java",
+      "action": "edit",
+      "tokens": 530,
+      "at": "2026-06-29T18:09:27.643Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/manifest/DomainManifestStore.java",
+      "action": "edit",
+      "tokens": 584,
+      "at": "2026-06-29T18:09:38.693Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/manifest/EffectiveManifest.java",
+      "action": "edit",
+      "tokens": 210,
+      "at": "2026-06-29T18:09:46.641Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/test/java/ai/meridian/gateway/domain/manifest/EffectiveManifestTest.java",
+      "action": "edit",
+      "tokens": 6,
+      "at": "2026-06-29T18:09:56.477Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/test/java/ai/meridian/gateway/domain/manifest/EffectiveManifestTest.java",
+      "action": "edit",
+      "tokens": 31,
+      "at": "2026-06-29T18:09:58.310Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/test/java/ai/meridian/gateway/domain/manifest/EffectiveManifestMergeTest.java",
+      "action": "edit",
+      "tokens": 17,
+      "at": "2026-06-29T18:10:00.163Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/test/java/ai/meridian/gateway/domain/manifest/EffectiveManifestMergeTest.java",
+      "action": "edit",
+      "tokens": 56,
+      "at": "2026-06-29T18:10:02.001Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java",
+      "action": "edit",
+      "tokens": 78,
+      "at": "2026-06-29T18:10:27.188Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java",
+      "action": "edit",
+      "tokens": 1462,
+      "at": "2026-06-29T18:10:55.237Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java",
+      "action": "edit",
+      "tokens": 389,
+      "at": "2026-06-29T18:11:06.110Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java",
+      "action": "edit",
+      "tokens": 285,
+      "at": "2026-06-29T18:11:14.913Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java",
+      "action": "edit",
+      "tokens": 68,
+      "at": "2026-06-29T18:11:19.416Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java",
+      "action": "edit",
+      "tokens": 465,
+      "at": "2026-06-29T18:11:34.157Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/synthesis/answer/AnswerSynthesizer.java",
+      "action": "edit",
+      "tokens": 1016,
+      "at": "2026-06-29T18:12:03.848Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/synthesis/answer/AnswerSynthesizer.java",
+      "action": "edit",
+      "tokens": 55,
+      "at": "2026-06-29T18:12:10.189Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/synthesis/answer/AnswerSynthesizer.java",
+      "action": "edit",
+      "tokens": 33,
+      "at": "2026-06-29T18:12:12.251Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/synthesis/answer/AnswerSynthesizer.java",
+      "action": "edit",
+      "tokens": 146,
+      "at": "2026-06-29T18:12:15.736Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
+      "action": "edit",
+      "tokens": 260,
+      "at": "2026-06-29T18:12:35.198Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
+      "action": "edit",
+      "tokens": 66,
+      "at": "2026-06-29T18:12:40.923Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
+      "action": "edit",
+      "tokens": 130,
+      "at": "2026-06-29T18:12:44.201Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
+      "action": "edit",
+      "tokens": 61,
+      "at": "2026-06-29T18:12:46.457Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
+      "action": "edit",
+      "tokens": 55,
+      "at": "2026-06-29T18:12:48.240Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
+      "action": "edit",
+      "tokens": 163,
+      "at": "2026-06-29T18:12:54.920Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
+      "action": "edit",
+      "tokens": 209,
+      "at": "2026-06-29T18:13:01.830Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
+      "action": "edit",
+      "tokens": 98,
+      "at": "2026-06-29T18:13:11.199Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityResolver.java",
+      "action": "edit",
+      "tokens": 379,
+      "at": "2026-06-29T18:13:56.884Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityResolver.java",
+      "action": "edit",
+      "tokens": 36,
+      "at": "2026-06-29T18:14:02.869Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/resources/application.yml",
+      "action": "edit",
+      "tokens": 165,
+      "at": "2026-06-29T18:14:17.595Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/resources/application.yml",
+      "action": "edit",
+      "tokens": 143,
+      "at": "2026-06-29T18:14:23.511Z"
     }
   ],
   "edit_counts": {
     "docs/WORLD-B-LOCKDOWN.md": 2,
     "scripts/world-b-check.sh": 2,
     ".claude/rules/world-b.md": 1,
-    "gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java": 2,
+    "gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java": 18,
     "gateway/src/main/java/ai/meridian/gateway/orchestration/executor/FlatPlanExecutor.java": 3,
     "eval/continuous_loop.py": 1,
     "eval/Dockerfile": 1,
     "scripts/eval-gate.sh": 1,
     "scripts/verify.sh": 1,
-    "docker-compose.yml": 2,
+    "docker-compose.yml": 3,
     "scripts/verify-telemetry-e2e.sh": 1,
     "gateway/src/main/resources/agent-manifest.schema.json": 1,
     "gateway/src/main/java/ai/meridian/gateway/registry/loader/RegistryBootstrapLoader.java": 2,
-    "gateway/src/main/java/ai/meridian/gateway/domain/manifest/DomainManifestStore.java": 4,
-    "gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java": 1,
-    "gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityExtractor.java": 1,
-    "gateway/src/main/java/ai/meridian/gateway/synthesis/answer/AnswerSynthesizer.java": 1,
+    "gateway/src/main/java/ai/meridian/gateway/domain/manifest/DomainManifestStore.java": 6,
+    "gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java": 8,
+    "gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityExtractor.java": 2,
+    "gateway/src/main/java/ai/meridian/gateway/synthesis/answer/AnswerSynthesizer.java": 5,
     "docs/PROMPT-AUDIT.md": 2,
     ".claude/worktrees/agent-acd21fbd8fbefdaf5/gateway/src/main/java/ai/meridian/gateway/domain/auth/CerbosEntitlementAdapter.java": 3,
     ".claude/worktrees/agent-acd21fbd8fbefdaf5/gateway/src/main/java/ai/meridian/gateway/domain/auth/EntitlementService.java": 3,
@@ -976,12 +1392,29 @@
     ".claude/worktrees/agent-a32957dd9f9ee5dfd/e2e/tests/10-coverage-flow.spec.ts": 1,
     "gateway/src/main/java/ai/meridian/gateway/domain/auth/CerbosEntitlementAdapter.java": 3,
     "gateway/src/main/java/ai/meridian/gateway/domain/auth/EntitlementService.java": 2,
-    "gateway/src/main/resources/application.yml": 1,
-    "mock-agents/wealth-coverage/tests/test_coverage.py": 1
+    "gateway/src/main/resources/application.yml": 3,
+    "mock-agents/wealth-coverage/tests/test_coverage.py": 1,
+    "eval/eval_deepeval.py": 1,
+    "registry/domains/wealth-management/private-banking.json": 2,
+    "registry/domains/asset-servicing/cash-management.json": 1,
+    "registry/domains/asset-servicing/corporate-actions.json": 1,
+    "registry/domains/asset-servicing/custody-operations.json": 1,
+    "gateway/src/main/java/ai/meridian/gateway/domain/manifest/EntityType.java": 1,
+    "gateway/src/main/java/ai/meridian/gateway/domain/manifest/SubDomainManifest.java": 2,
+    "docs/MODEL-SELECTION.md": 4,
+    "gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityBag.java": 1,
+    "gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityResolver.java": 3,
+    "gateway/src/main/java/ai/meridian/gateway/synthesis/input/InputSynthesizerImpl.java": 3,
+    "gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentResult.java": 1,
+    "gateway/src/test/java/ai/meridian/gateway/synthesis/input/EntityBagTest.java": 1,
+    "gateway/src/test/resources/domains/wealth-management/private-banking.json": 1,
+    "gateway/src/main/java/ai/meridian/gateway/domain/manifest/EffectiveManifest.java": 1,
+    "gateway/src/test/java/ai/meridian/gateway/domain/manifest/EffectiveManifestTest.java": 2,
+    "gateway/src/test/java/ai/meridian/gateway/domain/manifest/EffectiveManifestMergeTest.java": 2
   },
-  "anatomy_hits": 99,
+  "anatomy_hits": 109,
   "anatomy_misses": 18,
-  "repeated_reads_warned": 69,
+  "repeated_reads_warned": 106,
   "cerebrum_warnings": 0,
-  "stop_count": 22
+  "stop_count": 32
 }

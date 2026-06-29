@@ -34,6 +34,14 @@ management:
         url: ${MANAGEMENT_OTLP_METRICS_EXPORT_URL:http://localhost:4318/v1/metrics}
 
 meridian:
+  # ── Assistant framing (World B) ───────────────────────────────────────────────
+  # Domain-neutral defaults. A domain deployment overrides these to reskin the
+  # assistant; the gateway carries no hardcoded domain copy. domain-context feeds the
+  # intent-classifier opener + the history-only synthesis prompt; display-name names
+  # the answer synthesizer's identity.
+  assistant:
+    domain-context: ${MERIDIAN_ASSISTANT_DOMAIN_CONTEXT:an enterprise data assistant for relationship managers}
+    display-name: ${MERIDIAN_ASSISTANT_DISPLAY_NAME:Meridian}
   auth:
     jwks-url: ${MERIDIAN_AUTH_JWKS_URL:http://user-mgmt:8084/.well-known/jwks.json}
     # Comma-separated list of accepted JWT issuers.
@@ -50,6 +58,9 @@ meridian:
     confidence-floor: 0.30       # absolute cosine similarity floor
     relative-floor-factor: 0.65  # dynamic floor = max(absolute, topScore * factor); prunes long-tail matches
     top-k: 10
+    # Domain-neutral entity-resolution endpoint (legacy fallback resolver; the live World-B path
+    # resolves via CoverageClient using the manifest's coverage.resolve_url). No domain literal.
+    entity-resolve-url: ${MERIDIAN_RESOLVER_ENTITY_RESOLVE_URL:http://mock-crm:8085/entities/resolve}
   llm:
     # ── Intent Classifier (classification + routing) ──────────────────────────
     # Default: Z.AI GLM (fast flash model for low-latency classification).

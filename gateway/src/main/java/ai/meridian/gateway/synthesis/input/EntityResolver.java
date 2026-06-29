@@ -31,8 +31,18 @@ public class EntityResolver {
 
     private static final Logger log = LoggerFactory.getLogger(EntityResolver.class);
 
-    @Value("${meridian.crm.wealth.url:http://mock-crm:8085}")
-    private String crmUrl;
+    // Domain-neutral resolve endpoint (full URL). World B: no domain literal in Java.
+    //
+    // NOTE (legacy): this resolver is a duplicate of the World-B CoverageClient, which ALREADY
+    // sources its resolve endpoint from the domain manifest (coverage.resolve_url) at request
+    // time. In the live, resource-scoped path the coverage pipeline resolves the reference and
+    // injects the canonical ID before this runs, so this external call is only a fallback for an
+    // optional, non-coverage entity. The manifest's coverage endpoint uses a different request
+    // contract ({reference,...}) than this resolver ({query,type}); repointing here would break
+    // it, so the endpoint is sourced from a domain-neutral property, defaulting to the manifest's
+    // configured coverage host. Unifying this with CoverageClient is tracked separately.
+    @Value("${meridian.resolver.entity-resolve-url:http://mock-crm:8085/entities/resolve}")
+    private String entityResolveUrl;
 
     private final RestTemplate restTemplate;
     private final DomainManifestStore manifestStore;
@@ -76,7 +86,7 @@ public class EntityResolver {
             headers.setContentType(MediaType.APPLICATION_JSON);
             var entity = new HttpEntity<>(reqBody, headers);
             var response = restTemplate.postForObject(
-                crmUrl + "/entities/resolve", entity, CrmResolveResponse.class);
+                entityResolveUrl, entity, CrmResolveResponse.class);
             if (response != null && Boolean.TRUE.equals(response.resolved())) {
                 log.debug("Resolved '{}' ({}) → '{}'", reference, et.resolveType(), response.entityId());
                 return response.entityId();

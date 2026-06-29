@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-29T17:55:08.596Z
-> Files: 618 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-29T18:14:23.505Z
+> Files: 619 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/
 
@@ -469,7 +469,7 @@
 
 ## gateway/src/main/java/ai/meridian/gateway/domain/chat/
 
-- `ChatService.java` — Entry point from the controller — called on a virtual thread after the async boundary. (~12562 tok)
+- `ChatService.java` — Entry point from the controller — called on a virtual thread after the async boundary. (~12713 tok)
 
 ## gateway/src/main/java/ai/meridian/gateway/domain/coverage/
 
@@ -481,18 +481,18 @@
 ## gateway/src/main/java/ai/meridian/gateway/domain/intent/
 
 - `Intent.java` — Routing label produced by {@link IntentClassifier}. (~186 tok)
-- `IntentClassifier.java` — Stage A of the request pipeline: classifies the user's intent before routing. (~4135 tok)
+- `IntentClassifier.java` — Stage A of the request pipeline: classifies the user's intent before routing. (~4925 tok)
 - `IntentResult.java` — Output of {@link IntentClassifier}. (~278 tok)
 
 ## gateway/src/main/java/ai/meridian/gateway/domain/manifest/
 
 - `ClarificationSchema.java` — Class: ClarificationSchema (~112 tok)
 - `DomainManifest.java` — DomainManifest: Coverage, MemoryCompaction (~272 tok)
-- `DomainManifestStore.java` — Resolves ${VAR_NAME} placeholders in all Coverage URL fields using Spring Environment. (~2687 tok)
+- `DomainManifestStore.java` — Resolves ${VAR_NAME} placeholders in all Coverage URL fields using Spring Environment. (~3206 tok)
 - `DomainPrerequisiteValidator.java` — Service: DomainPrerequisiteValidator (~439 tok)
-- `EffectiveManifest.java` — Returns true if this effective manifest requires a relationship_id in context. (~643 tok)
+- `EffectiveManifest.java` — Returns true if this effective manifest declares any required-context entity. (~706 tok)
 - `EntityType.java` — A manifest-declared entity type. This is the load-bearing declaration that makes the (~528 tok)
-- `SubDomainManifest.java` — Normalise a missing entity_types declaration to an empty list. (~408 tok)
+- `SubDomainManifest.java` — Normalise missing optional collections so callers never NPE. (~650 tok)
 
 ## gateway/src/main/java/ai/meridian/gateway/domain/session/
 
@@ -581,20 +581,20 @@
 
 ## gateway/src/main/java/ai/meridian/gateway/synthesis/answer/
 
-- `AnswerSynthesizer.java` — Synthesizes a grounded, streamed answer from agent outputs using Z.AI GLM. (~6928 tok)
+- `AnswerSynthesizer.java` — Synthesizes a grounded, streamed answer from agent outputs using Z.AI GLM. (~7131 tok)
 
 ## gateway/src/main/java/ai/meridian/gateway/synthesis/input/
 
 - `EntityBag.java` — Generic, manifest-driven carrier for extracted and resolved entities. (~853 tok)
 - `EntityExtractor.java` — Stage 1 — Extract. (~3484 tok)
-- `EntityResolver.java` — Stage 2 — Resolve. (~1241 tok)
+- `EntityResolver.java` — Stage 2 — Resolve. (~1478 tok)
 - `InputSynthesizer.java` — Input synthesis pipeline: Extract → Resolve → Bind. (~496 tok)
 - `InputSynthesizerImpl.java` — Stage 3 — Bind, and orchestrates the full Extract → Resolve → Bind pipeline. (~2255 tok)
 
 ## gateway/src/main/resources/
 
 - `agent-manifest.schema.json` (~1677 tok)
-- `application.yml` (~1553 tok)
+- `application.yml` (~1798 tok)
 
 ## gateway/src/main/resources/domains/
 
@@ -636,8 +636,8 @@
 
 ## gateway/src/test/java/ai/meridian/gateway/domain/manifest/
 
-- `EffectiveManifestMergeTest.java` — Class: EffectiveManifestMergeTest (~1250 tok)
-- `EffectiveManifestTest.java` — Targeted unit tests for {@link EffectiveManifest#merge} covering the three (~906 tok)
+- `EffectiveManifestMergeTest.java` — Class: EffectiveManifestMergeTest (~1253 tok)
+- `EffectiveManifestTest.java` — Targeted unit tests for {@link EffectiveManifest#merge} covering the three (~900 tok)
 
 ## gateway/src/test/java/ai/meridian/gateway/domain/session/
 
@@ -650,6 +650,10 @@
 ## gateway/src/test/java/ai/meridian/gateway/synthesis/input/
 
 - `EntityBagTest.java` — Locks in the generic, manifest-keyed EntityBag contract that replaced the wealth-shaped record. (~838 tok)
+
+## gateway/src/test/resources/domains/wealth-management/
+
+- `private-banking.json` (~769 tok)
 
 ## glassbox/
 
@@ -1019,7 +1023,7 @@
 
 ## registry/domains/wealth-management/
 
-- `private-banking.json` (~468 tok)
+- `private-banking.json` (~769 tok)
 
 ## registry/manifests/
 

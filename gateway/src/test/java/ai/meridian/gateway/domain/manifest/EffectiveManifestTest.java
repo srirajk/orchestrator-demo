@@ -17,7 +17,7 @@ class EffectiveManifestTest {
 
     // (a) resource_scoped=true sub-domain
     @Test
-    @DisplayName("merge with resource_scoped=true: resourceScoped, coverage, requiresRelationship all correct")
+    @DisplayName("merge with resource_scoped=true: resourceScoped, coverage, requiresContext all correct")
     void merge_resourceScopedTrue_fullContractHolds() {
         var coverage = new DomainManifest.Coverage(
                 "http://wealth-coverage:8086/coverage/{principal_id}",
@@ -40,7 +40,7 @@ class EffectiveManifestTest {
 
         assertThat(em.resourceScoped()).isTrue();
         assertThat(em.coverage()).isNotNull();
-        assertThat(em.requiresRelationship()).isTrue();
+        assertThat(em.requiresContext()).isTrue();
         assertThat(em.coverage().discoverUrl()).contains("coverage");
         assertThat(em.coverage().checkUrl()).contains("resources");
         assertThat(em.coverage().resolveUrl()).contains("resolve");
@@ -58,7 +58,7 @@ class EffectiveManifestTest {
         var em = EffectiveManifest.merge(domain, sub, "acme.servicing.nav");
 
         assertThat(em.resourceScoped()).isFalse();
-        assertThat(em.requiresRelationship()).isFalse();
+        assertThat(em.requiresContext()).isFalse();
     }
 
     // (c) null domain: no NPE, coverage is null
@@ -73,7 +73,7 @@ class EffectiveManifestTest {
             var em = EffectiveManifest.merge(null, sub, "test-agent");
             assertThat(em.coverage()).isNull();
             assertThat(em.resourceScoped()).isTrue();
-            assertThat(em.requiresRelationship()).isTrue();
+            assertThat(em.requiresContext()).isTrue();
         });
     }
 }

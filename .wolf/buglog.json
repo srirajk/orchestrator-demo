@@ -1781,6 +1781,358 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-06-29T17:23:24.561Z"
+    },
+    {
+      "id": "bug-111",
+      "timestamp": "2026-06-29T17:46:53.818Z",
+      "error_message": "Wrong return value",
+      "file": "eval/eval_deepeval.py",
+      "root_cause": "Was returning: \"glm-4.6\"",
+      "fix": "Now returns: os.getenv(\"DEEPEVAL_JUDGE_MODEL\", \"glm-4.6\")",
+      "tags": [
+        "auto-detected",
+        "return-value",
+        "py"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T17:46:53.818Z"
+    },
+    {
+      "id": "bug-112",
+      "timestamp": "2026-06-29T17:48:06.778Z",
+      "error_message": "Null/undefined access in ",
+      "file": "gateway/src/main/java/ai/meridian/gateway/domain/manifest/DomainManifestStore.java",
+      "root_cause": "Property access on potentially null/undefined value",
+      "fix": "Added null safety (optional chaining or null check)",
+      "tags": [
+        "auto-detected",
+        "null-safety",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T17:48:06.778Z"
+    },
+    {
+      "id": "bug-113",
+      "timestamp": "2026-06-29T17:50:27.044Z",
+      "error_message": "Missing guard clause",
+      "file": "gateway/src/main/java/ai/meridian/gateway/synthesis/input/InputSynthesizerImpl.java",
+      "root_cause": "No early return/throw for edge case: resolvedValue != null",
+      "fix": "Added guard clause: if (resolvedValue != null)",
+      "tags": [
+        "auto-detected",
+        "guard-clause",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T17:50:27.044Z"
+    },
+    {
+      "id": "bug-114",
+      "timestamp": "2026-06-29T17:50:43.733Z",
+      "error_message": "Significant refactor of ",
+      "file": "gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 19→27 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T17:50:43.733Z"
+    },
+    {
+      "id": "bug-115",
+      "timestamp": "2026-06-29T17:51:34.171Z",
+      "error_message": "Wrong condition in logic",
+      "file": "gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
+      "root_cause": "Condition was: if (preExtracted != null && preExtracted.relationshipR)",
+      "fix": "Changed to: if (coverageEntity != null && preExtracted != null\n   )",
+      "tags": [
+        "auto-detected",
+        "logic-fix",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T17:51:34.171Z"
+    },
+    {
+      "id": "bug-116",
+      "timestamp": "2026-06-29T17:52:07.243Z",
+      "error_message": "Missing guard clause",
+      "file": "gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
+      "root_cause": "No early return/throw for edge case: et == null",
+      "fix": "Added guard clause: if (et == null)",
+      "tags": [
+        "auto-detected",
+        "guard-clause",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T17:52:07.243Z"
+    },
+    {
+      "id": "bug-117",
+      "timestamp": "2026-06-29T17:54:56.595Z",
+      "error_message": "Significant refactor of ",
+      "file": "docs/MODEL-SELECTION.md",
+      "root_cause": "8 lines replaced/restructured",
+      "fix": "Rewrote 15→29 lines (8 removed) | Also: It would (a) blow the p99 latency budget on routin; (b) cost ~10× on bounded tasks for no quality gain",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-06-29T17:55:08.604Z"
+    },
+    {
+      "id": "bug-118",
+      "timestamp": "2026-06-29T18:09:27.644Z",
+      "error_message": "Significant refactor of ",
+      "file": "gateway/src/main/java/ai/meridian/gateway/domain/manifest/SubDomainManifest.java",
+      "root_cause": "6 lines replaced/restructured",
+      "fix": "Rewrote 21→34 lines (6 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T18:09:27.644Z"
+    },
+    {
+      "id": "bug-119",
+      "timestamp": "2026-06-29T18:09:38.694Z",
+      "error_message": "Null/undefined access in ",
+      "file": "gateway/src/main/java/ai/meridian/gateway/domain/manifest/DomainManifestStore.java",
+      "root_cause": "Property access on potentially null/undefined value",
+      "fix": "Added null safety (optional chaining or null check)",
+      "tags": [
+        "auto-detected",
+        "null-safety",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T18:09:38.694Z"
+    },
+    {
+      "id": "bug-120",
+      "timestamp": "2026-06-29T18:09:46.642Z",
+      "error_message": "Significant refactor of ",
+      "file": "gateway/src/main/java/ai/meridian/gateway/domain/manifest/EffectiveManifest.java",
+      "root_cause": "7 lines replaced/restructured",
+      "fix": "Rewrote 11→16 lines (7 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T18:09:46.642Z"
+    },
+    {
+      "id": "bug-121",
+      "timestamp": "2026-06-29T18:09:56.478Z",
+      "error_message": "Wrong reference: requiresRelationship should be requiresContext",
+      "file": "gateway/src/test/java/ai/meridian/gateway/domain/manifest/EffectiveManifestTest.java",
+      "root_cause": "Used \"requiresRelationship\" instead of \"requiresContext\"",
+      "fix": "Changed requiresRelationship → requiresContext",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T18:09:56.478Z"
+    },
+    {
+      "id": "bug-122",
+      "timestamp": "2026-06-29T18:09:58.310Z",
+      "error_message": "Incorrect value in code",
+      "file": "gateway/src/test/java/ai/meridian/gateway/domain/manifest/EffectiveManifestTest.java",
+      "root_cause": "Had \"merge with resource_scoped=true: resourceScoped, ",
+      "fix": "Changed to \"merge with resource_scoped=true: resourceScoped, ",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T18:09:58.310Z"
+    },
+    {
+      "id": "bug-123",
+      "timestamp": "2026-06-29T18:10:00.164Z",
+      "error_message": "Wrong reference: requiresRelationship should be requiresContext",
+      "file": "gateway/src/test/java/ai/meridian/gateway/domain/manifest/EffectiveManifestMergeTest.java",
+      "root_cause": "Used \"requiresRelationship\" instead of \"requiresContext\"",
+      "fix": "Changed requiresRelationship → requiresContext",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T18:10:00.164Z"
+    },
+    {
+      "id": "bug-124",
+      "timestamp": "2026-06-29T18:10:02.002Z",
+      "error_message": "Incorrect value in code",
+      "file": "gateway/src/test/java/ai/meridian/gateway/domain/manifest/EffectiveManifestMergeTest.java",
+      "root_cause": "Had \"Which client relationship?\"",
+      "fix": "Changed to \"relationship_id\"",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T18:10:02.002Z"
+    },
+    {
+      "id": "bug-125",
+      "timestamp": "2026-06-29T18:10:55.238Z",
+      "error_message": "Null/undefined access in ",
+      "file": "gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java",
+      "root_cause": "Property access on potentially null/undefined value",
+      "fix": "Added null safety (optional chaining or null check)",
+      "tags": [
+        "auto-detected",
+        "null-safety",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T18:10:55.238Z"
+    },
+    {
+      "id": "bug-126",
+      "timestamp": "2026-06-29T18:11:19.417Z",
+      "error_message": "Wrong reference: SYSTEM_PROMPT should be systemPrompt",
+      "file": "gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java",
+      "root_cause": "Used \"SYSTEM_PROMPT\" instead of \"systemPrompt\"",
+      "fix": "Changed SYSTEM_PROMPT → systemPrompt",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T18:11:19.417Z"
+    },
+    {
+      "id": "bug-127",
+      "timestamp": "2026-06-29T18:11:34.158Z",
+      "error_message": "Missing guard clause",
+      "file": "gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java",
+      "root_cause": "No early return/throw for edge case: intent == Intent.FETCH_DATA",
+      "fix": "Added guard clause: if (intent == Intent.FETCH_DATA)",
+      "tags": [
+        "auto-detected",
+        "guard-clause",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T18:11:34.158Z"
+    },
+    {
+      "id": "bug-128",
+      "timestamp": "2026-06-29T18:12:10.190Z",
+      "error_message": "Wrong reference: SYSTEM_PROMPT should be systemPrompt",
+      "file": "gateway/src/main/java/ai/meridian/gateway/synthesis/answer/AnswerSynthesizer.java",
+      "root_cause": "Used \"SYSTEM_PROMPT\" instead of \"systemPrompt\"",
+      "fix": "Changed SYSTEM_PROMPT → systemPrompt",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-06-29T18:12:12.252Z"
+    },
+    {
+      "id": "bug-129",
+      "timestamp": "2026-06-29T18:12:35.199Z",
+      "error_message": "Significant refactor of ",
+      "file": "gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
+      "root_cause": "4 lines replaced/restructured",
+      "fix": "Rewrote 8→13 lines (4 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T18:12:35.199Z"
+    },
+    {
+      "id": "bug-130",
+      "timestamp": "2026-06-29T18:12:40.924Z",
+      "error_message": "Incorrect value in code",
+      "file": "gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
+      "root_cause": "Had \"I wasn'",
+      "fix": "Changed to \"needs_more_detail\"",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 3,
+      "last_seen": "2026-06-29T18:12:48.241Z"
+    },
+    {
+      "id": "bug-131",
+      "timestamp": "2026-06-29T18:13:01.831Z",
+      "error_message": "Null/undefined access in ",
+      "file": "gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
+      "root_cause": "Property access on potentially null/undefined value",
+      "fix": "Added null safety (optional chaining or null check)",
+      "tags": [
+        "auto-detected",
+        "null-safety",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T18:13:01.831Z"
+    },
+    {
+      "id": "bug-132",
+      "timestamp": "2026-06-29T18:13:56.885Z",
+      "error_message": "Significant refactor of ",
+      "file": "gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityResolver.java",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 11→21 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T18:13:56.885Z"
     }
   ]
 }

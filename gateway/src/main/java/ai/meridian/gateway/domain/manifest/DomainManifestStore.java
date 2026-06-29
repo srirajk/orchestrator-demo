@@ -213,6 +213,51 @@ public class DomainManifestStore {
         return null;
     }
 
+    /**
+     * The de-duplicated union of {@code required_context} entity keys across ALL loaded
+     * sub-domains. The deterministic CLARIFY check (WORLD-B §4.2) and the coverage entity
+     * selection both read this instead of relying on a per-entity {@code required} flag, so
+     * "which entity must be present" is a manifest declaration, not Java logic.
+     */
+    public List<String> requiredContextKeys() {
+        java.util.LinkedHashSet<String> keys = new java.util.LinkedHashSet<>();
+        for (SubDomainManifest sd : subDomains.values()) {
+            if (sd.requiredContext() != null) keys.addAll(sd.requiredContext());
+        }
+        return List.copyOf(keys);
+    }
+
+    /**
+     * A user-facing clarification/error message declared in a sub-domain's {@code messages}
+     * block, searched across all sub-domains, or null when none is declared. The gateway holds
+     * no domain copy — every user-facing string is sourced here (WORLD-B §5).
+     */
+    public String message(String key) {
+        if (key == null) return null;
+        for (SubDomainManifest sd : subDomains.values()) {
+            String v = sd.messages().get(key);
+            if (v != null) return v;
+        }
+        return null;
+    }
+
+    /**
+     * The human-readable denial copy declared for a coverage denial reason code
+     * (e.g. {@code not-covered}), searched across all sub-domains. Falls back to the
+     * manifest-declared {@code default} entry, then null.
+     */
+    public String denialMessage(String reasonCode) {
+        for (SubDomainManifest sd : subDomains.values()) {
+            Map<String, String> dm = sd.denialMessages();
+            if (reasonCode != null && dm.get(reasonCode) != null) return dm.get(reasonCode);
+        }
+        for (SubDomainManifest sd : subDomains.values()) {
+            String def = sd.denialMessages().get("default");
+            if (def != null) return def;
+        }
+        return null;
+    }
+
     public Map<String, DomainManifest> allDomains() {
         return Map.copyOf(domains);
     }

@@ -14,22 +14,35 @@ public record SubDomainManifest(
     @JsonProperty("resource_scoped") boolean resourceScoped,
     @JsonProperty("clarification_schema") Map<String, ClarificationSchema> clarificationSchema,
     List<String> agents,
-    @JsonProperty("entity_types") List<EntityType> entityTypes
+    @JsonProperty("entity_types") List<EntityType> entityTypes,
+    @JsonProperty("denial_messages") Map<String, String> denialMessages,
+    @JsonProperty("messages") Map<String, String> messages
 ) {
 
-    /** Normalise a missing entity_types declaration to an empty list. */
+    /** Normalise missing optional collections so callers never NPE. */
     public SubDomainManifest {
-        if (entityTypes == null) entityTypes = List.of();
+        if (entityTypes == null)    entityTypes = List.of();
+        if (denialMessages == null) denialMessages = Map.of();
+        if (messages == null)       messages = Map.of();
     }
 
     /**
-     * Backwards-compatible constructor (pre-{@code entity_types}). Used by hand-built test
-     * fixtures; defaults {@code entityTypes} to empty.
+     * Backwards-compatible constructor (pre-{@code entity_types}/{@code messages}). Used by
+     * hand-built test fixtures; defaults the manifest-driven collections to empty.
      */
     public SubDomainManifest(String subDomainId, String displayName, String parentDomain,
                              List<String> requiredContext, boolean resourceScoped,
                              Map<String, ClarificationSchema> clarificationSchema, List<String> agents) {
         this(subDomainId, displayName, parentDomain, requiredContext, resourceScoped,
-             clarificationSchema, agents, List.of());
+             clarificationSchema, agents, List.of(), Map.of(), Map.of());
+    }
+
+    /** Backwards-compatible constructor with explicit entity_types (pre-{@code messages}). */
+    public SubDomainManifest(String subDomainId, String displayName, String parentDomain,
+                             List<String> requiredContext, boolean resourceScoped,
+                             Map<String, ClarificationSchema> clarificationSchema, List<String> agents,
+                             List<EntityType> entityTypes) {
+        this(subDomainId, displayName, parentDomain, requiredContext, resourceScoped,
+             clarificationSchema, agents, entityTypes, Map.of(), Map.of());
     }
 }

@@ -24,7 +24,7 @@ class EffectiveManifestMergeTest {
         var effective = EffectiveManifest.merge(domain, sub, "acme.wealth.holdings");
 
         assertThat(effective.resourceScoped()).isTrue();
-        assertThat(effective.requiresRelationship()).isTrue();
+        assertThat(effective.requiresContext()).isTrue();
     }
 
     @Test
@@ -83,8 +83,8 @@ class EffectiveManifestMergeTest {
 
         var effective = EffectiveManifest.merge(domain, sub, "acme.wealth.holdings");
 
-        assertThat(effective.relationshipClarification()).isNotNull();
-        assertThat(effective.relationshipClarification().question()).isEqualTo("Which client relationship?");
+        assertThat(effective.clarificationFor("relationship_id")).isNotNull();
+        assertThat(effective.clarificationFor("relationship_id").question()).isEqualTo("Which client relationship?");
     }
 
     @Test

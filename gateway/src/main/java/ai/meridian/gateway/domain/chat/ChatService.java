@@ -280,13 +280,18 @@ public class ChatService {
         // coverageRelId is set by the coverage pipeline before synthesis;
         // it takes priority over the synthesis-extracted relationship ID when saving the session.
         String coverageRelId = null;
-        // The entitled/coverage entity type (e.g. relationship) and an optional secondary
-        // resolvable entity (e.g. fund) come from the manifest — never hardcoded here.
+        // Deterministic CLARIFY (WORLD-B §4.2): which entity MUST resolve before fetch is a
+        // manifest declaration (sub-domain required_context), NOT a Java rule. The coverage
+        // pipeline below clarifies when this required resolvable entity is unresolved — that is
+        // the generic `required ∩ resolved = ∅ → CLARIFY` check, manifest-declared.
+        java.util.List<String> requiredKeys = manifestStore.requiredContextKeys();
         EntityType coverageEntity = manifestStore.entityTypes().stream()
-                .filter(EntityType::isResolvable).filter(EntityType::required)
+                .filter(EntityType::isResolvable)
+                .filter(et -> requiredKeys.contains(et.key()))
                 .findFirst().orElse(null);
         EntityType secondaryEntity = manifestStore.entityTypes().stream()
-                .filter(EntityType::isResolvable).filter(et -> !et.required())
+                .filter(EntityType::isResolvable)
+                .filter(et -> !requiredKeys.contains(et.key()))
                 .findFirst().orElse(null);
         try {
             ResolverResult resolved = resolver.resolve(latestPrompt);
@@ -304,8 +309,8 @@ public class ChatService {
 
             if (resolved.fallback() || resolved.selected().isEmpty()) {
                 emitRequestOutcome("FAILED");
-                streamTextAndComplete(emitter, "I wasn't sure which services to consult. " +
-                        "Please mention the client name and what you need.");
+                streamTextAndComplete(emitter, msg("needs_more_detail",
+                        "I wasn't sure which services to consult. Please add more detail about what you need."));
                 tracePublisher.publish(TraceEvent.of("request_complete", requestId,
                         new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
                 return;
@@ -408,10 +413,9 @@ public class ChatService {
                             } else {
                                 // Not found in coverage at all.
                                 emitRequestOutcome("CLARIFIED");
-                                streamTextAndComplete(emitter,
-                                    "I could not find a client relationship matching \""
-                                    + preExtracted.reference(coverageEntity.extractAs())
-                                    + "\". Please provide the relationship ID or a more specific name.");
+                                streamTextAndComplete(emitter, msg("reference_not_found",
+                                    "I could not find a match for that reference. Please provide a specific identifier.")
+                                    .replace("{reference}", preExtracted.reference(coverageEntity.extractAs())));
                                 tracePublisher.publish(TraceEvent.of("request_complete", requestId,
                                     new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
                                 return;
@@ -424,8 +428,8 @@ public class ChatService {
 
                             if (discovered.isEmpty()) {
                                 emitRequestOutcome("DENIED");
-                                streamTextAndComplete(emitter,
-                                    "You have no client relationships in your coverage.");
+                                streamTextAndComplete(emitter, msg("no_coverage",
+                                    "Your coverage set is empty."));
                                 tracePublisher.publish(TraceEvent.of("request_complete", requestId,
                                     new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
                                 return;
@@ -500,7 +504,8 @@ public class ChatService {
             }
             if (synthesis.inputs().isEmpty()) {
                 emitRequestOutcome("FAILED");
-                streamTextAndComplete(emitter, "Please specify the client name or relationship ID."); return;
+                streamTextAndComplete(emitter, msg("specify_entity",
+                        "Please specify the resource identifier.")); return;
             }
 
             String resolvedRelId = extractResolvedId(synthesis, coverageEntity);
@@ -606,17 +611,17 @@ public class ChatService {
                                 String requestId, long requestStart) throws Exception {
         Principal principal = (jwtPrincipal != null) ? jwtPrincipal : principalStore.load(userId);
 
-        StringBuilder msg = new StringBuilder();
+        String message;
         if (session.relationshipId() != null) {
-            msg.append("Could you clarify what you'd like to know about ")
-               .append(session.relationshipId())
-               .append("? For example: holdings, performance, settlements, or corporate actions.");
+            message = msg("followup_clarification",
+                    "Could you clarify what you'd like to know about {entity}? Please add more detail.")
+                    .replace("{entity}", session.relationshipId());
         } else {
-            msg.append("Which client relationship are you asking about? " +
-                    "Please provide the relationship ID or client name to continue.");
+            message = msg("missing_entity_question",
+                    "Which resource are you asking about? Please provide its identifier to continue.");
         }
         emitRequestOutcome("CLARIFIED");
-        streamTextAndComplete(emitter, msg.toString());
+        streamTextAndComplete(emitter, message);
         tracePublisher.publish(TraceEvent.of("request_complete", requestId,
                 new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
     }
@@ -654,13 +659,17 @@ public class ChatService {
      * human-readable message suitable for streaming to the end user.
      */
     private String mapDenialReason(String reason) {
-        if (reason == null) return "Access denied for this client relationship.";
-        return switch (reason) {
-            case "not-covered"           -> "That client is not in your coverage.";
-            case "coverage-transferred"  -> "Coverage for that client has been transferred.";
-            case "relationship-closed"   -> "That client relationship is no longer active.";
-            default                      -> "Access denied for this client relationship.";
-        };
+        // Reason codes (not-covered, coverage-transferred, relationship-closed) are the stable
+        // contract; their user-facing TEXT is declared in the sub-domain manifest's
+        // denial_messages map. The gateway holds no domain copy (WORLD-B §5).
+        String text = manifestStore.denialMessage(reason);
+        return text != null ? text : "Access to the requested resource was denied.";
+    }
+
+    /** Returns a manifest-declared user-facing message, falling back to a domain-neutral default. */
+    private String msg(String key, String fallback) {
+        String m = manifestStore.message(key);
+        return (m != null && !m.isBlank()) ? m : fallback;
     }
 
     /**
@@ -674,10 +683,11 @@ public class ChatService {
     private String buildClarificationQuestion(EffectiveManifest em,
                                                List<? extends Object> candidates,
                                                List<CoverageResource> discovered) {
-        ai.meridian.gateway.domain.manifest.ClarificationSchema cs = em.relationshipClarification();
+        ai.meridian.gateway.domain.manifest.ClarificationSchema cs =
+                em.clarificationFor(em.primaryRequiredKey());
         String questionText = (cs != null && cs.question() != null && !cs.question().isBlank())
             ? cs.question()
-            : "Which client relationship are you asking about?";
+            : msg("missing_entity_question", "Which resource are you asking about?");
 
         // Use discovered list when candidates is empty or no match narrowing was done.
         List<CoverageResource> options = discovered.isEmpty()

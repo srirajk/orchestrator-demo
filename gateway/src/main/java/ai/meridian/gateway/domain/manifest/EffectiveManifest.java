@@ -54,14 +54,19 @@ public record EffectiveManifest(
         );
     }
 
-    /** Returns true if this effective manifest requires a relationship_id in context. */
-    public boolean requiresRelationship() {
-        return requiredContext != null && requiredContext.contains("relationship_id");
+    /** Returns true if this effective manifest declares any required-context entity. */
+    public boolean requiresContext() {
+        return requiredContext != null && !requiredContext.isEmpty();
     }
 
-    /** Returns the ClarificationSchema for relationship_id, or null if not configured. */
-    public ClarificationSchema relationshipClarification() {
-        if (clarificationSchema == null) return null;
-        return clarificationSchema.get("relationship_id");
+    /** The first manifest-declared required-context entity key, or null when none. */
+    public String primaryRequiredKey() {
+        return (requiredContext == null || requiredContext.isEmpty()) ? null : requiredContext.get(0);
+    }
+
+    /** The ClarificationSchema declared for an entity key, or null if not configured. */
+    public ClarificationSchema clarificationFor(String entityKey) {
+        if (clarificationSchema == null || entityKey == null) return null;
+        return clarificationSchema.get(entityKey);
     }
 }

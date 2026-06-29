@@ -1028,3 +1028,38 @@
 | 13:54 | Edited docs/MODEL-SELECTION.md | expanded (+14 lines) | ~577 |
 | 13:55 | Edited docs/MODEL-SELECTION.md | 3→6 lines | ~139 |
 | 13:55 | Session end: 88 writes across 39 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 124 reads | ~226858 tok |
+| 14:03 | Session end: 88 writes across 39 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 124 reads | ~226858 tok |
+| 14:08 | Edited registry/domains/wealth-management/private-banking.json | expanded (+16 lines) | ~322 |
+| 14:09 | Edited gateway/src/test/resources/domains/wealth-management/private-banking.json | expanded (+16 lines) | ~322 |
+| 14:09 | Edited gateway/src/main/java/ai/meridian/gateway/domain/manifest/SubDomainManifest.java | added 2 condition(s) | ~495 |
+| 14:09 | Session end: 91 writes across 39 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 127 reads | ~233445 tok |
+| 14:09 | Edited gateway/src/main/java/ai/meridian/gateway/domain/manifest/DomainManifestStore.java | added 5 condition(s) | ~545 |
+| 14:09 | Edited gateway/src/main/java/ai/meridian/gateway/domain/manifest/EffectiveManifest.java | modified requiresContext() | ~196 |
+| 14:09 | Edited gateway/src/test/java/ai/meridian/gateway/domain/manifest/EffectiveManifestTest.java | inline fix | ~6 |
+| 14:09 | Edited gateway/src/test/java/ai/meridian/gateway/domain/manifest/EffectiveManifestTest.java | "merge with resource_scope" → "merge with resource_scope" | ~29 |
+| 14:10 | Edited gateway/src/test/java/ai/meridian/gateway/domain/manifest/EffectiveManifestMergeTest.java | inline fix | ~16 |
+| 14:10 | Edited gateway/src/test/java/ai/meridian/gateway/domain/manifest/EffectiveManifestMergeTest.java | relationshipClarification() → clarificationFor() | ~53 |
+| 14:10 | Edited gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java | added 2 import(s) | ~73 |
+| 14:10 | Edited gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java | added 7 condition(s) | ~1364 |
+| 14:11 | Edited gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java | expanded (+6 lines) | ~363 |
+| 14:11 | Edited gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java | 13→17 lines | ~266 |
+| 14:11 | Edited gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java | 3→3 lines | ~63 |
+| 14:11 | Edited gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java | added 1 condition(s) | ~434 |
+| 14:12 | Edited gateway/src/main/java/ai/meridian/gateway/synthesis/answer/AnswerSynthesizer.java | modified HIERARCHY() | ~948 |
+| 14:12 | Edited gateway/src/main/java/ai/meridian/gateway/synthesis/answer/AnswerSynthesizer.java | 3→3 lines | ~51 |
+| 14:12 | Edited gateway/src/main/java/ai/meridian/gateway/synthesis/answer/AnswerSynthesizer.java | 2→2 lines | ~31 |
+| 14:12 | Edited gateway/src/main/java/ai/meridian/gateway/synthesis/answer/AnswerSynthesizer.java | 6→6 lines | ~136 |
+| 14:12 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | modified CLARIFY() | ~243 |
+| 14:12 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | 3→3 lines | ~62 |
+| 14:12 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | 6→5 lines | ~122 |
+| 14:12 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | 3→3 lines | ~57 |
+| 14:12 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | 2→3 lines | ~51 |
+| 14:12 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | 11→11 lines | ~152 |
+| 14:13 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | modified mapDenialReason() | ~195 |
+| 14:13 | Session end: 114 writes across 42 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 127 reads | ~239290 tok |
+| 14:13 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | modified question() | ~91 |
+| 14:13 | Edited gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityResolver.java | modified NOTE() | ~354 |
+| 14:14 | Edited gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityResolver.java | 2→2 lines | ~33 |
+| 14:14 | Edited gateway/src/main/resources/application.yml | expanded (+8 lines) | ~165 |
+| 14:14 | Edited gateway/src/main/resources/application.yml | 4→7 lines | ~143 |
+| 14:15 | World B steps 6/2/5/9: manifest-driven LLM prompts + clarification/denial copy + deterministic CLARIFY + generic resolve URL | IntentClassifier, AnswerSynthesizer, ChatService, EffectiveManifest, DomainManifestStore, SubDomainManifest, EntityResolver, manifests, application.yml | CRITICAL 43→9, 49/49 tests green | ~45k |
