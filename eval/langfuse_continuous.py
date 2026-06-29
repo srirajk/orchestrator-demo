@@ -60,6 +60,9 @@ ZAI_BASE_URL: str = JUDGE_BASE_URL
 
 EVAL_LOOKBACK_HOURS: int = int(os.environ.get("EVAL_LOOKBACK_HOURS", "24"))
 EVAL_TRACE_LIMIT: int = int(os.environ.get("EVAL_TRACE_LIMIT", "50"))
+# Only score real conversation turns (the gateway tags these "chat-turn"); set blank
+# to score all traces. Keeps health/auto-title/denial noise out of the eval average.
+EVAL_TRACE_NAME: str = os.environ.get("EVAL_TRACE_NAME", "chat-turn")
 
 # Words that constitute an acknowledgment of missing / failed data
 ACKNOWLEDGMENT_WORDS: list = [
@@ -429,14 +432,23 @@ def run_continuous_eval() -> None:
     )
 
     try:
+        # Only score real conversation turns. Without this name filter the loop also
+        # scores GET /health probes, LibreChat auto-title calls, and other non-answer
+        # traces, whose empty/irrelevant output drags relevance to 0.00. The gateway
+        # tags every chat turn's root span langfuse.trace.name = "chat-turn".
         traces_page = lf.get_traces(
             limit=EVAL_TRACE_LIMIT,
             from_timestamp=from_ts,
+            name=EVAL_TRACE_NAME,
         )
         traces = traces_page.data if hasattr(traces_page, "data") else []
     except Exception as exc:
         logger.error("Failed to fetch traces from Langfuse: %s", exc)
         return
+
+    # Belt-and-suspenders: drop any trace with no synthesized answer (e.g. a clarify or
+    # denial turn that produced no gradable output) so they don't poison the average.
+    traces = [t for t in traces if (getattr(t, "output", None) or "").strip()]
 
     if not traces:
         logger.info("No traces found in the lookback window — nothing to score")
