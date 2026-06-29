@@ -89,7 +89,10 @@ public class DomainManifestStore {
         while (m.find()) {
             String varName = m.group(1);
             String value = env.getProperty(varName);
-            m.appendReplacement(sb, value != null ? Matcher.quoteReplacement(value) : m.group(0));
+            // Always use quoteReplacement — the fallback m.group(0) contains ${...}
+            // which Matcher.appendReplacement would interpret as a named back-reference.
+            String replacement = value != null ? value : m.group(0);
+            m.appendReplacement(sb, Matcher.quoteReplacement(replacement));
         }
         m.appendTail(sb);
         return sb.toString();

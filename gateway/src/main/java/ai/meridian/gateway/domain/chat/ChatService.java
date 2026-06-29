@@ -579,14 +579,9 @@ public class ChatService {
             msg.append("Could you clarify what you'd like to know about ")
                .append(session.relationshipId())
                .append("? For example: holdings, performance, settlements, or corporate actions.");
-        } else if (principal.book() != null && !principal.book().isEmpty()) {
-            msg.append("Which client relationship are you asking about? You have access to:\n");
-            for (String relId : principal.book()) {
-                msg.append("  • ").append(relId).append("\n");
-            }
-            msg.append("\nReply with the relationship ID to continue.");
         } else {
-            msg.append("Which client or relationship ID are you asking about?");
+            msg.append("Which client relationship are you asking about? " +
+                    "Please provide the relationship ID or client name to continue.");
         }
         emitRequestOutcome("CLARIFIED");
         streamTextAndComplete(emitter, msg.toString());

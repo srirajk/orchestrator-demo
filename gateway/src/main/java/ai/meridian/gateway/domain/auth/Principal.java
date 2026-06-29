@@ -6,42 +6,39 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import java.util.List;
 
 /**
- * A caller's identity + entitlement attributes used for every authorization check.
+ * A caller's verified identity + structural attributes used for authorization checks.
+ *
+ * <p>JWT carries identity and structural claims only: {@code sub}, {@code roles},
+ * {@code segments}, {@code clearance}, {@code tenant_id}. No {@code book} claim.
+ * Book-of-business is enforced at runtime by the domain coverage service (DISCOVER/CHECK),
+ * never embedded in the token or cached in gateway Redis.
  *
  * <p>Fields:
  * <ul>
- *   <li>{@code tenantId} — tenant scope for coverage checks (from JWT {@code tenant_id} claim)</li>
+ *   <li>{@code tenantId} — tenant scope for coverage checks (from JWT {@code tenant_id})</li>
  *   <li>{@code roles} — coarse RBAC roles (relationship_manager, domain_admin, platform_admin)</li>
- *   <li>{@code book} — relationship IDs this caller may read (entitlement check)</li>
  *   <li>{@code clearance} — numeric data-classification clearance level (1–5)</li>
  *   <li>{@code adminDomains} — org domains this caller may administer (domain_admin only)</li>
- *   <li>{@code segments} — business segments ("wealth", "servicing") — governs which agent
- *       domains this principal can invoke (e.g. "wealth" → wealth-management agents)</li>
- *   <li>{@code domains} — org domain memberships (e.g. "wealth-private-banking") — used in
- *       domain-resource Cerbos policies</li>
+ *   <li>{@code segments} — business segments ("wealth", "servicing")</li>
+ *   <li>{@code domains} — org domain memberships (e.g. "wealth-private-banking")</li>
  * </ul>
  */
 public record Principal(
         String       id,
         String       tenantId,
         List<String> roles,
-        List<String> book,
         int          clearance,
         List<String> adminDomains,
-        List<String> segments,    // business segments: "wealth", "servicing", …
-        List<String> domains      // org domain memberships: "wealth-private-banking", …
+        List<String> segments,
+        List<String> domains
 ) {
     /** Fallback for unauthenticated / anonymous callers — no data access. */
     public static Principal anonymous() {
         return new Principal("anonymous", "default", List.of("relationship_manager"),
-                List.of(), 2, List.of(), List.of(), List.of());
+                2, List.of(), List.of(), List.of());
     }
 
-    /**
-     * Build a {@link Principal} from a Spring Security {@link Jwt} (oauth2-resource-server).
-     * Primary factory after Phase 10.
-     */
-    @SuppressWarnings("unchecked")
+    /** Build a {@link Principal} from a Spring Security {@link Jwt}. Primary factory. */
     public static Principal fromSpringJwt(Jwt jwt) {
         String sub = jwt.getSubject();
 
@@ -50,9 +47,6 @@ public record Principal(
 
         List<String> roles = jwt.getClaimAsStringList("roles");
         if (roles == null) roles = List.of("relationship_manager");
-
-        List<String> book = jwt.getClaimAsStringList("book");
-        if (book == null) book = List.of();
 
         Object rawClearance = jwt.getClaim("clearance");
         int clearance = rawClearance instanceof Number n ? n.intValue() : 2;
@@ -66,12 +60,10 @@ public record Principal(
         List<String> domains = jwt.getClaimAsStringList("domains");
         if (domains == null) domains = List.of();
 
-        return new Principal(sub, tenantId, roles, book, clearance, adminDomains, segments, domains);
+        return new Principal(sub, tenantId, roles, clearance, adminDomains, segments, domains);
     }
 
-    /**
-     * Build a {@link Principal} from a Nimbus {@link JWTClaimsSet} (unit tests and legacy code).
-     */
+    /** Build a {@link Principal} from a Nimbus {@link JWTClaimsSet} (unit tests / legacy). */
     @SuppressWarnings("unchecked")
     public static Principal fromJwtClaims(JWTClaimsSet claims) {
         String sub = claims.getSubject();
@@ -81,9 +73,6 @@ public record Principal(
 
         Object rawRoles = claims.getClaim("roles");
         List<String> roles = rawRoles instanceof List<?> l ? (List<String>) l : List.of("relationship_manager");
-
-        Object rawBook = claims.getClaim("book");
-        List<String> book = rawBook instanceof List<?> l ? (List<String>) l : List.of();
 
         Object rawClearance = claims.getClaim("clearance");
         int clearance = rawClearance instanceof Number n ? n.intValue() : 2;
@@ -97,6 +86,6 @@ public record Principal(
         Object rawDomains = claims.getClaim("domains");
         List<String> domains = rawDomains instanceof List<?> l ? (List<String>) l : List.of();
 
-        return new Principal(sub, tenantId, roles, book, clearance, adminDomains, segments, domains);
+        return new Principal(sub, tenantId, roles, clearance, adminDomains, segments, domains);
     }
 }

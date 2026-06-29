@@ -130,7 +130,6 @@ class SecurityRejectionIT {
                 .expirationTime(exp)
                 .issueTime(new Date())
                 .claim("roles", roles)
-                .claim("book", List.of())
                 .claim("clearance", 2)
                 .build();
         JWSHeader header = new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(kid).build();

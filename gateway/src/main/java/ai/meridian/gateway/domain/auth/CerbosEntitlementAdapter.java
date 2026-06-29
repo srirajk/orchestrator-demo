@@ -117,15 +117,12 @@ public class CerbosEntitlementAdapter {
             return new BatchResult(results, "cerbos");
 
         } catch (Exception e) {
-            log.error("Cerbos agent check failed for principal={}: {}", principal.id(), e.getMessage());
-            // fail-open for agent invocation (relationship check is the hard gate)
-            Map<String, Boolean> fallback = new HashMap<>();
-            boolean isAdmin = principal.roles().contains("platform_admin")
-                    || principal.roles().contains("admin");
-            for (AgentManifest m : manifests) {
-                fallback.put(m.agentId(), isAdmin || !m.constraints().isMutating());
-            }
-            return new BatchResult(fallback, "local-fallback");
+            // fail-CLOSED for agent checks — Cerbos outage is a security event, not graceful degradation.
+            log.error("Cerbos agent check FAILED — denying all agents for principal={}: {}",
+                    principal.id(), e.getMessage());
+            Map<String, Boolean> denied = new HashMap<>();
+            manifests.forEach(m -> denied.put(m.agentId(), false));
+            return new BatchResult(denied, "local-fallback-closed");
         }
     }
 
@@ -193,12 +190,10 @@ public class CerbosEntitlementAdapter {
 
         ObjectNode attr = p.putObject("attr");
 
-        // Relationship entitlement
-        ArrayNode book = attr.putArray("book");
-        principal.book().forEach(book::add);
+        // Structural attributes only — no book claim.
+        // Book-of-business is enforced by the domain coverage service (DISCOVER/CHECK), not Cerbos.
         attr.put("clearance", principal.clearance());
 
-        // Domain access (for agent + domain policies)
         ArrayNode segments = attr.putArray("segments");
         principal.segments().forEach(segments::add);
 
@@ -213,20 +208,19 @@ public class CerbosEntitlementAdapter {
                                        List<String> ids, String kind) {
         log.error("Cerbos PDP unreachable ({}): {}", kind, e.getMessage());
         if ("local".equals(failMode)) {
-            log.warn("Cerbos fail-mode=local: falling back to JWT book claim for principal={}", principal.id());
+            // local fallback: admins pass, everyone else is denied — no stale book to fall back to.
+            log.warn("Cerbos fail-mode=local: principal={} kind={} — admins only", principal.id(), kind);
             Map<String, Boolean> fallback = new HashMap<>();
             boolean isAdmin = principal.roles().contains("platform_admin")
                     || principal.roles().contains("admin");
-            for (String id : ids) {
-                fallback.put(id, isAdmin || principal.book().contains(id));
-            }
+            ids.forEach(id -> fallback.put(id, isAdmin));
             return new BatchResult(fallback, "local-fallback");
         }
         log.warn("Cerbos fail-mode=closed: denying all {} {}(s) for principal={}",
                 ids.size(), kind, principal.id());
         Map<String, Boolean> denied = new HashMap<>();
         ids.forEach(id -> denied.put(id, false));
-        return new BatchResult(denied, "local-fallback");
+        return new BatchResult(denied, "local-fallback-closed");
     }
 
     private Map<String, Boolean> parseResponse(String body, String action, List<String> requestedIds) throws Exception {

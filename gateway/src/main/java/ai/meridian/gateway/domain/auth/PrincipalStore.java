@@ -15,14 +15,16 @@ import java.util.Map;
  *
  * <p>Storage layout — Redis Hash keyed by {@code principal:{userId}}:
  * <pre>
- *   id        rm_jane
- *   roles     ["relationship_manager"]
- *   book      ["REL-00042","REL-00099"]
- *   clearance 2
+ *   id           rm_jane
+ *   roles        ["relationship_manager"]
+ *   clearance    2
+ *   segments     ["wealth","servicing"]
+ *   domains      ["wealth-private-banking"]
+ *   adminDomains []
  * </pre>
  *
- * <p>Demo principals are seeded by user-mgmt at startup (not by the gateway).
- * The gateway is a pure reader of the principal store.
+ * <p>No {@code book} field — book-of-business is enforced by the domain coverage service at
+ * runtime, never stored here. Demo principals are seeded at startup via seed-users.sh.
  */
 @Service
 public class PrincipalStore {
@@ -55,12 +57,11 @@ public class PrincipalStore {
                 return Principal.anonymous();
             }
             List<String> roles        = parseList(fields.get("roles"));
-            List<String> book         = parseList(fields.get("book"));
             int          clearance    = parseInt(fields.get("clearance"), 2);
             List<String> segments     = parseList(fields.get("segments"));
             List<String> domains      = parseList(fields.get("domains"));
             List<String> adminDomains = parseList(fields.get("adminDomains"));
-            return new Principal(userId, "default", roles, book, clearance, adminDomains, segments, domains);
+            return new Principal(userId, "default", roles, clearance, adminDomains, segments, domains);
         } catch (Exception e) {
             log.warn("PrincipalStore.load failed for {}: {}", userId, e.getMessage());
             return Principal.anonymous();

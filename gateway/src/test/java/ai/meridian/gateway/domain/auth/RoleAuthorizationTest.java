@@ -84,7 +84,6 @@ class RoleAuthorizationTest {
                 .expirationTime(new Date(System.currentTimeMillis() + 3_600_000L))
                 .issueTime(new Date())
                 .claim("roles", roles)
-                .claim("book", List.of())
                 .claim("admin_domains", adminDomains)
                 .claim("clearance", 2)
                 .build();
@@ -257,7 +256,6 @@ class RoleAuthorizationTest {
                 .expirationTime(new Date(System.currentTimeMillis() + 3_600_000L))
                 .issueTime(new Date())
                 .claim("roles", List.of("relationship_manager"))
-                .claim("book", List.of())
                 .claim("admin_domains", List.of())
                 .claim("clearance", 2)
                 .build();

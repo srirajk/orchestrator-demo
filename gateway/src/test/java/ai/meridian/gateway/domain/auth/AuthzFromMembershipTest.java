@@ -35,17 +35,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 
 /**
- * Verifies that JWT-carried book claims drive entitlement decisions correctly.
+ * Verifies JWT → Principal mapping and Cerbos-backed entitlement decisions.
  *
- * <p>Scenarios tested:
- * <ol>
- *   <li>{@code rm_jane}'s JWT does NOT include {@code REL-00188} (Okafor) →
- *       the chat response must contain an access-denied message.</li>
- *   <li>A new JWT minted with {@code REL-00188} in the book → access is allowed
- *       (simulates the RM being added to the domain membership).</li>
- *   <li>A token carrying {@code is_mutating=true} flag can be used to demonstrate
- *       that the Principal book is populated from JWT, not just Redis.</li>
- * </ol>
+ * <p>JWT carries structural claims only ({@code sub}, {@code roles}, {@code segments},
+ * {@code clearance}). No {@code book} claim. Book-of-business is enforced at runtime
+ * by the domain coverage service (DISCOVER/CHECK), not embedded in the token.
  *
  * <p>The {@link JwksClient} is replaced with a {@link MockBean} so no real
  * user-mgmt service is needed.
@@ -86,30 +80,26 @@ class AuthzFromMembershipTest {
         when(jwksClient.getPublicKey(argThat(k -> !"membership-key-1".equals(k))))
                 .thenReturn(null);
 
-        // Default: Cerbos allows REL-00042 and REL-00099 (in rm_jane's book),
-        // denies REL-00188 unless a test explicitly overrides this stub.
+        // Default: Cerbos allows relationship_manager and admin roles (structural check only).
+        // Book-of-business enforcement is handled by the domain coverage service, not Cerbos.
         when(cerbosAdapter.checkRelationships(any(), any()))
                 .thenAnswer(inv -> {
                     @SuppressWarnings("unchecked")
                     List<String> ids = (List<String>) inv.getArgument(1);
-                    // Guard: during Mockito stub recording the arg may be null
                     if (ids == null) return new CerbosEntitlementAdapter.BatchResult(Map.of(), "cerbos");
                     Principal p = inv.getArgument(0);
+                    boolean allow = p != null && p.roles().stream()
+                            .anyMatch(r -> r.contains("relationship_manager") || r.contains("admin"));
                     java.util.Map<String, Boolean> decisions = new java.util.HashMap<>();
-                    for (String id : ids) {
-                        // Honour the principal's book claim as the local proxy for Cerbos
-                        boolean adminRole = p != null && p.roles().stream()
-                                .anyMatch(r -> r.contains("admin"));
-                        boolean inBook    = p != null && p.book().contains(id);
-                        decisions.put(id, adminRole || inBook);
-                    }
+                    ids.forEach(id -> decisions.put(id, allow));
                     return new CerbosEntitlementAdapter.BatchResult(decisions, "cerbos");
                 });
     }
 
     // ── Token minting helper ─────────────────────────────────────────────────────
 
-    private String mintToken(String sub, List<String> book) throws Exception {
+    // Mints a JWT with structural claims only — no book claim.
+    private String mintToken(String sub) throws Exception {
         JWTClaimsSet claims = new JWTClaimsSet.Builder()
                 .subject(sub)
                 .issuer("meridian-user-mgmt")
@@ -117,7 +107,6 @@ class AuthzFromMembershipTest {
                 .expirationTime(new Date(System.currentTimeMillis() + 3_600_000L))
                 .issueTime(new Date())
                 .claim("roles", List.of("relationship_manager"))
-                .claim("book", book)
                 .claim("clearance", 2)
                 .build();
 
@@ -128,33 +117,36 @@ class AuthzFromMembershipTest {
         return jwt.serialize();
     }
 
-    // ── Test: rm_jane cannot access Okafor (REL-00188 not in her book) ───────────
+    // ── Test: rm_jane JWT maps to correct Principal (no book field) ───────────────
 
     @Test
-    void rmJane_okaforNotInBook_accessDenied() throws Exception {
-        // Verify that the JWT → Principal mapping correctly excludes REL-00188,
-        // and EntitlementService denies it. The full SSE stream is tested implicitly
-        // via the integration path; unit-level denial is in entitlementService_rmWithoutRelInBook_denied().
+    void rmJane_jwtMapsToStructuralPrincipal() throws Exception {
+        // Verify JWT → Principal mapping carries structural claims only (no book).
+        // Book-of-business is enforced by coverage service at runtime, not embedded in JWT.
         JWTClaimsSet claims = new JWTClaimsSet.Builder()
                 .subject("rm_jane")
                 .claim("roles", List.of("relationship_manager"))
-                .claim("book", List.of("REL-00042", "REL-00099"))
                 .claim("clearance", 2)
                 .build();
 
         Principal fromJwt = Principal.fromJwtClaims(claims);
         assertThat(fromJwt.id()).isEqualTo("rm_jane");
-        assertThat(fromJwt.book()).containsExactlyInAnyOrder("REL-00042", "REL-00099");
-        assertThat(fromJwt.book()).doesNotContain("REL-00188");
+        assertThat(fromJwt.roles()).containsExactly("relationship_manager");
+        assertThat(fromJwt.clearance()).isEqualTo(2);
+        // No book field — structural check only; coverage service handles book-of-business.
 
-        // EntitlementService must deny REL-00188 for this JWT-derived principal
-        // cerbosAdapter is stubbed in @BeforeEach to honour the principal's book claim
+        // Cerbos structural check would ALLOW relationship_manager.
+        // Coverage service (not tested here) would DENY Okafor as out-of-book.
+        // Override to deny for this assertion:
+        when(cerbosAdapter.checkRelationships(any(), any()))
+                .thenReturn(new CerbosEntitlementAdapter.BatchResult(Map.of("REL-00188", false), "cerbos"));
+
         EntitlementService.EntitlementResult result = entitlementService.checkRelationship(fromJwt, "REL-00188");
         assertThat(result.allowed()).isFalse();
         assertThat(result.source()).isEqualTo("cerbos");
 
         // HTTP-level: JWT is accepted (200, not 401), proving verification + principal extraction
-        String token = mintToken("rm_jane", List.of("REL-00042", "REL-00099"));
+        String token = mintToken("rm_jane");
         String body = """
                 {
                   "model": "meridian-assistant",
@@ -169,13 +161,13 @@ class AuthzFromMembershipTest {
                 .andExpect(status().isOk());  // valid JWT → gateway accepts it (not 401)
     }
 
-    // ── Test: after "membership add", new JWT grants access ──────────────────────
+    // ── Test: valid JWT → gateway accepts request, Cerbos structural check passes ──
 
     @Test
-    void rmJane_afterMembershipAdd_okaforAllowed() throws Exception {
-        // Simulate domain membership update: rm_jane now has REL-00188 in her book.
-        // In production, the user-mgmt service issues a new JWT after the membership change.
-        String token = mintToken("rm_jane", List.of("REL-00042", "REL-00099", "REL-00188"));
+    void rmJane_validJwt_requestAccepted() throws Exception {
+        // A valid JWT with relationship_manager role — gateway must accept it (200, not 401/403).
+        // Coverage service (not wired here) would handle the actual book-of-business enforcement.
+        String token = mintToken("rm_jane");
 
         // Request about REL-00188 — should now pass the entitlement check.
         // The intent classifier / resolver may or may not fan out (depends on demo data),
@@ -209,11 +201,11 @@ class AuthzFromMembershipTest {
     // ── Test: principal is built from JWT claims, not only Redis ─────────────────
 
     @Test
-    void principalBookComesFromJwt_notOnlyRedis() throws Exception {
+    void principalComesFromJwt_notOnlyRedis() throws Exception {
         // "rm_new" does not exist in Redis (was not seeded at startup), but the JWT
-        // attests that she has access to REL-00042.  The PrincipalStore should use
-        // the JWT-derived Principal rather than falling back to anonymous().
-        String token = mintToken("rm_new", List.of("REL-00042"));
+        // establishes her identity and roles.  The gateway must use the JWT-derived
+        // Principal rather than falling back to anonymous().
+        String token = mintToken("rm_new");
 
         String body = """
                 {
@@ -241,15 +233,16 @@ class AuthzFromMembershipTest {
                 .doesNotContain("access denied: you are not authorized");
     }
 
-    // ── Test: Principal.fromJwtClaims() maps claims correctly ────────────────────
+    // ── Test: Principal.fromJwtClaims() maps structural claims correctly ──────────
 
     @Test
     void principalFromJwtClaims_mapsFieldsCorrectly() throws Exception {
         // Unit-level check of the fromJwtClaims factory without involving MockMvc.
+        // JWT carries structural claims only — no book claim.
         JWTClaimsSet claims = new JWTClaimsSet.Builder()
                 .subject("rm_test_user")
                 .claim("roles", List.of("relationship_manager", "senior_rm"))
-                .claim("book", List.of("REL-00042", "REL-00099", "REL-00188"))
+                .claim("segments", List.of("wealth", "servicing"))
                 .claim("clearance", 3)
                 .build();
 
@@ -257,13 +250,13 @@ class AuthzFromMembershipTest {
 
         assertThat(principal.id()).isEqualTo("rm_test_user");
         assertThat(principal.roles()).containsExactly("relationship_manager", "senior_rm");
-        assertThat(principal.book()).containsExactlyInAnyOrder("REL-00042", "REL-00099", "REL-00188");
+        assertThat(principal.segments()).containsExactlyInAnyOrder("wealth", "servicing");
         assertThat(principal.clearance()).isEqualTo(3);
     }
 
     @Test
     void principalFromJwtClaims_missingOptionalClaims_usesDefaults() throws Exception {
-        // When optional claims (roles, book, clearance) are absent, safe defaults apply.
+        // When optional claims (roles, clearance) are absent, safe defaults apply.
         JWTClaimsSet claims = new JWTClaimsSet.Builder()
                 .subject("rm_minimal")
                 .build();
@@ -272,17 +265,15 @@ class AuthzFromMembershipTest {
 
         assertThat(principal.id()).isEqualTo("rm_minimal");
         assertThat(principal.roles()).containsExactly("relationship_manager");
-        assertThat(principal.book()).isEmpty();
         assertThat(principal.clearance()).isEqualTo(2);
     }
 
     // ── Test: EntitlementService delegates to Cerbos adapter ─────────────────────
 
     @Test
-    void entitlementService_adminRole_grantsAccessRegardlessOfBook() {
-        // platform_admin/admin: Cerbos returns ALLOW (policy has no book condition for admin roles).
-        // We stub the adapter to return ALLOW — the point is EntitlementService honours the verdict.
-        Principal admin = new Principal("admin", "default", List.of("platform_admin"), List.of(), 5, List.of(), List.of(), List.of());
+    void entitlementService_adminRole_grantsAccess() {
+        // platform_admin: Cerbos returns ALLOW — EntitlementService honours the verdict.
+        Principal admin = new Principal("admin", "default", List.of("platform_admin"), 5, List.of(), List.of(), List.of());
         when(cerbosAdapter.checkRelationships(any(), any()))
                 .thenReturn(new CerbosEntitlementAdapter.BatchResult(Map.of("REL-00188", true), "cerbos"));
 
@@ -293,10 +284,12 @@ class AuthzFromMembershipTest {
     }
 
     @Test
-    void entitlementService_rmWithoutRelInBook_denied() {
-        // Cerbos denies REL-00188 because it's not in rm_jane's book.
+    void entitlementService_cerbosDenies_resultIsDenied() {
+        // Cerbos denies the relationship — EntitlementService relays the denial.
+        // In practice, structural Cerbos check passes for relationship_manager, but the
+        // coverage service (DISCOVER/CHECK) would deny Okafor as not in rm_jane's coverage.
         Principal rm = new Principal("rm_jane", "default", List.of("relationship_manager"),
-                List.of("REL-00042", "REL-00099"), 2, List.of(), List.of("wealth"), List.of("wealth-private-banking"));
+                2, List.of(), List.of("wealth"), List.of("wealth-private-banking"));
         when(cerbosAdapter.checkRelationships(any(), any()))
                 .thenReturn(new CerbosEntitlementAdapter.BatchResult(Map.of("REL-00188", false), "cerbos"));
 
@@ -307,10 +300,10 @@ class AuthzFromMembershipTest {
     }
 
     @Test
-    void entitlementService_rmWithRelInBook_allowed() {
-        // Cerbos allows REL-00188 because rm_jane's book now contains it.
+    void entitlementService_cerbosAllows_resultIsAllowed() {
+        // Cerbos allows the relationship — EntitlementService relays the approval.
         Principal rm = new Principal("rm_jane", "default", List.of("relationship_manager"),
-                List.of("REL-00042", "REL-00099", "REL-00188"), 2, List.of(), List.of("wealth"), List.of("wealth-private-banking"));
+                2, List.of(), List.of("wealth"), List.of("wealth-private-banking"));
         when(cerbosAdapter.checkRelationships(any(), any()))
                 .thenReturn(new CerbosEntitlementAdapter.BatchResult(Map.of("REL-00188", true), "cerbos"));
 
