@@ -494,4 +494,90 @@ World B is locked-in and demonstrable when:
 
 When the second domain passes the gate live on screen, World B is no longer a claim. That is
 the achievement we are locking down.
+
+---
+
+## 9. The enforcement loop — how agent teams write code under this spec
+
+The spec is worthless if it lives only in one person's memory and a human has to be the
+guardrail every session. World B is enforced by a **three-layer loop** so that any agent — a
+subagent, a future session, a human teammate — is checked against it automatically, without
+anyone re-explaining it.
+
+### Layer 1 — Deterministic gate (does not depend on remembering)
+
+**`scripts/world-b-check.sh`** greps `gateway/src/main/java` for domain coupling and prints
+every violation as a file:line worklist, with a CRITICAL count.
+
+- **Today it FAILS by design** — the code is mid-refactor. The violation list *is* the World
+  B worklist, and the CRITICAL count is the progress metric. Baseline at lockdown:
+  **68 CRITICAL + 5 REVIEW.**
+- **Every build-plan step (§7) must drive the count down.** A step that claims to remove a
+  violation class (e.g. step 4 = entity-extraction field names) must take that class to 0.
+- **No change may increase the count.** That is the one hard rule even while the total is
+  non-zero.
+- **When CRITICAL reaches 0**, wire it into `scripts/verify.sh` and a pre-commit hook as a
+  hard gate. From then on, domain knowledge cannot re-enter the gateway silently — the build
+  breaks.
+
+The check is intentionally split into CRITICAL (must be zero) and REVIEW (entity-type literals
+/ domain-specific env names that need human judgment because they *might* legitimately read a
+manifest). REVIEW flags are resolved or justified before the hard gate is turned on.
+
+### Layer 2 — Always-in-context rule (every session starts knowing)
+
+**`.claude/rules/world-b.md`** is loaded into context every session (same mechanism as the
+OpenWolf rule). It states the six invariants, points here, and mandates the pre-flight read
+and the post-flight check. This is what stops drift at the *start* of work, before a line is
+written — no human reminder needed.
+
+### Layer 3 — The agent harness (the contract for writing code)
+
+Any agent writing gateway code — including subagents this project spawns — operates under this
+contract. When spawning a coding subagent, inject this harness into its prompt verbatim:
+
+```
+WORLD B CONTRACT — you are editing a manifest-interpreter gateway.
+
+PRE-FLIGHT (before writing code):
+  1. Read docs/WORLD-B-LOCKDOWN.md §4 (target architecture) and §8 (definition of done).
+  2. Run scripts/world-b-check.sh and record the CRITICAL count as your BEFORE baseline.
+
+INVARIANTS (never bend — see §9 / .claude/rules/world-b.md):
+  - No domain knowledge in gateway/src/main/java: no domain or client names, no REL-/FND-
+    patterns, no entity-type literals, no user-facing domain copy. All come from the manifest.
+  - CLARIFY is deterministic (extracted ∩ required = ∅), not LLM-judged.
+  - Entity context is map-based; adding an entity type is a manifest edit, not a Java field.
+  - LLM prompts are compiled from the manifest, not hardcoded.
+  - RESOLVE is principal-agnostic; CHECK is the only gate. Zero fabricated IDs.
+
+POST-FLIGHT (before reporting done):
+  1. Re-run scripts/world-b-check.sh. Report BEFORE → AFTER CRITICAL count.
+  2. AFTER must be <= BEFORE. If your step targets a violation class, that class must be 0.
+  3. Confirm the existing E2E suite is still green (88/88).
+  4. Self-report against the §8 checklist items your change was responsible for.
+
+Return: the before/after count, which §8 items you closed, and any REVIEW flags you touched.
+```
+
+### The loop, in one line
+
+> **Rule in context (Layer 2) → harness on every coding agent (Layer 3) → deterministic gate
+> on every change (Layer 1) → count to zero → hard CI gate.** No step depends on a human
+> remembering World B. The script is the memory.
+
+### What this does NOT catch (and how it's covered)
+
+The grep gate catches *textual* domain coupling. Three invariants are structural and not
+grep-able — they are covered by required tests + the §8 checklist, not by the script:
+
+- **Deterministic CLARIFY** (§4.2) → a unit test: missing required entity ⇒ CLARIFY without an
+  LLM call.
+- **Domain-scoped routing** (§4.3) → an integration test: a PE-shaped prompt selects the PE
+  manifest context, not wealth's.
+- **Admission gate** (§4.5) → the onboarding eval itself is the test: a bad example set fails
+  registration.
+
+These three are the items a reviewer (human or an adversarial subagent) verifies by reading,
+because no regex can. Everything else, the script owns.
 ```
