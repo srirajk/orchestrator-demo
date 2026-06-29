@@ -25,8 +25,11 @@ public class DomainManifestStore {
 
     private final ObjectMapper mapper;
     private final Environment env;
-    private final Map<String, DomainManifest> domains = new HashMap<>();
-    private final Map<String, SubDomainManifest> subDomains = new HashMap<>();
+    private final Map<String, DomainManifest>    domains          = new HashMap<>();
+    private final Map<String, SubDomainManifest> subDomains       = new HashMap<>();
+    // Reverse map: agentId → subDomainId — built from sub-domain agents[] lists at load time.
+    // Used as fallback when the AgentManifest in Redis lacks sub_domain (Jackson/record issue).
+    private final Map<String, String>            agentToSubDomain = new HashMap<>();
 
     public DomainManifestStore(ObjectMapper mapper, Environment env) {
         this.mapper = mapper;
@@ -112,6 +115,12 @@ public class DomainManifestStore {
                 subDomains.put(sd.subDomainId(), sd);
                 log.debug("Loaded sub-domain: {} (parent: {}) resourceScoped={}",
                     sd.subDomainId(), sd.parentDomain(), sd.resourceScoped());
+                // Build reverse map so getEffective() works even when AgentManifest.subDomain() is null.
+                if (sd.agents() != null) {
+                    for (String aid : sd.agents()) {
+                        agentToSubDomain.put(aid, sd.subDomainId());
+                    }
+                }
             } catch (Exception e) {
                 log.debug("Skipping non-subdomain file {}: {}", r.getFilename(), e.getMessage());
             }
@@ -155,7 +164,11 @@ public class DomainManifestStore {
 
     public EffectiveManifest getEffective(String agentId, String domainId, String subDomainId) {
         DomainManifest domain = domains.get(domainId);
-        SubDomainManifest sub = subDomains.get(subDomainId);
+        // Prefer the explicitly-passed subDomainId; fall back to the reverse map built from agents[] lists.
+        // The fallback handles the case where AgentManifest.subDomain() is null due to a Jackson/record
+        // deserialization quirk where @JsonProperty("sub_domain") is not applied on the constructor param.
+        String resolvedSubDomainId = (subDomainId != null) ? subDomainId : agentToSubDomain.get(agentId);
+        SubDomainManifest sub = subDomains.get(resolvedSubDomainId);
         return EffectiveManifest.merge(domain, sub, agentId);
     }
 
