@@ -160,6 +160,11 @@ public class AnswerSynthesizer {
             if (output.length() > 2000) output = output.substring(0, 2000) + "…";
             llmSpan.setAttribute("llm.output_messages.0.message.role", "assistant");
             llmSpan.setAttribute("llm.output_messages.0.message.content", output);
+            // Mirror the synthesized answer to the trace-level output. Without this Langfuse
+            // shows Output: undefined and the continuous relevance judge scores an empty
+            // answer (0.00). Span.current() is the root chat.handle span (made current via
+            // baggageScope in ChatService); llmSpan is never made current.
+            Span.current().setAttribute("langfuse.trace.output", output);
             if (tokenCounts[2] > 0) {
                 llmSpan.setAttribute("llm.token_count.prompt", tokenCounts[0]);
                 llmSpan.setAttribute("llm.token_count.completion", tokenCounts[1]);
@@ -303,8 +308,13 @@ public class AnswerSynthesizer {
             String requestBody = mapper.writeValueAsString(root);
             log.debug("synthesizeFromHistory: model={}", model);
 
-            streamFromLlm(requestBody, emitter, completionId, created, new StringBuilder(),
+            StringBuilder synthesizedText = new StringBuilder();
+            streamFromLlm(requestBody, emitter, completionId, created, synthesizedText,
                     showReasoning, new long[3]);
+            // Mirror the answer to trace-level output (see synthesize() for rationale).
+            String histOutput = synthesizedText.toString();
+            if (histOutput.length() > 2000) histOutput = histOutput.substring(0, 2000) + "…";
+            Span.current().setAttribute("langfuse.trace.output", histOutput);
             emitter.send(SseEmitter.event().data(stopDelta(completionId, created, mapper)));
             emitter.send(SseEmitter.event().data("[DONE]"));
             emitter.complete();
