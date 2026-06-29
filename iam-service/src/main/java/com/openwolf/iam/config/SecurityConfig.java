@@ -107,8 +107,8 @@ public class SecurityConfig {
         RequestMatcher endpointsMatcher = authorizationServerConfigurer.getEndpointsMatcher();
 
         // Include /login in this chain so form login is served here, not by the resource-server
-        // chain (which has no login form). Without this, the redirect to /login after clicking
-        // "Login with Meridian SSO" hits the Order-2 chain and returns 500 "No static resource login."
+        // chain. Static resources (/css/**) are intentionally NOT in this matcher — they fall
+        // to Order-2 which permitAll()s them, avoiding the Bearer 401 from the resource server.
         http
             .securityMatcher(new OrRequestMatcher(
                     endpointsMatcher,
@@ -126,7 +126,7 @@ public class SecurityConfig {
                     )
             )
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()))
-            .formLogin(Customizer.withDefaults());
+            .formLogin(form -> form.loginPage("/login").permitAll());
 
         return http.build();
     }
@@ -151,7 +151,11 @@ public class SecurityConfig {
                                 "/oauth/**",
                                 "/auth/login",
                                 "/auth/token",
-                                "/login"
+                                "/login",
+                                "/css/**",
+                                "/js/**",
+                                "/images/**",
+                                "/default-ui.css"
                         ).permitAll()
                         // Everything else requires a valid JWT
                         .anyRequest().authenticated()

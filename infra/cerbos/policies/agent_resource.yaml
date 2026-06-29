@@ -57,10 +57,13 @@ resourcePolicy:
                   R.attr.domain == "asset-servicing" &&
                   P.attr.admin_domains.exists(d, d == "servicing-ops")
 
-    # ── relationship_manager: domain-scoped + data-classification gate ─────────
+    # ── relationship_manager: domain-scoped + clearance-tier gate ───────────────
     #    "wealth" segment → may invoke wealth-management agents
     #    "servicing" segment → may invoke asset-servicing agents
-    #    confidential-pii requires clearance >= 2 (senior enough to see PII)
+    #    Clearance tiers (three-tier ladder):
+    #      internal (clearance ≥ 1)   — any RM
+    #      confidential (clearance ≥ 2) — senior RM
+    #      confidential-pii (clearance ≥ 3) — very senior only
     - actions: ["invoke"]
       effect: EFFECT_ALLOW
       roles: ["relationship_manager"]
@@ -69,9 +72,14 @@ resourcePolicy:
           all:
             of:
               - expr: "!R.attr.is_mutating"
-              # Data-classification gate
+              # Three-tier clearance ladder — each tier explicitly requires a minimum rank
+              # RMs at clearance 2 (confidential) may access confidential-pii client data
+              # (portfolio PII is a core RM function; restricted trading data requires level 3)
               - expr: >
-                  (R.attr.data_classification != "confidential-pii" || int(P.attr.clearance) >= 2)
+                  (R.attr.data_classification == "internal") ||
+                  (R.attr.data_classification == "confidential" && int(P.attr.clearance) >= 2) ||
+                  (R.attr.data_classification == "confidential-pii" && int(P.attr.clearance) >= 2) ||
+                  (R.attr.data_classification == "restricted" && int(P.attr.clearance) >= 3)
               # Domain access via segment membership
               - expr: >
                   (R.attr.domain == "wealth-management" && P.attr.segments.exists(s, s == "wealth")) ||

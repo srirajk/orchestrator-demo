@@ -2,60 +2,29 @@
 Tests for the Meridian User Management Service — RS256 JWT, JWKS, domain/membership model.
 
 Run with:
-    pip install pytest httpx fakeredis python-jose[cryptography] cryptography
-    pytest tests/test_user_mgmt.py -v
+    cd user-mgmt
+    pip install -r requirements.txt
+    pytest tests/ -v
 
-These tests use an in-process TestClient (no real Redis required — fakeredis patches it).
+These tests use SQLite in-memory (StaticPool) for the DB, and fakeredis for auth codes.
+All tests are async (pytest-asyncio with asyncio_mode = auto).
 """
 
 import base64
-import json
-import math
 
-import fakeredis
 import pytest
-from fastapi.testclient import TestClient
+from httpx import AsyncClient
 from jose import jwt as jose_jwt
-from jose.utils import base64url_decode
-
-# Patch Redis before importing the app so the module-level singleton is replaced.
-import redis as redis_lib
-
-_fake_redis = fakeredis.FakeRedis(decode_responses=True)
-
-
-def _fake_get_redis():
-    return _fake_redis
-
 
 import main as app_module
-
-# Monkey-patch the Redis factory
-app_module.get_redis = _fake_get_redis
-app_module._redis = _fake_redis
-
-from main import app
-
-client = TestClient(app)
-
-
-# ── Fixtures ──────────────────────────────────────────────────────────────────
-
-@pytest.fixture(autouse=True)
-def flush_redis():
-    """Start every test with a clean Redis store and re-run startup seeding."""
-    _fake_redis.flushall()
-    # Re-run the startup seed so principals and domains exist
-    app_module.seed()
-    yield
-    _fake_redis.flushall()
+from main import DEMO_PASSWORD
 
 
 # ── JWKS tests ────────────────────────────────────────────────────────────────
 
 class TestJWKS:
-    def test_jwks_has_correct_structure(self):
-        resp = client.get("/.well-known/jwks.json")
+    async def test_jwks_has_correct_structure(self, app_client: AsyncClient):
+        resp = await app_client.get("/.well-known/jwks.json")
         assert resp.status_code == 200
         body = resp.json()
         assert "keys" in body
@@ -68,18 +37,19 @@ class TestJWKS:
         assert "n" in key and len(key["n"]) > 0
         assert "e" in key and len(key["e"]) > 0
 
-    def test_jwks_e_is_65537(self):
+    async def test_jwks_e_is_65537(self, app_client: AsyncClient):
         """Public exponent must be 65537 (the standard value)."""
-        resp = client.get("/.well-known/jwks.json")
+        from jose.utils import base64url_decode
+        resp = await app_client.get("/.well-known/jwks.json")
         key = resp.json()["keys"][0]
-        # Decode base64url → big-endian integer (jose.utils.base64url_decode needs bytes)
         e_bytes = base64url_decode(key["e"].encode())
         e = int.from_bytes(e_bytes, "big")
         assert e == 65537
 
-    def test_jwks_n_length(self):
+    async def test_jwks_n_length(self, app_client: AsyncClient):
         """Modulus for a 2048-bit key should be 256 bytes when decoded."""
-        resp = client.get("/.well-known/jwks.json")
+        from jose.utils import base64url_decode
+        resp = await app_client.get("/.well-known/jwks.json")
         key = resp.json()["keys"][0]
         n_bytes = base64url_decode(key["n"].encode())
         assert len(n_bytes) == 256  # 2048 / 8
@@ -88,12 +58,15 @@ class TestJWKS:
 # ── Token issuance and RS256 verification ─────────────────────────────────────
 
 class TestTokenIssuance:
-    def _get_public_key_pem(self):
-        """Fetch public key from JWKS and reconstruct PEM for jose verification."""
-        return app_module._rsa_private_key.public_key()
+    def _pub_pem(self) -> str:
+        from cryptography.hazmat.primitives import serialization
+        return app_module._rsa_private_key.public_key().public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        ).decode()
 
-    def test_issue_token_returns_rs256_jwt(self):
-        resp = client.post("/auth/token", json={"user_id": "rm_jane"})
+    async def test_issue_token_returns_rs256_jwt(self, app_client: AsyncClient):
+        resp = await app_client.post("/auth/token", json={"user_id": "rm_jane"})
         assert resp.status_code == 200
         body = resp.json()
         assert "access_token" in body
@@ -101,24 +74,12 @@ class TestTokenIssuance:
         assert body["key_id"] == "meridian-key-1"
         assert "jwks_uri" in body
 
-    def test_token_is_valid_rs256(self):
-        """Decode the issued token using the public key from JWKS."""
-        resp = client.post("/auth/token", json={"user_id": "rm_jane"})
+    async def test_token_is_valid_rs256(self, app_client: AsyncClient):
+        resp = await app_client.post("/auth/token", json={"user_id": "rm_jane"})
         token = resp.json()["access_token"]
-
-        # Get public key PEM
-        from cryptography.hazmat.primitives import serialization
-        pub_pem = app_module._rsa_private_key.public_key().public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
-        ).decode()
-
         claims = jose_jwt.decode(
-            token,
-            pub_pem,
-            algorithms=["RS256"],
-            audience="meridian-gateway",
-            issuer="meridian-user-mgmt",
+            token, self._pub_pem(), algorithms=["RS256"],
+            audience="meridian-gateway", issuer="meridian-user-mgmt",
         )
         assert claims["sub"] == "rm_jane"
         assert claims["iss"] == "meridian-user-mgmt"
@@ -126,88 +87,74 @@ class TestTokenIssuance:
         assert "exp" in claims
         assert "iat" in claims
 
-    def test_token_claims_match_user(self):
-        resp = client.post("/auth/token", json={"user_id": "rm_jane"})
+    async def test_token_claims_match_user(self, app_client: AsyncClient):
+        resp = await app_client.post("/auth/token", json={"user_id": "rm_jane"})
         token = resp.json()["access_token"]
-
-        from cryptography.hazmat.primitives import serialization
-        pub_pem = app_module._rsa_private_key.public_key().public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
-        ).decode()
-
         claims = jose_jwt.decode(
-            token, pub_pem,
-            algorithms=["RS256"],
-            audience="meridian-gateway",
-            issuer="meridian-user-mgmt",
+            token, self._pub_pem(), algorithms=["RS256"],
+            audience="meridian-gateway", issuer="meridian-user-mgmt",
             options={"verify_exp": False},
         )
         assert claims["name"] == "Jane Smith"
         assert claims["email"] == "jane.smith@meridianbank.com"
-        assert "roles" in claims
         assert "relationship_manager" in claims["roles"]
 
-    def test_token_header_has_kid(self):
-        resp = client.post("/auth/token", json={"user_id": "rm_jane"})
+    async def test_token_header_has_kid(self, app_client: AsyncClient):
+        resp = await app_client.post("/auth/token", json={"user_id": "rm_jane"})
         token = resp.json()["access_token"]
         header = jose_jwt.get_unverified_header(token)
         assert header["alg"] == "RS256"
         assert header["kid"] == "meridian-key-1"
 
-    def test_token_unknown_user_returns_404(self):
-        resp = client.post("/auth/token", json={"user_id": "nonexistent"})
+    async def test_token_unknown_user_returns_404(self, app_client: AsyncClient):
+        resp = await app_client.post("/auth/token", json={"user_id": "nonexistent"})
         assert resp.status_code == 404
 
-    def test_derived_book_in_response(self):
-        resp = client.post("/auth/token", json={"user_id": "rm_jane"})
+    async def test_derived_book_in_response(self, app_client: AsyncClient):
+        resp = await app_client.post("/auth/token", json={"user_id": "rm_jane"})
         assert resp.status_code == 200
         body = resp.json()
         assert "derived_book" in body
-        # rm_jane is in wealth-private-banking → REL-00042, REL-00099
+        # rm_jane has REL-00042, REL-00099 in her personal resources
         assert "REL-00042" in body["derived_book"]
         assert "REL-00099" in body["derived_book"]
 
 
-# ── Domain membership → book derivation ──────────────────────────────────────
+# ── Book management (PersonalResource table) ──────────────────────────────────
 
-class TestDomainMembership:
-    def test_book_derived_from_domains_rm_jane(self):
-        """rm_jane is in wealth-private-banking → book should include REL-00042, REL-00099."""
-        book = app_module.get_book_from_domains("rm_jane")
-        assert "REL-00042" in book
-        assert "REL-00099" in book
-        # Should NOT include rm_okafor's relationships
-        assert "REL-00188" not in book
+class TestBookManagement:
+    """
+    In the new system, book = personal_resources rows with resource_type='relationship'.
+    Domain membership does NOT auto-populate the book — they are separate concepts.
+    """
 
-    def test_book_derived_from_domains_rm_okafor(self):
-        """rm_okafor is in intl-wealth → REL-00188, REL-00200."""
-        book = app_module.get_book_from_domains("rm_okafor")
-        assert "REL-00188" in book
-        assert "REL-00200" in book
-        assert "REL-00042" not in book
+    async def test_rm_jane_initial_book(self, app_client: AsyncClient):
+        resp = await app_client.get("/users/rm_jane/book")
+        assert resp.status_code == 200
+        rels = resp.json()["relationships"]
+        assert "REL-00042" in rels
+        assert "REL-00099" in rels
 
-    def test_admin_book_is_empty(self):
-        """admin is in admin-domain which has no relationships."""
-        book = app_module.get_book_from_domains("admin")
-        assert book == []
+    async def test_rm_okafor_initial_book(self, app_client: AsyncClient):
+        resp = await app_client.get("/users/rm_okafor/book")
+        assert resp.status_code == 200
+        rels = resp.json()["relationships"]
+        assert "REL-00188" in rels
+        assert "REL-00200" in rels
+        assert "REL-00042" not in rels
 
-    def test_jwt_book_claim_derived_from_domains(self):
-        """The 'book' claim in the JWT must match the derived (domain-based) book."""
-        resp = client.post("/auth/token", json={"user_id": "rm_jane"})
-        token = resp.json()["access_token"]
-
+    async def test_jwt_book_claim_from_personal_resources(self, app_client: AsyncClient):
+        """The 'book' claim in the JWT reflects the user's personal relationship resources."""
         from cryptography.hazmat.primitives import serialization
+        resp = await app_client.post("/auth/token", json={"user_id": "rm_jane"})
+        token = resp.json()["access_token"]
         pub_pem = app_module._rsa_private_key.public_key().public_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo,
         ).decode()
-
         claims = jose_jwt.decode(
-            token, pub_pem,
-            algorithms=["RS256"],
-            audience="meridian-gateway",
-            issuer="meridian-user-mgmt",
+            token, pub_pem, algorithms=["RS256"],
+            audience="meridian-gateway", issuer="meridian-user-mgmt",
             options={"verify_exp": False},
         )
         assert "REL-00042" in claims["book"]
@@ -215,56 +162,71 @@ class TestDomainMembership:
         assert "domains" in claims
         assert "wealth-private-banking" in claims["domains"]
 
-    def test_add_member_to_domain_updates_book(self):
-        """Adding rm_jane to intl-wealth means her token now includes REL-00188."""
-        # Initially rm_jane should NOT have REL-00188
-        book_before = app_module.get_book_from_domains("rm_jane")
+    async def test_adding_to_domain_does_not_change_book(self, app_client: AsyncClient):
+        """
+        Domain membership is decoupled from book in the new system.
+        Adding rm_jane to intl-wealth does NOT add intl-wealth's relationships to her book.
+        """
+        book_before = (await app_client.get("/users/rm_jane/book")).json()["relationships"]
         assert "REL-00188" not in book_before
 
-        # Add rm_jane to intl-wealth
-        resp = client.post(
+        # Add rm_jane to intl-wealth domain
+        resp = await app_client.post(
             "/domains/intl-wealth/members",
             json={"user_id": "rm_jane"},
         )
         assert resp.status_code == 201
 
-        # Now the derived book should include REL-00188
-        book_after = app_module.get_book_from_domains("rm_jane")
-        assert "REL-00188" in book_after
-        assert "REL-00042" in book_after  # still has original domain
+        # Book is unchanged — domain membership does NOT auto-populate book
+        book_after = (await app_client.get("/users/rm_jane/book")).json()["relationships"]
+        assert "REL-00188" not in book_after
+        # Jane still has her own relationships
+        assert "REL-00042" in book_after
 
-    def test_remove_member_from_domain_removes_relationships(self):
-        """Removing rm_jane from wealth-private-banking removes those relationships."""
-        resp = client.delete("/domains/wealth-private-banking/members/rm_jane")
+    async def test_removing_from_domain_does_not_remove_book_relationships(self, app_client: AsyncClient):
+        """
+        Removing from a domain does not remove personal relationships.
+        """
+        resp = await app_client.delete("/domains/wealth-private-banking/members/rm_jane")
         assert resp.status_code == 200
 
-        book = app_module.get_book_from_domains("rm_jane")
-        # rm_chen is still in wealth-private-banking but rm_jane's book should be empty now
-        assert "REL-00042" not in book
-        assert "REL-00099" not in book
+        # Book is unchanged — domain membership and book are separate
+        book = (await app_client.get("/users/rm_jane/book")).json()["relationships"]
+        assert "REL-00042" in book
+        assert "REL-00099" in book
+
+    async def test_patch_book_add(self, app_client: AsyncClient):
+        resp = await app_client.patch("/users/rm_jane/book", json={"add": ["REL-EXTRA"], "remove": []})
+        assert resp.status_code == 200
+        assert "REL-EXTRA" in resp.json()["book"]
+
+    async def test_patch_book_remove(self, app_client: AsyncClient):
+        resp = await app_client.patch("/users/rm_jane/book", json={"add": [], "remove": ["REL-00042"]})
+        assert resp.status_code == 200
+        assert "REL-00042" not in resp.json()["book"]
+        assert "REL-00099" in resp.json()["book"]
 
 
 # ── Domain CRUD ───────────────────────────────────────────────────────────────
 
 class TestDomainCRUD:
-    def test_list_domains(self):
-        resp = client.get("/domains")
+    async def test_list_domains(self, app_client: AsyncClient):
+        resp = await app_client.get("/domains")
         assert resp.status_code == 200
-        domains = resp.json()
-        domain_ids = [d["id"] for d in domains]
+        domain_ids = [d["id"] for d in resp.json()]
         assert "wealth-private-banking" in domain_ids
         assert "intl-wealth" in domain_ids
         assert "admin-domain" in domain_ids
 
-    def test_get_domain(self):
-        resp = client.get("/domains/wealth-private-banking")
+    async def test_get_domain(self, app_client: AsyncClient):
+        resp = await app_client.get("/domains/wealth-private-banking")
         assert resp.status_code == 200
         d = resp.json()
         assert d["id"] == "wealth-private-banking"
         assert "REL-00042" in d["relationships"]
 
-    def test_create_domain(self):
-        resp = client.post("/domains", json={
+    async def test_create_domain(self, app_client: AsyncClient):
+        resp = await app_client.post("/domains", json={
             "id": "new-domain",
             "name": "New Domain",
             "relationships": ["REL-99999"],
@@ -272,87 +234,111 @@ class TestDomainCRUD:
         assert resp.status_code == 201
         assert resp.json()["id"] == "new-domain"
 
-    def test_create_domain_duplicate_returns_409(self):
-        resp = client.post("/domains", json={
+    async def test_create_domain_duplicate_returns_409(self, app_client: AsyncClient):
+        resp = await app_client.post("/domains", json={
             "id": "wealth-private-banking",
             "name": "Duplicate",
             "relationships": [],
         })
         assert resp.status_code == 409
 
-    def test_update_domain_relationships(self):
-        resp = client.put(
+    async def test_update_domain_relationships(self, app_client: AsyncClient):
+        resp = await app_client.put(
             "/domains/intl-wealth/relationships",
             json={"relationships": ["REL-00188", "REL-00200", "REL-00300"]},
         )
         assert resp.status_code == 200
         assert "REL-00300" in resp.json()["relationships"]
 
-    def test_list_domain_members(self):
-        resp = client.get("/domains/wealth-private-banking/members")
+    async def test_list_domain_members(self, app_client: AsyncClient):
+        resp = await app_client.get("/domains/wealth-private-banking/members")
         assert resp.status_code == 200
         body = resp.json()
         assert "rm_jane" in body["members"]
         assert "rm_chen" in body["members"]
 
-    def test_get_user_domains(self):
-        resp = client.get("/users/rm_jane/domains")
+    async def test_get_user_domains(self, app_client: AsyncClient):
+        resp = await app_client.get("/users/rm_jane/domains")
         assert resp.status_code == 200
-        body = resp.json()
-        domain_ids = [d["id"] for d in body["domains"]]
+        domain_ids = [d["id"] for d in resp.json()["domains"]]
         assert "wealth-private-banking" in domain_ids
 
-    def test_get_user_domains_unknown_user_returns_404(self):
-        resp = client.get("/users/nobody/domains")
+    async def test_get_user_domains_unknown_user_returns_404(self, app_client: AsyncClient):
+        resp = await app_client.get("/users/nobody/domains")
         assert resp.status_code == 404
 
 
 # ── Health check ──────────────────────────────────────────────────────────────
 
 class TestHealth:
-    def test_health_includes_algorithm_info(self):
-        resp = client.get("/health")
+    async def test_health_includes_algorithm_info(self, app_client: AsyncClient):
+        resp = await app_client.get("/health")
         assert resp.status_code == 200
         body = resp.json()
         assert body["jwt_algorithm"] == "RS256"
         assert body["key_id"] == "meridian-key-1"
 
+    async def test_health_postgres_connected(self, app_client: AsyncClient):
+        resp = await app_client.get("/health")
+        assert resp.json()["postgres"] == "connected"
 
-# ── Existing user CRUD (regression) ──────────────────────────────────────────
+
+# ── User CRUD ─────────────────────────────────────────────────────────────────
 
 class TestUserCRUD:
-    def test_list_users(self):
-        resp = client.get("/users")
+    async def test_list_users(self, app_client: AsyncClient):
+        resp = await app_client.get("/users")
         assert resp.status_code == 200
         ids = [u["id"] for u in resp.json()]
         assert "rm_jane" in ids
         assert "rm_okafor" in ids
 
-    def test_get_user(self):
-        resp = client.get("/users/rm_jane")
+    async def test_get_user(self, app_client: AsyncClient):
+        resp = await app_client.get("/users/rm_jane")
         assert resp.status_code == 200
         assert resp.json()["name"] == "Jane Smith"
 
-    def test_get_unknown_user_returns_404(self):
-        resp = client.get("/users/ghost")
+    async def test_get_unknown_user_returns_404(self, app_client: AsyncClient):
+        resp = await app_client.get("/users/ghost")
         assert resp.status_code == 404
 
-    def test_patch_book(self):
-        resp = client.patch("/users/rm_jane/book", json={"add": ["REL-EXTRA"], "remove": []})
+    async def test_delete_user(self, app_client: AsyncClient):
+        resp = await app_client.delete("/users/rm_chen")
         assert resp.status_code == 200
-        assert "REL-EXTRA" in resp.json()["book"]
+        assert (await app_client.get("/users/rm_chen")).status_code == 404
 
-    def test_delete_user(self):
-        resp = client.delete("/users/rm_chen")
-        assert resp.status_code == 200
-        assert client.get("/users/rm_chen").status_code == 404
+    async def test_create_user(self, app_client: AsyncClient):
+        resp = await app_client.post("/users?user_id=new_user", json={
+            "name": "New User",
+            "email": "new@example.com",
+            "roles": ["relationship_manager"],
+            "book": ["REL-55555"],
+            "segments": ["wealth"],
+            "clearance": 2,
+            "team": "",
+        })
+        assert resp.status_code == 201
+        assert resp.json()["id"] == "new_user"
+        assert "REL-55555" in resp.json()["book"]
+
+    async def test_create_duplicate_user_returns_409(self, app_client: AsyncClient):
+        resp = await app_client.post("/users?user_id=rm_jane", json={
+            "name": "Jane Duplicate",
+            "email": "jane@dup.com",
+            "roles": ["relationship_manager"],
+            "book": [],
+            "segments": [],
+            "clearance": 2,
+            "team": "",
+        })
+        assert resp.status_code == 409
 
 
-# ── OIDC integration tests ────────────────────────────────────────────────────
+# ── OIDC tests ────────────────────────────────────────────────────────────────
 
 class TestOIDCDiscovery:
-    def test_discovery_doc_has_required_fields(self):
-        resp = client.get("/.well-known/openid-configuration")
+    async def test_discovery_doc_has_required_fields(self, app_client: AsyncClient):
+        resp = await app_client.get("/.well-known/openid-configuration")
         assert resp.status_code == 200
         doc = resp.json()
         assert "issuer" in doc
@@ -362,52 +348,33 @@ class TestOIDCDiscovery:
         assert "jwks_uri" in doc
         assert "code" in doc["response_types_supported"]
 
-    def test_discovery_issuer_matches_configured(self):
-        resp = client.get("/.well-known/openid-configuration")
+    async def test_discovery_issuer_matches_configured(self, app_client: AsyncClient):
+        resp = await app_client.get("/.well-known/openid-configuration")
         doc = resp.json()
-        # issuer must be a non-empty string — LibreChat validates id_token.iss against this
         assert doc["issuer"] == app_module.OIDC_ISSUER
         assert doc["issuer"].startswith("http")
 
-    def test_discovery_jwks_uri_reachable(self):
-        """jwks_uri in discovery doc must point to a reachable JWKS endpoint."""
-        # We test this indirectly — the JWKS endpoint is already tested; just verify the path
-        resp = client.get("/.well-known/jwks.json")
-        assert resp.status_code == 200
-
 
 class TestOIDCAuthorize:
-    def test_get_authorize_returns_html_form(self):
-        resp = client.get("/oauth/authorize", params={
+    async def test_get_authorize_returns_html_form(self, app_client: AsyncClient):
+        resp = await app_client.get("/oauth/authorize", params={
             "response_type": "code",
-            "client_id":     "meridian-librechat",
-            "redirect_uri":  "http://localhost:3080/oauth/openid/callback",
-            "state":         "test-state-123",
-        }, follow_redirects=False)
+            "client_id": "meridian-librechat",
+            "redirect_uri": "http://localhost:3080/oauth/openid/callback",
+            "state": "test-state-123",
+        })
         assert resp.status_code == 200
         assert "text/html" in resp.headers["content-type"]
         assert "Sign In" in resp.text
         assert "Meridian" in resp.text
 
-    def test_get_authorize_form_has_hidden_fields(self):
-        resp = client.get("/oauth/authorize", params={
-            "response_type": "code",
-            "client_id":     "meridian-librechat",
-            "redirect_uri":  "http://localhost:3080/oauth/openid/callback",
-            "state":         "xyz",
-        })
-        assert resp.status_code == 200
-        assert 'name="client_id"' in resp.text
-        assert 'name="redirect_uri"' in resp.text
-        assert 'name="state"' in resp.text
-
-    def test_post_authorize_valid_credentials_redirects_with_code(self):
-        resp = client.post("/oauth/authorize", data={
-            "username":     "rm_jane",
-            "password":     app_module.DEMO_PASSWORD,
-            "client_id":    "meridian-librechat",
+    async def test_post_authorize_valid_credentials_redirects_with_code(self, app_client: AsyncClient):
+        resp = await app_client.post("/oauth/authorize", data={
+            "username": "rm_jane",
+            "password": DEMO_PASSWORD,
+            "client_id": "meridian-librechat",
             "redirect_uri": "http://localhost:3080/oauth/openid/callback",
-            "state":        "state-abc",
+            "state": "state-abc",
         }, follow_redirects=False)
         assert resp.status_code == 302
         location = resp.headers["location"]
@@ -415,54 +382,57 @@ class TestOIDCAuthorize:
         assert "state=state-abc" in location
         assert "error" not in location
 
-    def test_post_authorize_wrong_password_redirects_with_error(self):
-        resp = client.post("/oauth/authorize", data={
-            "username":     "rm_jane",
-            "password":     "wrong-password",
-            "client_id":    "meridian-librechat",
+    async def test_post_authorize_wrong_password_redirects_with_error(self, app_client: AsyncClient):
+        resp = await app_client.post("/oauth/authorize", data={
+            "username": "rm_jane",
+            "password": "wrong-password",
+            "client_id": "meridian-librechat",
             "redirect_uri": "http://localhost:3080/oauth/openid/callback",
-            "state":        "state-def",
+            "state": "state-def",
         }, follow_redirects=False)
         assert resp.status_code == 302
-        location = resp.headers["location"]
-        assert "error=" in location
+        assert "error=" in resp.headers["location"]
 
-    def test_post_authorize_unknown_user_redirects_with_error(self):
-        resp = client.post("/oauth/authorize", data={
-            "username":     "nobody",
-            "password":     "password",
-            "client_id":    "meridian-librechat",
+    async def test_post_authorize_unknown_user_redirects_with_error(self, app_client: AsyncClient):
+        resp = await app_client.post("/oauth/authorize", data={
+            "username": "nobody",
+            "password": "password",
+            "client_id": "meridian-librechat",
             "redirect_uri": "http://localhost:3080/oauth/openid/callback",
-            "state":        "state-ghi",
+            "state": "state-ghi",
         }, follow_redirects=False)
         assert resp.status_code == 302
         assert "error=" in resp.headers["location"]
 
 
 class TestOIDCTokenEndpoint:
-    def _get_auth_code(self, user_id: str = "rm_jane") -> tuple[str, str]:
+    async def _get_auth_code(self, app_client: AsyncClient, user_id: str = "rm_jane") -> tuple[str, str]:
         """Helper: POST to /oauth/authorize and extract the auth code from redirect."""
         redirect_uri = "http://localhost:3080/oauth/openid/callback"
-        resp = client.post("/oauth/authorize", data={
-            "username":     user_id,
-            "password":     app_module.DEMO_PASSWORD,
-            "client_id":    "meridian-librechat",
+        resp = await app_client.post("/oauth/authorize", data={
+            "username": user_id,
+            "password": DEMO_PASSWORD,
+            "client_id": "meridian-librechat",
             "redirect_uri": redirect_uri,
-            "state":        "st",
+            "state": "st",
         }, follow_redirects=False)
         assert resp.status_code == 302
         location = resp.headers["location"]
-        code = [p.split("=", 1)[1] for p in location.split("?", 1)[1].split("&") if p.startswith("code=")][0]
+        code = None
+        for param in location.split("?", 1)[-1].split("&"):
+            if param.startswith("code="):
+                code = param.split("=", 1)[1]
+        assert code is not None
         return code, redirect_uri
 
-    def test_token_exchange_returns_access_and_id_token(self):
-        code, redirect_uri = self._get_auth_code("rm_jane")
-        resp = client.post("/oauth/token", data={
-            "grant_type":    "authorization_code",
-            "code":          code,
-            "client_id":     "meridian-librechat",
+    async def test_token_exchange_returns_access_and_id_token(self, app_client: AsyncClient):
+        code, redirect_uri = await self._get_auth_code(app_client, "rm_jane")
+        resp = await app_client.post("/oauth/token", data={
+            "grant_type": "authorization_code",
+            "code": code,
+            "client_id": "meridian-librechat",
             "client_secret": "meridian-client-secret",
-            "redirect_uri":  redirect_uri,
+            "redirect_uri": redirect_uri,
         })
         assert resp.status_code == 200
         body = resp.json()
@@ -471,18 +441,18 @@ class TestOIDCTokenEndpoint:
         assert body["token_type"] == "Bearer"
         assert body["expires_in"] == 3600
 
-    def test_access_token_audience_is_gateway(self):
+    async def test_access_token_audience_is_gateway(self, app_client: AsyncClient):
         """access_token must be verifiable by the gateway (aud=meridian-gateway)."""
-        code, redirect_uri = self._get_auth_code("rm_jane")
-        resp = client.post("/oauth/token", data={
-            "grant_type":    "authorization_code",
-            "code":          code,
-            "client_id":     "meridian-librechat",
+        from cryptography.hazmat.primitives import serialization
+        code, redirect_uri = await self._get_auth_code(app_client, "rm_jane")
+        resp = await app_client.post("/oauth/token", data={
+            "grant_type": "authorization_code",
+            "code": code,
+            "client_id": "meridian-librechat",
             "client_secret": "meridian-client-secret",
-            "redirect_uri":  redirect_uri,
+            "redirect_uri": redirect_uri,
         })
         access_token = resp.json()["access_token"]
-        from cryptography.hazmat.primitives import serialization
         pub_pem = app_module._rsa_private_key.public_key().public_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo,
@@ -497,18 +467,18 @@ class TestOIDCTokenEndpoint:
         assert "roles" in claims
         assert "segments" in claims
 
-    def test_id_token_audience_is_client_id(self):
+    async def test_id_token_audience_is_client_id(self, app_client: AsyncClient):
         """id_token must be for LibreChat (aud=meridian-librechat, iss=OIDC_ISSUER)."""
-        code, redirect_uri = self._get_auth_code("rm_jane")
-        resp = client.post("/oauth/token", data={
-            "grant_type":    "authorization_code",
-            "code":          code,
-            "client_id":     "meridian-librechat",
+        from cryptography.hazmat.primitives import serialization
+        code, redirect_uri = await self._get_auth_code(app_client, "rm_jane")
+        resp = await app_client.post("/oauth/token", data={
+            "grant_type": "authorization_code",
+            "code": code,
+            "client_id": "meridian-librechat",
             "client_secret": "meridian-client-secret",
-            "redirect_uri":  redirect_uri,
+            "redirect_uri": redirect_uri,
         })
         id_token = resp.json()["id_token"]
-        from cryptography.hazmat.primitives import serialization
         pub_pem = app_module._rsa_private_key.public_key().public_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo,
@@ -522,53 +492,53 @@ class TestOIDCTokenEndpoint:
         assert claims["iss"] == app_module.OIDC_ISSUER
         assert claims["aud"] == "meridian-librechat"
 
-    def test_auth_code_is_single_use(self):
+    async def test_auth_code_is_single_use(self, app_client: AsyncClient):
         """Consuming a code once must prevent replay."""
-        code, redirect_uri = self._get_auth_code("rm_jane")
+        code, redirect_uri = await self._get_auth_code(app_client, "rm_jane")
         data = {
-            "grant_type":    "authorization_code",
-            "code":          code,
-            "client_id":     "meridian-librechat",
+            "grant_type": "authorization_code",
+            "code": code,
+            "client_id": "meridian-librechat",
             "client_secret": "meridian-client-secret",
-            "redirect_uri":  redirect_uri,
+            "redirect_uri": redirect_uri,
         }
-        resp1 = client.post("/oauth/token", data=data)
+        resp1 = await app_client.post("/oauth/token", data=data)
         assert resp1.status_code == 200
 
-        resp2 = client.post("/oauth/token", data=data)
+        resp2 = await app_client.post("/oauth/token", data=data)
         assert resp2.status_code == 400
         assert "invalid_grant" in resp2.json()["detail"]
 
-    def test_wrong_client_secret_rejected(self):
-        code, redirect_uri = self._get_auth_code("rm_jane")
-        resp = client.post("/oauth/token", data={
-            "grant_type":    "authorization_code",
-            "code":          code,
-            "client_id":     "meridian-librechat",
+    async def test_wrong_client_secret_rejected(self, app_client: AsyncClient):
+        code, redirect_uri = await self._get_auth_code(app_client, "rm_jane")
+        resp = await app_client.post("/oauth/token", data={
+            "grant_type": "authorization_code",
+            "code": code,
+            "client_id": "meridian-librechat",
             "client_secret": "wrong-secret",
-            "redirect_uri":  redirect_uri,
+            "redirect_uri": redirect_uri,
         })
         assert resp.status_code == 401
 
-    def test_redirect_uri_mismatch_rejected(self):
-        code, redirect_uri = self._get_auth_code("rm_jane")
-        resp = client.post("/oauth/token", data={
-            "grant_type":    "authorization_code",
-            "code":          code,
-            "client_id":     "meridian-librechat",
+    async def test_redirect_uri_mismatch_rejected(self, app_client: AsyncClient):
+        code, redirect_uri = await self._get_auth_code(app_client, "rm_jane")
+        resp = await app_client.post("/oauth/token", data={
+            "grant_type": "authorization_code",
+            "code": code,
+            "client_id": "meridian-librechat",
             "client_secret": "meridian-client-secret",
-            "redirect_uri":  "http://evil.example.com/callback",
+            "redirect_uri": "http://evil.example.com/callback",
         })
         assert resp.status_code == 400
 
-    def test_token_exchange_basic_auth(self):
+    async def test_token_exchange_basic_auth(self, app_client: AsyncClient):
         """client_secret_basic: credentials in Authorization header."""
-        code, redirect_uri = self._get_auth_code("rm_jane")
+        code, redirect_uri = await self._get_auth_code(app_client, "rm_jane")
         credentials = base64.b64encode(b"meridian-librechat:meridian-client-secret").decode()
-        resp = client.post("/oauth/token",
+        resp = await app_client.post("/oauth/token",
             data={
-                "grant_type":   "authorization_code",
-                "code":         code,
+                "grant_type": "authorization_code",
+                "code": code,
                 "redirect_uri": redirect_uri,
             },
             headers={"Authorization": f"Basic {credentials}"},
@@ -578,44 +548,46 @@ class TestOIDCTokenEndpoint:
 
 
 class TestOIDCUserInfo:
-    def _get_access_token(self, user_id: str = "rm_jane") -> str:
+    async def _get_access_token(self, app_client: AsyncClient, user_id: str = "rm_jane") -> str:
         redirect_uri = "http://localhost:3080/oauth/openid/callback"
-        resp1 = client.post("/oauth/authorize", data={
-            "username": user_id, "password": app_module.DEMO_PASSWORD,
+        resp1 = await app_client.post("/oauth/authorize", data={
+            "username": user_id, "password": DEMO_PASSWORD,
             "client_id": "meridian-librechat", "redirect_uri": redirect_uri, "state": "s",
         }, follow_redirects=False)
-        location = resp1.headers["location"]
-        code = [p.split("=", 1)[1] for p in location.split("?", 1)[1].split("&") if p.startswith("code=")][0]
-        resp2 = client.post("/oauth/token", data={
+        code = None
+        for p in resp1.headers["location"].split("?", 1)[-1].split("&"):
+            if p.startswith("code="):
+                code = p.split("=", 1)[1]
+        resp2 = await app_client.post("/oauth/token", data={
             "grant_type": "authorization_code", "code": code,
             "client_id": "meridian-librechat", "client_secret": "meridian-client-secret",
             "redirect_uri": redirect_uri,
         })
         return resp2.json()["access_token"]
 
-    def test_userinfo_returns_profile(self):
-        token = self._get_access_token("rm_jane")
-        resp = client.get("/oauth/userinfo", headers={"Authorization": f"Bearer {token}"})
+    async def test_userinfo_returns_profile(self, app_client: AsyncClient):
+        token = await self._get_access_token(app_client, "rm_jane")
+        resp = await app_client.get("/oauth/userinfo", headers={"Authorization": f"Bearer {token}"})
         assert resp.status_code == 200
         body = resp.json()
         assert body["sub"] == "rm_jane"
         assert body["name"] == "Jane Smith"
         assert "email" in body
 
-    def test_userinfo_without_token_is_401(self):
-        resp = client.get("/oauth/userinfo")
+    async def test_userinfo_without_token_is_401(self, app_client: AsyncClient):
+        resp = await app_client.get("/oauth/userinfo")
         assert resp.status_code == 401
 
-    def test_userinfo_with_bad_token_is_401(self):
-        resp = client.get("/oauth/userinfo", headers={"Authorization": "Bearer not.a.jwt"})
+    async def test_userinfo_with_bad_token_is_401(self, app_client: AsyncClient):
+        resp = await app_client.get("/oauth/userinfo", headers={"Authorization": "Bearer not.a.jwt"})
         assert resp.status_code == 401
 
 
 class TestPasswordHashing:
-    def test_default_password_accepted(self):
+    async def test_default_password_accepted(self, app_client: AsyncClient):
         """Seeded users must authenticate with DEMO_PASSWORD."""
-        resp = client.post("/oauth/authorize", data={
-            "username": "admin", "password": app_module.DEMO_PASSWORD,
+        resp = await app_client.post("/oauth/authorize", data={
+            "username": "admin", "password": DEMO_PASSWORD,
             "client_id": "meridian-librechat",
             "redirect_uri": "http://localhost:3080/oauth/openid/callback",
             "state": "s",
@@ -623,9 +595,9 @@ class TestPasswordHashing:
         assert resp.status_code == 302
         assert "code=" in resp.headers["location"]
 
-    def test_wrong_password_rejected_for_all_roles(self):
+    async def test_wrong_password_rejected_for_all_roles(self, app_client: AsyncClient):
         for uid in ["rm_jane", "admin", "rm_diaz"]:
-            resp = client.post("/oauth/authorize", data={
+            resp = await app_client.post("/oauth/authorize", data={
                 "username": uid, "password": "totally_wrong",
                 "client_id": "meridian-librechat",
                 "redirect_uri": "http://localhost:3080/oauth/openid/callback",

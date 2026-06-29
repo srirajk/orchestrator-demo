@@ -1,0 +1,691 @@
+{
+  "__inputs": [],
+  "__requires": [],
+  "annotations": {"list": []},
+  "description": "Deep-dive resilience KPIs for every agent in the Meridian fleet — circuit breaker state, bulkhead pressure, error rates and p95 latency. Target audience: SREs and gateway engineers.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": ["meridian", "agents", "operations"],
+  "templating": {
+    "list": [
+      {
+        "current": {"text": "All", "value": "$__all"},
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "definition": "label_values(meridian_agent_calls_total, agentId)",
+        "description": "Agent identifier — multi-select to compare specific agents, or choose All for the full fleet view",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Agent",
+        "multi": true,
+        "name": "agentId",
+        "options": [],
+        "query": {
+          "query": "label_values(meridian_agent_calls_total, agentId)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Meridian — Agent Health",
+  "uid": "meridian-agent-health",
+  "version": 1,
+  "panels": [
+
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
+      "id": 1,
+      "title": "Fleet Overview",
+      "type": "row"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "description": "Count of agents whose circuit breaker is CLOSED — the healthy state. Under normal conditions all 9 agents should be CLOSED. Yellow = 1-2 degraded, Red = 3+ degraded.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "yellow", "value": 7},
+              {"color": "green", "value": 9}
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 1},
+      "id": 2,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"]},
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "count(meridian_circuit_breaker_state{agentId=~\"$agentId\"} == 0) or vector(0)",
+          "legendFormat": "Healthy Agents",
+          "refId": "A"
+        }
+      ],
+      "title": "Healthy Agents (CB CLOSED)",
+      "type": "stat"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "description": "Count of agents whose circuit breaker has tripped OPEN — all requests to these agents are being shed immediately. Any value > 0 requires immediate investigation.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "orange", "value": 1},
+              {"color": "red", "value": 3}
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 1},
+      "id": 3,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"]},
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "count(meridian_circuit_breaker_state{agentId=~\"$agentId\"} == 2) or vector(0)",
+          "legendFormat": "Tripped Breakers",
+          "refId": "A"
+        }
+      ],
+      "title": "Agents OPEN (Circuit Tripped)",
+      "type": "stat"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "description": "Per-agent error rate over the selected window. A sustained spike on a single agent indicates a downstream service degradation. Threshold lines at 5% (warning) and 15% (critical).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          },
+          "unit": "percentunit",
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 0.05},
+              {"color": "red", "value": 0.15}
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 4, "w": 12, "x": 12, "y": 1},
+      "id": 4,
+      "options": {
+        "tooltip": {"mode": "multi", "sort": "desc"},
+        "legend": {"displayMode": "list", "placement": "bottom", "calcs": ["lastNotNull"]}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum(rate(meridian_agent_calls_total{agentId=~\"$agentId\", status!=\"OK\"}[5m])) by (agentId) / clamp_min(sum(rate(meridian_agent_calls_total{agentId=~\"$agentId\"}[5m])) by (agentId), 0.001)",
+          "legendFormat": "{{agentId}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Fleet Error Rate — Per Agent (5m rate)",
+      "type": "timeseries"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "description": "Response time heat map across all selected agents. X-axis = time, Y-axis = latency bucket, colour intensity = request volume. A hot band shifting upward indicates progressive latency degradation.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "hideFrom": {"legend": false, "tooltip": false, "viz": false},
+            "scaleDistribution": {"type": "log", "log": 2}
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 5},
+      "id": 5,
+      "options": {
+        "calculate": false,
+        "cellGap": 1,
+        "color": {
+          "exponent": 0.5,
+          "fill": "dark-orange",
+          "mode": "scheme",
+          "scale": "exponential",
+          "scheme": "Oranges",
+          "steps": 128
+        },
+        "exemplars": {"color": "rgba(255,0,255,0.7)"},
+        "filterValues": {"le": 1e-9},
+        "legend": {"show": true},
+        "rowsFrame": {"layout": "auto"},
+        "tooltip": {"mode": "single", "showColorScale": false, "yHistogram": false},
+        "yAxis": {
+          "axisPlacement": "left",
+          "decimals": 0,
+          "unit": "s"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum(rate(meridian_agent_latency_seconds_bucket{agentId=~\"$agentId\"}[5m])) by (le)",
+          "format": "heatmap",
+          "legendFormat": "{{le}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Agent Latency Distribution Heatmap (All Selected Agents)",
+      "type": "heatmap"
+    },
+
+    {
+      "collapsed": true,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 13},
+      "id": 6,
+      "title": "Per-Agent Detail — $agentId",
+      "repeat": "agentId",
+      "repeatDirection": "v",
+      "type": "row",
+      "panels": [
+
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "Average calls per minute directed at this agent over the last 1 minute. Reflects how actively bankers rely on this capability.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "fixed", "fixedColor": "blue"},
+              "mappings": [],
+              "unit": "reqpm",
+              "min": 0
+            }
+          },
+          "gridPos": {"h": 3, "w": 6, "x": 0, "y": 14},
+          "id": 101,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {"calcs": ["lastNotNull"]},
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "prometheus"},
+              "expr": "sum(rate(meridian_agent_calls_total{agentId=\"$agentId\"}[1m])) * 60",
+              "legendFormat": "calls/min",
+              "refId": "A"
+            }
+          ],
+          "title": "Calls / min",
+          "type": "stat"
+        },
+
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "Percentage of calls to this agent that resulted in an error (FAILED, TIMEOUT, BREAKER_OPEN, QUEUE_FULL). Green < 5%, Yellow 5-15%, Red >= 15%.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "thresholds"},
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "yellow", "value": 5},
+                  {"color": "red", "value": 15}
+                ]
+              },
+              "unit": "percent",
+              "min": 0,
+              "max": 100
+            }
+          },
+          "gridPos": {"h": 3, "w": 6, "x": 6, "y": 14},
+          "id": 102,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {"calcs": ["lastNotNull"]},
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "prometheus"},
+              "expr": "100 * sum(rate(meridian_agent_calls_total{agentId=\"$agentId\", status!=\"OK\"}[5m])) / clamp_min(sum(rate(meridian_agent_calls_total{agentId=\"$agentId\"}[5m])), 0.001)",
+              "legendFormat": "error %",
+              "refId": "A"
+            }
+          ],
+          "title": "Error Rate %",
+          "type": "stat"
+        },
+
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "95th-percentile response latency for this agent in milliseconds. Green < 1 000 ms, Yellow 1 000-3 000 ms, Red >= 3 000 ms. P95 is the key SLO metric for banker-facing agents.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "thresholds"},
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "yellow", "value": 1000},
+                  {"color": "red", "value": 3000}
+                ]
+              },
+              "unit": "ms",
+              "min": 0
+            }
+          },
+          "gridPos": {"h": 3, "w": 6, "x": 12, "y": 14},
+          "id": 103,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {"calcs": ["lastNotNull"]},
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "prometheus"},
+              "expr": "histogram_quantile(0.95, sum(rate(meridian_agent_latency_seconds_bucket{agentId=\"$agentId\"}[5m])) by (le)) * 1000",
+              "legendFormat": "p95 ms",
+              "refId": "A"
+            }
+          ],
+          "title": "p95 Latency (ms)",
+          "type": "stat"
+        },
+
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "Current circuit breaker state: CLOSED = healthy and passing requests; HALF_OPEN = in recovery probe; OPEN = tripped, all requests shed. Any non-CLOSED state during a demo means the agent is degraded.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "thresholds"},
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "0": {"text": "CLOSED", "color": "green", "index": 0},
+                    "1": {"text": "HALF_OPEN", "color": "orange", "index": 1},
+                    "2": {"text": "OPEN", "color": "red", "index": 2}
+                  }
+                }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "orange", "value": 1},
+                  {"color": "red", "value": 2}
+                ]
+              },
+              "unit": "short"
+            }
+          },
+          "gridPos": {"h": 3, "w": 6, "x": 18, "y": 14},
+          "id": 104,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {"calcs": ["lastNotNull"]},
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "prometheus"},
+              "expr": "meridian_circuit_breaker_state{agentId=\"$agentId\"}",
+              "legendFormat": "CB state",
+              "refId": "A"
+            }
+          ],
+          "title": "Circuit Breaker State",
+          "type": "stat"
+        },
+
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "Number of calls actively executing inside this agent's bulkhead right now. When this reaches max-concurrent the bulkhead starts queuing. Sustained saturation indicates the agent is too slow or overloaded.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "yellow", "value": 6},
+                  {"color": "red", "value": 9}
+                ]
+              },
+              "unit": "short",
+              "min": 0,
+              "max": 10
+            }
+          },
+          "gridPos": {"h": 3, "w": 8, "x": 0, "y": 17},
+          "id": 105,
+          "options": {
+            "displayMode": "gradient",
+            "minVizHeight": 10,
+            "minVizWidth": 0,
+            "orientation": "horizontal",
+            "reduceOptions": {"calcs": ["lastNotNull"]},
+            "showUnfilled": true
+          },
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "prometheus"},
+              "expr": "meridian_bulkhead_executing{agentId=\"$agentId\"}",
+              "legendFormat": "executing",
+              "refId": "A"
+            }
+          ],
+          "title": "Bulkhead — Executing Slots",
+          "type": "bargauge"
+        },
+
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "Number of calls waiting in the bulkhead queue for an execution slot. Any queued calls represent backpressure. When the queue is full, new calls get QUEUE_FULL status immediately.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "yellow", "value": 3},
+                  {"color": "red", "value": 8}
+                ]
+              },
+              "unit": "short",
+              "min": 0,
+              "max": 10
+            }
+          },
+          "gridPos": {"h": 3, "w": 8, "x": 8, "y": 17},
+          "id": 106,
+          "options": {
+            "displayMode": "gradient",
+            "minVizHeight": 10,
+            "minVizWidth": 0,
+            "orientation": "horizontal",
+            "reduceOptions": {"calcs": ["lastNotNull"]},
+            "showUnfilled": true
+          },
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "prometheus"},
+              "expr": "meridian_bulkhead_queued{agentId=\"$agentId\"}",
+              "legendFormat": "queued",
+              "refId": "A"
+            }
+          ],
+          "title": "Bulkhead — Queued Calls",
+          "type": "bargauge"
+        },
+
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "Percentage of calls to this agent that timed out (exceeded the configured deadline). Timeouts are expensive: they hold an execution slot until expiry. A rising timeout rate often precedes a circuit breaker trip.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {"mode": "thresholds"},
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"color": "green", "value": null},
+                  {"color": "yellow", "value": 2},
+                  {"color": "red", "value": 10}
+                ]
+              },
+              "unit": "percent",
+              "min": 0,
+              "max": 100
+            }
+          },
+          "gridPos": {"h": 3, "w": 8, "x": 16, "y": 17},
+          "id": 107,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {"calcs": ["lastNotNull"]},
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "prometheus"},
+              "expr": "100 * sum(rate(meridian_agent_calls_total{agentId=\"$agentId\", status=\"TIMEOUT\"}[5m])) / clamp_min(sum(rate(meridian_agent_calls_total{agentId=\"$agentId\"}[5m])), 0.001)",
+              "legendFormat": "timeout %",
+              "refId": "A"
+            }
+          ],
+          "title": "Timeout Rate %",
+          "type": "stat"
+        }
+
+      ]
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 14},
+      "id": 7,
+      "title": "Resilience Story — Circuit Breakers, Bulkhead Pressure and Protocol Comparison",
+      "type": "row"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "description": "Circuit breaker state for every selected agent over time — 0 = CLOSED (green), 1 = HALF_OPEN (orange), 2 = OPEN (red). Ideal: all agents flat at 0. A vertical jump to 2 shows the exact moment a breaker tripped. Use this during the resilience demo to narrate the failure and recovery story.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "showPoints": "always",
+            "pointSize": 4
+          },
+          "unit": "short",
+          "min": 0,
+          "max": 2,
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {"text": "CLOSED", "color": "green"},
+                "1": {"text": "HALF_OPEN", "color": "orange"},
+                "2": {"text": "OPEN", "color": "red"}
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "orange", "value": 1},
+              {"color": "red", "value": 2}
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 15},
+      "id": 8,
+      "options": {
+        "tooltip": {"mode": "multi", "sort": "none"},
+        "legend": {"displayMode": "list", "placement": "bottom", "calcs": []}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "meridian_circuit_breaker_state{agentId=~\"$agentId\"}",
+          "legendFormat": "{{agentId}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Circuit Breaker State History (0=CLOSED · 1=HALF_OPEN · 2=OPEN)",
+      "type": "timeseries"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "description": "Bulkhead slot utilisation over time for the selected agents. Solid lines = executing slots (active work), dashed lines = queued calls waiting for a slot. When queued > 0 the agent is backpressured. When queued reaches max-queue-capacity, new calls are shed immediately with QUEUE_FULL.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byFrameRefID", "options": "B"},
+            "properties": [
+              {"id": "custom.lineStyle", "value": {"dash": [8, 8], "fill": "dash"}},
+              {"id": "custom.lineWidth", "value": 1}
+            ]
+          }
+        ]
+      },
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 15},
+      "id": 9,
+      "options": {
+        "tooltip": {"mode": "multi", "sort": "desc"},
+        "legend": {"displayMode": "list", "placement": "bottom", "calcs": ["lastNotNull"]}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "meridian_bulkhead_executing{agentId=~\"$agentId\"}",
+          "legendFormat": "executing — {{agentId}}",
+          "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "meridian_bulkhead_queued{agentId=~\"$agentId\"}",
+          "legendFormat": "queued — {{agentId}}",
+          "refId": "B"
+        }
+      ],
+      "title": "Bulkhead Pressure — Executing (solid) vs Queued (dashed)",
+      "type": "timeseries"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "description": "Average response latency in milliseconds grouped by protocol (HTTP for Wealth agents, MCP for Asset Servicing agents). Compares the two transport layers to surface protocol-level performance differences — useful to justify protocol choice in architecture reviews.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {
+            "fillOpacity": 60,
+            "gradientMode": "none",
+            "hideFrom": {"legend": false, "tooltip": false, "viz": false},
+            "lineWidth": 1
+          },
+          "unit": "ms",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 15},
+      "id": 10,
+      "options": {
+        "barWidth": 0.6,
+        "groupWidth": 0.6,
+        "orientation": "vertical",
+        "legend": {"displayMode": "list", "placement": "bottom"},
+        "tooltip": {"mode": "multi", "sort": "desc"},
+        "xField": "protocol",
+        "xTickLabelMaxLength": 20,
+        "xTickLabelRotation": 0
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum(rate(meridian_agent_latency_seconds_sum{agentId=~\"$agentId\"}[5m])) by (protocol) / clamp_min(sum(rate(meridian_agent_latency_seconds_count{agentId=~\"$agentId\"}[5m])) by (protocol), 0.001) * 1000",
+          "legendFormat": "{{protocol}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Protocol Latency Comparison — HTTP vs MCP (avg ms)",
+      "transformations": [
+        {
+          "id": "timeSeriesTable",
+          "options": {}
+        }
+      ],
+      "type": "barchart"
+    }
+
+  ]
+}

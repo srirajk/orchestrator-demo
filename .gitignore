@@ -100,3 +100,5 @@ blob-report/
 *.pid
 data/
 volumes/
+# Claude Code agent worktrees (isolated, never commit)
+.claude/worktrees/

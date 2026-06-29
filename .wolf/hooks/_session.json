@@ -1,0 +1,223 @@
+{
+  "session_id": "session-2026-06-29-0305",
+  "started": "2026-06-29T07:05:48.700Z",
+  "files_read": {
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/e2e/screenshots/axiom-login.png": {
+      "count": 1,
+      "tokens": 0,
+      "first_read": "2026-06-29T07:06:29.355Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/e2e/screenshots/meridian-login.png": {
+      "count": 1,
+      "tokens": 0,
+      "first_read": "2026-06-29T07:06:39.763Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/e2e/screenshots/meridian-chat.png": {
+      "count": 1,
+      "tokens": 0,
+      "first_read": "2026-06-29T07:06:43.658Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/docs/domain-onboarding-standard.md": {
+      "count": 1,
+      "tokens": 4115,
+      "first_read": "2026-06-29T12:16:16.478Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/docs/implementation-checklist.md": {
+      "count": 1,
+      "tokens": 4638,
+      "first_read": "2026-06-29T12:16:16.906Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/docs/gateway-domain-architecture.md": {
+      "count": 2,
+      "tokens": 7276,
+      "first_read": "2026-06-29T12:16:17.366Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/registry/manifests/acme.wealth.holdings.json": {
+      "count": 1,
+      "tokens": 422,
+      "first_read": "2026-06-29T14:45:34.746Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/registry/manifests/acme.wealth.performance.json": {
+      "count": 1,
+      "tokens": 428,
+      "first_read": "2026-06-29T14:45:35.228Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/registry/manifests/acme.wealth.goal_planning.json": {
+      "count": 1,
+      "tokens": 434,
+      "first_read": "2026-06-29T14:45:35.818Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/registry/manifests/acme.wealth.risk_profile.json": {
+      "count": 1,
+      "tokens": 428,
+      "first_read": "2026-06-29T14:45:36.217Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/registry/manifests/acme.servicing.custody_positions.json": {
+      "count": 1,
+      "tokens": 427,
+      "first_read": "2026-06-29T14:45:40.331Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/registry/manifests/acme.servicing.settlement_status.json": {
+      "count": 1,
+      "tokens": 512,
+      "first_read": "2026-06-29T14:45:40.732Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/registry/manifests/acme.servicing.nav.json": {
+      "count": 1,
+      "tokens": 438,
+      "first_read": "2026-06-29T14:45:41.351Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/registry/manifests/acme.servicing.cash_management.json": {
+      "count": 1,
+      "tokens": 414,
+      "first_read": "2026-06-29T14:45:41.582Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityResolver.java": {
+      "count": 1,
+      "tokens": 962,
+      "first_read": "2026-06-29T14:45:43.084Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/manifest/DomainManifestStore.java": {
+      "count": 2,
+      "tokens": 2240,
+      "first_read": "2026-06-29T14:45:46.056Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/docker-compose.yml": {
+      "count": 2,
+      "tokens": 6815,
+      "first_read": "2026-06-29T14:45:46.478Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/resources/application.yml": {
+      "count": 3,
+      "tokens": 1481,
+      "first_read": "2026-06-29T14:45:46.925Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java": {
+      "count": 1,
+      "tokens": 11953,
+      "first_read": "2026-06-29T14:45:46.976Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/session/ConversationSession.java": {
+      "count": 1,
+      "tokens": 1408,
+      "first_read": "2026-06-29T14:45:54.274Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/mock-agents/crm/data.py": {
+      "count": 1,
+      "tokens": 674,
+      "first_read": "2026-06-29T14:45:59.970Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/manifest/EffectiveManifest.java": {
+      "count": 1,
+      "tokens": 643,
+      "first_read": "2026-06-29T14:46:01.116Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/mock-agents/wealth-coverage/data.py": {
+      "count": 1,
+      "tokens": 1091,
+      "first_read": "2026-06-29T14:46:02.092Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/mock-agents/wealth-coverage/main.py": {
+      "count": 1,
+      "tokens": 1047,
+      "first_read": "2026-06-29T14:46:02.526Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/auth/CerbosEntitlementAdapter.java": {
+      "count": 1,
+      "tokens": 3037,
+      "first_read": "2026-06-29T14:46:03.878Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/auth/EntitlementService.java": {
+      "count": 1,
+      "tokens": 1733,
+      "first_read": "2026-06-29T14:46:07.049Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/synthesis/input/InputSynthesizerImpl.java": {
+      "count": 1,
+      "tokens": 2225,
+      "first_read": "2026-06-29T14:46:09.991Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/manifest/DomainManifest.java": {
+      "count": 2,
+      "tokens": 272,
+      "first_read": "2026-06-29T14:46:12.483Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/manifest/SubDomainManifest.java": {
+      "count": 2,
+      "tokens": 188,
+      "first_read": "2026-06-29T14:46:12.672Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityExtractor.java": {
+      "count": 1,
+      "tokens": 2699,
+      "first_read": "2026-06-29T14:46:13.324Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/registry/model/AgentManifest.java": {
+      "count": 1,
+      "tokens": 817,
+      "first_read": "2026-06-29T14:46:16.985Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityBag.java": {
+      "count": 1,
+      "tokens": 376,
+      "first_read": "2026-06-29T14:46:17.450Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/coverage/CoverageClient.java": {
+      "count": 1,
+      "tokens": 1847,
+      "first_read": "2026-06-29T14:46:26.001Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/resources/domains/wealth-management.json": {
+      "count": 2,
+      "tokens": 147,
+      "first_read": "2026-06-29T14:46:28.961Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/resources/domains/wealth-management/private-banking.json": {
+      "count": 2,
+      "tokens": 203,
+      "first_read": "2026-06-29T14:46:29.686Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/resolver/service/AgentResolver.java": {
+      "count": 1,
+      "tokens": 1067,
+      "first_read": "2026-06-29T14:46:29.748Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/resources/domains/asset-servicing.json": {
+      "count": 1,
+      "tokens": 56,
+      "first_read": "2026-06-29T14:46:29.849Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/resources/domains/asset-servicing/custody-operations.json": {
+      "count": 1,
+      "tokens": 79,
+      "first_read": "2026-06-29T14:46:32.290Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/resources/domains/asset-servicing/cash-management.json": {
+      "count": 1,
+      "tokens": 65,
+      "first_read": "2026-06-29T14:46:32.757Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/resources/domains/asset-servicing/corporate-actions.json": {
+      "count": 1,
+      "tokens": 74,
+      "first_read": "2026-06-29T14:46:33.401Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java": {
+      "count": 1,
+      "tokens": 3874,
+      "first_read": "2026-06-29T14:46:35.450Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/meridian/gateway/synthesis/answer/AnswerSynthesizer.java": {
+      "count": 1,
+      "tokens": 6780,
+      "first_read": "2026-06-29T14:46:39.738Z"
+    }
+  },
+  "files_written": [],
+  "edit_counts": {},
+  "anatomy_hits": 39,
+  "anatomy_misses": 3,
+  "repeated_reads_warned": 9,
+  "cerebrum_warnings": 0,
+  "stop_count": 8
+}

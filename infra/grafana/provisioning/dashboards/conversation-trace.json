@@ -9,7 +9,7 @@
   "id": null,
   "links": [],
   "refresh": "30s",
-  "schemaVersion": 38,
+  "schemaVersion": 39,
   "tags": ["meridian", "traces"],
   "templating": {
     "list": [
@@ -20,6 +20,15 @@
         "label": "Relationship / Trace ID",
         "name": "entity_id",
         "query": "REL-00042",
+        "type": "textbox"
+      },
+      {
+        "current": {"value": ""},
+        "description": "Conversation ID emitted by the gateway as MDC key convId and W3C Baggage — paste a convId to filter Loki logs to a single conversation across all Meridian services",
+        "hide": 0,
+        "label": "Conversation ID",
+        "name": "convId",
+        "query": "",
         "type": "textbox"
       }
     ]
@@ -196,6 +205,81 @@
       },
       "title": "How to use",
       "type": "text"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 38},
+      "id": 40,
+      "title": "Conversation Logs (by convId) — requires Loki",
+      "type": "row"
+    },
+
+    {
+      "datasource": null,
+      "gridPos": {"h": 4, "w": 24, "x": 0, "y": 39},
+      "id": 41,
+      "options": {
+        "content": "## How to use Conversation Logs\n\n1. **Paste a Conversation ID** into the **Conversation ID** variable at the top of this dashboard (e.g. a UUID emitted by the gateway as MDC key `convId`).\n2. The **All Logs** panel below shows every log line across all `meridian-*` services that contain that conversation ID — gateway intent classification, Cerbos ABAC decisions, agent fan-out calls and synthesis steps.\n3. The **Errors & Warnings** panel filters to `ERROR` and `WARN` lines only — use this to diagnose a failed or degraded request.\n4. **Click a `traceId` value** in any log line to jump directly to the Tempo span waterfall for that request.\n5. If no logs appear, confirm that Promtail is running (`docker compose ps promtail`) and that the gateway emits `convId` in structured JSON logs.",
+        "mode": "markdown"
+      },
+      "title": "How to use Conversation Logs",
+      "type": "text"
+    },
+
+    {
+      "datasource": {"type": "loki", "uid": "loki"},
+      "description": "All log lines from every Meridian service that contain the selected conversation ID — including gateway request handling, intent classification, Cerbos decisions, agent fan-out and answer synthesis. Click a traceId value to open the corresponding Tempo trace.",
+      "gridPos": {"h": 12, "w": 24, "x": 0, "y": 43},
+      "id": 42,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": {"type": "loki", "uid": "loki"},
+          "expr": "{service=~\"meridian.*\"} |= \"$convId\"",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "All Logs for Conversation — $convId",
+      "type": "logs"
+    },
+
+    {
+      "datasource": {"type": "loki", "uid": "loki"},
+      "description": "ERROR and WARN log lines only for the selected conversation ID — surfaces exceptions, circuit breaker trips, Cerbos denials and synthesis failures without noise from INFO-level call tracing. Use this first when a banker reports an unexpected or incomplete answer.",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 55},
+      "id": 43,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": {"type": "loki", "uid": "loki"},
+          "expr": "{service=~\"meridian.*\"} |= \"$convId\" | level =~ \"ERROR|WARN\"",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "Errors and Warnings — $convId",
+      "type": "logs"
     }
+
   ]
 }

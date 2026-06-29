@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
+import { IAM_ADMIN_PASSWORD } from './helpers'
 
-const BASE = 'http://localhost:5180'
+const BASE = process.env.ADMIN_UI_URL || 'http://localhost:5180'
 
 test.describe('Admin UI', () => {
   test('login page renders', async ({ page }) => {
@@ -12,7 +13,7 @@ test.describe('Admin UI', () => {
   test('login with admin credentials', async ({ page }) => {
     await page.goto(`${BASE}/login`)
     await page.getByLabel(/username/i).fill('admin')
-    await page.getByLabel(/password/i).fill('Meridian@2024')
+    await page.getByLabel(/password/i).fill(IAM_ADMIN_PASSWORD)
     await page.getByRole('button', { name: /sign in/i }).click()
     await expect(page).toHaveURL(`${BASE}/`, { timeout: 8000 })
     await page.screenshot({ path: 'test-results/admin-02-dashboard.png', fullPage: true })
@@ -21,7 +22,7 @@ test.describe('Admin UI', () => {
   test('dashboard shows stat cards', async ({ page }) => {
     await page.goto(`${BASE}/login`)
     await page.getByLabel(/username/i).fill('admin')
-    await page.getByLabel(/password/i).fill('Meridian@2024')
+    await page.getByLabel(/password/i).fill(IAM_ADMIN_PASSWORD)
     await page.getByRole('button', { name: /sign in/i }).click()
     await page.waitForURL(`${BASE}/`)
     await expect(page.getByText(/users/i).first()).toBeVisible()
@@ -31,7 +32,7 @@ test.describe('Admin UI', () => {
   test('users page loads', async ({ page }) => {
     await page.goto(`${BASE}/login`)
     await page.getByLabel(/username/i).fill('admin')
-    await page.getByLabel(/password/i).fill('Meridian@2024')
+    await page.getByLabel(/password/i).fill(IAM_ADMIN_PASSWORD)
     await page.getByRole('button', { name: /sign in/i }).click()
     await page.waitForURL(`${BASE}/`)
     await page.getByRole('link', { name: /users/i }).click()
@@ -42,7 +43,7 @@ test.describe('Admin UI', () => {
   test('teams page loads', async ({ page }) => {
     await page.goto(`${BASE}/login`)
     await page.getByLabel(/username/i).fill('admin')
-    await page.getByLabel(/password/i).fill('Meridian@2024')
+    await page.getByLabel(/password/i).fill(IAM_ADMIN_PASSWORD)
     await page.getByRole('button', { name: /sign in/i }).click()
     await page.waitForURL(`${BASE}/`)
     await page.getByRole('link', { name: /teams/i }).click()
@@ -53,7 +54,7 @@ test.describe('Admin UI', () => {
   test('roles page loads', async ({ page }) => {
     await page.goto(`${BASE}/login`)
     await page.getByLabel(/username/i).fill('admin')
-    await page.getByLabel(/password/i).fill('Meridian@2024')
+    await page.getByLabel(/password/i).fill(IAM_ADMIN_PASSWORD)
     await page.getByRole('button', { name: /sign in/i }).click()
     await page.waitForURL(`${BASE}/`)
     await page.getByRole('link', { name: /roles/i }).click()
@@ -64,7 +65,7 @@ test.describe('Admin UI', () => {
   test('policies page loads', async ({ page }) => {
     await page.goto(`${BASE}/login`)
     await page.getByLabel(/username/i).fill('admin')
-    await page.getByLabel(/password/i).fill('Meridian@2024')
+    await page.getByLabel(/password/i).fill(IAM_ADMIN_PASSWORD)
     await page.getByRole('button', { name: /sign in/i }).click()
     await page.waitForURL(`${BASE}/`)
     await page.getByRole('link', { name: /policies/i }).click()

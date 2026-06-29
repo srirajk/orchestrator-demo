@@ -15,11 +15,35 @@ Fault knobs (env vars, set in docker-compose for resilience tests):
   MCP_FAULT_DELAY_MS=500           → inject latency (ms) to every call
 
 The gateway's McpAdapter connects to: http://servicing:8082/sse
+
+Distributed Tracing Note (MCP limitation):
+  The MCP protocol (JSON-RPC over SSE) does not carry HTTP headers per-tool-call,
+  so the W3C traceparent / tracestate headers that the gateway sends are not
+  available inside individual tool handlers.  This means MCP tool spans are
+  NOT automatically linked to the gateway's root OTel span.
+
+  Future path: pass {"_traceId": "<trace-id>"} as a metadata key in tool
+  arguments, then extract it here to manually create a linked child span.
+  Until then, MCP spans appear as independent traces in Tempo (not as children
+  of the gateway root).  A warning is emitted at startup to make this visible.
 """
 
 import sys
 import os
+import logging
 sys.path.insert(0, os.path.dirname(__file__))
+
+_log = logging.getLogger(__name__)
+
+# MCP does not propagate W3C traceparent headers to individual tool calls.
+# Agent spans will not be linked to the gateway's OTel root span.
+# To get linked spans, callers should include {"_traceId": "<id>"} in tool
+# args metadata; individual tools should extract it and log it explicitly.
+_log.warning(
+    "servicing-mcp: MCP protocol does not support native trace propagation. "
+    "Agent tool spans will NOT appear as children of the gateway root span in Tempo. "
+    "Pass _traceId in tool metadata to correlate manually."
+)
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings

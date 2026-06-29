@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { getJwt, GATEWAY_URL, USER_MGMT_URL } from './helpers';
+import { getJwt, GATEWAY_URL, USER_MGMT_URL, IAM_ADMIN_PASSWORD, IAM_USER_PASSWORD } from './helpers';
 
 /**
  * Phase 8 / M15 — RS256/JWKS identity.
@@ -30,7 +30,7 @@ test.describe('JWT identity (Phase 8 M15)', () => {
 
   test('POST /auth/token returns RS256 JWT for rm_jane with correct book', async ({ request }) => {
     const resp = await request.post(`${USER_MGMT_URL}/auth/token`, {
-      data: { username: 'rm_jane', password: 'Meridian@2024' },
+      data: { username: 'rm_jane', password: IAM_USER_PASSWORD },
     });
     expect(resp.status()).toBe(200);
     const body = await resp.json();
@@ -117,7 +117,7 @@ test.describe('JWT identity (Phase 8 M15)', () => {
     const adminResp = await request.post(`${USER_MGMT_URL}/auth/token`, {
       data: {
         username: 'admin',
-        password: process.env.IAM_ADMIN_PASSWORD || 'Meridian@2024',
+        password: IAM_ADMIN_PASSWORD,
       },
     });
     expect(adminResp.status()).toBe(200);
@@ -132,7 +132,7 @@ test.describe('JWT identity (Phase 8 M15)', () => {
 
     // 2. Get fresh rm_jane token — book in response must include REL-00188
     const tokenResp = await request.post(`${USER_MGMT_URL}/auth/token`, {
-      data: { username: 'rm_jane', password: 'Meridian@2024' },
+      data: { username: 'rm_jane', password: IAM_USER_PASSWORD },
     });
     expect(tokenResp.status()).toBe(200);
     const loginData = await tokenResp.json();
@@ -151,7 +151,7 @@ test.describe('JWT identity (Phase 8 M15)', () => {
     const adminResp = await request.post(`${USER_MGMT_URL}/auth/token`, {
       data: {
         username: 'admin',
-        password: process.env.IAM_ADMIN_PASSWORD || 'Meridian@2024',
+        password: IAM_ADMIN_PASSWORD,
       },
     });
     expect(adminResp.status()).toBe(200);
@@ -165,7 +165,7 @@ test.describe('JWT identity (Phase 8 M15)', () => {
 
     // Verify rm_jane token no longer has REL-00188 in book
     const tokenResp = await request.post(`${USER_MGMT_URL}/auth/token`, {
-      data: { username: 'rm_jane', password: 'Meridian@2024' },
+      data: { username: 'rm_jane', password: IAM_USER_PASSWORD },
     });
     expect(tokenResp.status()).toBe(200);
     const loginData = await tokenResp.json();

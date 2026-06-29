@@ -3,18 +3,26 @@ import { test, expect } from '@playwright/test'
 /**
  * Cerbos Authorization Matrix — direct PDP API tests
  *
- * Calls the Cerbos PDP REST API at :3592 for every authorization scenario.
+ * Calls the Cerbos PDP REST API at :3594 (host) for every authorization scenario.
  * These are pure API tests — no browser, no gateway. They validate that the
- * Cerbos policies enforce the correct decisions before any gateway code runs.
+ * Cerbos policies enforce the correct structural decisions.
  *
- * Run order matters: scenarios are numbered by priority (1 = must pass for M8).
+ * Three-layer auth architecture:
+ * - Layer 1 (IAM/Cerbos structural): can this role perform this action? (these tests)
+ * - Layer 2 (Coverage service): does this RM cover this client? (08-domain-authz.spec.ts)
+ * - Layer 3 (Gateway enforcement): prune-before-fan-out using layers 1+2
  *
- * Reference: Cerbos expert audit identified 9 priority scenarios + Gap #1 fix.
+ * Cerbos is role-based only — no book attribute. Book-of-business is the coverage
+ * service's responsibility, not Cerbos's.
  */
 
 // Cerbos REST API — note host port is 3594 (mapped from container port 3592)
 const CERBOS_URL = process.env.CERBOS_URL || 'http://localhost:3594'
 const IAM_URL    = process.env.IAM_URL    || 'http://localhost:8084'
+
+// IAM service passwords — override via env for CI or rotated credentials
+const IAM_ADMIN_PASSWORD = process.env.IAM_ADMIN_PASSWORD || 'Meridian@2024'
+const IAM_USER_PASSWORD  = process.env.IAM_USER_PASSWORD  || 'Meridian@2024'
 
 // ── Cerbos REST helper ─────────────────────────────────────────────────────
 
@@ -86,7 +94,8 @@ const RM_JANE: Principal = {
     tenant_id: 'default',
     clearance: 2,
     segments: ['wealth'],
-    book: ['REL-00042', 'REL-00099'],
+    // No book attribute — Cerbos enforces structural (role-based) access only.
+    // Book-of-business enforcement is handled by the domain coverage service.
     admin_domains: [],
   },
 }
@@ -98,7 +107,7 @@ const JUNIOR_RM: Principal = {
     tenant_id: 'default',
     clearance: 1,         // internal — below confidential (rank 2)
     segments: ['wealth'],
-    book: ['REL-00314'],
+    // No book attribute — coverage service handles book-of-business.
     admin_domains: [],
   },
 }
@@ -217,26 +226,32 @@ test.describe('Agent resource authz (Cerbos PDP)', () => {
 })
 
 // ────────────────────────────────────────────────────────────────────────────
-// SUITE 2 — Relationship resource (prune-before-fan-out gate)
+// SUITE 2 — Relationship resource (structural role-based gate via Cerbos)
+//
+// Architecture note: Cerbos enforces STRUCTURAL access (can RM role read
+// relationship resources?). Book-of-business enforcement (does rm_jane actually
+// cover this client?) is handled by the domain coverage service (DISCOVER/CHECK),
+// NOT by Cerbos. See 08-domain-authz.spec.ts for coverage service E2E tests.
 // ────────────────────────────────────────────────────────────────────────────
 
-test.describe('Relationship resource authz — book-based entitlement (Cerbos PDP)', () => {
+test.describe('Relationship resource authz — structural role gate (Cerbos PDP)', () => {
 
-  test('P1 rm_jane → REL-00042 Whitman [ALLOW] — in book', async () => {
+  test('rm_jane → REL-00042 Whitman [ALLOW] — relationship_manager role', async () => {
     const whitman = { kind: 'relationship', id: 'REL-00042', attr: { tenant_id: 'default' } }
     const actions = await checkResource(RM_JANE, whitman, ['read'])
-    expect(actions['read'], 'REL-00042 is in rm_jane\'s book').toBe('EFFECT_ALLOW')
+    expect(actions['read'], 'relationship_manager role → ALLOW for any relationship').toBe('EFFECT_ALLOW')
   })
 
-  test('P1 rm_jane → REL-00188 Okafor [DENY] — not in book (the demo denial)', async () => {
-    // This is the most important security test: rm_jane must be denied Okafor.
-    // REL-00188 belongs to rm_carlos, not rm_jane.
+  test('rm_jane → REL-00188 Okafor [ALLOW] — Cerbos structural gate (coverage service denies later)', async () => {
+    // Cerbos structural check: rm_jane has relationship_manager role → ALLOW.
+    // The actual denial for Okafor comes from the coverage service (not-in-book),
+    // which runs inside the gateway at fan-out time. See 08-domain-authz.spec.ts.
     const okafor = { kind: 'relationship', id: 'REL-00188', attr: { tenant_id: 'default' } }
     const actions = await checkResource(RM_JANE, okafor, ['read'])
-    expect(actions['read'], 'REL-00188 (Okafor) is NOT in rm_jane\'s book — must DENY').toBe('EFFECT_DENY')
+    expect(actions['read'], 'Cerbos structural gate passes; coverage service is the book-of-business authority').toBe('EFFECT_ALLOW')
   })
 
-  test('rm_jane → REL-00099 Calderon [ALLOW] — second in-book relationship', async () => {
+  test('rm_jane → REL-00099 Calderon [ALLOW] — relationship_manager role', async () => {
     const calderon = { kind: 'relationship', id: 'REL-00099', attr: { tenant_id: 'default' } }
     const actions = await checkResource(RM_JANE, calderon, ['read'])
     expect(actions['read']).toBe('EFFECT_ALLOW')
@@ -248,11 +263,12 @@ test.describe('Relationship resource authz — book-based entitlement (Cerbos PD
     expect(actions['read']).toBe('EFFECT_ALLOW')
   })
 
-  test('junior_rm → REL-00042 Whitman [DENY] — not in junior book', async () => {
-    // junior_rm's book only contains REL-00314
+  test('junior_rm → REL-00042 Whitman [ALLOW] — structural gate passes (coverage service handles book)', async () => {
+    // Cerbos structural check: junior_rm has relationship_manager role → ALLOW.
+    // Coverage service (not Cerbos) would deny based on book-of-business.
     const whitman = { kind: 'relationship', id: 'REL-00042', attr: { tenant_id: 'default' } }
     const actions = await checkResource(JUNIOR_RM, whitman, ['read'])
-    expect(actions['read'], 'REL-00042 not in junior_rm\'s book').toBe('EFFECT_DENY')
+    expect(actions['read'], 'Cerbos structural gate passes for relationship_manager').toBe('EFFECT_ALLOW')
   })
 
 })
@@ -342,7 +358,7 @@ test.describe('IAM resource authz — RBAC matrix (Cerbos PDP)', () => {
 test.describe('IAM service API — authorization enforced end-to-end', () => {
 
   test('admin can list all users (paginated)', async () => {
-    const token = await iamLogin('admin', 'Meridian@2024')
+    const token = await iamLogin('admin', IAM_ADMIN_PASSWORD)
     const resp = await iamRequest(token, 'GET', '/users')
     expect(resp.status).toBe(200)
     const page = await resp.json() as { content: unknown[]; totalElements: number }
@@ -351,7 +367,7 @@ test.describe('IAM service API — authorization enforced end-to-end', () => {
   })
 
   test('rm_jane can read her own profile', async () => {
-    const token = await iamLogin('rm_jane', 'Meridian@2024')
+    const token = await iamLogin('rm_jane', IAM_USER_PASSWORD)
     const resp = await iamRequest(token, 'GET', '/users/rm_jane')
     expect(resp.status).toBe(200)
     const user = await resp.json() as { id: string; roles: string[] }
@@ -359,14 +375,14 @@ test.describe('IAM service API — authorization enforced end-to-end', () => {
   })
 
   test('rm_jane cannot list all users — @PreAuthorize enforces admin-only', async () => {
-    const token = await iamLogin('rm_jane', 'Meridian@2024')
+    const token = await iamLogin('rm_jane', IAM_USER_PASSWORD)
     const resp = await iamRequest(token, 'GET', '/users')
     // relationship_manager has no admin role — Spring Security returns 403
     expect(resp.status).toBe(403)
   })
 
   test('admin can read audit log', async () => {
-    const token = await iamLogin('admin', 'Meridian@2024')
+    const token = await iamLogin('admin', IAM_ADMIN_PASSWORD)
     const resp = await iamRequest(token, 'GET', '/admin/audit?page=0&size=5')
     expect(resp.status).toBe(200)
     const body = await resp.json() as { content: unknown[] }
@@ -374,7 +390,7 @@ test.describe('IAM service API — authorization enforced end-to-end', () => {
   })
 
   test('policy lifecycle: draft → approve → deploy (via API)', async () => {
-    const token = await iamLogin('admin', 'Meridian@2024')
+    const token = await iamLogin('admin', IAM_ADMIN_PASSWORD)
 
     // Create a draft policy
     const draft = {
@@ -407,7 +423,7 @@ test.describe('IAM service API — authorization enforced end-to-end', () => {
   })
 
   test('relationship book seeded correctly — rm_jane has Whitman + Calderon', async () => {
-    const token = await iamLogin('admin', 'Meridian@2024')
+    const token = await iamLogin('admin', IAM_ADMIN_PASSWORD)
     const resp = await iamRequest(token, 'GET', '/users/rm_jane')
     expect(resp.status).toBe(200)
     const user = await resp.json() as { book: string[] }
@@ -417,7 +433,7 @@ test.describe('IAM service API — authorization enforced end-to-end', () => {
   })
 
   test('rm_carlos has Okafor in book, rm_jane does not', async () => {
-    const token = await iamLogin('admin', 'Meridian@2024')
+    const token = await iamLogin('admin', IAM_ADMIN_PASSWORD)
 
     const janeResp = await iamRequest(token, 'GET', '/users/rm_jane')
     const janeUser = await janeResp.json() as { book: string[] }

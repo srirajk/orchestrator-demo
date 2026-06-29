@@ -69,9 +69,9 @@ public class AnswerSynthesizer {
     public AnswerSynthesizer(
             ObjectMapper mapper,
             Tracer tracer,
-            @Value("${meridian.llm.synthesizer.base-url:https://api.openai.com/v1}") String baseUrl,
+            @Value("${meridian.llm.synthesizer.base-url:https://api.z.ai/api/paas/v4}") String baseUrl,
             @Value("${meridian.llm.synthesizer.api-key:}") String apiKey,
-            @Value("${meridian.llm.synthesizer.model:gpt-4o-mini}") String model,
+            @Value("${meridian.llm.synthesizer.model:glm-4.6}") String model,
             @Value("${meridian.llm.show-reasoning:false}") boolean showReasoning,
             @Value("${meridian.llm.max-retries:3}") int maxRetries,
             @Value("${meridian.llm.retry-initial-delay-ms:2000}") int retryInitialDelayMs,

@@ -111,6 +111,17 @@
             <version>2.2.0</version>
         </dependency>
 
+        <!-- WebClient — used by CoverageClient for synchronous coverage service calls -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-webflux</artifactId>
+        </dependency>
+        <!-- Reactor Netty — HTTP client backend for WebClient -->
+        <dependency>
+            <groupId>io.projectreactor.netty</groupId>
+            <artifactId>reactor-netty-http</artifactId>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

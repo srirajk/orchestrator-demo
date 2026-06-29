@@ -55,7 +55,8 @@ public class SecurityConfig {
     @Value("${meridian.auth.required-issuers:meridian-user-mgmt,http://user-mgmt:8084,http://host.docker.internal:8084,http://iam-service:8084,http://localhost:8084}")
     private String requiredIssuersRaw;
 
-    private static final String EXPECTED_AUDIENCE = "meridian-gateway";
+    @Value("${meridian.auth.required-audience:meridian-gateway}")
+    private String expectedAudience;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
@@ -160,7 +161,7 @@ public class SecurityConfig {
                 }
 
                 List<String> aud = claims.getAudience();
-                if (aud == null || !aud.contains(EXPECTED_AUDIENCE)) {
+                if (aud == null || !aud.contains(expectedAudience)) {
                     throw new JwtException("invalid aud: " + aud);
                 }
 

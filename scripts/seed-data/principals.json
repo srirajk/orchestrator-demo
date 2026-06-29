@@ -1,0 +1,38 @@
+[
+  {
+    "id": "rm_jane",
+    "name": "Jane Smith",
+    "email": "jane.smith@meridianbank.com",
+    "roles": ["relationship_manager"],
+    "book": ["REL-00042", "REL-00099"],
+    "clearance": 2,
+    "segments": ["wealth", "servicing"],
+    "domains": ["wealth-private-banking"],
+    "adminDomains": [],
+    "team": "wealth-private-banking"
+  },
+  {
+    "id": "rm_carlos",
+    "name": "Carlos Mendez",
+    "email": "carlos.mendez@meridianbank.com",
+    "roles": ["relationship_manager"],
+    "book": ["REL-00099"],
+    "clearance": 2,
+    "segments": ["wealth"],
+    "domains": ["wealth-private-banking"],
+    "adminDomains": [],
+    "team": "wealth-private-banking"
+  },
+  {
+    "id": "rm_guest",
+    "name": "Guest RM",
+    "email": "guest.rm@meridianbank.com",
+    "roles": ["relationship_manager"],
+    "book": [],
+    "clearance": 2,
+    "segments": ["wealth"],
+    "domains": [],
+    "adminDomains": [],
+    "team": ""
+  }
+]

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { getJwt, GATEWAY_URL, USER_MGMT_URL } from './helpers';
+import { getJwt, GATEWAY_URL, USER_MGMT_URL, IAM_USER_PASSWORD } from './helpers';
 
 /**
  * Phase 11 — Domain-scoped ABAC (segment × agent-domain).
@@ -253,7 +253,7 @@ test.describe('Domain-scoped ABAC (Phase 11)', () => {
 
   test('rm_jane JWT contains segments=["wealth"]', async ({ request }) => {
     const resp = await request.post(`${USER_MGMT_URL}/auth/token`, {
-      data: { username: 'rm_jane', password: 'Meridian@2024' },
+      data: { username: 'rm_jane', password: IAM_USER_PASSWORD },
     });
     expect(resp.status()).toBe(200);
     const body = await resp.json();
@@ -273,7 +273,7 @@ test.describe('Domain-scoped ABAC (Phase 11)', () => {
 
   test('rm_diaz JWT contains segments=["wealth","servicing"] (dual-segment RM)', async ({ request }) => {
     const resp = await request.post(`${USER_MGMT_URL}/auth/token`, {
-      data: { username: 'rm_diaz', password: 'Meridian@2024' },
+      data: { username: 'rm_diaz', password: IAM_USER_PASSWORD },
     });
     expect(resp.status()).toBe(200);
     const body = await resp.json();

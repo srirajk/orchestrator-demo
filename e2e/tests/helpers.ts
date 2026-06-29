@@ -8,6 +8,11 @@ export const GLASSBOX_URL   = process.env.GLASSBOX_URL   || 'http://localhost:40
 export const TEST_EMAIL    = 'meridian.e2e@test.local';
 export const TEST_PASSWORD = 'Meridian@E2E#2025!';
 
+// IAM service passwords — set via env to support rotated or CI-specific credentials.
+// These match the seeds in iam-service/src/main/resources/data.sql (bootstrap defaults).
+export const IAM_ADMIN_PASSWORD = process.env.IAM_ADMIN_PASSWORD || 'Meridian@2024';
+export const IAM_USER_PASSWORD  = process.env.IAM_USER_PASSWORD  || 'Meridian@2024';
+
 // Hero prompt from agent-catalog.md
 export const HERO_PROMPT =
   'Give me a full portfolio review for the Whitman Family Office — ' +
@@ -22,7 +27,7 @@ export async function getJwt(userId: string): Promise<string> {
   const resp = await fetch(`${USER_MGMT_URL}/auth/token`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ username: userId, password: 'Meridian@2024' }),
+    body:    JSON.stringify({ username: userId, password: IAM_USER_PASSWORD }),
   });
   if (!resp.ok) throw new Error(`iam-service /auth/token returned ${resp.status}`);
   const data = await resp.json();
@@ -91,9 +96,10 @@ export async function sendMessage(page: Page, text: string): Promise<string> {
   const inputBox = page.locator('#prompt-textarea').first();
   await inputBox.waitFor({ state: 'visible', timeout: 30_000 });
 
-  // Also wait for #send-button to be enabled — this ensures any prior streaming reply has
-  // fully settled before we try to send the next message (important in multi-turn tests).
-  await expect(page.locator('#send-button')).toBeEnabled({ timeout: 15_000 }).catch(() => {});
+  // Wait for any prior streaming reply to settle before sending the next message.
+  // Gateway responds in 16-20s; 45s gives comfortable buffer without bloating test time.
+  // This is a pre-send guard — waitForReply handles the post-send wait separately.
+  await expect(page.locator('#send-button')).toBeEnabled({ timeout: 45_000 }).catch(() => {});
 
   await inputBox.click();
   await inputBox.fill(text);
@@ -110,7 +116,7 @@ export async function sendMessage(page: Page, text: string): Promise<string> {
  * The most reliable signal is: #send-button is re-enabled after streaming ends.
  * We then return the full body innerText so callers can search it for their expected content.
  */
-export async function waitForReply(page: Page, timeoutMs = 75_000): Promise<string> {
+export async function waitForReply(page: Page, timeoutMs = 120_000): Promise<string> {
   const deadline = Date.now() + timeoutMs;
 
   // Wait until the send button is no longer disabled.

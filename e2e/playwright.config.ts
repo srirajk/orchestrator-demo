@@ -28,5 +28,7 @@ export default defineConfig({
   ],
 
   // Deliberately no webServer block — the stack is started externally by docker compose
-  timeout: 90_000,
+  // LibreChat browser UI tests involve LLM synthesis (30-90s) + login overhead (~20s).
+  // Multi-turn tests need 3+ LLM calls and up to 10 minutes under full-suite load.
+  timeout: 600_000,
 });

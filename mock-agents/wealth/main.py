@@ -19,8 +19,10 @@ sys.path.insert(0, os.path.dirname(__file__))
 import logging
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from opentelemetry import trace as otel_trace
 from shared.fault_knobs import fault_knob_middleware
 from shared.jwt_verify import verify_bearer_token
+from shared.telemetry import setup_telemetry
 from holdings.handler import router as holdings_router
 from performance.handler import router as performance_router
 from goal_planning.handler import router as goal_planning_router
@@ -41,6 +43,10 @@ app = FastAPI(
     license_info={"name": "Internal Demo"},
 )
 
+# Wire OTel distributed tracing — picks up W3C traceparent from the gateway
+# and creates child spans, completing the gateway root → agent child trace in Tempo.
+setup_telemetry(app)
+
 @app.middleware("http")
 async def jwt_auth_middleware(request: Request, call_next):
     """Verify JWT on every request except /health and /openapi.json."""
@@ -49,7 +55,13 @@ async def jwt_auth_middleware(request: Request, call_next):
     auth = request.headers.get("Authorization")
     allowed, error, claims = verify_bearer_token(auth)
     if not allowed:
-        log.warning("wealth-http: rejected request — %s (path=%s)", error, request.url.path)
+        ctx = otel_trace.get_current_span().get_span_context()
+        trace_id = format(ctx.trace_id, "032x") if ctx and ctx.is_valid else "none"
+        log.warning(
+            "wealth-http: rejected request — %s (path=%s) trace_id=%s convId=%s",
+            error, request.url.path, trace_id,
+            request.headers.get("x-conversation-id", "none"),
+        )
         return JSONResponse(status_code=401, content={"detail": error})
     if claims:
         request.state.principal = claims.get("sub")

@@ -51,6 +51,7 @@ exporters:
     endpoint: "0.0.0.0:8889"
     namespace: meridian
 
+  # Logs → debug only (Promtail handles Docker→Loki log shipping directly)
   debug:
     verbosity: basic
 
@@ -72,3 +73,8 @@ service:
       receivers: [otlp]
       processors: [batch, resource]
       exporters: [prometheus]
+
+    logs:
+      receivers: [otlp]
+      processors: [batch, resource]
+      exporters: [debug]
