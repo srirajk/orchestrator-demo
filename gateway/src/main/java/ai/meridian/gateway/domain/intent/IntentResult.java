@@ -16,7 +16,7 @@ public record IntentResult(Intent intent, double confidence, String reasoning,
     /** Fallback used when the classifier itself fails. */
     public static IntentResult fetchDataFallback() {
         return new IntentResult(Intent.FETCH_DATA, 0.5, "classifier-fallback",
-                EntityBag.extracted(null, null, java.util.List.of(), "QTD"));
+                EntityBag.empty());
     }
 
     /** Convenience ctor without entities (for FOLLOW_UP / CHITCHAT / CLARIFY). */

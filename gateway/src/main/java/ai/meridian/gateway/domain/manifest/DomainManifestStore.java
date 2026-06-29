@@ -179,6 +179,40 @@ public class DomainManifestStore {
         return EffectiveManifest.merge(domain, sub, agentId);
     }
 
+    /**
+     * The de-duplicated union (by {@code key}) of entity_types across ALL loaded sub-domain
+     * manifests. This is the single source the input pipeline (extract/resolve/bind) loops over
+     * instead of hardcoding entity fields.
+     *
+     * <p>Single-domain today. When domain routing lands this should be scoped to the selected
+     * domain(s); that seam is intentionally left for later.
+     */
+    public List<EntityType> entityTypes() {
+        Map<String, EntityType> byKey = new java.util.LinkedHashMap<>();
+        for (SubDomainManifest sd : subDomains.values()) {
+            if (sd.entityTypes() == null) continue;
+            for (EntityType et : sd.entityTypes()) {
+                if (et.key() != null) byKey.putIfAbsent(et.key(), et);
+            }
+        }
+        return List.copyOf(byKey.values());
+    }
+
+    /**
+     * The clarification schema declared for an entity key, searched across all sub-domains,
+     * or null when none is declared.
+     */
+    public ClarificationSchema clarificationFor(String entityKey) {
+        if (entityKey == null) return null;
+        for (SubDomainManifest sd : subDomains.values()) {
+            Map<String, ClarificationSchema> cs = sd.clarificationSchema();
+            if (cs != null && cs.get(entityKey) != null) {
+                return cs.get(entityKey);
+            }
+        }
+        return null;
+    }
+
     public Map<String, DomainManifest> allDomains() {
         return Map.copyOf(domains);
     }

@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-29T17:23:24.554Z
-> Files: 611 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-29T17:55:08.596Z
+> Files: 618 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/
 
@@ -23,7 +23,7 @@
 - `agent-manifest.schema.json` (~1558 tok)
 - `BUILD_REPORT.md` — Build Report — Meridian AI Gateway (~15724 tok)
 - `CLAUDE.md` — OpenWolf (~6447 tok)
-- `docker-compose.yml` — Docker Compose services (~7163 tok)
+- `docker-compose.yml` — Docker Compose services (~7234 tok)
 - `README.md` — Project documentation (~4696 tok)
 - `z.ai-tiers.md` — Declares Model (~778 tok)
 
@@ -251,6 +251,7 @@
 - `implementation-checklist.md` — Implementation Checklist — Pre-Build Validation Spec (~4638 tok)
 - `input-synthesis-deep-spec.md` — Input Synthesis — Deep Spec (the one unproven piece) (~1951 tok)
 - `master-build-plan-consolidated.md` — Enterprise Intelligence Platform — Master Build Plan (Meridian) (~3833 tok)
+- `MODEL-SELECTION.md` — Model Selection Guide — Meridian AI Gateway (~2289 tok)
 - `platform-vision-and-maturity-path.md` — Enterprise Intelligence Platform — Vision & Maturity Path (~1324 tok)
 - `PROMPT-AUDIT.md` — Prompt Contract Audit — every production prompt vs the 9-element framework (~1931 tok)
 - `technical-architecture-clear-boundaries.md` — Technical Architecture — Clear Boundaries (~1990 tok)
@@ -378,7 +379,7 @@
 - `cerbos_policy_eval.py` — check, run (~1465 tok)
 - `continuous_loop.py` — main (~501 tok)
 - `Dockerfile` — Docker container definition (~86 tok)
-- `eval_deepeval.py` — PartialHonestyMetric: configure_judge_model, measure, a_measure, is_successful + 7 more (~5358 tok)
+- `eval_deepeval.py` — PartialHonestyMetric: configure_judge_model, measure, a_measure, is_successful + 6 more (~5444 tok)
 - `golden-prompts.json` (~3317 tok)
 - `langfuse_continuous.py` — check_grounding, check_partial_honesty, llm_judge, extract_trace_data (~5808 tok)
 - `langfuse_run_experiment.py` — Run a Langfuse experiment against the meridian-routing dataset. (~4132 tok)
@@ -468,7 +469,7 @@
 
 ## gateway/src/main/java/ai/meridian/gateway/domain/chat/
 
-- `ChatService.java` — Entry point from the controller — called on a virtual thread after the async boundary. (~12274 tok)
+- `ChatService.java` — Entry point from the controller — called on a virtual thread after the async boundary. (~12562 tok)
 
 ## gateway/src/main/java/ai/meridian/gateway/domain/coverage/
 
@@ -480,17 +481,18 @@
 ## gateway/src/main/java/ai/meridian/gateway/domain/intent/
 
 - `Intent.java` — Routing label produced by {@link IntentClassifier}. (~186 tok)
-- `IntentClassifier.java` — Stage A of the request pipeline: classifies the user's intent before routing. (~3979 tok)
-- `IntentResult.java` — Output of {@link IntentClassifier}. (~310 tok)
+- `IntentClassifier.java` — Stage A of the request pipeline: classifies the user's intent before routing. (~4135 tok)
+- `IntentResult.java` — Output of {@link IntentClassifier}. (~278 tok)
 
 ## gateway/src/main/java/ai/meridian/gateway/domain/manifest/
 
 - `ClarificationSchema.java` — Class: ClarificationSchema (~112 tok)
 - `DomainManifest.java` — DomainManifest: Coverage, MemoryCompaction (~272 tok)
-- `DomainManifestStore.java` — Resolves ${VAR_NAME} placeholders in all Coverage URL fields using Spring Environment. (~2317 tok)
+- `DomainManifestStore.java` — Resolves ${VAR_NAME} placeholders in all Coverage URL fields using Spring Environment. (~2687 tok)
 - `DomainPrerequisiteValidator.java` — Service: DomainPrerequisiteValidator (~439 tok)
 - `EffectiveManifest.java` — Returns true if this effective manifest requires a relationship_id in context. (~643 tok)
-- `SubDomainManifest.java` — Class: SubDomainManifest (~188 tok)
+- `EntityType.java` — A manifest-declared entity type. This is the load-bearing declaration that makes the (~528 tok)
+- `SubDomainManifest.java` — Normalise a missing entity_types declaration to an empty list. (~408 tok)
 
 ## gateway/src/main/java/ai/meridian/gateway/domain/session/
 
@@ -583,11 +585,11 @@
 
 ## gateway/src/main/java/ai/meridian/gateway/synthesis/input/
 
-- `EntityBag.java` — EntityBag: EntityCandidate, extracted, withResolved, withCandidates (~376 tok)
-- `EntityExtractor.java` — Stage 1 — Extract. (~2874 tok)
-- `EntityResolver.java` — Service: EntityResolver (~962 tok)
+- `EntityBag.java` — Generic, manifest-driven carrier for extracted and resolved entities. (~853 tok)
+- `EntityExtractor.java` — Stage 1 — Extract. (~3484 tok)
+- `EntityResolver.java` — Stage 2 — Resolve. (~1241 tok)
 - `InputSynthesizer.java` — Input synthesis pipeline: Extract → Resolve → Bind. (~496 tok)
-- `InputSynthesizerImpl.java` — Stage 3 — Bind, and orchestrates the full Extract → Resolve → Bind pipeline. (~2225 tok)
+- `InputSynthesizerImpl.java` — Stage 3 — Bind, and orchestrates the full Extract → Resolve → Bind pipeline. (~2255 tok)
 
 ## gateway/src/main/resources/
 
@@ -644,6 +646,10 @@
 ## gateway/src/test/java/ai/meridian/gateway/orchestration/harness/
 
 - `AgentHarnessResilienceIT.java` — Resilience integration test — verifies the harness's core invariant: (~2919 tok)
+
+## gateway/src/test/java/ai/meridian/gateway/synthesis/input/
+
+- `EntityBagTest.java` — Locks in the generic, manifest-keyed EntityBag contract that replaced the wealth-shaped record. (~838 tok)
 
 ## glassbox/
 
@@ -1004,6 +1010,16 @@
 - `PHASE-7.md` — Phase 7 — Proof: Accuracy & Scale (~463 tok)
 - `PHASE-8.md` — Phase 8 — Identity, Domains & End-to-End Authorization (~1741 tok)
 - `PHASE-9.md` — Next Test Run — Verify Identity, Authorization & Correlation Are *Real* (~2254 tok)
+
+## registry/domains/asset-servicing/
+
+- `cash-management.json` (~243 tok)
+- `corporate-actions.json` (~281 tok)
+- `custody-operations.json` (~274 tok)
+
+## registry/domains/wealth-management/
+
+- `private-banking.json` (~468 tok)
 
 ## registry/manifests/
 

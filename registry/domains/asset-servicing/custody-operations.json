@@ -7,6 +7,8 @@
   "entity_types": [
     {
       "key": "fund_id",
+      "extract_as": "fund_reference",
+      "kind": "resolvable",
       "display": "fund or portfolio",
       "id_pattern": "FND-\\w+",
       "resolve_type": "fund",
@@ -14,16 +16,18 @@
     },
     {
       "key": "settlement_id",
+      "extract_as": "settlement_id",
+      "kind": "literal",
       "display": "settlement or trade reference",
       "id_pattern": "SETT-\\w+",
-      "resolve_type": "settlement",
       "required": false
     },
     {
       "key": "security_id",
+      "extract_as": "security_id",
+      "kind": "literal",
       "display": "security or ISIN",
       "id_pattern": "[A-Z]{2}[A-Z0-9]{10}|[A-Z]{2,5}",
-      "resolve_type": "security",
       "required": false
     }
   ],

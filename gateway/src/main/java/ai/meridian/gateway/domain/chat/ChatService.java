@@ -16,6 +16,7 @@ import ai.meridian.gateway.domain.intent.IntentResult;
 import ai.meridian.gateway.domain.manifest.DomainManifest;
 import ai.meridian.gateway.domain.manifest.DomainManifestStore;
 import ai.meridian.gateway.domain.manifest.EffectiveManifest;
+import ai.meridian.gateway.domain.manifest.EntityType;
 import ai.meridian.gateway.domain.session.ConversationSession;
 import ai.meridian.gateway.domain.session.ConversationSessionStore;
 import ai.meridian.gateway.infrastructure.telemetry.TraceEvent;
@@ -279,6 +280,14 @@ public class ChatService {
         // coverageRelId is set by the coverage pipeline before synthesis;
         // it takes priority over the synthesis-extracted relationship ID when saving the session.
         String coverageRelId = null;
+        // The entitled/coverage entity type (e.g. relationship) and an optional secondary
+        // resolvable entity (e.g. fund) come from the manifest — never hardcoded here.
+        EntityType coverageEntity = manifestStore.entityTypes().stream()
+                .filter(EntityType::isResolvable).filter(EntityType::required)
+                .findFirst().orElse(null);
+        EntityType secondaryEntity = manifestStore.entityTypes().stream()
+                .filter(EntityType::isResolvable).filter(et -> !et.required())
+                .findFirst().orElse(null);
         try {
             ResolverResult resolved = resolver.resolve(latestPrompt);
 
@@ -361,10 +370,12 @@ public class ChatService {
                             }
                             coverageRelId = session.relationshipId();
 
-                        } else if (preExtracted != null && preExtracted.relationshipReference() != null) {
+                        } else if (coverageEntity != null && preExtracted != null
+                                && preExtracted.reference(coverageEntity.extractAs()) != null) {
                             // RM named a client — resolve the text to a canonical relationship ID.
                             CoverageResolveResult resolveResult = coverageClient.resolve(
-                                preExtracted.relationshipReference(), "relationship", principalId, coverage);
+                                preExtracted.reference(coverageEntity.extractAs()),
+                                coverageEntity.resolveType(), principalId, coverage);
 
                             if (resolveResult.resolved()) {
                                 coverageRelId = resolveResult.id();
@@ -399,7 +410,7 @@ public class ChatService {
                                 emitRequestOutcome("CLARIFIED");
                                 streamTextAndComplete(emitter,
                                     "I could not find a client relationship matching \""
-                                    + preExtracted.relationshipReference()
+                                    + preExtracted.reference(coverageEntity.extractAs())
                                     + "\". Please provide the relationship ID or a more specific name.");
                                 tracePublisher.publish(TraceEvent.of("request_complete", requestId,
                                     new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
@@ -466,14 +477,16 @@ public class ChatService {
             SynthesisResult synthesis;
             if (preExtracted != null) {
                 EntityBag effectiveBag = preExtracted;
-                if (coverageRelId != null) {
-                    effectiveBag = EntityBag.extracted(
-                            coverageRelId, preExtracted.fundReference(),
-                            preExtracted.tickerReferences(), preExtracted.period());
-                } else if (preExtracted.relationshipReference() == null && session.relationshipId() != null) {
-                    effectiveBag = EntityBag.extracted(
-                            session.relationshipId(), preExtracted.fundReference(),
-                            preExtracted.tickerReferences(), preExtracted.period());
+                if (coverageEntity != null) {
+                    String covExtractAs = coverageEntity.extractAs();
+                    if (coverageRelId != null) {
+                        // Inject the coverage-verified canonical ID as the entity reference so
+                        // the resolver short-circuits via its id_pattern (no external lookup).
+                        effectiveBag = preExtracted.withReference(covExtractAs, coverageRelId);
+                    } else if (preExtracted.reference(covExtractAs) == null
+                            && session.relationshipId() != null) {
+                        effectiveBag = preExtracted.withReference(covExtractAs, session.relationshipId());
+                    }
                 }
                 synthesis = inputSynthesizer.synthesize(effectiveBag, finalManifests);
             } else {
@@ -490,7 +503,7 @@ public class ChatService {
                 streamTextAndComplete(emitter, "Please specify the client name or relationship ID."); return;
             }
 
-            String resolvedRelId = extractResolvedRelId(synthesis);
+            String resolvedRelId = extractResolvedId(synthesis, coverageEntity);
             if (resolvedRelId != null) {
                 EntitlementResult ent = entitlementService.checkRelationship(principal, resolvedRelId);
                 tracePublisher.publish(TraceEvent.of("entitlement_check", requestId,
@@ -542,8 +555,8 @@ public class ChatService {
             log.info("Fan-out complete {}/{} ok", okCount, results.size());
 
             // Prefer the coverage-verified relationship ID over the synthesis-extracted one.
-            String finalRelId = coverageRelId != null ? coverageRelId : extractResolvedRelId(synthesis);
-            sessionStore.save(session.withResults(finalRelId, extractResolvedFundId(synthesis), results));
+            String finalRelId = coverageRelId != null ? coverageRelId : extractResolvedId(synthesis, coverageEntity);
+            sessionStore.save(session.withResults(finalRelId, extractResolvedId(synthesis, secondaryEntity), results));
 
             tracePublisher.publish(TraceEvent.of("synthesis_start", requestId,
                     new SynthesisStartData(results.size(), (int) okCount)));
@@ -702,17 +715,18 @@ public class ChatService {
         return sb.toString();
     }
 
-    private String extractResolvedRelId(SynthesisResult synthesis) {
+    /**
+     * Extracts the resolved id for an entity type from the bound agent inputs. The field name
+     * (entity {@code key}) and the validity check ({@code id_pattern}) both come from the
+     * manifest — no hardcoded field names or ID prefixes.
+     */
+    private String extractResolvedId(SynthesisResult synthesis, EntityType et) {
+        if (et == null) return null;
         return synthesis.inputs().values().stream()
-                .map(node -> node.path("relationship_id").asText(null))
-                .filter(v -> v != null && v.startsWith("REL-"))
-                .findFirst().orElse(null);
-    }
-
-    private String extractResolvedFundId(SynthesisResult synthesis) {
-        return synthesis.inputs().values().stream()
-                .map(node -> node.path("fund_id").asText(null))
-                .filter(v -> v != null && v.startsWith("FND-"))
+                .map(node -> node.path(et.key()).asText(null))
+                .filter(v -> v != null && !v.isBlank())
+                .filter(v -> et.idPattern() == null || et.idPattern().isBlank()
+                        || v.toUpperCase().matches(et.idPattern()))
                 .findFirst().orElse(null);
     }
 

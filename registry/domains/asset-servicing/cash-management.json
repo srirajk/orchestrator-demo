@@ -7,6 +7,8 @@
   "entity_types": [
     {
       "key": "fund_id",
+      "extract_as": "fund_reference",
+      "kind": "resolvable",
       "display": "fund or portfolio",
       "id_pattern": "FND-\\w+",
       "resolve_type": "fund",
@@ -14,16 +16,18 @@
     },
     {
       "key": "account_id",
+      "extract_as": "account_id",
+      "kind": "literal",
       "display": "cash account",
       "id_pattern": "ACCT-\\w+",
-      "resolve_type": "account",
       "required": false
     },
     {
       "key": "currency",
+      "extract_as": "currency",
+      "kind": "literal",
       "display": "currency",
       "id_pattern": "[A-Z]{3}",
-      "resolve_type": "currency",
       "required": false
     }
   ],

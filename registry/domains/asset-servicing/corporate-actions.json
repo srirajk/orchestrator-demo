@@ -7,6 +7,8 @@
   "entity_types": [
     {
       "key": "fund_id",
+      "extract_as": "fund_reference",
+      "kind": "resolvable",
       "display": "fund or portfolio",
       "id_pattern": "FND-\\w+",
       "resolve_type": "fund",
@@ -14,16 +16,18 @@
     },
     {
       "key": "security_id",
+      "extract_as": "security_id",
+      "kind": "literal",
       "display": "security or ISIN",
       "id_pattern": "[A-Z]{2}[A-Z0-9]{10}|[A-Z]{2,5}",
-      "resolve_type": "security",
       "required": false
     },
     {
       "key": "valuation_date",
+      "extract_as": "valuation_date",
+      "kind": "literal",
       "display": "valuation or NAV date",
       "id_pattern": "\\d{4}-\\d{2}-\\d{2}",
-      "resolve_type": "date",
       "required": false,
       "default": "latest available"
     }

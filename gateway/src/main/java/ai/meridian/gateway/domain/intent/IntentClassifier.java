@@ -236,13 +236,21 @@ public class IntentClassifier {
             intent = Intent.FETCH_DATA;
         }
 
-        // Extract entity fields included in the same response (FETCH_DATA only)
+        // Extract entity fields included in the same response (FETCH_DATA only).
+        // NOTE: the JSON keys below mirror this class's SYSTEM_PROMPT, which a separate
+        // World B pass makes manifest-driven. Here we only adapt to the generic EntityBag:
+        // populate the bag's reference/list maps keyed by the prompt's extract_as fields.
         EntityBag entities = null;
         if (intent == Intent.FETCH_DATA) {
+            java.util.Map<String, String> references = new java.util.LinkedHashMap<>();
             String relRef = nullableText(parsed, "relationship_reference");
+            if (relRef != null) references.put("relationship_reference", relRef);
             String fundRef = nullableText(parsed, "fund_reference");
+            if (fundRef != null) references.put("fund_reference", fundRef);
             String period = parsed.path("period").asText("QTD");
             if (period.isBlank()) period = "QTD";
+            references.put("period", period);
+
             List<String> tickers = new ArrayList<>();
             JsonNode tickerNode = parsed.path("ticker_references");
             if (tickerNode.isArray()) {
@@ -251,7 +259,7 @@ public class IntentClassifier {
                     if (val != null && !val.isBlank()) tickers.add(val.toUpperCase());
                 }
             }
-            entities = EntityBag.extracted(relRef, fundRef, tickers, period);
+            entities = EntityBag.of(references, java.util.Map.of("ticker_references", tickers));
         }
 
         return new IntentResult(intent, confidence, reasoning, entities);

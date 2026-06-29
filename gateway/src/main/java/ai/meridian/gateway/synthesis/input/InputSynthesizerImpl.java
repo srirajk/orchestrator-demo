@@ -1,5 +1,8 @@
 package ai.meridian.gateway.synthesis.input;
 
+import ai.meridian.gateway.domain.manifest.ClarificationSchema;
+import ai.meridian.gateway.domain.manifest.DomainManifestStore;
+import ai.meridian.gateway.domain.manifest.EntityType;
 import ai.meridian.gateway.registry.model.AgentManifest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -37,20 +40,23 @@ public class InputSynthesizerImpl implements InputSynthesizer {
     private final EntityExtractor extractor;
     private final EntityResolver  resolver;
     private final ObjectMapper    mapper;
+    private final DomainManifestStore manifestStore;
 
     public InputSynthesizerImpl(EntityExtractor extractor,
                                 EntityResolver resolver,
-                                ObjectMapper mapper) {
+                                ObjectMapper mapper,
+                                DomainManifestStore manifestStore) {
         this.extractor = extractor;
         this.resolver  = resolver;
         this.mapper    = mapper;
+        this.manifestStore = manifestStore;
     }
 
     @Override
     public SynthesisResult synthesize(EntityBag preExtracted, List<AgentManifest> selected) {
         // Pre-extracted bag from the combined intent+entity LLM call — skip extractor
-        log.debug("Skipping LLM extraction — using pre-extracted bag: relRef={}, fundRef={}, period={}",
-                preExtracted.relationshipReference(), preExtracted.fundReference(), preExtracted.period());
+        log.debug("Skipping LLM extraction — using pre-extracted bag: references={}",
+                preExtracted.references());
         return resolveAndBind(preExtracted, selected);
     }
 
@@ -58,9 +64,7 @@ public class InputSynthesizerImpl implements InputSynthesizer {
     public SynthesisResult synthesize(String prompt, List<AgentManifest> selected) {
         // ── Stage 1: Extract ─────────────────────────────────────────────────
         EntityBag rawBag = extractor.extract(prompt);
-        log.debug("Extracted: relRef={}, fundRef={}, tickers={}, period={}",
-                rawBag.relationshipReference(), rawBag.fundReference(),
-                rawBag.tickerReferences(), rawBag.period());
+        log.debug("Extracted: references={}, lists={}", rawBag.references(), rawBag.lists());
         return resolveAndBind(rawBag, selected);
     }
 
@@ -68,9 +72,8 @@ public class InputSynthesizerImpl implements InputSynthesizer {
     private SynthesisResult resolveAndBind(EntityBag rawBag, List<AgentManifest> selected) {
         // ── Stage 2: Resolve ─────────────────────────────────────────────────
         EntityBag resolvedBag = resolver.resolve(rawBag);
-        log.debug("Resolved:  relId={}, fundId={}, needsClarification={}",
-                resolvedBag.relationshipId(), resolvedBag.fundId(),
-                resolvedBag.needsClarification());
+        log.debug("Resolved:  resolved={}, needsClarification={}",
+                resolvedBag.resolved(), resolvedBag.needsClarification());
 
         // ── Stage 3: Bind ────────────────────────────────────────────────────
         Map<String, JsonNode> inputs        = new LinkedHashMap<>();
@@ -150,38 +153,41 @@ public class InputSynthesizerImpl implements InputSynthesizer {
     }
 
     /**
-     * Maps a schema field name to the corresponding value from the resolved entity bag.
-     * Returns {@code null} when this extractor doesn't know that field — the agent
-     * schema may declare optional fields we don't populate; that is fine.
+     * Maps an agent-schema field name to a value from the resolved entity bag. Agent input
+     * fields are expected to match entity-type {@code key}s (resolvable/literal) or list
+     * {@code extract_as} fields. Returns {@code null} for fields the gateway does not supply.
      */
     private Object resolveField(String fieldName, EntityBag bag) {
-        return switch (fieldName) {
-            case "relationship_id"   -> bag.relationshipId();
-            case "fund_id"           -> bag.fundId();
-            case "period"            -> bag.period();
-            case "tickers",
-                 "ticker_references" -> bag.tickerReferences().isEmpty() ? null
-                                                                         : bag.tickerReferences();
-            // Fields the gateway doesn't supply (e.g. agent-specific params) → null
-            default                  -> null;
-        };
+        String resolvedValue = bag.resolved(fieldName);   // resolvable keys → resolved id
+        if (resolvedValue != null) return resolvedValue;
+
+        String reference = bag.reference(fieldName);       // literal keys → raw value
+        if (reference != null) return reference;
+
+        List<String> list = bag.list(fieldName);           // list keys → list value
+        if (list != null && !list.isEmpty()) return list;
+
+        return null;
     }
 
     // ── Clarification message builder ─────────────────────────────────────────
 
+    /**
+     * Builds a clarification message from the manifest. Finds the required resolvable entity
+     * that could not be resolved and returns its declared clarification question; falls back to
+     * a generic question built from the entity's display label. No hardcoded domain copy.
+     */
     private String buildClarificationMessage(EntityBag raw, EntityBag resolved) {
-        if (raw.relationshipReference() != null && resolved.relationshipId() == null) {
-            return String.format(
-                    "I couldn't find a relationship matching \"%s\" in your book. " +
-                    "Could you clarify which client you meant? " +
-                    "Try using the full client name or a relationship ID (REL-XXXXX).",
-                    raw.relationshipReference());
+        for (EntityType et : manifestStore.entityTypes()) {
+            if (!et.isResolvable() || !et.required()) continue;
+            if (resolved.resolved(et.key()) != null) continue; // this one resolved fine
+
+            ClarificationSchema cs = manifestStore.clarificationFor(et.key());
+            if (cs != null && cs.question() != null && !cs.question().isBlank()) {
+                return cs.question();
+            }
+            return "Which " + et.display() + " are you asking about?";
         }
-        if (raw.relationshipReference() == null) {
-            return "Which client relationship should I pull data for? " +
-                   "Please mention the client name or relationship ID.";
-        }
-        return "I need a little more information to answer your question. " +
-               "Could you clarify which relationship or fund you are asking about?";
+        return "I need a little more information to answer your question.";
     }
 }

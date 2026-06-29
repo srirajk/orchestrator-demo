@@ -7,24 +7,37 @@
   "entity_types": [
     {
       "key": "relationship_id",
+      "extract_as": "relationship_reference",
+      "kind": "resolvable",
       "display": "client relationship",
-      "id_pattern": "REL-\\d{5}",
+      "id_pattern": "REL-\\d+",
       "resolve_type": "relationship",
       "required": true
     },
     {
-      "key": "time_period",
-      "display": "reporting period",
-      "id_pattern": "(Q[1-4]\\s+\\d{4}|YTD|QTD|MTD)",
-      "resolve_type": "time_period",
-      "required": false,
-      "default": "most recent quarter"
-    },
-    {
       "key": "fund_id",
+      "extract_as": "fund_reference",
+      "kind": "resolvable",
       "display": "fund or investment strategy",
       "id_pattern": "FND-\\w+",
       "resolve_type": "fund",
+      "required": false
+    },
+    {
+      "key": "period",
+      "extract_as": "period",
+      "kind": "literal",
+      "display": "reporting period",
+      "id_pattern": "(Q[1-4]\\s+\\d{4}|YTD|QTD|MTD)",
+      "required": false,
+      "default": "QTD"
+    },
+    {
+      "key": "ticker_references",
+      "extract_as": "ticker_references",
+      "kind": "list",
+      "display": "stock tickers",
+      "id_pattern": "[A-Z]{2,5}",
       "required": false
     }
   ],
@@ -37,10 +50,10 @@
       "options_source": "discover",
       "priority": 1
     },
-    "time_period": {
+    "period": {
       "question": "Which period would you like to review?",
       "options_source": "agent_derived",
-      "default": "most recent quarter",
+      "default": "QTD",
       "priority": 2
     }
   },

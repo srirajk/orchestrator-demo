@@ -990,3 +990,41 @@
 | 13:22 | Edited gateway/src/main/java/ai/meridian/gateway/domain/auth/EntitlementService.java | modified EntitlementService() | ~172 |
 | 13:22 | Edited gateway/src/main/resources/application.yml | 5→9 lines | ~125 |
 | 13:23 | Edited mock-agents/wealth-coverage/tests/test_coverage.py | modified test_okafor_resolves_for_anyone_but_check_denies_rm_jane() | ~130 |
+| 13:25 | Session end: 58 writes across 30 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 117 reads | ~203789 tok |
+| 13:30 | Session end: 58 writes across 30 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 117 reads | ~203789 tok |
+| 13:37 | Session end: 58 writes across 30 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 120 reads | ~207470 tok |
+| 13:39 | Session end: 58 writes across 30 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 122 reads | ~208959 tok |
+| 13:46 | Edited eval/eval_deepeval.py | 5→8 lines | ~142 |
+| 13:46 | Created registry/domains/wealth-management/private-banking.json | — | ~468 |
+| 13:47 | Created registry/domains/asset-servicing/cash-management.json | — | ~243 |
+| 13:47 | Created registry/domains/asset-servicing/corporate-actions.json | — | ~281 |
+| 13:47 | Created registry/domains/asset-servicing/custody-operations.json | — | ~274 |
+| 13:47 | Edited docker-compose.yml | 2→5 lines | ~114 |
+| 13:47 | Created gateway/src/main/java/ai/meridian/gateway/domain/manifest/EntityType.java | — | ~528 |
+| 13:47 | Created gateway/src/main/java/ai/meridian/gateway/domain/manifest/SubDomainManifest.java | — | ~408 |
+| 13:48 | Edited gateway/src/main/java/ai/meridian/gateway/domain/manifest/DomainManifestStore.java | added 4 condition(s) | ~396 |
+| 13:48 | Created docs/MODEL-SELECTION.md | — | ~1534 |
+| 13:48 | Created gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityBag.java | — | ~853 |
+| 13:49 | Created gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityExtractor.java | — | ~3484 |
+| 13:49 | Session end: 70 writes across 35 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 124 reads | ~220352 tok |
+| 13:49 | Created gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityResolver.java | — | ~1241 |
+| 13:49 | Edited gateway/src/main/java/ai/meridian/gateway/synthesis/input/InputSynthesizerImpl.java | added 3 import(s) | ~162 |
+| 13:50 | Edited gateway/src/main/java/ai/meridian/gateway/synthesis/input/InputSynthesizerImpl.java | modified InputSynthesizerImpl() | ~479 |
+| 13:50 | Edited gateway/src/main/java/ai/meridian/gateway/synthesis/input/InputSynthesizerImpl.java | added 4 condition(s) | ~500 |
+| 13:50 | Edited gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentResult.java | extracted() → empty() | ~62 |
+| 13:50 | Edited gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java | extracted() → put() | ~412 |
+| 13:50 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | added 1 import(s) | ~64 |
+| 13:51 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | expanded (+8 lines) | ~231 |
+| 13:51 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | 4→6 lines | ~144 |
+| 13:51 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | 5→5 lines | ~110 |
+| 13:51 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | added 1 condition(s) | ~263 |
+| 13:51 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | extractResolvedRelId() → extractResolvedId() | ~33 |
+| 13:51 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | 3→3 lines | ~89 |
+| 13:52 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | added 1 condition(s) | ~199 |
+| 13:52 | Edited docs/MODEL-SELECTION.md | modified GLM() | ~528 |
+| 13:53 | Created gateway/src/test/java/ai/meridian/gateway/synthesis/input/EntityBagTest.java | — | ~838 |
+| 13:53 | Session end: 86 writes across 39 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 124 reads | ~226091 tok |
+| 13:54 | World B Wave 2: manifest-driven input pipeline (extract/resolve/bind generic) | EntityExtractor/EntityBag/EntityResolver/InputSynthesizerImpl/ChatService/IntentClassifier + 4 manifests | CRITICAL 67→43, synthesis/input pkg 0; 49 tests green | ~20k |
+| 13:54 | Edited docs/MODEL-SELECTION.md | expanded (+14 lines) | ~577 |
+| 13:55 | Edited docs/MODEL-SELECTION.md | 3→6 lines | ~139 |
+| 13:55 | Session end: 88 writes across 39 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 124 reads | ~226858 tok |
