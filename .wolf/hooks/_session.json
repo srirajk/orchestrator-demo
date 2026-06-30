@@ -56,6 +56,26 @@
       "count": 1,
       "tokens": 701,
       "first_read": "2026-06-30T00:08:05.039Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/CLAUDE.md": {
+      "count": 1,
+      "tokens": 6447,
+      "first_read": "2026-06-30T00:28:23.529Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/BUILD_REPORT.md": {
+      "count": 1,
+      "tokens": 15724,
+      "first_read": "2026-06-30T00:29:25.966Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/README.md": {
+      "count": 1,
+      "tokens": 4696,
+      "first_read": "2026-06-30T00:31:27.390Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/docs/WORLD-B-LOCKDOWN.md": {
+      "count": 1,
+      "tokens": 8919,
+      "first_read": "2026-06-30T00:32:51.518Z"
     }
   },
   "files_written": [
@@ -208,6 +228,42 @@
       "action": "create",
       "tokens": 3940,
       "at": "2026-06-30T00:14:07.761Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/docs/PROJECT-OVERVIEW.md",
+      "action": "create",
+      "tokens": 3350,
+      "at": "2026-06-30T00:27:32.918Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/CLAUDE.md",
+      "action": "create",
+      "tokens": 1940,
+      "at": "2026-06-30T00:28:58.591Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/BUILD_REPORT.md",
+      "action": "create",
+      "tokens": 1173,
+      "at": "2026-06-30T00:29:48.901Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/registry/README.md",
+      "action": "create",
+      "tokens": 1948,
+      "at": "2026-06-30T00:30:41.708Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/README.md",
+      "action": "create",
+      "tokens": 2033,
+      "at": "2026-06-30T00:32:06.247Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/docs/WORLD-B-LOCKDOWN.md",
+      "action": "edit",
+      "tokens": 114,
+      "at": "2026-06-30T00:32:57.383Z"
     }
   ],
   "edit_counts": {
@@ -219,11 +275,17 @@
     "gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java": 1,
     "infra/cerbos/policies/agent_resource.yaml": 1,
     "scripts/seed-users.sh": 1,
-    "docs/OPERATOR-RUNBOOK.md": 1
+    "docs/OPERATOR-RUNBOOK.md": 1,
+    "docs/PROJECT-OVERVIEW.md": 1,
+    "CLAUDE.md": 1,
+    "BUILD_REPORT.md": 1,
+    "registry/README.md": 1,
+    "README.md": 1,
+    "docs/WORLD-B-LOCKDOWN.md": 1
   },
-  "anatomy_hits": 10,
+  "anatomy_hits": 14,
   "anatomy_misses": 1,
   "repeated_reads_warned": 9,
   "cerebrum_warnings": 0,
-  "stop_count": 5
+  "stop_count": 7
 }

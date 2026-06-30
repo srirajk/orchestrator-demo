@@ -1,413 +1,138 @@
 # Meridian — Enterprise AI Gateway
 
-> One plain-English question. Multiple specialist AI agents across HTTP and MCP. One grounded, attributed answer. Live authorization decisions. Everything visible in real time.
+> One plain-English question → the right specialist systems, across HTTP and MCP → one grounded,
+> attributed answer, with every routing and access decision visible live.
 
-This is a **production-architecture demo** of an enterprise AI gateway built for a bank. A relationship manager types a question into the Meridian-branded chat UI; the gateway figures out which specialist agents to call, checks entitlements, fans out in parallel, synthesizes one answer, and streams it back — showing every routing and access decision in a live glass-box panel beside the chat.
+**Meridian is an enterprise AI gateway for a bank.** A relationship manager asks a question in
+plain English; the gateway figures out which specialist systems hold the answer, checks the user
+is entitled to that data, calls those systems in parallel, and streams back **one synthesized,
+grounded answer** — while showing the entire decision live in a glass-box panel.
 
-It is not a prototype. Every component follows patterns you would ship to production: virtual threads, circuit breakers, ABAC authorization, JWT-secured agent calls, an immutable audit trail, and a complete OIDC identity layer.
-
----
-
-## What makes this interesting
-
-**You type one question. The system does everything else.**
-
-```
-"What's the current portfolio allocation and any pending settlements for Jane Whitman?"
-```
-
-The gateway:
-1. Classifies intent — wealth query touching two domains
-2. Vector-searches the agent registry — finds portfolio-analytics + settlements agents
-3. Checks Cerbos — is this RM allowed to invoke these agent classes at this classification level?
-4. Calls the domain authorization contract — does rm_jane have REL-00042 in her book?
-5. Extracts entities — resolves "Jane Whitman" → REL-00042 (never guesses)
-6. Fans out in parallel — HTTP to Wealth agents, MCP to Asset Servicing agents
-7. Synthesizes one grounded answer via Z.AI GLM — every number sourced from agent output
-8. Streams the answer back to the chat UI
-9. Kills one agent mid-request — answer still comes back, gap explicitly stated
-
-All of this is visible live in the glass-box panel: which agents were selected, which were denied, per-agent latency, the authorization decision, the synthesis.
+What makes it different is **"World B": the gateway carries zero domain knowledge.** A new
+business line is onboarded by adding manifest files + a coverage-service URL — **no gateway code
+changes.** (We prove it here: insurance was added to a wealth-and-servicing gateway by manifest
+alone.) See [`docs/PROJECT-OVERVIEW.md`](docs/PROJECT-OVERVIEW.md) for the full story and module
+map.
 
 ---
 
-## Architecture
+## What you can do with this demo
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  Meridian (LibreChat — branded)           Admin UI (localhost:5180)          │
-│  localhost:3080                           IAM, users, roles, policies, audit │
-└────────────────┬────────────────────────────────────────────────────────────┘
-                 │  POST /v1/chat/completions  (OpenAI-compatible, SSE)
-                 ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  Meridian Gateway  ·  Java 21  ·  Spring Boot 3.5  ·  Virtual Threads       │
-│                                                                             │
-│  ┌─────────────┐  ┌──────────────────┐  ┌────────────────────────────────┐ │
-│  │  Intent     │  │  Capability      │  │  Entity Extractor              │ │
-│  │  Classifier │→ │  Resolver        │→ │  Extract → Resolve → Bind      │ │
-│  │  (GLM-4.6)  │  │  Vector search   │  │  Zero fabricated IDs           │ │
-│  └─────────────┘  │  + Cerbos gate   │  └────────────────────────────────┘ │
-│                   └──────────────────┘                ↓                    │
-│  ┌────────────────────────────────────────────────────────────────────────┐ │
-│  │  Fan-Out Executor  ·  Semaphore bulkhead  ·  Virtual threads           │ │
-│  │  ┌───────────────────────────┐  ┌─────────────────────────────────┐   │ │
-│  │  │  HTTP Adapter             │  │  MCP Adapter                    │   │ │
-│  │  │  Wealth Management agents │  │  Asset Servicing agents         │   │ │
-│  │  │  FastAPI · OpenAPI-driven │  │  FastMCP · SSE transport        │   │ │
-│  │  └───────────────────────────┘  └─────────────────────────────────┘   │ │
-│  └────────────────────────────────────────────────────────────────────────┘ │
-│                               ↓                                             │
-│  ┌────────────────────────────────────────────────────────────────────────┐ │
-│  │  Synthesizer  ·  Z.AI GLM streaming  ·  Grounding check               │ │
-│  │  Agent outputs are DATA, not instructions. Every number verified.      │ │
-│  └────────────────────────────────────────────────────────────────────────┘ │
-│                                                                             │
-│  Cross-cutting: Resilience4j circuit breakers  ·  OTel spans  ·  Micrometer│
-└──────────┬────────────────┬───────────────────────┬────────────────────────┘
-           │                │                       │
-           ▼                ▼                       ▼
-    Redis Stack        Cerbos PDP             IAM Service
-    Vector index       ABAC policies          OIDC provider
-    Agent registry     Agent + IAM            JWT · JWKS
-    Session context    resource policies      Users · Roles
-    Auth cache         Derived roles          Audit log
-```
+Four things, all live, all on the same stack:
+
+1. **Ask the hero question** and get one grounded answer fanned out across HTTP + MCP agents.
+2. **Kill an agent mid-question** and watch the answer still come back — honestly stating what's
+   missing.
+3. **Ask about a client you don't cover** and watch it get denied *before* any data is fetched.
+4. **Ask something ambiguous** and get a scoped clarifying question instead of a hallucination.
+
+Every one of these is **visible end-to-end** — in the chat, in the live glass-box, in the traces,
+and in the quality scores.
 
 ---
 
-## Components
-
-### Gateway (`gateway/`) — Java 21 · Spring Boot 3.5
-The brain. Receives the chat message and orchestrates everything.
-
-| Layer | What it does |
-|---|---|
-| Intent Classifier | Single LLM call: classify + extract entities simultaneously |
-| Capability Resolver | Vector search (DJL + MiniLM-L6-v2) against agent registry in Redis |
-| Cerbos Gate | ABAC check before fan-out — role × clearance × domain segment |
-| Entity Extractor | Extract → Resolve → Bind: human names become canonical IDs, never guessed |
-| Protocol Adapters | `HttpAdapter` (OpenAPI-driven) + `McpAdapter` (MCP Java SDK) |
-| Harness | Dual Semaphore bulkhead + virtual threads + Resilience4j circuit breaker per agent |
-| Synthesizer | Z.AI GLM streaming; agent outputs are delimited DATA; numeric grounding check |
-| Glass-box | OTel spans → SSE stream → live panel in the browser |
-
-### IAM Service (`iam-service/`) — Java 21 · Spring Boot 3.5
-A standalone, multi-tenant Identity and Access Management service. Replaceable with any OIDC provider in production.
-
-- **Spring Authorization Server** — full OIDC: JWT issuance, JWKS endpoint, discovery document
-- **Virtual threads** (not reactive) — Spring MVC + blocking JPA, same concurrency without the complexity
-- **No Redis for JWT** — RS256 validation is stateless; JWKS cached in-memory
-- **Product RBAC** — `platform_admin`, `tenant_admin`, `domain_admin`, `policy_author`, `policy_approver`, `auditor`, `member`
-- **Cerbos self-authorization** — the IAM service uses Cerbos (`resource: iam-resource`) to authorize its own API operations
-- **Immutable audit log** — every write recorded with before/after state; `UPDATE`/`DELETE` revoked at DB level
-- **Flyway migrations** — V1 schema + V2 demo seed data
-
-### Mock Agents (`mock-agents/`)
-Stand-ins for real domain-team services. Return canned data keyed by `relationship_id`. Support fault knobs for resilience demos.
-
-**Wealth Management** (HTTP / FastAPI · port 8090)
-| Agent | What it returns |
-|---|---|
-| `holdings` | Portfolio positions, allocations, asset class breakdown |
-| `performance` | Returns vs. benchmark, time-weighted, attribution |
-| `goal-planning` | Progress toward retirement/education goals |
-| `risk-profile` | VaR, Sharpe ratio, drawdown, concentration risks |
-
-**Asset Servicing** (MCP / FastMCP · SSE transport · port 8091)
-| Agent | What it returns |
-|---|---|
-| `custody` | Custodian breakdown, account structures |
-| `settlements` | Pending and recent settlement instructions |
-| `corporate-actions` | Dividends, splits, rights issues |
-| `cash` | Cash balances, sweeps, currency positions |
-| `nav` | Net Asset Values for fund-linked portfolios |
-
-### Authorization (`infra/cerbos/policies/`)
-Five Cerbos resource policies, all using derived roles — no inline CEL in rules.
-
-| Policy file | Governs |
-|---|---|
-| `agent_resource.yaml` | Who can invoke which agent class (role × domain × clearance) |
-| `relationship_resource.yaml` | Personal entitlement checks (RM's book) |
-| `domain_resource.yaml` | Domain admin operations |
-| `iam_derived_roles.yaml` | Reusable derived roles for IAM self-authz |
-| `iam_resource.yaml` | IAM API self-authorization (create users, deploy policies, etc.) |
-
-### Admin UI (`admin-ui/`) — React · TypeScript · Tailwind CSS
-A real enterprise IAM console served at `localhost:5180`.
-
-| Page | What you see |
-|---|---|
-| Dashboard | Live stats (users, roles, teams, policies) + recent activity feed |
-| Users | All principals with classification badges, role assignments, relationship books |
-| Teams | Groups with domain scoping and member management |
-| Roles | Role definitions with permission sets |
-| Policies | Policy lifecycle — Draft → Approved → Deployed |
-| Audit Log | Immutable audit trail, before/after state, filterable, exportable |
-
-### Glass-box (`glassbox/`)
-A standalone HTML/JS page at `localhost:8080/glassbox` that subscribes to the gateway's `/trace/stream` SSE endpoint and renders the live decision tree: which agents were selected, which denied, per-agent latency, the authorization verdict, synthesis timing.
-
----
-
-## Prerequisites
-
-| Tool | Version | Why |
-|---|---|---|
-| Docker + Compose v2 | Docker 24+ | All services run in containers |
-| JDK | 21+ | Gateway + IAM service (25 preferred — JEP-491 removes virtual-thread pinning) |
-| Maven | 3.9+ | Builds gateway and IAM service |
-| Python | 3.11+ | Mock agents (FastAPI + FastMCP) |
-| Node | 20+ | Admin UI + Playwright tests |
-
----
-
-## Quick Start
+## Spin it up
 
 ```bash
-# 1. Copy env file and set your Z.AI API key
-cp .env.example .env
-# Set ZAI_API_KEY in .env
-
-# 2. Build the Java services
-cd gateway  && mvn clean package -DskipTests -q && cd ..
-cd iam-service && mvn clean package -DskipTests -q && cd ..
-
-# 3. Start the core stack
-docker compose up -d --build
-
-# 4. Wait for all services to be healthy
-./scripts/wait-for-healthy.sh
-
-# 5. Open everything
-open http://localhost:3080   # Meridian chat UI (LibreChat)
-open http://localhost:5180   # Admin UI
-open http://localhost:8080/glassbox  # Live trace panel
+cp .env.example .env          # then set MERIDIAN_LLM_SYNTHESIZER_API_KEY (an OpenAI key)
+docker compose up -d          # core stack
+bash scripts/seed-users.sh    # demo identities (rm_jane, uw_sam, …)
+docker compose --profile eval up -d eval-worker   # optional: continuous quality scoring
 ```
 
-Default credentials (from seed data):
-| Username | Password | Role |
-|---|---|---|
-| `admin` | `Meridian@2024` | Platform Admin |
-| `rm_jane` | `Meridian@2024` | Relationship Manager |
-| `rm_carlos` | `Meridian@2024` | Senior RM |
-| `auditor` | `Meridian@2024` | Compliance Auditor |
-| `policy_author` | `Meridian@2024` | Policy Author |
-| `policy_approver` | `Meridian@2024` | CISO / Policy Approver |
+Then take the guided tour below. (Full reference — every port, login, and the exact demo
+prompts — is in [`docs/OPERATOR-RUNBOOK.md`](docs/OPERATOR-RUNBOOK.md).)
 
 ---
 
-## Services
+## The guided tour — open these, here's what to look at
 
-| Service | URL | What it is |
-|---|---|---|
-| Meridian Chat | http://localhost:3080 | LibreChat, Meridian-branded |
-| Admin UI | http://localhost:5180 | IAM console |
-| Gateway API | http://localhost:8080 | OpenAI-compatible endpoint |
-| Gateway Health | http://localhost:8080/actuator/health | |
-| IAM Service | http://localhost:8084 | OIDC provider + user management |
-| IAM JWKS | http://localhost:8084/.well-known/jwks.json | Public key set |
-| OIDC Discovery | http://localhost:8084/.well-known/openid-configuration | |
-| Wealth Agents | http://localhost:8090 | FastAPI HTTP agents + OpenAPI spec |
-| Servicing Agents | http://localhost:8091 | FastMCP SSE agents |
-| Cerbos PDP | http://localhost:3592 | Authorization policy decision point |
-| Redis Stack | http://localhost:8001 | RedisInsight dev UI |
-| Glass-box | http://localhost:8080/glassbox | Live trace panel |
+### 1. The chat — LibreChat → http://localhost:3080
+*Log in as `rm_jane` / `Meridian@2024`.* This is what the banker uses.
+**Try:** *"Give me a complete overview of the Whitman relationship: holdings, performance,
+settlement status, and cash position."*
+**Look for:** one streamed answer where every number (portfolio value, allocations, the
+settlement, cash) is real — pulled from the agents, nothing invented. Then ask a follow-up
+("*which holding is largest, and how much cash is unsettled?*") — it answers from memory without
+you restating the client.
 
----
+### 2. The decision — Glass-Box → http://localhost:4000
+Open it beside the chat; confirm the top-right says **"Connected"**, then send a prompt.
+**Look for** the six stages light up live:
+1. **Request Received** — the raw question
+2. **Intent Classification** — fetch-data, with confidence
+3. **Agent Routing** — which agents were selected (with scores) **and which were not**
+4. **Entitlement Gate** — ALLOWED / DENIED, with the resolved entity
+5. **Agent Fan-out** — each agent, **HTTP or MCP**, with its own latency, green ✓ or red ✗
+6. **Answer Synthesis** — streamed to the client
+…ending in a summary (total latency, *N/M agents succeeded*). This is the trust surface — the
+"why did it answer that" story for compliance.
 
-## The Demo
+### 3. The traces & quality — Langfuse → http://localhost:3030
+*Log in as `admin@meridian.bank` / `changeme`.*
+- **Tracing → Sessions:** your conversation is one **session**; each turn is a **trace** under it
+  (1 conversation → many traces). Open a trace to see the prompt (input) **and** the answer
+  (output), plus the child spans for each agent call (HTTP + MCP) with timings and token usage.
+- **Scores (on each trace):** if the eval worker is running, you'll see **grounding**,
+  **partial_honesty**, **relevance**, and **safety** — posted automatically every few minutes by
+  the continuous evaluator. This is "is the answer actually good?", measured, not assumed.
+- **Datasets / Experiments:** the release gate (DeepEval, run via `scripts/eval-gate.sh`) scores
+  routing accuracy + faithfulness against golden datasets — the pre-ship certification, separate
+  from the always-on scoring.
 
-### Hero prompt
-Type this in the Meridian chat (as `rm_jane`):
-
-```
-What is the current portfolio allocation and any pending settlements for Jane Whitman?
-```
-
-**What happens:**
-- Routes to ~7 agents across HTTP (Wealth) and MCP (Asset Servicing)
-- Returns one grounded answer with allocation percentages and settlement references
-- Glass-box shows the routing decision, per-agent latency, and authorization verdict
-
-### The authorization story
-`rm_jane` has REL-00042 (Whitman) and REL-00099 (Calderon Trust) in her book.
-She does **not** have REL-00188 (Okafor Family Account) — that's Carlos's client.
-
-```
-"Tell me about the Okafor account."
-```
-
-The gateway resolves "Okafor" → REL-00188 → checks the domain authorization contract → denied. The glass-box shows the prune decision. Jane never sees Okafor's data.
-
-### Resilience demo
-```bash
-# Kill the settlements agent mid-request
-curl "http://localhost:8091/fault?agent=settlements&fail=true"
-
-# Ask the hero prompt again
-# → Answer still returns, explicitly states settlement data is unavailable
-# → Glass-box shows the failed node
-```
-
-### Policy lifecycle demo
-1. Open Admin UI → Policies
-2. See `restricted-trading-policy` in **Draft** state (Emma Watson is authoring it)
-3. See `compliance-access-policy` in **Approved** state (waiting for James Kim to deploy)
-4. See `wealth-agent-policy` in **Deployed** state (live, enforced by Cerbos)
-
----
-
-## Authorization Model
-
-Seven authorization points, applied in order on every request:
-
-```
-1. JWT validation          — RS256 signature, expiry, issuer (IAM Service)
-2. Structural RBAC         — role × agent class × domain segment (Cerbos)
-3. Clearance gate          — principal.classification >= agent.min_classification (Cerbos derived role)
-4. Domain scope filter     — RM's segment must include the agent's domain
-5. Personal entitlement    — live call to domain authorization contract (not cached in JWT)
-6. Entity binding          — zero fabricated IDs; unresolved reference → clarification, not guess
-7. Response grounding      — every number in synthesis must appear in an agent output
-```
-
-**Two Cerbos resource types, one sidecar:**
-- `resource: agent` — gateway routing authorization
-- `resource: iam-resource` — IAM service self-authorization (create users, deploy policies, etc.)
-
----
-
-## The IAM Service
-
-The IAM service (`iam-service/`) is designed to be **reusable across any enterprise tenant** — not specific to banking.
-
-| Feature | Detail |
+### 4. The metrics, logs & distributed traces — Grafana → http://localhost:3000
+*Log in as `admin` / `changeme`.* Dashboards (left nav → Dashboards):
+| Dashboard | What it shows |
 |---|---|
-| OIDC provider | Spring Authorization Server — JWKS, discovery, authorization code, client credentials |
-| Multi-tenant | One IAM instance serves multiple tenants; policies namespaced by `tenant_id` |
-| Classification tiers | Tenant-defined named tiers (`public → internal → confidential → restricted`); not hardcoded numbers |
-| Product RBAC | IAM uses Cerbos to authorize its own API — same pattern as the gateway |
-| Audit trail | Immutable Postgres table; `UPDATE`/`DELETE` revoked at DB level; before/after state on every write |
-| Domain agnostic | `attributes JSONB` on principal; `personal_resources` table replaces hardcoded "book" concept |
+| **Meridian — Live Demo View** | the at-a-glance demo panel |
+| **Meridian Gateway — Performance** | request rate, success rate, **p50/p95/p99 latency**, outbound agent-call latency |
+| **Meridian — Agent Health** | per-agent success/error rates and latency (spot a failing agent) |
+| **Meridian — Business Overview** | intents, domains, cost-by-domain |
+| **Meridian — Conversation Trace Explorer** | drill a single conversation across the stack |
+| **Meridian — Resource Usage** | JVM CPU / memory |
 
-Hospital would use `patient` resources. Law firm would use `matter` resources. The table is the same.
+- **Logs (Loki):** Explore → Loki → query `{container="meridian-gateway"}`. The gateway logs the
+  conversation id it derived (`conv-…`); grab it and filter by it to follow one conversation's
+  logs. *(Tip: click "Run query" twice on first load if a panel says "No data".)*
+- **Distributed traces (Tempo):** Explore → Tempo → search recent traces to see the same request
+  as a span waterfall (gateway → each agent), complementary to the glass-box.
 
 ---
 
-## Tech Stack
+## How the end-to-end works (in one breath)
 
-| Concern | Technology |
+`question → intent + entity extraction (no invented IDs) → semantic route → entitlement prune
+(structural + book-of-business) → parallel fan-out over HTTP + MCP (virtual threads, circuit
+breakers) → grounded synthesis → streamed answer`, with OTel spans + glass-box events emitted
+throughout and quality scored asynchronously. The full lifecycle is in
+[`docs/PROJECT-OVERVIEW.md` §3](docs/PROJECT-OVERVIEW.md).
+
+---
+
+## Onboard a new business
+
+The whole point of World B: add a domain with **no gateway code**. The step-by-step (with file
+templates) is in [`registry/README.md`](registry/README.md).
+
+---
+
+## Documentation map
+
+| Doc | Read it for |
 |---|---|
-| Gateway runtime | Java 21 · Spring Boot 3.5 · Virtual threads |
-| IAM service | Java 21 · Spring Boot 3.5 · Spring Authorization Server 1.3 · JPA · Flyway |
-| Mock agents (HTTP) | Python 3.11 · FastAPI · uvicorn (auto-serves OpenAPI spec) |
-| Mock agents (MCP) | Python 3.11 · FastMCP · SSE transport |
-| Routing + state | Redis Stack — RediSearch HNSW vector index + RedisJSON |
-| Embeddings | DJL + `all-MiniLM-L6-v2` (in-JVM, 384-dim, no external API) |
-| LLM | Z.AI GLM-4.6 — OpenAI-compatible, 200K context, function-calling, streaming |
-| Authorization | Cerbos PDP sidecar — ABAC, derived roles, CEL conditions |
-| Identity | Spring Authorization Server (RS256 JWT, JWKS, OIDC discovery) |
-| Resilience | Resilience4j circuit breaker + dual Semaphore bulkhead |
-| Telemetry | Micrometer + OpenTelemetry — feeds the glass-box panel |
-| Admin UI | React · TypeScript · Tailwind CSS · Vite |
-| E2E tests | Playwright (Chromium, headless) |
-| Load tests | k6 |
-| Orchestration | Docker Compose v2 |
+| [`docs/PROJECT-OVERVIEW.md`](docs/PROJECT-OVERVIEW.md) | **What the project is** — the GTM story + module-by-module map |
+| [`docs/OPERATOR-RUNBOOK.md`](docs/OPERATOR-RUNBOOK.md) | **Run & demo** — every URL/port/login, the four-beat script, troubleshooting |
+| [`registry/README.md`](registry/README.md) | **Onboard a new business** — the manifest structure + checklist |
+| [`docs/WORLD-B-LOCKDOWN.md`](docs/WORLD-B-LOCKDOWN.md) | The deep product/architecture spec |
+| [`docs/MODEL-SELECTION.md`](docs/MODEL-SELECTION.md) | Model / provider strategy |
+| [`BUILD_REPORT.md`](BUILD_REPORT.md) | Build status & verification record |
+| [`CLAUDE.md`](CLAUDE.md) | How an AI agent should work in this repo (invariants) |
 
 ---
 
-## Verification
+## Verify everything
 
 ```bash
-# Full automated suite: build → start → health check → API smoke → Playwright E2E
-./scripts/verify.sh
-
-# Playwright only (requires services running)
-cd e2e && npx playwright test
-
-# Gateway unit + integration tests
-cd gateway && mvn test
-
-# IAM service tests
-cd iam-service && mvn test
-
-# Mock agent tests (Python)
-cd mock-agents && pytest tests/ -v
+./scripts/verify.sh            # build → up → smoke → e2e → eval (world-b-check is a hard gate)
+bash scripts/world-b-check.sh  # the "no domain knowledge in the gateway" gate → CRITICAL must be 0
 ```
-
----
-
-## Seed Data
-
-The environment seeds 8 personas, 5 groups, 3 example policies at different lifecycle stages, and 12 pre-seeded audit log entries — so every screen has real data the moment the stack starts.
-
-**The core authz story:**
-- `rm_jane` has Whitman (REL-00042) + Calderon Trust (REL-00099)
-- `rm_carlos` has Whitman (shared) + **Okafor** (REL-00188) + Sterling Capital
-- Ask as Jane about Okafor → denied, shown in glass-box
-- Ask as Carlos about Okafor → allowed
-
-**Policy lifecycle already populated:**
-- `wealth-agent-policy` — Deployed (live)
-- `compliance-access-policy` — Approved (awaiting deploy)
-- `restricted-trading-policy` — Draft (Emma Watson's work in progress)
-
----
-
-## Scale Profile (Phase 7)
-
-```bash
-# Adds Prometheus, Grafana, OTel collector, k6
-docker compose --profile scale up -d
-open http://localhost:3000   # Grafana (admin / meridian)
-open http://localhost:9090   # Prometheus
-```
-
----
-
-## Repository Layout
-
-```
-/
-├── gateway/          Java — ingress, resolver, synthesis, harness, adapters, telemetry
-├── iam-service/      Java — OIDC provider, user management, product RBAC, audit log
-├── mock-agents/
-│   ├── wealth/       Python FastAPI — 4 HTTP agents (holdings, performance, goals, risk)
-│   └── servicing/    Python FastMCP — 5 MCP agents (custody, settlements, CA, cash, nav)
-├── admin-ui/         React/TS — IAM console (users, roles, teams, policies, audit log)
-├── glassbox/         Standalone HTML/JS — live trace panel
-├── infra/
-│   ├── cerbos/       5 Cerbos policy files
-│   └── ...
-├── registry/         Agent manifests + JSON schema
-├── e2e/              Playwright tests
-├── eval/             DeepEval + Langfuse evaluation scripts
-├── loadtest/         k6 scripts
-├── docs/             Architecture specs, authz model, domain manifest design
-├── phases/           Build phase files (loop protocol)
-├── scripts/          verify.sh, wait-for-healthy.sh
-├── docker-compose.yml
-├── .env.example
-└── BUILD_REPORT.md   Per-phase status + what to run at each human test gate
-```
-
----
-
-## Documentation
-
-| Doc | What it covers |
-|---|---|
-| `docs/authorization-model.md` | The 7-point authorization model, industry examples, ASCII diagrams |
-| `docs/authz-architecture-brief.md` | Architecture decisions — Cerbos vs OpenFGA, IAM schema design |
-| `docs/clearance-tiers-and-agent-metadata.md` | Classification tier design, two-place rule, Cerbos derived roles |
-| `docs/domain-manifest-and-memory.md` | Domain manifest schema, session context, memory compaction |
-| `docs/input-synthesis-deep-spec.md` | Extract → Resolve → Bind — zero fabricated identifiers |
-| `docs/execution-orchestration-layer.md` | Plan model, executor, harness composition |
-| `docs/harness-and-telemetry-deep-spec.md` | Per-call harness pipeline, OTel spans, glass-box events |
-| `BUILD_REPORT.md` | Current build status, what passes, what to run at each gate |
-
----
-
-Built with Java 21 + Spring Boot 3.5 · Python 3.11 · React · Redis Stack · Cerbos · Z.AI GLM · Docker Compose

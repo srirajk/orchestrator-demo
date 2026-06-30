@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-30T00:14:07.748Z
-> Files: 650 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-30T00:32:57.377Z
+> Files: 652 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/
 
@@ -21,10 +21,10 @@
 - `.DS_Store` (~1640 tok)
 - `.gitignore` — Git ignore rules (~483 tok)
 - `agent-manifest.schema.json` (~1558 tok)
-- `BUILD_REPORT.md` — Build Report — Meridian AI Gateway (~15724 tok)
-- `CLAUDE.md` — OpenWolf (~6447 tok)
+- `BUILD_REPORT.md` — Build Report — Meridian AI Gateway (~1027 tok)
+- `CLAUDE.md` — OpenWolf (~1698 tok)
 - `docker-compose.yml` — Docker Compose services (~8283 tok)
-- `README.md` — Project documentation (~4696 tok)
+- `README.md` — Project documentation (~1779 tok)
 - `z.ai-tiers.md` — Declares Model (~778 tok)
 
 ## .claude/
@@ -270,9 +270,10 @@
 - `MODEL-SELECTION.md` — Model Selection Guide — Meridian AI Gateway (~2289 tok)
 - `OPERATOR-RUNBOOK.md` — Meridian Gateway — Operator & Demo Runbook (~3447 tok)
 - `platform-vision-and-maturity-path.md` — Enterprise Intelligence Platform — Vision & Maturity Path (~1324 tok)
+- `PROJECT-OVERVIEW.md` — Meridian — Project Overview (~2932 tok)
 - `PROMPT-AUDIT.md` — Prompt Contract Audit — every production prompt vs the 9-element framework (~1931 tok)
 - `technical-architecture-clear-boundaries.md` — Technical Architecture — Clear Boundaries (~1990 tok)
-- `WORLD-B-LOCKDOWN.md` — Meridian — World B Architecture Lockdown (~8919 tok)
+- `WORLD-B-LOCKDOWN.md` — Meridian — World B Architecture Lockdown (~8941 tok)
 
 ## e2e/
 
@@ -1083,6 +1084,7 @@
 ## registry/
 
 - `agent-manifest.schema.json` (~1714 tok)
+- `README.md` — Project documentation (~1705 tok)
 
 ## registry/domains/
 

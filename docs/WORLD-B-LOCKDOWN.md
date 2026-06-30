@@ -7,10 +7,11 @@
 > a full audit of the running gateway plus a deep design review. If it is not in this doc,
 > it is not part of the World B commitment.
 >
-> **Companion canonical docs:** `gateway-domain-architecture.md` (architecture),
-> `domain-onboarding-standard.md` (the contract domain teams implement),
-> `implementation-checklist.md` (the build checklist). This doc sits **above** those three:
-> it is the strategy and the lockdown; they are the mechanics.
+> **Companion canonical docs:** [`PROJECT-OVERVIEW.md`](PROJECT-OVERVIEW.md) (what the project is +
+> module map), `gateway-domain-architecture.md` (architecture), `domain-onboarding-standard.md`
+> and [`../registry/README.md`](../registry/README.md) (the onboarding contract domain teams
+> implement). This doc sits **above** those: it is the strategy and the lockdown; they are the
+> mechanics.
 
 ---
 
