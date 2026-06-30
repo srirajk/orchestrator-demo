@@ -11,10 +11,10 @@
         <relativePath/>
     </parent>
 
-    <groupId>ai.meridian</groupId>
+    <groupId>ai.conduit</groupId>
     <artifactId>gateway</artifactId>
     <version>0.1.0-SNAPSHOT</version>
-    <name>Meridian AI Gateway</name>
+    <name>conduit AI Gateway</name>
     <description>Enterprise AI Gateway — OpenAI-compatible ingress, multi-protocol agent orchestration</description>
 
     <properties>

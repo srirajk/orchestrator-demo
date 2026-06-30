@@ -49,7 +49,7 @@ exporters:
   # Metrics → Prometheus (scraped from :8889/metrics)
   prometheus:
     endpoint: "0.0.0.0:8889"
-    namespace: meridian
+    namespace: conduit
 
   # Logs → debug only (Promtail handles Docker→Loki log shipping directly)
   debug:

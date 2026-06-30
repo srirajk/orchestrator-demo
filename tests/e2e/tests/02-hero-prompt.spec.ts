@@ -43,14 +43,14 @@ test.describe('Hero prompt', () => {
     expect(resp.status()).toBe(200);
     const body = await resp.json();
     const ids: string[] = body.data?.map((m: { id: string }) => m.id) ?? [];
-    expect(ids).toContain('meridian-assistant');
+    expect(ids).toContain('conduit-assistant');
   });
 
   test('streaming SSE is well-formed (ends with [DONE])', async ({ request }) => {
     const resp = await request.post(`${GATEWAY_URL}/v1/chat/completions`, {
       headers: { 'Content-Type': 'application/json' },
       data: {
-        model:    'meridian-assistant',
+        model:    'conduit-assistant',
         messages: [{ role: 'user', content: 'hello' }],
         stream:   true,
       },

@@ -1,5 +1,5 @@
 {
-  "name": "meridian-e2e",
+  "name": "conduit-e2e",
   "version": "1.0.0",
   "private": true,
   "description": "Playwright E2E tests for Meridian AI gateway and LibreChat UI",

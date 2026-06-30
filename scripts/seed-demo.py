@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Meridian Gateway — Demo Seed Script
+Conduit Gateway — Demo Seed Script
 
 Fires representative requests at startup so Phoenix and Tempo are pre-populated
 with real LLM traces. Each request carries a fixed conversation_id so Phoenix's
@@ -48,7 +48,7 @@ def mint_token(user_id: str) -> str:
 def chat(prompt: str, token: str, conv_id: str, turn_label: str) -> str:
     """Fire a single chat request and return the full response text."""
     payload = json.dumps({
-        "model": "meridian",
+        "model": "conduit",
         "stream": True,
         "messages": [{"role": "user", "content": prompt}],
     }).encode()
@@ -98,7 +98,7 @@ def chat(prompt: str, token: str, conv_id: str, turn_label: str) -> str:
 def chat_multi(messages: list, token: str, conv_id: str, turn_label: str) -> str:
     """Fire a multi-turn chat request with explicit message history."""
     payload = json.dumps({
-        "model": "meridian",
+        "model": "conduit",
         "stream": True,
         "messages": messages,
     }).encode()
@@ -164,7 +164,7 @@ def wait_for_gateway(max_wait: int = 120) -> bool:
 
 def main():
     print("=" * 60, flush=True)
-    print("Meridian Gateway — Phoenix/Tempo seed", flush=True)
+    print("Conduit Gateway — Phoenix/Tempo seed", flush=True)
     print("=" * 60, flush=True)
 
     if not wait_for_gateway():
@@ -258,7 +258,7 @@ def main():
     print("  → Projects → default → Sessions tab", flush=True)
     print("  → Filter by session.id to see each conversation", flush=True)
     print("Open Tempo at http://localhost:3000 (Grafana → Explore → Tempo)", flush=True)
-    print("  → Search by service=meridian-gateway, tag session.id=seed-hero-001", flush=True)
+    print("  → Search by service=conduit-gateway, tag session.id=seed-hero-001", flush=True)
     print("=" * 60, flush=True)
 
 

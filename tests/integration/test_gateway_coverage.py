@@ -104,7 +104,7 @@ def chat(
         "X-Conversation-Id": conv_id,
     }
     body = {
-        "model": "meridian-assistant",
+        "model": "conduit-assistant",
         "messages": messages,
         "stream": True,
     }
@@ -154,7 +154,7 @@ def test_8_unauthenticated_request_rejected():
         f"{GATEWAY_URL}/v1/chat/completions",
         headers={"Content-Type": "application/json"},
         json={
-            "model": "meridian-assistant",
+            "model": "conduit-assistant",
             "messages": [{"role": "user", "content": "Show my portfolio"}],
             "stream": True,
         },

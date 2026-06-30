@@ -1,14 +1,14 @@
 /**
- * Meridian Gateway — Lightweight k6 Load Test (demo / CI)
+ * Conduit Gateway — Lightweight k6 Load Test (demo / CI)
  * Max 10 VUs, 2 minutes total. Measures TTFT p95 and error rate.
  */
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { Trend, Rate } from 'k6/metrics';
 
-const ttft       = new Trend('meridian_ttft_ms', true);
-const streamTime = new Trend('meridian_stream_ms', true);
-const errorRate  = new Rate('meridian_error_rate');
+const ttft       = new Trend('conduit_ttft_ms', true);
+const streamTime = new Trend('conduit_stream_ms', true);
+const errorRate  = new Rate('conduit_error_rate');
 
 export const options = {
   scenarios: {
@@ -23,9 +23,9 @@ export const options = {
     },
   },
   thresholds: {
-    meridian_ttft_ms:   ['p(95)<8000'],
-    meridian_stream_ms: ['p(95)<30000'],
-    meridian_error_rate:['rate<0.10'],
+    conduit_ttft_ms:   ['p(95)<8000'],
+    conduit_stream_ms: ['p(95)<30000'],
+    conduit_error_rate:['rate<0.10'],
   },
 };
 
@@ -41,7 +41,7 @@ const GATEWAY_URL = __ENV.GATEWAY_URL || 'http://localhost:8080';
 export default function () {
   const prompt = PROMPTS[__VU % PROMPTS.length];
   const payload = JSON.stringify({
-    model: 'meridian-assistant',
+    model: 'conduit-assistant',
     stream: true,
     messages: [{ role: 'user', content: prompt }],
   });

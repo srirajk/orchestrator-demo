@@ -19,7 +19,7 @@ except ImportError:
     _OI_AVAILABLE = False
 
 OTEL_ENDPOINT = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector:4318")
-SERVICE_NAME = os.getenv("OTEL_SERVICE_NAME", "meridian-servicing-mcp")
+SERVICE_NAME = os.getenv("OTEL_SERVICE_NAME", "conduit-servicing-mcp")
 
 provider = TracerProvider()
 exporter = OTLPSpanExporter(endpoint=f"{OTEL_ENDPOINT}/v1/traces")

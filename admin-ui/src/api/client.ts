@@ -1,7 +1,7 @@
 const BASE = '/api'
 
 function token(): string {
-  return localStorage.getItem('meridian_admin_token') || ''
+  return localStorage.getItem('conduit_admin_token') || ''
 }
 
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {

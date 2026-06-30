@@ -7,7 +7,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 echo ""
 echo "═══════════════════════════════════════════════════════════════════════"
-echo "  Meridian Gateway — Verify Script"
+echo "  Conduit Gateway — Verify Script"
 echo "═══════════════════════════════════════════════════════════════════════"
 
 # ── Phase 1: unit tests ───────────────────────────────────────────────────────
@@ -30,13 +30,13 @@ echo "▶  [3/3] API smoke tests..."
 
 # /v1/models
 MODELS=$(curl -sf http://localhost:8080/v1/models)
-echo "$MODELS" | grep -q '"id":"meridian-assistant"'
-echo "   ✅  GET /v1/models → meridian-assistant found"
+echo "$MODELS" | grep -q '"id":"conduit-assistant"'
+echo "   ✅  GET /v1/models → conduit-assistant found"
 
 # /v1/chat/completions — check SSE stream contains [DONE]
 STREAM=$(curl -sf -X POST http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -d '{"model":"meridian-assistant","messages":[{"role":"user","content":"hello"}],"stream":true}' \
+  -d '{"model":"conduit-assistant","messages":[{"role":"user","content":"hello"}],"stream":true}' \
   --max-time 15)
 
 echo "$STREAM" | grep -q '\[DONE\]'

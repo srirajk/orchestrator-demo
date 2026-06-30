@@ -12,7 +12,7 @@ fail() { echo "  ❌  $1"; (( FAIL++ )) || true; }
 
 echo ""
 echo "═══════════════════════════════════════════════════════════════"
-echo "  Meridian Gateway — Integration Tests  (${GATEWAY})"
+echo "  Conduit Gateway — Integration Tests  (${GATEWAY})"
 echo "═══════════════════════════════════════════════════════════════"
 
 # ── 1. Actuator health ────────────────────────────────────────────────────────
@@ -36,16 +36,16 @@ else
   fail "Response missing object=list: $MODELS"
 fi
 
-if echo "$MODELS" | grep -q '"id":"meridian-assistant"'; then
-  ok "meridian-assistant model present"
+if echo "$MODELS" | grep -q '"id":"conduit-assistant"'; then
+  ok "conduit-assistant model present"
 else
-  fail "meridian-assistant not found in models: $MODELS"
+  fail "conduit-assistant not found in models: $MODELS"
 fi
 
-if echo "$MODELS" | grep -q '"owned_by":"meridian"'; then
-  ok "owned_by = meridian"
+if echo "$MODELS" | grep -q '"owned_by":"conduit"'; then
+  ok "owned_by = conduit"
 else
-  fail "owned_by not meridian: $MODELS"
+  fail "owned_by not conduit: $MODELS"
 fi
 
 # ── 3. Chat completions — SSE format ─────────────────────────────────────────
@@ -53,7 +53,7 @@ echo ""
 echo "▶ 3. POST /v1/chat/completions (SSE stream)"
 SSE=$(curl -sf -X POST "${GATEWAY}/v1/chat/completions" \
   -H "Content-Type: application/json" \
-  -d '{"model":"meridian-assistant","messages":[{"role":"user","content":"hello meridian"}],"stream":true}' \
+  -d '{"model":"conduit-assistant","messages":[{"role":"user","content":"hello conduit"}],"stream":true}' \
   --max-time 20)
 
 if echo "$SSE" | grep -q '^data:'; then
@@ -99,7 +99,7 @@ echo ""
 echo "▶ 4. Auto-title short-circuit"
 TITLE_SSE=$(curl -sf -X POST "${GATEWAY}/v1/chat/completions" \
   -H "Content-Type: application/json" \
-  -d '{"model":"meridian-assistant","messages":[{"role":"user","content":"Generate a concise title for this conversation"}],"stream":true}' \
+  -d '{"model":"conduit-assistant","messages":[{"role":"user","content":"Generate a concise title for this conversation"}],"stream":true}' \
   --max-time 10)
 
 if echo "$TITLE_SSE" | grep -q 'data:\[DONE\]'; then
@@ -119,7 +119,7 @@ echo ""
 echo "▶ 5. Extra LibreChat params are ignored gracefully"
 EXTRA=$(curl -sf -o /dev/null -w "%{http_code}" -X POST "${GATEWAY}/v1/chat/completions" \
   -H "Content-Type: application/json" \
-  -d '{"model":"meridian-assistant","messages":[{"role":"user","content":"test"}],"stream":true,"stop":null,"frequency_penalty":0,"presence_penalty":0}' \
+  -d '{"model":"conduit-assistant","messages":[{"role":"user","content":"test"}],"stream":true,"stop":null,"frequency_penalty":0,"presence_penalty":0}' \
   --max-time 10)
 
 if [[ "$EXTRA" == "200" ]]; then

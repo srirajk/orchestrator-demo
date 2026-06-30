@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Seed Langfuse datasets from eval/golden-prompts.json.
-Run once (idempotent) to create the meridian-routing dataset in Langfuse.
+Run once (idempotent) to create the conduit-routing dataset in Langfuse.
 After running: open Langfuse UI → Datasets to see all items.
 Then run langfuse_run_experiment.py to run your first experiment.
 """
@@ -18,7 +18,7 @@ Then run langfuse_run_experiment.py to run your first experiment.
 #   comparison. See: langfuse_run_experiment.py
 #
 # HOW TO COMPARE IN THE UI:
-#   Datasets → select "meridian-routing" → Runs tab → click any 2 runs → Compare.
+#   Datasets → select "conduit-routing" → Runs tab → click any 2 runs → Compare.
 #   Each item shows its score per run so you can spot regressions.
 #
 # SCORES:
@@ -242,7 +242,7 @@ def ensure_dataset(lf, name: str, description: str):
 
 
 def seed_routing_dataset(lf) -> int:
-    """Seed the meridian-routing dataset from golden-prompts.json. Returns item count."""
+    """Seed the conduit-routing dataset from golden-prompts.json. Returns item count."""
     with open(GOLDEN_PROMPTS_PATH, "r") as f:
         data = json.load(f)
 
@@ -253,7 +253,7 @@ def seed_routing_dataset(lf) -> int:
 
     ensure_dataset(
         lf,
-        name="meridian-routing",
+        name="conduit-routing",
         description="Golden routing prompts for gateway eval — expected_agents reflects realistic multi-agent banking queries",
     )
 
@@ -262,7 +262,7 @@ def seed_routing_dataset(lf) -> int:
         item_id: str = item["id"]
         try:
             lf.create_dataset_item(
-                dataset_name="meridian-routing",
+                dataset_name="conduit-routing",
                 id=item_id,
                 input={"prompt": item["prompt"]},
                 expected_output={"expected_agents": item["expected_agents"]},
@@ -272,15 +272,15 @@ def seed_routing_dataset(lf) -> int:
         except Exception as exc:
             logger.warning("Failed to upsert item %s: %s", item_id, exc)
 
-    logger.info("Seeded %d items into dataset meridian-routing", seeded)
+    logger.info("Seeded %d items into dataset conduit-routing", seeded)
     return seeded
 
 
 def seed_synthesis_dataset(lf) -> int:
-    """Seed the meridian-synthesis dataset from hardcoded test cases. Returns item count."""
+    """Seed the conduit-synthesis dataset from hardcoded test cases. Returns item count."""
     ensure_dataset(
         lf,
-        name="meridian-synthesis",
+        name="conduit-synthesis",
         description="Synthesis pipeline test cases — grounding, partial honesty, authz denial, chitchat, entity ambiguity",
     )
 
@@ -289,7 +289,7 @@ def seed_synthesis_dataset(lf) -> int:
         item_id: str = case["id"]
         try:
             lf.create_dataset_item(
-                dataset_name="meridian-synthesis",
+                dataset_name="conduit-synthesis",
                 id=item_id,
                 input={
                     "prompt": case["input"]["prompt"],
@@ -305,7 +305,7 @@ def seed_synthesis_dataset(lf) -> int:
         except Exception as exc:
             logger.warning("Failed to upsert item %s: %s", item_id, exc)
 
-    logger.info("Seeded %d items into dataset meridian-synthesis", seeded)
+    logger.info("Seeded %d items into dataset conduit-synthesis", seeded)
     return seeded
 
 
@@ -318,8 +318,8 @@ def main() -> None:
     # Flush the async Langfuse SDK queue before exit
     lf.flush()
 
-    print(f"\nSeeded {routing_count} items into dataset meridian-routing")
-    print(f"Seeded {synthesis_count} items into dataset meridian-synthesis")
+    print(f"\nSeeded {routing_count} items into dataset conduit-routing")
+    print(f"Seeded {synthesis_count} items into dataset conduit-synthesis")
     print(f"\nOpen Langfuse UI → Datasets: {LANGFUSE_HOST}/datasets")
     print("Then run: python3 eval/langfuse_run_experiment.py --run-name <name>")
 

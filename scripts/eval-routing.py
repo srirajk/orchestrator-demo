@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-Meridian Gateway — Routing Accuracy Evaluation
+Conduit Gateway — Routing Accuracy Evaluation
 
 Runs golden prompts through the resolver and prints per-prompt F1 and overall accuracy.
 Exit code 0 = above threshold, 1 = below threshold.
 
 Usage:
-  python3 scripts/eval-routing.py [--gateway-url http://localhost:8080] [--user-mgmt-url http://localhost:8084]
+  python3 scripts/eval-routing.py [--gateway-url http://localhost:8080] [--iam-service-url http://localhost:8084]
 
 The debug/resolve endpoint requires platform_admin or domain_admin role.
-This script mints an admin JWT from user-mgmt automatically.
+This script mints an admin JWT from iam-service automatically.
 Override with --token <jwt> if the token endpoint is unavailable.
 """
 
@@ -21,7 +21,7 @@ import urllib.error
 
 
 def mint_admin_token(user_mgmt_url: str) -> str:
-    """Mint a short-lived admin JWT from the user-mgmt service."""
+    """Mint a short-lived admin JWT from the iam-service service."""
     req = urllib.request.Request(
         f"{user_mgmt_url}/auth/token",
         data=json.dumps({"user_id": "admin"}).encode(),
@@ -78,10 +78,10 @@ def f1(predicted, expected):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--gateway-url",  default="http://localhost:8080")
-    parser.add_argument("--user-mgmt-url", default="http://localhost:8084")
+    parser.add_argument("--iam-service-url", default="http://localhost:8084")
     parser.add_argument("--prompts",      default="eval/golden-prompts.json")
     parser.add_argument("--token",        default="",
-                        help="Admin JWT to use instead of auto-minting from user-mgmt")
+                        help="Admin JWT to use instead of auto-minting from iam-service")
     args = parser.parse_args()
 
     # Mint admin token if not provided

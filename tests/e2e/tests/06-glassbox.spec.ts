@@ -16,7 +16,7 @@ test.describe('Glass-box (Phase 5 M9)', () => {
     // Send a prompt to generate trace events
     const chatResp = await request.post(`${GATEWAY_URL}/v1/chat/completions`, {
       data: {
-        model:    'meridian-assistant',
+        model:    'conduit-assistant',
         messages: [{ role: 'user', content: 'hello' }],
         stream:   true,
       },

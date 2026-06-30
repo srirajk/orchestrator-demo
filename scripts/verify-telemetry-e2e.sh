@@ -44,7 +44,7 @@ AUTH=(); [ -n "$TOKEN" ] && AUTH=(-H "Authorization: Bearer $TOKEN")
 turn(){
   curl -s -N -X POST "$GATEWAY/v1/chat/completions" \
     "${AUTH[@]}" -H 'Content-Type: application/json' -H "X-Conversation-Id: $CONV" \
-    -d "{\"model\":\"meridian-assistant\",\"stream\":true,\"messages\":[{\"role\":\"user\",\"content\":\"$1\"}]}" \
+    -d "{\"model\":\"conduit-assistant\",\"stream\":true,\"messages\":[{\"role\":\"user\",\"content\":\"$1\"}]}" \
     | grep -c 'data:' >/dev/null && echo "      turn sent: $1"
 }
 echo ""; echo "[2] send two turns (same conversationId)"

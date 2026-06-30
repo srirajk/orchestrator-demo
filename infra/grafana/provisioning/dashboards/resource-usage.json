@@ -2,7 +2,7 @@
   "__inputs": [],
   "__requires": [],
   "annotations": {"list": []},
-  "description": "Meridian — per-container CPU / memory (cAdvisor) + gateway JVM heap (Micrometer)",
+  "description": "Conduit — per-container CPU / memory (cAdvisor) + gateway JVM heap (Micrometer)",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -10,7 +10,7 @@
   "links": [],
   "refresh": "10s",
   "schemaVersion": 38,
-  "tags": ["meridian", "resources", "cadvisor"],
+  "tags": ["conduit", "resources", "cadvisor"],
   "templating": {
     "list": [
       {
@@ -50,8 +50,8 @@
   "time": {"from": "now-1h", "to": "now"},
   "timepicker": {},
   "timezone": "browser",
-  "title": "Meridian — Resource Usage",
-  "uid": "meridian-resources",
+  "title": "Conduit — Resource Usage",
+  "uid": "conduit-resources",
   "version": 1,
   "panels": [
 
@@ -140,15 +140,15 @@
       "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"]}, "tooltip": {"mode": "multi"}},
       "targets": [
         {
-          "expr": "sum(jvm_memory_used_bytes{job=\"meridian-gateway\", area=\"heap\"})",
+          "expr": "sum(jvm_memory_used_bytes{job=\"conduit-gateway\", area=\"heap\"})",
           "legendFormat": "heap used"
         },
         {
-          "expr": "sum(jvm_memory_committed_bytes{job=\"meridian-gateway\", area=\"heap\"})",
+          "expr": "sum(jvm_memory_committed_bytes{job=\"conduit-gateway\", area=\"heap\"})",
           "legendFormat": "heap committed"
         },
         {
-          "expr": "sum(jvm_memory_used_bytes{job=\"meridian-gateway\", area=\"nonheap\"})",
+          "expr": "sum(jvm_memory_used_bytes{job=\"conduit-gateway\", area=\"nonheap\"})",
           "legendFormat": "nonheap used"
         }
       ],
@@ -171,11 +171,11 @@
       "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["last"]}, "tooltip": {"mode": "multi"}},
       "targets": [
         {
-          "expr": "sum(jvm_threads_live_threads{job=\"meridian-gateway\"})",
+          "expr": "sum(jvm_threads_live_threads{job=\"conduit-gateway\"})",
           "legendFormat": "live threads"
         },
         {
-          "expr": "sum(jvm_threads_daemon_threads{job=\"meridian-gateway\"})",
+          "expr": "sum(jvm_threads_daemon_threads{job=\"conduit-gateway\"})",
           "legendFormat": "daemon threads"
         }
       ],

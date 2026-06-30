@@ -7,7 +7,7 @@ TIMEOUT=${1:-120}
 INTERVAL=5
 ELAPSED=0
 
-SERVICES=(meridian-redis meridian-gateway meridian-mock-agents meridian-mongodb meridian-librechat)
+SERVICES=(conduit-redis conduit-gateway meridian-mock-agents conduit-mongodb meridian-librechat)
 
 echo "⏳  Waiting for services to become healthy (timeout: ${TIMEOUT}s)..."
 

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Run a Langfuse experiment against the meridian-routing dataset.
+"""Run a Langfuse experiment against the conduit-routing dataset.
 Usage:
   python3 eval/langfuse_run_experiment.py --run-name "glm-4.6-baseline"
   python3 eval/langfuse_run_experiment.py --run-name "glm-4.7-flash-test" --model glm-4.7-flash
   python3 eval/langfuse_run_experiment.py --run-name "dry-run-check" --dry-run
 
-After running: open Langfuse UI → Datasets → meridian-routing → Runs
+After running: open Langfuse UI → Datasets → conduit-routing → Runs
 You will see your experiment with per-item routing accuracy scores.
 Run twice with different settings to compare experiments side by side.
 """
@@ -23,7 +23,7 @@ Run twice with different settings to compare experiments side by side.
 #   model or prompt creates a new run — they do not overwrite each other.
 #
 # HOW TO COMPARE RUNS IN THE UI:
-#   Datasets → select "meridian-routing" → click the "Runs" tab.
+#   Datasets → select "conduit-routing" → click the "Runs" tab.
 #   Check any two runs → a side-by-side comparison view appears.
 #   Each dataset item shows its score in each run so regressions are obvious.
 #
@@ -140,7 +140,7 @@ def call_gateway(gateway_url: str, prompt: str, timeout: float = 30.0) -> str:
     The gateway returns an OpenAI-compatible JSON response when stream=false.
     """
     payload = {
-        "model": "meridian",
+        "model": "conduit-assistant",
         "stream": False,
         "messages": [{"role": "user", "content": prompt}],
     }
@@ -351,7 +351,7 @@ def run_experiment(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run a Langfuse experiment against the meridian-routing dataset.",
+        description="Run a Langfuse experiment against the conduit-routing dataset.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
@@ -368,8 +368,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--dataset",
-        default="meridian-routing",
-        help="Langfuse dataset name to run against (default: meridian-routing)",
+        default="conduit-routing",
+        help="Langfuse dataset name to run against (default: conduit-routing)",
     )
     parser.add_argument(
         "--gateway-url",

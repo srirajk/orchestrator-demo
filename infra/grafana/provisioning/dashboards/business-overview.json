@@ -4,7 +4,7 @@
   "annotations": {
     "list": []
   },
-  "description": "Meridian AI Gateway — executive business overview: query volume, intent routing, access control, and agent health",
+  "description": "Conduit AI Gateway — executive business overview: query volume, intent routing, access control, and agent health",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -28,7 +28,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Total number of banker chat queries handled by Meridian in the past 24 hours. Each query may fan out to multiple data agents in parallel.",
+      "description": "Total number of banker chat queries handled by Conduit in the past 24 hours. Each query may fan out to multiple data agents in parallel.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -292,7 +292,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Distribution of query intent types. FETCH_DATA = data retrieval across agents. CLARIFY = Meridian asked a follow-up question. FOLLOW_UP = continued conversation. CHITCHAT = off-topic / greeting.",
+      "description": "Distribution of query intent types. FETCH_DATA = data retrieval across agents. CLARIFY = Conduit asked a follow-up question. FOLLOW_UP = continued conversation. CHITCHAT = off-topic / greeting.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -458,7 +458,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (agentId) (increase(meridian_agent_calls_total{status=\"OK\"}[1h]))",
+          "expr": "sum by (agentId) (increase(conduit_agent_calls_total{status=\"OK\"}[1h]))",
           "legendFormat": "{{agentId}}"
         }
       ]
@@ -591,7 +591,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(meridian_authz_decisions_total{decision=\"ALLOW\"}[1h])) / sum(rate(meridian_authz_decisions_total[1h])) * 100",
+          "expr": "sum(rate(conduit_authz_decisions_total{decision=\"ALLOW\"}[1h])) / sum(rate(conduit_authz_decisions_total[1h])) * 100",
           "legendFormat": "allow %"
         }
       ]
@@ -660,7 +660,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(meridian_authz_decisions_total{source=\"cerbos\"}[1h])) / sum(rate(meridian_authz_decisions_total[1h])) * 100",
+          "expr": "sum(rate(conduit_authz_decisions_total{source=\"cerbos\"}[1h])) / sum(rate(conduit_authz_decisions_total[1h])) * 100",
           "legendFormat": "cerbos %"
         }
       ]
@@ -740,7 +740,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (decision) (rate(meridian_authz_decisions_total[1h]))",
+          "expr": "sum by (decision) (rate(conduit_authz_decisions_total[1h]))",
           "legendFormat": "{{decision}}"
         }
       ]
@@ -945,7 +945,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "meridian_circuit_breaker_state",
+          "expr": "conduit_circuit_breaker_state",
           "format": "table",
           "instant": true,
           "legendFormat": "",
@@ -956,7 +956,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(meridian_agent_calls_total[1m]) * 60",
+          "expr": "rate(conduit_agent_calls_total[1m]) * 60",
           "format": "table",
           "instant": true,
           "legendFormat": "",
@@ -967,7 +967,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(meridian_agent_calls_total{status!=\"OK\"}[5m]) / rate(meridian_agent_calls_total[5m]) * 100",
+          "expr": "rate(conduit_agent_calls_total{status!=\"OK\"}[5m]) / rate(conduit_agent_calls_total[5m]) * 100",
           "format": "table",
           "instant": true,
           "legendFormat": "",
@@ -978,7 +978,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, rate(meridian_agent_latency_seconds_bucket[5m])) * 1000",
+          "expr": "histogram_quantile(0.95, rate(conduit_agent_latency_seconds_bucket[5m])) * 1000",
           "format": "table",
           "instant": true,
           "legendFormat": "",
@@ -1035,7 +1035,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Breakdown of how queries resolved over the past hour. ANSWERED = grounded answer returned. CLARIFIED = Meridian asked a clarifying question. DENIED = banker lacked entitlements. FAILED = agent error. ERROR = gateway exception.",
+      "description": "Breakdown of how queries resolved over the past hour. ANSWERED = grounded answer returned. CLARIFIED = Conduit asked a clarifying question. DENIED = banker lacked entitlements. FAILED = agent error. ERROR = gateway exception.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1165,7 +1165,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (outcome) (increase(meridian_request_outcome_total[1h]))",
+          "expr": "sum by (outcome) (increase(conduit_request_outcome_total[1h]))",
           "legendFormat": "{{outcome}}"
         }
       ]
@@ -1233,7 +1233,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(meridian_request_outcome_total{outcome=\"ANSWERED\"}[1h])) / (sum(rate(meridian_request_outcome_total{outcome=\"ANSWERED\"}[1h])) + sum(rate(meridian_request_outcome_total{outcome=\"FAILED\"}[1h])) + sum(rate(meridian_request_outcome_total{outcome=\"ERROR\"}[1h]))) * 100",
+          "expr": "sum(rate(conduit_request_outcome_total{outcome=\"ANSWERED\"}[1h])) / (sum(rate(conduit_request_outcome_total{outcome=\"ANSWERED\"}[1h])) + sum(rate(conduit_request_outcome_total{outcome=\"FAILED\"}[1h])) + sum(rate(conduit_request_outcome_total{outcome=\"ERROR\"}[1h]))) * 100",
           "legendFormat": "success rate"
         }
       ]
@@ -1242,7 +1242,7 @@
   "refresh": "30s",
   "schemaVersion": 39,
   "tags": [
-    "meridian",
+    "conduit",
     "business",
     "executive"
   ],
@@ -1255,7 +1255,7 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Meridian — Business Overview",
-  "uid": "meridian-business",
+  "title": "Conduit — Business Overview",
+  "uid": "conduit-business",
   "version": 1
 }

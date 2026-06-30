@@ -1,5 +1,5 @@
 /**
- * Meridian Gateway — Scenario Performance Test
+ * Conduit Gateway — Scenario Performance Test
  *
  * Tests specific gateway behaviours under concurrent load:
  *   Scenario 1 (hero)        — full 7+ agent fan-out (HTTP + MCP), multi-protocol
@@ -21,14 +21,14 @@ import { check, sleep, group } from 'k6';
 import { Trend, Rate, Counter, Gauge } from 'k6/metrics';
 
 // ── Custom metrics ──────────────────────────────────────────────────────────
-const ttft          = new Trend('meridian_scenario_ttft_ms',    true);
-const e2eTime       = new Trend('meridian_scenario_e2e_ms',     true);
-const heroLatency   = new Trend('meridian_hero_e2e_ms',         true);
-const errorRate     = new Rate('meridian_scenario_error_rate');
-const deniedCount   = new Counter('meridian_entitlement_denied');
-const allowedCount  = new Counter('meridian_entitlement_allowed');
-const doneCount     = new Counter('meridian_scenario_done');
-const agentsFanOut  = new Trend('meridian_agents_fanned_out',   false);
+const ttft          = new Trend('conduit_scenario_ttft_ms',    true);
+const e2eTime       = new Trend('conduit_scenario_e2e_ms',     true);
+const heroLatency   = new Trend('conduit_hero_e2e_ms',         true);
+const errorRate     = new Rate('conduit_scenario_error_rate');
+const deniedCount   = new Counter('conduit_entitlement_denied');
+const allowedCount  = new Counter('conduit_entitlement_allowed');
+const doneCount     = new Counter('conduit_scenario_done');
+const agentsFanOut  = new Trend('conduit_agents_fanned_out',   false);
 
 // ── Config ──────────────────────────────────────────────────────────────────
 const GATEWAY_URL   = __ENV.GATEWAY_URL    || 'http://localhost:8080';
@@ -90,12 +90,12 @@ export const options = {
   },
   thresholds: {
     // Overall error rate across all scenarios
-    'meridian_scenario_error_rate': ['rate<0.15'],   // < 15% errors (LLM 429s expected under stress)
+    'conduit_scenario_error_rate': ['rate<0.15'],   // < 15% errors (LLM 429s expected under stress)
     // Hero fan-out p95 < 45s (LLM calls dominate)
-    'meridian_hero_e2e_ms':         ['p(95)<45000'],
+    'conduit_hero_e2e_ms':         ['p(95)<45000'],
     // E2E p95 < 40s across non-hero scenarios
-    'meridian_scenario_e2e_ms{scenario:routing}':    ['p(95)<40000'],
-    'meridian_scenario_e2e_ms{scenario:entitlement}':['p(95)<35000'],
+    'conduit_scenario_e2e_ms{scenario:routing}':    ['p(95)<40000'],
+    'conduit_scenario_e2e_ms{scenario:entitlement}':['p(95)<35000'],
     // HTTP errors (500/503 from agents or gateway crash)
     'http_req_failed':  ['rate<0.10'],
   },
@@ -127,7 +127,7 @@ function chat(prompt, userId, token, conversationId) {
   const res = http.post(
     `${GATEWAY_URL}/v1/chat/completions`,
     JSON.stringify({
-      model: 'meridian-assistant',
+      model: 'conduit-assistant',
       stream: true,
       messages: [{ role: 'user', content: prompt }],
     }),
@@ -188,7 +188,7 @@ export function heroScenario(data) {
 
   const res = http.post(
     `${GATEWAY_URL}/v1/chat/completions`,
-    JSON.stringify({ model: 'meridian-assistant', stream: true,
+    JSON.stringify({ model: 'conduit-assistant', stream: true,
                      messages: [{ role: 'user', content: prompt }] }),
     { headers, timeout: '90s', responseType: 'text' }
   );

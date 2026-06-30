@@ -37,7 +37,7 @@ echo "   ✅  Gateway reachable at ${GATEWAY_URL}/v1/models"
 
 # ── [2/3] Seed Langfuse datasets (best-effort; tolerate already-exists) ──────
 echo ""
-echo "▶  [2/3] Seeding Langfuse datasets (meridian-routing + meridian-synthesis)..."
+echo "▶  [2/3] Seeding Langfuse datasets (conduit-routing + conduit-synthesis)..."
 if python3 "$ROOT/eval/langfuse_seed_datasets.py"; then
   echo "   ✅  Datasets seeded (or already present)."
 else

@@ -2,7 +2,7 @@
   "__inputs": [],
   "__requires": [],
   "annotations": {"list": []},
-  "description": "Deep-dive resilience KPIs for every agent in the Meridian fleet — circuit breaker state, bulkhead pressure, error rates and p95 latency. Target audience: SREs and gateway engineers.",
+  "description": "Deep-dive resilience KPIs for every agent in the Conduit fleet — circuit breaker state, bulkhead pressure, error rates and p95 latency. Target audience: SREs and gateway engineers.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -10,13 +10,13 @@
   "links": [],
   "refresh": "10s",
   "schemaVersion": 39,
-  "tags": ["meridian", "agents", "operations"],
+  "tags": ["conduit", "agents", "operations"],
   "templating": {
     "list": [
       {
         "current": {"text": "All", "value": "$__all"},
         "datasource": {"type": "prometheus", "uid": "prometheus"},
-        "definition": "label_values(meridian_agent_calls_total, agentId)",
+        "definition": "label_values(conduit_agent_calls_total, agentId)",
         "description": "Agent identifier — multi-select to compare specific agents, or choose All for the full fleet view",
         "hide": 0,
         "includeAll": true,
@@ -25,7 +25,7 @@
         "name": "agentId",
         "options": [],
         "query": {
-          "query": "label_values(meridian_agent_calls_total, agentId)",
+          "query": "label_values(conduit_agent_calls_total, agentId)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 2,
@@ -38,8 +38,8 @@
   "time": {"from": "now-1h", "to": "now"},
   "timepicker": {},
   "timezone": "browser",
-  "title": "Meridian — Agent Health",
-  "uid": "meridian-agent-health",
+  "title": "Conduit — Agent Health",
+  "uid": "conduit-agent-health",
   "version": 1,
   "panels": [
 
@@ -82,7 +82,7 @@
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "count(meridian_circuit_breaker_state{agentId=~\"$agentId\"} == 0) or vector(0)",
+          "expr": "count(conduit_circuit_breaker_state{agentId=~\"$agentId\"} == 0) or vector(0)",
           "legendFormat": "Healthy Agents",
           "refId": "A"
         }
@@ -122,7 +122,7 @@
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "count(meridian_circuit_breaker_state{agentId=~\"$agentId\"} == 2) or vector(0)",
+          "expr": "count(conduit_circuit_breaker_state{agentId=~\"$agentId\"} == 2) or vector(0)",
           "legendFormat": "Tripped Breakers",
           "refId": "A"
         }
@@ -164,7 +164,7 @@
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "sum(rate(meridian_agent_calls_total{agentId=~\"$agentId\", status!=\"OK\"}[5m])) by (agentId) / clamp_min(sum(rate(meridian_agent_calls_total{agentId=~\"$agentId\"}[5m])) by (agentId), 0.001)",
+          "expr": "sum(rate(conduit_agent_calls_total{agentId=~\"$agentId\", status!=\"OK\"}[5m])) by (agentId) / clamp_min(sum(rate(conduit_agent_calls_total{agentId=~\"$agentId\"}[5m])) by (agentId), 0.001)",
           "legendFormat": "{{agentId}}",
           "refId": "A"
         }
@@ -212,7 +212,7 @@
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "sum(rate(meridian_agent_latency_seconds_bucket{agentId=~\"$agentId\"}[5m])) by (le)",
+          "expr": "sum(rate(conduit_agent_latency_seconds_bucket{agentId=~\"$agentId\"}[5m])) by (le)",
           "format": "heatmap",
           "legendFormat": "{{le}}",
           "refId": "A"
@@ -256,7 +256,7 @@
           "targets": [
             {
               "datasource": {"type": "prometheus", "uid": "prometheus"},
-              "expr": "sum(rate(meridian_agent_calls_total{agentId=\"$agentId\"}[1m])) * 60",
+              "expr": "sum(rate(conduit_agent_calls_total{agentId=\"$agentId\"}[1m])) * 60",
               "legendFormat": "calls/min",
               "refId": "A"
             }
@@ -298,7 +298,7 @@
           "targets": [
             {
               "datasource": {"type": "prometheus", "uid": "prometheus"},
-              "expr": "100 * sum(rate(meridian_agent_calls_total{agentId=\"$agentId\", status!=\"OK\"}[5m])) / clamp_min(sum(rate(meridian_agent_calls_total{agentId=\"$agentId\"}[5m])), 0.001)",
+              "expr": "100 * sum(rate(conduit_agent_calls_total{agentId=\"$agentId\", status!=\"OK\"}[5m])) / clamp_min(sum(rate(conduit_agent_calls_total{agentId=\"$agentId\"}[5m])), 0.001)",
               "legendFormat": "error %",
               "refId": "A"
             }
@@ -339,7 +339,7 @@
           "targets": [
             {
               "datasource": {"type": "prometheus", "uid": "prometheus"},
-              "expr": "histogram_quantile(0.95, sum(rate(meridian_agent_latency_seconds_bucket{agentId=\"$agentId\"}[5m])) by (le)) * 1000",
+              "expr": "histogram_quantile(0.95, sum(rate(conduit_agent_latency_seconds_bucket{agentId=\"$agentId\"}[5m])) by (le)) * 1000",
               "legendFormat": "p95 ms",
               "refId": "A"
             }
@@ -388,7 +388,7 @@
           "targets": [
             {
               "datasource": {"type": "prometheus", "uid": "prometheus"},
-              "expr": "meridian_circuit_breaker_state{agentId=\"$agentId\"}",
+              "expr": "conduit_circuit_breaker_state{agentId=\"$agentId\"}",
               "legendFormat": "CB state",
               "refId": "A"
             }
@@ -432,7 +432,7 @@
           "targets": [
             {
               "datasource": {"type": "prometheus", "uid": "prometheus"},
-              "expr": "meridian_bulkhead_executing{agentId=\"$agentId\"}",
+              "expr": "conduit_bulkhead_executing{agentId=\"$agentId\"}",
               "legendFormat": "executing",
               "refId": "A"
             }
@@ -476,7 +476,7 @@
           "targets": [
             {
               "datasource": {"type": "prometheus", "uid": "prometheus"},
-              "expr": "meridian_bulkhead_queued{agentId=\"$agentId\"}",
+              "expr": "conduit_bulkhead_queued{agentId=\"$agentId\"}",
               "legendFormat": "queued",
               "refId": "A"
             }
@@ -518,7 +518,7 @@
           "targets": [
             {
               "datasource": {"type": "prometheus", "uid": "prometheus"},
-              "expr": "100 * sum(rate(meridian_agent_calls_total{agentId=\"$agentId\", status=\"TIMEOUT\"}[5m])) / clamp_min(sum(rate(meridian_agent_calls_total{agentId=\"$agentId\"}[5m])), 0.001)",
+              "expr": "100 * sum(rate(conduit_agent_calls_total{agentId=\"$agentId\", status=\"TIMEOUT\"}[5m])) / clamp_min(sum(rate(conduit_agent_calls_total{agentId=\"$agentId\"}[5m])), 0.001)",
               "legendFormat": "timeout %",
               "refId": "A"
             }
@@ -583,7 +583,7 @@
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "meridian_circuit_breaker_state{agentId=~\"$agentId\"}",
+          "expr": "conduit_circuit_breaker_state{agentId=~\"$agentId\"}",
           "legendFormat": "{{agentId}}",
           "refId": "A"
         }
@@ -625,13 +625,13 @@
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "meridian_bulkhead_executing{agentId=~\"$agentId\"}",
+          "expr": "conduit_bulkhead_executing{agentId=~\"$agentId\"}",
           "legendFormat": "executing — {{agentId}}",
           "refId": "A"
         },
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "meridian_bulkhead_queued{agentId=~\"$agentId\"}",
+          "expr": "conduit_bulkhead_queued{agentId=~\"$agentId\"}",
           "legendFormat": "queued — {{agentId}}",
           "refId": "B"
         }
@@ -672,7 +672,7 @@
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "sum(rate(meridian_agent_latency_seconds_sum{agentId=~\"$agentId\"}[5m])) by (protocol) / clamp_min(sum(rate(meridian_agent_latency_seconds_count{agentId=~\"$agentId\"}[5m])) by (protocol), 0.001) * 1000",
+          "expr": "sum(rate(conduit_agent_latency_seconds_sum{agentId=~\"$agentId\"}[5m])) by (protocol) / clamp_min(sum(rate(conduit_agent_latency_seconds_count{agentId=~\"$agentId\"}[5m])) by (protocol), 0.001) * 1000",
           "legendFormat": "{{protocol}}",
           "refId": "A"
         }

@@ -3,7 +3,7 @@ import { registerOrLogin, LIBRECHAT_URL } from './helpers';
 
 /**
  * Phase 5 / M12 — Meridian branding.
- * The LibreChat UI must present itself as "Meridian AI", not generic LibreChat.
+ * The LibreChat UI must present itself as "Conduit AI", not generic LibreChat.
  */
 test.describe('Branding', () => {
 
@@ -12,7 +12,7 @@ test.describe('Branding', () => {
     expect(resp?.status()).toBeLessThan(400);
   });
 
-  test('chat textarea placeholder shows "Meridian AI"', async ({ page }) => {
+  test('chat textarea placeholder shows "Conduit AI"', async ({ page }) => {
     await registerOrLogin(page);
 
     // Wait for the textarea to exist and its placeholder to be populated by React
@@ -24,7 +24,7 @@ test.describe('Branding', () => {
       { timeout: 25_000 }
     );
 
-    // React sets placeholder as a DOM property: "Message Meridian AI" — confirmed via live debug
+    // React sets placeholder as a DOM property: "Message Conduit AI" — confirmed via live debug
     const placeholder = await page.locator('#prompt-textarea').evaluate(
       el => (el as HTMLTextAreaElement).placeholder
     );
@@ -34,7 +34,7 @@ test.describe('Branding', () => {
   test('model selector is hidden (modelSelect: false)', async ({ page }) => {
     await registerOrLogin(page);
 
-    // The model-select UI must not be visible — locked to Meridian AI in librechat.yaml
+    // The model-select UI must not be visible — locked to Conduit AI in librechat.yaml
     const modelSelect = page.locator('[data-testid="model-select"], button[aria-label*="Model"]').first();
     const visible = await modelSelect.isVisible().catch(() => false);
     expect(visible).toBe(false);

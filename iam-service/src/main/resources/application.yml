@@ -1,12 +1,12 @@
 server:
   port: 8084
 
-meridian:
+conduit:
   iam:
     # Mandated claim: tenant_id is always included in every issued JWT.
     # Value comes from principal.tenant_id in the database.
     # This fallback is used only when a principal record cannot be loaded.
-    default-tenant-id: ${MERIDIAN_IAM_DEFAULT_TENANT_ID:default}
+    default-tenant-id: ${CONDUIT_IAM_DEFAULT_TENANT_ID:default}
 
 spring:
   threads:

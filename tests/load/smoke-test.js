@@ -1,5 +1,5 @@
 /**
- * Meridian Gateway — Smoke Test (fast CI check)
+ * Conduit Gateway — Smoke Test (fast CI check)
  *
  * 3 VUs, 30 seconds. Verifies the gateway is up and serving SSE responses.
  * Runs before the full load test to catch obvious startup failures.
@@ -41,12 +41,12 @@ export default function () {
   const modelsRes = http.get(`${GATEWAY_URL}/v1/models`);
   check(modelsRes, {
     'models 200':              r => r.status === 200,
-    'models has meridian':     r => r.body.includes('meridian-assistant'),
+    'models has conduit':     r => r.body.includes('conduit-assistant'),
   });
 
   // Test 2: chat completions (full pipeline)
   const payload = JSON.stringify({
-    model: 'meridian-assistant',
+    model: 'conduit-assistant',
     stream: true,
     messages: [{ role: 'user', content: 'What are the holdings for Whitman Family Office?' }],
   });

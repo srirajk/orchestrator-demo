@@ -1,5 +1,5 @@
 /**
- * Meridian Gateway — k6 Phased Load Test
+ * Conduit Gateway — k6 Phased Load Test
  *
  * Four sequential phases that match the build milestones:
  *   Phase 1 (smoke)   — 1 VU, baseline correctness
@@ -16,11 +16,11 @@ import { check, sleep } from 'k6';
 import { Trend, Rate, Counter } from 'k6/metrics';
 
 // ── Custom metrics ─────────────────────────────────────────────────────────
-const ttft       = new Trend('meridian_ttft_ms',     true);
-const streamTime = new Trend('meridian_stream_ms',   true);
-const agentCount = new Trend('meridian_agent_count', false);
-const errorRate  = new Rate('meridian_error_rate');
-const doneCount  = new Counter('meridian_done_count');
+const ttft       = new Trend('conduit_ttft_ms',     true);
+const streamTime = new Trend('conduit_stream_ms',   true);
+const agentCount = new Trend('conduit_agent_count', false);
+const errorRate  = new Rate('conduit_error_rate');
+const doneCount  = new Counter('conduit_done_count');
 
 // ── Configuration ──────────────────────────────────────────────────────────
 export const options = {
@@ -69,11 +69,11 @@ export const options = {
     // TTFT: realistically 3 sequential Z.AI LLM calls per request (intent + extract + synthesize).
     // Under 25 VU sustained load, p95 TTFT observed at ~14s — set threshold at 20s to catch
     // genuine degradation vs normal LLM pipeline latency.
-    meridian_ttft_ms:    ['p(95)<20000'],
+    conduit_ttft_ms:    ['p(95)<20000'],
     // Full stream: synthesis is streamed, so 30s covers slow synthesis under peak load
-    meridian_stream_ms:  ['p(95)<30000'],
+    conduit_stream_ms:  ['p(95)<30000'],
     // Error rate: < 5% under all phases including stress
-    meridian_error_rate: ['rate<0.05'],
+    conduit_error_rate: ['rate<0.05'],
     http_req_failed:     ['rate<0.05'],
   },
 };
@@ -95,7 +95,7 @@ const GATEWAY_URL = __ENV.GATEWAY_URL || 'http://gateway:8080';
 export default function () {
   const prompt = PROMPTS[__VU % PROMPTS.length];
   const payload = JSON.stringify({
-    model: 'meridian-assistant',
+    model: 'conduit-assistant',
     stream: true,
     messages: [{ role: 'user', content: prompt }],
   });
@@ -147,7 +147,7 @@ export default function () {
           contentChunks++;
         }
         // Read agent count from the last chunk's usage metadata (if present)
-        const agentsUsed = chunk?.usage?.meridian_agent_count;
+        const agentsUsed = chunk?.usage?.conduit_agent_count;
         if (agentsUsed) agentCount.add(agentsUsed);
       } catch (_) {}
     }

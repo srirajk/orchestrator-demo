@@ -51,7 +51,7 @@ test.describe('JWT identity (Phase 8 M15)', () => {
     const resp = await request.post(`${GATEWAY_URL}/v1/chat/completions`, {
       headers: { 'Authorization': `Bearer ${token}` },
       data: {
-        model:    'meridian-assistant',
+        model:    'conduit-assistant',
         messages: [{ role: 'user', content: 'hello' }],
         stream:   true,
       },
@@ -67,7 +67,7 @@ test.describe('JWT identity (Phase 8 M15)', () => {
                          '.INVALIDSIGNATUREXXXXXXXXXXXXXXXX'
       },
       data: {
-        model:    'meridian-assistant',
+        model:    'conduit-assistant',
         messages: [{ role: 'user', content: 'hello' }],
         stream:   false,
       },
@@ -89,7 +89,7 @@ test.describe('JWT identity (Phase 8 M15)', () => {
                          '.fakesig'
       },
       data: {
-        model:    'meridian-assistant',
+        model:    'conduit-assistant',
         messages: [{ role: 'user', content: 'hello' }],
         stream:   false,
       },
@@ -102,7 +102,7 @@ test.describe('JWT identity (Phase 8 M15)', () => {
     const resp = await request.post(`${GATEWAY_URL}/v1/chat/completions`, {
       headers: { 'X-User-Id': 'rm_jane' },
       data: {
-        model:    'meridian-assistant',
+        model:    'conduit-assistant',
         messages: [{ role: 'user', content: 'ping' }],
         stream:   true,
       },

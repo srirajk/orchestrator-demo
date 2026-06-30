@@ -80,7 +80,7 @@ test.describe('Entitlements (Phase 5 M8)', () => {
       timeout: 75_000,   // agent fan-out + LLM synthesis can take 30-60s
       headers: { 'Authorization': `Bearer ${token}` },
       data: {
-        model:    'meridian-assistant',
+        model:    'conduit-assistant',
         messages: [{ role: 'user', content: OKAFOR_PROMPT }],
         stream:   true,
       },
@@ -104,7 +104,7 @@ test.describe('Entitlements (Phase 5 M8)', () => {
     const resp = await request.post(`${GATEWAY_URL}/v1/chat/completions`, {
       headers: { 'Authorization': `Bearer ${token}` },
       data: {
-        model:    'meridian-assistant',
+        model:    'conduit-assistant',
         // Use a very explicit relationship ID so the entity extractor is most likely to pick it up
         messages: [{ role: 'user', content: 'Retrieve the complete portfolio and holdings data for REL-00188 Okafor Family Trust right now.' }],
         stream:   true,

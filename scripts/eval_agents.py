@@ -44,7 +44,7 @@ DeepEval itself does not yet natively push to Phoenix, but each test case genera
 an LLM call (the judge call) that can be observed in Phoenix if you configure the
 eval script's OpenAI client to route through the OTel collector:
   OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
-  OTEL_SERVICE_NAME=meridian-eval
+  OTEL_SERVICE_NAME=conduit-eval
 """
 
 import os

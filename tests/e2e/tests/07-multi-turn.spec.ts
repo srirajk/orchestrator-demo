@@ -100,7 +100,7 @@ test.describe('Multi-turn conversation', () => {
       timeout: 75_000,
       headers,
       data: {
-        model:    'meridian-assistant',
+        model:    'conduit-assistant',
         messages: [{ role: 'user', content: 'Show holdings for Whitman Family Office REL-00042' }],
         stream:   true,
       },
@@ -114,7 +114,7 @@ test.describe('Multi-turn conversation', () => {
       timeout: 75_000,
       headers,
       data: {
-        model:    'meridian-assistant',
+        model:    'conduit-assistant',
         messages: [
           { role: 'user',      content: 'Show holdings for Whitman Family Office REL-00042' },
           { role: 'assistant', content: '(prior answer about Whitman holdings)' },
@@ -144,7 +144,7 @@ test.describe('Multi-turn conversation', () => {
         timeout: 75_000,
         headers: headers1,
         data: {
-          model:    'meridian-assistant',
+          model:    'conduit-assistant',
           messages: [{ role: 'user', content: 'Show holdings for Whitman Family Office REL-00042' }],
           stream:   true,
         },
@@ -153,7 +153,7 @@ test.describe('Multi-turn conversation', () => {
         timeout: 75_000,
         headers: headers2,
         data: {
-          model:    'meridian-assistant',
+          model:    'conduit-assistant',
           messages: [{ role: 'user', content: 'Show holdings for Whitman Family Office REL-00042' }],
           stream:   true,
         },
@@ -182,7 +182,7 @@ test.describe('Multi-turn conversation', () => {
       timeout: 75_000,
       headers: baseHeaders,
       data: {
-        model:    'meridian-assistant',
+        model:    'conduit-assistant',
         messages: [{ role: 'user', content: 'What are the current holdings for REL-00042?' }],
         stream:   true,
       },
@@ -197,7 +197,7 @@ test.describe('Multi-turn conversation', () => {
       timeout: 60_000,
       headers: { ...baseHeaders, 'X-User-Id': 'rm_jane' },
       data: {
-        model:    'meridian-assistant',
+        model:    'conduit-assistant',
         messages: [
           { role: 'user',      content: 'What are the current holdings for REL-00042?' },
           { role: 'assistant', content: '(prior answer)' },

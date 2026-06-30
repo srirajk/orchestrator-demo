@@ -44,7 +44,7 @@ def configure_judge_model() -> str:
     zai_key = os.getenv("ZAI_API_KEY", "")
     if zai_key:
         os.environ["OPENAI_API_KEY"] = zai_key
-    os.environ["OPENAI_BASE_URL"] = os.getenv("MERIDIAN_LLM_JUDGE_BASE_URL", "https://api.z.ai/api/paas/v4")
+    os.environ["OPENAI_BASE_URL"] = os.getenv("CONDUIT_LLM_JUDGE_BASE_URL", "https://api.z.ai/api/paas/v4")
     # Release-gate judge = MAX tier. This judge BLOCKS deploys, so use the strongest
     # available reasoning model (cost is irrelevant offline). Env-overridable per the
     # model-selection guide (docs/MODEL-SELECTION.md).
@@ -334,7 +334,7 @@ def call_chat(gateway_url: str, prompt: str, user_id: str = "rm_jane") -> tuple[
     """Get a synthesized answer and the agent outputs used."""
     url = f"{gateway_url}/v1/chat/completions"
     body = json.dumps({
-        "model": "meridian-assistant",
+        "model": "conduit-assistant",
         "stream": False,
         "messages": [{"role": "user", "content": prompt}]
     }).encode()

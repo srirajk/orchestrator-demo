@@ -23,7 +23,7 @@ test.describe('Domain-scoped ABAC (Phase 11)', () => {
       timeout: 90_000,
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       data: {
-        model:    'meridian-assistant',
+        model:    'conduit-assistant',
         messages: [{ role: 'user', content: 'Show holdings and performance for Whitman Family Office REL-00042' }],
         stream:   true,
       },
@@ -57,7 +57,7 @@ test.describe('Domain-scoped ABAC (Phase 11)', () => {
       timeout: 90_000,
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       data: {
-        model:    'meridian-assistant',
+        model:    'conduit-assistant',
         messages: [{ role: 'user', content: 'Give me a complete picture for Whitman REL-00042 including settlement status and cash management' }],
         stream:   true,
       },
@@ -90,7 +90,7 @@ test.describe('Domain-scoped ABAC (Phase 11)', () => {
       timeout: 90_000,
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       data: {
-        model:    'meridian-assistant',
+        model:    'conduit-assistant',
         messages: [{ role: 'user', content: 'Show settlement status for REL-00300' }],
         stream:   true,
       },
@@ -115,7 +115,7 @@ test.describe('Domain-scoped ABAC (Phase 11)', () => {
       timeout: 90_000,
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       data: {
-        model:    'meridian-assistant',
+        model:    'conduit-assistant',
         messages: [{ role: 'user', content: 'Show me the full portfolio picture for Whitman REL-00042' }],
         stream:   true,
       },
@@ -141,7 +141,7 @@ test.describe('Domain-scoped ABAC (Phase 11)', () => {
       timeout: 90_000,
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       data: {
-        model:    'meridian-assistant',
+        model:    'conduit-assistant',
         messages: [{ role: 'user', content: 'Show portfolio holdings for Whitman REL-00042' }],
         stream:   true,
       },

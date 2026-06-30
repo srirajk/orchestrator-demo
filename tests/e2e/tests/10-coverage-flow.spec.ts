@@ -141,7 +141,7 @@ test.describe('Coverage flow (Phase 11)', () => {
         'X-Conversation-Id': `e2e-okafor-denial-${Date.now()}`,
       },
       data: {
-        model:    'meridian-assistant',
+        model:    'conduit-assistant',
         messages: [{ role: 'user', content: 'Show me the portfolio for Okafor Capital REL-00188' }],
         stream:   true,
       },
@@ -194,7 +194,7 @@ test.describe('Coverage flow (Phase 11)', () => {
         'X-Conversation-Id': `e2e-whitman-allow-${Date.now()}`,
       },
       data: {
-        model:    'meridian-assistant',
+        model:    'conduit-assistant',
         messages: [{ role: 'user', content: 'Show me holdings for Whitman Family Office REL-00042' }],
         stream:   true,
       },

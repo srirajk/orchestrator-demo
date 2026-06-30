@@ -4,7 +4,7 @@ services:
 
   redis-stack:
     image: redis/redis-stack-server:7.4.0-v3
-    container_name: meridian-redis
+    container_name: conduit-redis
     ports:
       - "6379:6379"
       - "8001:8001"    # RedisInsight (optional dev UI)
@@ -19,7 +19,7 @@ services:
 
   mongodb:
     image: mongo:8.0.20
-    container_name: meridian-mongodb
+    container_name: conduit-mongodb
     command: mongod --noauth
     volumes:
       - mongo-data:/data/db
@@ -34,7 +34,7 @@ services:
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:latest
-    container_name: meridian-otel
+    container_name: conduit-otel
     volumes:
       - ./infra/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
     ports:
@@ -48,7 +48,7 @@ services:
 
   tempo:
     image: grafana/tempo:2.6.1
-    container_name: meridian-tempo
+    container_name: conduit-tempo
     command: ["-config.file=/etc/tempo.yaml"]
     volumes:
       - ./infra/tempo.yaml:/etc/tempo.yaml:ro
@@ -60,7 +60,7 @@ services:
 
   prometheus:
     image: prom/prometheus:v2.55.1
-    container_name: meridian-prometheus
+    container_name: conduit-prometheus
     volumes:
       - ./infra/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
@@ -69,7 +69,7 @@ services:
 
   grafana:
     image: grafana/grafana:11.3.1
-    container_name: meridian-grafana
+    container_name: conduit-grafana
     ports:
       - "3000:3000"
     environment:
@@ -89,7 +89,7 @@ services:
 
   loki:
     image: grafana/loki:2.9.8
-    container_name: meridian-loki
+    container_name: conduit-loki
     command: ["-config.file=/etc/loki/config.yaml"]
     volumes:
       - ./infra/loki/config.yaml:/etc/loki/config.yaml:ro
@@ -106,7 +106,7 @@ services:
 
   promtail:
     image: grafana/promtail:2.9.8
-    container_name: meridian-promtail
+    container_name: conduit-promtail
     command: ["-config.file=/etc/promtail/promtail.yaml"]
     volumes:
       - ./infra/promtail/promtail.yaml:/etc/promtail/promtail.yaml:ro
@@ -121,7 +121,7 @@ services:
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.49.1
-    container_name: meridian-cadvisor
+    container_name: conduit-cadvisor
     ports:
       - "8090:8080"   # cAdvisor UI + /metrics (host 8090 — 8085/8086 taken by mocks)
     volumes:
@@ -141,24 +141,24 @@ services:
     build:
       context: ./gateway
       dockerfile: Dockerfile
-    container_name: meridian-gateway
+    container_name: conduit-gateway
     ports:
       - "8080:8080"
     environment:
-      MERIDIAN_LLM_INTENT_CLASSIFIER_BASE_URL: ${MERIDIAN_LLM_INTENT_CLASSIFIER_BASE_URL:-https://api.z.ai/api/paas/v4}
-      MERIDIAN_LLM_INTENT_CLASSIFIER_API_KEY: ${MERIDIAN_LLM_INTENT_CLASSIFIER_API_KEY:-}
-      MERIDIAN_LLM_INTENT_CLASSIFIER_MODEL: ${MERIDIAN_LLM_INTENT_CLASSIFIER_MODEL:-glm-4.5-flash}
-      MERIDIAN_LLM_ENTITY_EXTRACTOR_BASE_URL: ${MERIDIAN_LLM_ENTITY_EXTRACTOR_BASE_URL:-https://api.z.ai/api/paas/v4}
-      MERIDIAN_LLM_ENTITY_EXTRACTOR_API_KEY: ${MERIDIAN_LLM_ENTITY_EXTRACTOR_API_KEY:-}
-      MERIDIAN_LLM_ENTITY_EXTRACTOR_MODEL: ${MERIDIAN_LLM_ENTITY_EXTRACTOR_MODEL:-glm-4.5-flash}
-      MERIDIAN_LLM_SYNTHESIZER_BASE_URL: ${MERIDIAN_LLM_SYNTHESIZER_BASE_URL:-https://api.z.ai/api/paas/v4}
-      MERIDIAN_LLM_SYNTHESIZER_API_KEY: ${MERIDIAN_LLM_SYNTHESIZER_API_KEY:-}
-      MERIDIAN_LLM_SYNTHESIZER_MODEL: ${MERIDIAN_LLM_SYNTHESIZER_MODEL:-glm-4.6}
+      CONDUIT_LLM_INTENT_CLASSIFIER_BASE_URL: ${CONDUIT_LLM_INTENT_CLASSIFIER_BASE_URL:-https://api.z.ai/api/paas/v4}
+      CONDUIT_LLM_INTENT_CLASSIFIER_API_KEY: ${CONDUIT_LLM_INTENT_CLASSIFIER_API_KEY:-}
+      CONDUIT_LLM_INTENT_CLASSIFIER_MODEL: ${CONDUIT_LLM_INTENT_CLASSIFIER_MODEL:-glm-4.5-flash}
+      CONDUIT_LLM_ENTITY_EXTRACTOR_BASE_URL: ${CONDUIT_LLM_ENTITY_EXTRACTOR_BASE_URL:-https://api.z.ai/api/paas/v4}
+      CONDUIT_LLM_ENTITY_EXTRACTOR_API_KEY: ${CONDUIT_LLM_ENTITY_EXTRACTOR_API_KEY:-}
+      CONDUIT_LLM_ENTITY_EXTRACTOR_MODEL: ${CONDUIT_LLM_ENTITY_EXTRACTOR_MODEL:-glm-4.5-flash}
+      CONDUIT_LLM_SYNTHESIZER_BASE_URL: ${CONDUIT_LLM_SYNTHESIZER_BASE_URL:-https://api.z.ai/api/paas/v4}
+      CONDUIT_LLM_SYNTHESIZER_API_KEY: ${CONDUIT_LLM_SYNTHESIZER_API_KEY:-}
+      CONDUIT_LLM_SYNTHESIZER_MODEL: ${CONDUIT_LLM_SYNTHESIZER_MODEL:-glm-4.6}
       SPRING_DATA_REDIS_HOST: redis-stack
       SPRING_DATA_REDIS_PORT: 6379
-      MERIDIAN_EMBEDDING_PROVIDER: remote
-      MERIDIAN_EMBEDDING_REMOTE_URL: http://embeddings:8083/v1/embeddings
-      MERIDIAN_EMBEDDING_DIMENSION: 384
+      CONDUIT_EMBEDDING_PROVIDER: remote
+      CONDUIT_EMBEDDING_REMOTE_URL: http://embeddings:8083/v1/embeddings
+      CONDUIT_EMBEDDING_DIMENSION: 384
       # OTel export — all signals through the collector; collector fans out to Tempo + Langfuse.
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       MANAGEMENT_OTLP_TRACING_ENDPOINT: http://otel-collector:4318/v1/traces
@@ -166,7 +166,7 @@ services:
       CERBOS_HOST: cerbos
       CERBOS_HTTP_PORT: 3592
       # Phase 8: RS256 JWKS endpoint — use direct /oauth2/jwks (no redirect hop)
-      MERIDIAN_AUTH_JWKS_URL: http://iam-service:8084/oauth2/jwks
+      CONDUIT_AUTH_JWKS_URL: http://iam-service:8084/oauth2/jwks
       WEALTH_COVERAGE_URL: http://wealth-coverage:8086
       # World B: second domain (insurance) onboarded by manifests + services only —
       # no gateway code change. The insurance domain manifest references these URLs.
@@ -174,7 +174,7 @@ services:
       INSURANCE_COVERAGE_URL: http://insurance-coverage:8088
       # World B: agent + domain manifests are read from the mounted ./registry volume,
       # NOT baked into the image. Onboard a domain by dropping JSON here + restart.
-      MERIDIAN_REGISTRY_LOCATION: file:/registry/
+      CONDUIT_REGISTRY_LOCATION: file:/registry/
     volumes:
       - ./registry:/registry:ro
     depends_on:
@@ -206,7 +206,7 @@ services:
     build:
       context: ./mock-agents/embeddings
       dockerfile: Dockerfile
-    container_name: meridian-embeddings
+    container_name: conduit-embeddings
     ports:
       - "8083:8083"
     healthcheck:
@@ -223,7 +223,7 @@ services:
     build:
       context: ./mock-agents/wealth
       dockerfile: Dockerfile
-    container_name: meridian-wealth-http
+    container_name: conduit-wealth-http
     ports:
       - "8081:8081"
     environment:
@@ -253,7 +253,7 @@ services:
     build:
       context: ./mock-agents/servicing
       dockerfile: Dockerfile
-    container_name: meridian-servicing-mcp
+    container_name: conduit-servicing-mcp
     ports:
       - "8082:8082"
     environment:
@@ -309,7 +309,7 @@ services:
     build:
       context: ./mock-agents/insurance
       dockerfile: Dockerfile
-    container_name: meridian-insurance-http
+    container_name: conduit-insurance-http
     ports:
       - "8087:8087"
     environment:
@@ -341,7 +341,7 @@ services:
 
   librechat:
     image: registry.librechat.ai/danny-avila/librechat-dev:latest
-    container_name: meridian-librechat
+    container_name: conduit-librechat
     ports:
       - "3080:3080"
     environment:
@@ -400,7 +400,7 @@ services:
   # ── Cerbos PDP — policy enforcement point for ABAC entitlements ──────────────
   cerbos:
     image: ghcr.io/cerbos/cerbos:latest
-    container_name: meridian-cerbos
+    container_name: conduit-cerbos
     ports:
       - "3594:3592"   # HTTP API (host 3594 to avoid conflict with other cerbos instances)
       - "3595:3593"   # gRPC
@@ -418,7 +418,7 @@ services:
   # ── Postgres — primary data store for iam-service (principals, roles, domains) ──
   postgres:
     image: postgres:16-alpine
-    container_name: meridian-postgres
+    container_name: conduit-postgres
     environment:
       POSTGRES_USER: meridian
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-meridian_dev}
@@ -437,8 +437,8 @@ services:
     build:
       context: ./iam-service
       dockerfile: Dockerfile
-    image: meridian/iam-service:latest
-    container_name: meridian-iam-service
+    image: conduit/iam-service:latest
+    container_name: conduit-iam-service
     ports:
       - "8084:8084"
     environment:
@@ -481,7 +481,7 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_URL: http://localhost:8084
-    container_name: meridian-admin-ui
+    container_name: conduit-admin-ui
     ports:
       - "5180:80"
     depends_on:
@@ -500,7 +500,7 @@ services:
     build:
       context: ./glassbox
       dockerfile: Dockerfile
-    container_name: meridian-glassbox
+    container_name: conduit-glassbox
     ports:
       - "4000:4000"
     depends_on:
@@ -513,7 +513,7 @@ services:
   # ── MinIO — S3-compatible blob store for Langfuse v3 event/media storage ────────
   minio:
     image: minio/minio:latest
-    container_name: meridian-minio
+    container_name: conduit-minio
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
@@ -530,7 +530,7 @@ services:
   # Create the required Langfuse bucket in MinIO at startup
   minio-init:
     image: minio/mc:latest
-    container_name: meridian-minio-init
+    container_name: conduit-minio-init
     depends_on:
       minio:
         condition: service_healthy
@@ -545,7 +545,7 @@ services:
 
   clickhouse:
     image: clickhouse/clickhouse-server:24.3.3
-    container_name: meridian-clickhouse
+    container_name: conduit-clickhouse
     environment:
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-clickhouse}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhouse}
@@ -562,7 +562,7 @@ services:
 
   langfuse-db:
     image: postgres:16-alpine
-    container_name: meridian-langfuse-db
+    container_name: conduit-langfuse-db
     environment:
       POSTGRES_USER: ${LANGFUSE_DB_USER:-langfuse}
       POSTGRES_PASSWORD: ${LANGFUSE_DB_PASSWORD:-langfuse}
@@ -578,7 +578,7 @@ services:
 
   langfuse:
     image: langfuse/langfuse:3
-    container_name: meridian-langfuse
+    container_name: conduit-langfuse
     depends_on:
       langfuse-db:
         condition: service_healthy
@@ -638,7 +638,7 @@ services:
 
   langfuse-worker:
     image: langfuse/langfuse-worker:3
-    container_name: meridian-langfuse-worker
+    container_name: conduit-langfuse-worker
     depends_on:
       langfuse-db:
         condition: service_healthy
@@ -686,7 +686,7 @@ services:
     build:
       context: ./scripts/eval-worker
       dockerfile: Dockerfile
-    container_name: meridian-eval-worker
+    container_name: conduit-eval-worker
     profiles: [eval]
     depends_on:
       - langfuse
@@ -710,7 +710,7 @@ services:
     build:
       context: ./eval
       dockerfile: Dockerfile
-    container_name: meridian-eval-continuous
+    container_name: conduit-eval-continuous
     profiles: [eval]
     depends_on:
       - langfuse
@@ -724,7 +724,7 @@ services:
       # output. The funnel (throttle + exponential backoff) is retained for whichever
       # provider is set. To run it on GLM instead, point JUDGE_* at the Z.AI values.
       JUDGE_BASE_URL: ${JUDGE_BASE_URL:-https://api.openai.com/v1}
-      JUDGE_API_KEY: ${JUDGE_API_KEY:-${MERIDIAN_LLM_SYNTHESIZER_API_KEY}}
+      JUDGE_API_KEY: ${JUDGE_API_KEY:-${CONDUIT_LLM_SYNTHESIZER_API_KEY}}
       JUDGE_MODEL: ${JUDGE_MODEL:-gpt-4o-mini}
       EVAL_TRACE_NAME: ${EVAL_TRACE_NAME:-chat-turn}
       EVAL_JUDGE_THROTTLE_MS: ${EVAL_JUDGE_THROTTLE_MS:-300}
@@ -738,7 +738,7 @@ services:
 
   k6:
     image: grafana/k6:latest
-    container_name: meridian-k6
+    container_name: conduit-k6
     profiles: [scale]
     volumes:
       - ./tests/load:/scripts

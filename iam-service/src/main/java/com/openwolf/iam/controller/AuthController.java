@@ -149,7 +149,7 @@ public class AuthController {
                 .subject(principalId)
                 .issuedAt(now)
                 .expiresAt(expiry)
-                .audience(List.of("meridian-gateway"))
+                .audience(List.of("conduit-gateway"))
                 .claim("username", principal.getUsername())
                 .claim("email", principal.getEmail())
                 .claim("roles", roles)

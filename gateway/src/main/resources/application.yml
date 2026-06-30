@@ -1,6 +1,6 @@
 spring:
   application:
-    name: meridian-gateway
+    name: conduit-gateway
   threads:
     virtual:
       enabled: true   # Java 21+ GA virtual threads; Java 25 adds JEP-491 (no synchronized pinning)
@@ -33,82 +33,82 @@ management:
       export:
         url: ${MANAGEMENT_OTLP_METRICS_EXPORT_URL:http://localhost:4318/v1/metrics}
 
-meridian:
+conduit:
   # ── Assistant framing (World B) ───────────────────────────────────────────────
   # Domain-neutral defaults. A domain deployment overrides these to reskin the
   # assistant; the gateway carries no hardcoded domain copy. domain-context feeds the
   # intent-classifier opener + the history-only synthesis prompt; display-name names
   # the answer synthesizer's identity.
   assistant:
-    domain-context: ${MERIDIAN_ASSISTANT_DOMAIN_CONTEXT:an enterprise data assistant for relationship managers}
-    display-name: ${MERIDIAN_ASSISTANT_DISPLAY_NAME:Meridian}
+    domain-context: ${CONDUIT_ASSISTANT_DOMAIN_CONTEXT:an enterprise data assistant for relationship managers}
+    display-name: ${CONDUIT_ASSISTANT_DISPLAY_NAME:Meridian}
   auth:
-    jwks-url: ${MERIDIAN_AUTH_JWKS_URL:http://user-mgmt:8084/.well-known/jwks.json}
+    jwks-url: ${CONDUIT_AUTH_JWKS_URL:http://iam-service:8084/.well-known/jwks.json}
     # Comma-separated list of accepted JWT issuers.
-    # Includes legacy "meridian-user-mgmt" + the iam-service URL variants used in dev/docker.
-    required-issuers: ${MERIDIAN_AUTH_REQUIRED_ISSUERS:meridian-user-mgmt,http://user-mgmt:8084,http://host.docker.internal:8084,http://iam-service:8084,http://localhost:8084}
-    required-audience: meridian-gateway
+    # Includes the Axiom (iam-service) issuer URL variants used in dev/docker.
+    required-issuers: ${CONDUIT_AUTH_REQUIRED_ISSUERS:http://host.docker.internal:8084,http://iam-service:8084,http://localhost:8084}
+    required-audience: conduit-gateway
   embedding:
-    provider: ${MERIDIAN_EMBEDDING_PROVIDER:hash}   # hash | remote
-    dimension: ${MERIDIAN_EMBEDDING_DIMENSION:384}
-    model: ${MERIDIAN_EMBEDDING_MODEL:all-MiniLM-L6-v2}
+    provider: ${CONDUIT_EMBEDDING_PROVIDER:hash}   # hash | remote
+    dimension: ${CONDUIT_EMBEDDING_DIMENSION:384}
+    model: ${CONDUIT_EMBEDDING_MODEL:all-MiniLM-L6-v2}
     remote:
-      url: ${MERIDIAN_EMBEDDING_REMOTE_URL:http://localhost:8083/v1/embeddings}
+      url: ${CONDUIT_EMBEDDING_REMOTE_URL:http://localhost:8083/v1/embeddings}
   resolver:
     confidence-floor: 0.30       # absolute cosine similarity floor
     relative-floor-factor: 0.65  # dynamic floor = max(absolute, topScore * factor); prunes long-tail matches
     top-k: 10
     # Domain-neutral entity-resolution endpoint (legacy fallback resolver; the live World-B path
     # resolves via CoverageClient using the manifest's coverage.resolve_url). No domain literal.
-    entity-resolve-url: ${MERIDIAN_RESOLVER_ENTITY_RESOLVE_URL:http://mock-crm:8085/entities/resolve}
+    entity-resolve-url: ${CONDUIT_RESOLVER_ENTITY_RESOLVE_URL:http://mock-crm:8085/entities/resolve}
   llm:
     # ── Intent Classifier (classification + routing) ──────────────────────────
     # Default: Z.AI GLM (fast flash model for low-latency classification).
-    # Override per-client via MERIDIAN_LLM_*_BASE_URL / MODEL / API_KEY env vars.
-    # To use OpenAI: set MERIDIAN_LLM_*_BASE_URL=https://api.openai.com/v1 + OPENAI_API_KEY.
+    # Override per-client via CONDUIT_LLM_*_BASE_URL / MODEL / API_KEY env vars.
+    # To use OpenAI: set CONDUIT_LLM_*_BASE_URL=https://api.openai.com/v1 + OPENAI_API_KEY.
     intent-classifier:
-      base-url: ${MERIDIAN_LLM_INTENT_CLASSIFIER_BASE_URL:https://api.z.ai/api/paas/v4}
-      api-key: ${MERIDIAN_LLM_INTENT_CLASSIFIER_API_KEY:${ZAI_API_KEY:}}
-      model: ${MERIDIAN_LLM_INTENT_CLASSIFIER_MODEL:glm-4.5-flash}
+      base-url: ${CONDUIT_LLM_INTENT_CLASSIFIER_BASE_URL:https://api.z.ai/api/paas/v4}
+      api-key: ${CONDUIT_LLM_INTENT_CLASSIFIER_API_KEY:${ZAI_API_KEY:}}
+      model: ${CONDUIT_LLM_INTENT_CLASSIFIER_MODEL:glm-4.5-flash}
     # ── Entity Extractor (pull relationship/fund/ticker from user prompt) ─────
     entity-extractor:
-      base-url: ${MERIDIAN_LLM_ENTITY_EXTRACTOR_BASE_URL:https://api.z.ai/api/paas/v4}
-      api-key: ${MERIDIAN_LLM_ENTITY_EXTRACTOR_API_KEY:${ZAI_API_KEY:}}
-      model: ${MERIDIAN_LLM_ENTITY_EXTRACTOR_MODEL:glm-4.5-flash}
+      base-url: ${CONDUIT_LLM_ENTITY_EXTRACTOR_BASE_URL:https://api.z.ai/api/paas/v4}
+      api-key: ${CONDUIT_LLM_ENTITY_EXTRACTOR_API_KEY:${ZAI_API_KEY:}}
+      model: ${CONDUIT_LLM_ENTITY_EXTRACTOR_MODEL:glm-4.5-flash}
     # ── Answer Synthesizer (grounded streaming answer) ────────────────────────
     synthesizer:
-      base-url: ${MERIDIAN_LLM_SYNTHESIZER_BASE_URL:https://api.z.ai/api/paas/v4}
-      api-key: ${MERIDIAN_LLM_SYNTHESIZER_API_KEY:${ZAI_API_KEY:}}
-      model: ${MERIDIAN_LLM_SYNTHESIZER_MODEL:glm-4.6}
+      base-url: ${CONDUIT_LLM_SYNTHESIZER_BASE_URL:https://api.z.ai/api/paas/v4}
+      api-key: ${CONDUIT_LLM_SYNTHESIZER_API_KEY:${ZAI_API_KEY:}}
+      model: ${CONDUIT_LLM_SYNTHESIZER_MODEL:glm-4.6}
     # Set to true to stream the model's chain-of-thought as a blockquote before the answer
-    show-reasoning: ${MERIDIAN_LLM_SHOW_REASONING:false}
-    max-retries: ${MERIDIAN_LLM_MAX_RETRIES:3}
-    retry-initial-delay-ms: ${MERIDIAN_LLM_RETRY_INITIAL_DELAY_MS:2000}
-    retry-backoff-multiplier: ${MERIDIAN_LLM_RETRY_BACKOFF_MULTIPLIER:2}
-    request-timeout-seconds: ${MERIDIAN_LLM_REQUEST_TIMEOUT_SECONDS:25}
+    show-reasoning: ${CONDUIT_LLM_SHOW_REASONING:false}
+    max-retries: ${CONDUIT_LLM_MAX_RETRIES:3}
+    retry-initial-delay-ms: ${CONDUIT_LLM_RETRY_INITIAL_DELAY_MS:2000}
+    retry-backoff-multiplier: ${CONDUIT_LLM_RETRY_BACKOFF_MULTIPLIER:2}
+    request-timeout-seconds: ${CONDUIT_LLM_REQUEST_TIMEOUT_SECONDS:25}
   orchestration:
-    fan-out-deadline-ms: ${MERIDIAN_FANOUT_DEADLINE_MS:60000}
+    fan-out-deadline-ms: ${CONDUIT_FANOUT_DEADLINE_MS:60000}
     harness:
-      default-sla-ms: ${MERIDIAN_HARNESS_DEFAULT_SLA_MS:5000}
+      default-sla-ms: ${CONDUIT_HARNESS_DEFAULT_SLA_MS:5000}
       bulkhead:
-        max-concurrent: ${MERIDIAN_HARNESS_BULKHEAD_MAX_CONCURRENT:5}
-        queue-capacity: ${MERIDIAN_HARNESS_BULKHEAD_QUEUE_CAPACITY:20}
+        max-concurrent: ${CONDUIT_HARNESS_BULKHEAD_MAX_CONCURRENT:5}
+        queue-capacity: ${CONDUIT_HARNESS_BULKHEAD_QUEUE_CAPACITY:20}
       circuit-breaker:
-        failure-rate-threshold: ${MERIDIAN_CB_FAILURE_RATE_THRESHOLD:50}
-        slow-call-rate-threshold: ${MERIDIAN_CB_SLOW_CALL_RATE_THRESHOLD:80}
-        slow-call-duration-seconds: ${MERIDIAN_CB_SLOW_CALL_DURATION_SECONDS:10}
-        open-wait-seconds: ${MERIDIAN_CB_OPEN_WAIT_SECONDS:30}
-        sliding-window-size: ${MERIDIAN_CB_SLIDING_WINDOW_SIZE:10}
-        min-calls: ${MERIDIAN_CB_MIN_CALLS:3}
-        half-open-permitted-calls: ${MERIDIAN_CB_HALF_OPEN_PERMITTED_CALLS:2}
+        failure-rate-threshold: ${CONDUIT_CB_FAILURE_RATE_THRESHOLD:50}
+        slow-call-rate-threshold: ${CONDUIT_CB_SLOW_CALL_RATE_THRESHOLD:80}
+        slow-call-duration-seconds: ${CONDUIT_CB_SLOW_CALL_DURATION_SECONDS:10}
+        open-wait-seconds: ${CONDUIT_CB_OPEN_WAIT_SECONDS:30}
+        sliding-window-size: ${CONDUIT_CB_SLIDING_WINDOW_SIZE:10}
+        min-calls: ${CONDUIT_CB_MIN_CALLS:3}
+        half-open-permitted-calls: ${CONDUIT_CB_HALF_OPEN_PERMITTED_CALLS:2}
   telemetry:
-    trace-ttl-seconds: ${MERIDIAN_TELEMETRY_TRACE_TTL_SECONDS:86400}
+    trace-ttl-seconds: ${CONDUIT_TELEMETRY_TRACE_TTL_SECONDS:86400}
   session:
-    ttl-seconds: ${MERIDIAN_SESSION_TTL_SECONDS:1800}   # 30 min idle expiry
+    ttl-seconds: ${CONDUIT_SESSION_TTL_SECONDS:1800}   # 30 min idle expiry
   authz:
     # Cerbos resource kind for entity-level checks (e.g. relationship, account, deal).
     # Domain teams declare this; the gateway carries no hardcoded domain literal (World B).
-    resource-type: ${MERIDIAN_AUTHZ_RESOURCE_TYPE:relationship}
+    resource-type: ${CONDUIT_AUTHZ_RESOURCE_TYPE:relationship}
   coverage:
     wealth-management:
       url: ${WEALTH_COVERAGE_URL:http://wealth-coverage:8086}
@@ -117,13 +117,13 @@ meridian:
     http-port: ${CERBOS_HTTP_PORT:3592}
     # closed (default) = Cerbos unreachable → deny all (production safe)
     # local = Cerbos unreachable → fall back to JWT book claim (demo resilience)
-    fail-mode: ${MERIDIAN_CERBOS_FAIL_MODE:closed}
+    fail-mode: ${CONDUIT_CERBOS_FAIL_MODE:closed}
 
 logging:
   pattern:
     # Include MDC keys (requestId, conversationId, userId) in every log line
     console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} [rid=%X{requestId} cid=%X{conversationId} uid=%X{userId}] - %msg%n"
   level:
-    ai.meridian: DEBUG
+    ai.conduit: DEBUG
     org.springframework.web: INFO
     io.opentelemetry: WARN

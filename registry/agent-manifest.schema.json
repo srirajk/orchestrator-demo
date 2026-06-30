@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://meridian.dev/schemas/agent-manifest.schema.json",
+  "$id": "https://conduit.dev/schemas/agent-manifest.schema.json",
   "title": "Meridian Agent Manifest (domain-team submission)",
   "description": "Canonical contract a domain team submits to register one agent. A2A-Agent-Card-aligned with gateway extensions (protocol, connection, constraints). Input/output schemas are DERIVED by the gateway via introspection and are NOT part of this submission. Validate submissions against this BEFORE introspection and storage.",
   "type": "object",

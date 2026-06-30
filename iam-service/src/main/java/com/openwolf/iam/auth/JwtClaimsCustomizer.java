@@ -27,7 +27,7 @@ import java.util.Set;
  * Enriches JWTs with mandated claims. Every issued access token carries:
  * <ul>
  *   <li>{@code tenant_id} — from principal.tenant_id in the database.
- *       Configured via {@code meridian.iam.default-tenant-id} as the fallback.
+ *       Configured via {@code conduit.iam.default-tenant-id} as the fallback.
  *       Never hardcoded — the value is a mandated claim attribute driven by the
  *       principal's tenant membership at the IAM configuration level.</li>
  *   <li>{@code roles} — list of role names assigned to the principal</li>
@@ -49,7 +49,7 @@ public class JwtClaimsCustomizer {
     public JwtClaimsCustomizer(
             PrincipalRepository principalRepository,
             ObjectMapper objectMapper,
-            @Value("${meridian.iam.default-tenant-id:default}") String defaultTenantId) {
+            @Value("${conduit.iam.default-tenant-id:default}") String defaultTenantId) {
         this.principalRepository = principalRepository;
         this.objectMapper = objectMapper;
         this.defaultTenantId = defaultTenantId;
@@ -101,7 +101,7 @@ public class JwtClaimsCustomizer {
             String classification = (String) attrs.getOrDefault("classification", "internal");
 
             // Set claims — tenant_id is a mandated claim from the principal's
-            // database record, not hardcoded. Configured via meridian.iam.default-tenant-id.
+            // database record, not hardcoded. Configured via conduit.iam.default-tenant-id.
             context.getClaims()
                     .claim("roles", roles)
                     .claim("segments", segments)

@@ -37,7 +37,7 @@ except ImportError:
 log = logging.getLogger(__name__)
 
 OTEL_ENDPOINT = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector:4318")
-SERVICE_NAME = os.getenv("OTEL_SERVICE_NAME", "meridian-wealth-http")
+SERVICE_NAME = os.getenv("OTEL_SERVICE_NAME", "conduit-wealth-http")
 
 provider = TracerProvider()
 exporter = OTLPSpanExporter(endpoint=f"{OTEL_ENDPOINT}/v1/traces")

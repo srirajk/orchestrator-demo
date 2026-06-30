@@ -22,7 +22,7 @@ test.describe('Resilience (Phase 6 M11)', () => {
     try {
       const resp = await request.post(`${GATEWAY_URL}/v1/chat/completions`, {
         data: {
-          model:    'meridian-assistant',
+          model:    'conduit-assistant',
           messages: [{ role: 'user', content: HERO_PROMPT }],
           stream:   true,
         },
@@ -47,7 +47,7 @@ test.describe('Resilience (Phase 6 M11)', () => {
     const resp = await request.post(`${GATEWAY_URL}/v1/chat/completions`, {
       timeout: 90_000,
       data: {
-        model:    'meridian-assistant',
+        model:    'conduit-assistant',
         messages: [{ role: 'user', content: HERO_PROMPT }],
         stream:   true,
       },

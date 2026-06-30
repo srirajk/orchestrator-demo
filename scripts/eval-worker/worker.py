@@ -41,7 +41,7 @@ ZAI_API_KEY         = os.environ["ZAI_API_KEY"]
 ZAI_BASE_URL        = os.environ.get("ZAI_BASE_URL", "https://api.z.ai/api/paas/v4")
 ZAI_EVAL_MODEL      = os.environ.get("ZAI_EVAL_MODEL", "glm-4.6")
 POLL_INTERVAL       = int(os.environ.get("EVAL_POLL_INTERVAL_SECONDS", "300"))
-USER_MGMT_HOST      = os.environ.get("USER_MGMT_HOST", "http://user-mgmt:8084")
+USER_MGMT_HOST      = os.environ.get("USER_MGMT_HOST", "http://iam-service:8084")
 EVAL_USER_ID        = "rm_jane"
 EVAL_USER_PASS      = os.environ.get("EVAL_USER_PASS", "Meridian@2024")
 
@@ -133,7 +133,7 @@ def seed_datasets(lf: Langfuse) -> None:
 def call_gateway(question: str, conversation_id: str) -> str | None:
     """Call the live gateway and collect the full streamed answer."""
     payload = {
-        "model": "meridian",
+        "model": "conduit-assistant",
         "messages": [{"role": "user", "content": question}],
         "stream": True,
     }
