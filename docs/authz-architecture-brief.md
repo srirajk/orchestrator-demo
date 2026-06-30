@@ -26,7 +26,7 @@ The current design is a correct architectural sketch with several production-dis
 | `fail-mode` property (closed/local) with logging | Correct dual-mode; just extend it to agent checks too |
 | RS256 + JWKS + aud/iss/alg validation | Sound. Keep the validation strictness. Fix the ephemeral key. |
 | `Principal` as an immutable value type through the request stack | Correct — no re-reads mid-request |
-| Micrometer `meridian.authz.decisions` counter per decision | Right observability hook — add more tags, not fewer |
+| Micrometer `conduit.authz.decisions` counter per decision | Right observability hook — add more tags, not fewer |
 | Extract-Resolve-Bind input synthesis | Correct zero-fabrication contract |
 | Per-agent circuit breakers | Right isolation. Share state via Redis for multi-replica correctness. |
 | Declarative org seed from YAML | Keep this pattern. Generalize the field names. |
@@ -106,7 +106,7 @@ Agent checks must fail closed — not fail open. The comment "relationship check
 
 - Relationship checks: deny all (current behavior — correct)
 - Agent checks: deny all (change required)
-- Emit `meridian.authz.degraded{source=cerbos-unreachable}` Micrometer event
+- Emit `conduit.authz.degraded{source=cerbos-unreachable}` Micrometer event
 - Annotate OTel span with `authz.degraded=true`
 - Show warning in glass-box
 
@@ -285,7 +285,7 @@ The input extraction step must produce zero fabricated `relationship_id`, `accou
 
 ### Confused deputy at the agent boundary
 
-The gateway calls agents on behalf of users. Currently it forwards the user's JWT. Agents that check `aud` correctly reject the call (token was issued for `meridian-gateway`, not the agent). Agents that skip `aud` validation silently trust the gateway — which means any compromised agent could claim the gateway authorized a different user. Fix: the gateway presents a machine credential (client_credentials OAuth2 flow) plus a narrow user-context assertion scoped to what that specific agent needs. Agents log "gateway acted on behalf of rm_jane" — not "rm_jane accessed directly."
+The gateway calls agents on behalf of users. Currently it forwards the user's JWT. Agents that check `aud` correctly reject the call (token was issued for `conduit-gateway`, not the agent). Agents that skip `aud` validation silently trust the gateway — which means any compromised agent could claim the gateway authorized a different user. Fix: the gateway presents a machine credential (client_credentials OAuth2 flow) plus a narrow user-context assertion scoped to what that specific agent needs. Agents log "gateway acted on behalf of rm_jane" — not "rm_jane accessed directly."
 
 ### Trace stream as an enumeration API
 
@@ -293,7 +293,7 @@ The glass-box `/trace/stream` SSE endpoint currently requires no authentication.
 
 ### Stale entitlement window as a compliance event, not a UX issue
 
-When Cerbos fails and the gateway falls back to JWT-book-based authorization, users whose book was revoked mid-session retain access. The JWT can be hours old. This must not be a silent graceful degradation — it is a security event. Emit `meridian.authz.degraded` metrics, annotate every affected request span, and surface a visible warning in the glass-box. The on-call engineer must know within seconds whether authorization is operating on live state or stale JWT claims.
+When Cerbos fails and the gateway falls back to JWT-book-based authorization, users whose book was revoked mid-session retain access. The JWT can be hours old. This must not be a silent graceful degradation — it is a security event. Emit `conduit.authz.degraded` metrics, annotate every affected request span, and surface a visible warning in the glass-box. The on-call engineer must know within seconds whether authorization is operating on live state or stale JWT claims.
 
 ### Synthesis presenting filtered data as complete
 
@@ -341,7 +341,7 @@ These are blocking defects. Do them in parallel where possible.
 - Implement PlanResources call after vector routing, before fan-out — prune to user's operational segments
 - Switch `CerbosEntitlementAdapter` to `dev.cerbos:cerbos-sdk-java` gRPC client; delete ~80 lines of manual JSON construction
 - Add `book:{userId}` Redis SET; switch `filterCovered` to pipelined SISMEMBER
-- Add book-size Micrometer gauge; add `meridian.authz.degraded` counter and span annotation
+- Add book-size Micrometer gauge; add `conduit.authz.degraded` counter and span annotation
 
 ### Phase 3 — PostgreSQL for user management (two weeks)
 
@@ -378,7 +378,7 @@ Do this as a parallel workstream while Phase 1-2 are being validated:
 | 9 agent IDs in the registry seed | Catalog is small; manifests are in git; registration API exists for additions |
 | `glm-4.6` as default synthesis model | Behind `LLMClient` interface — one property change to swap |
 | Redis and Cerbos ports in docker-compose | Demo infrastructure; compose env vars are sufficient |
-| `fail-mode=closed` as a property default | Already externalized as `meridian.cerbos.fail-mode` — correct |
+| `fail-mode=closed` as a property default | Already externalized as `conduit.cerbos.fail-mode` — correct |
 | Cerbos sidecar port 3592 | Standard; document in .env.example |
 | `all-MiniLM-L6-v2` as embedding model | Behind `EmbeddingClient` interface; DJL model name is a config value |
 
@@ -395,7 +395,7 @@ Do this as a parallel workstream while Phase 1-2 are being validated:
 | Cerbos image version | Pinned explicit tag | `:latest` will break on a minor Cerbos release |
 | Principal `attributes` (clearance, segments, book) | Tenant JSONB config, not Pydantic model fields | Domain-specific fields in core models prevent reuse |
 | Token lifetime | Per-client config in `oauth_clients` | Different clients need different lifetimes |
-| Cerbos fail-mode | `meridian.cerbos.fail-mode` property (already done) | Prod = closed; demo = local — must not require code change to switch |
+| Cerbos fail-mode | `conduit.cerbos.fail-mode` property (already done) | Prod = closed; demo = local — must not require code change to switch |
 
 ### The pragmatic line
 

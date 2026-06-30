@@ -9,7 +9,7 @@ plus where memory, harness, and telemetry live, and an honest difficulty map.*
 
 ```
 ┌──────────────── YOU RUN AS-IS (config + rebrand only) ───────────────────┐
-│  LibreChat  (Meridian branded)                                     │
+│  LibreChat  (Conduit branded)                                      │
 │  • chat UI   • user login   • conversation history (Mongo)               │
 │  • renders the streamed answer                                           │
 └───────────────────────────────┬──────────────────────────────────────────┘

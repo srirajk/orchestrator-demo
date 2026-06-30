@@ -1,13 +1,13 @@
-# Meridian Gateway — Operator & Demo Runbook
+# Conduit Gateway — Operator & Demo Runbook
 
 > The single "where is everything, what is it, how do I log in, how do I demo it" doc.
 > Everything below was verified live against the running stack.
 
 ---
 
-## 1. What Meridian is
+## 1. What Conduit is
 
-Meridian is a **custom enterprise AI gateway for a bank**. A user types one plain-English
+Conduit is a **custom enterprise AI gateway for a bank**. A user types one plain-English
 question into a chat UI; the gateway:
 
 1. classifies intent and extracts the entities referenced (no fabricated IDs),
@@ -66,7 +66,7 @@ N/M agents succeeded).
 
 | Service | URL | What it is | Login |
 |---|---|---|---|
-| **LibreChat** (Meridian-branded) | http://localhost:3080 | The chat UI the banker uses | OIDC via IAM — sign in with a seeded user, e.g. **`rm_jane` / `Meridian@2024`**. A "Demo User" session is typically already active. |
+| **LibreChat** (Conduit-branded) | http://localhost:3080 | The chat UI the banker uses | OIDC via IAM — sign in with a seeded user, e.g. **`rm_jane` / `Meridian@2024`**. A "Demo User" session is typically already active. |
 | **Glass-Box** | http://localhost:4000 | Live decision trace for each request | None. Open it, confirm top-right says **"Connected"**, then send a prompt in LibreChat. |
 | **Langfuse** | http://localhost:3030 | LLM traces, sessions (conversation = session, 1→many turns), eval scores | **`admin@meridian.bank` / `changeme`** (`LANGFUSE_ADMIN_PASSWORD`). |
 | **Grafana** | http://localhost:3000 | Dashboards: JVM/CPU/mem (Prometheus), logs (Loki), distributed traces (Tempo) | **`admin` / `changeme`** (`GRAFANA_ADMIN_PASSWORD`). |
@@ -106,7 +106,7 @@ N/M agents succeeded).
 
 ```bash
 # 0. Prereqs: Docker + Compose v2, open egress to OpenAI (and Docker Hub/GHCR).
-cp .env.example .env           # then set MERIDIAN_LLM_SYNTHESIZER_API_KEY (OpenAI)
+cp .env.example .env           # then set CONDUIT_LLM_SYNTHESIZER_API_KEY (OpenAI)
 
 # 1. Bring up the core stack (everyday demo)
 docker compose up -d
@@ -140,13 +140,13 @@ unsettled?"* — answered from session memory (multi-turn carry-forward).
 
 ### Beat 2 — Resilience (kill an agent mid-request)
 ```bash
-docker stop meridian-servicing-mcp        # kills the MCP agents
+docker stop conduit-servicing-mcp        # kills the MCP agents
 ```
 Re-ask the hero prompt. **Watch:** the answer still returns from the HTTP survivors and
 **states the missing pieces** ("Settlement Status: Data unavailable (status: FAILED)").
 Glass-box shows the two MCP nodes in **red "failed"**, **3/5 succeeded**. Restart:
 ```bash
-docker start meridian-servicing-mcp
+docker start conduit-servicing-mcp
 ```
 
 ### Beat 3 — Entitlement (out-of-book denial)
@@ -189,7 +189,7 @@ it proceeds to the grounded answer.
 | Continuous eval judge | **OpenAI** `gpt-4o-mini` | async + low-volume; reliable structured output |
 | DeepEval release gate | offline batch | not realtime |
 
-Every call site is provider-swappable via env (`MERIDIAN_LLM_*`, `JUDGE_*`). To move the
+Every call site is provider-swappable via env (`CONDUIT_LLM_*`, `JUDGE_*`). To move the
 async judge back to GLM, point `JUDGE_BASE_URL/JUDGE_API_KEY/JUDGE_MODEL` at Z.AI and raise
 `EVAL_JUDGE_THROTTLE_MS` (the funnel — throttle + backoff — is retained either way).
 
@@ -242,7 +242,7 @@ passed — virtual-thread gateway handled concurrent streaming with zero failure
 |---|---|
 | LibreChat shows a blank reply | SSE format / gateway down — `docker compose ps gateway`; check `/v1/models`. |
 | Everything denied for a user | Principals not seeded — run `scripts/seed-users.sh` (Redis was wiped). |
-| Glass-box stuck "Connecting/Reconnecting" | Gateway restarting, or `MERIDIAN_GLASSBOX_ALLOWED_ORIGINS` too strict (default `*`). Reload after gateway is healthy. |
+| Glass-box stuck "Connecting/Reconnecting" | Gateway restarting, or `CONDUIT_GLASSBOX_ALLOWED_ORIGINS` too strict (default `*`). Reload after gateway is healthy. |
 | Glass-box "Waiting for a request" after sending | It only shows traces that arrive *after* it connects — confirm "Connected", then send. |
 | Langfuse trace shows no logs for a convo | LibreChat doesn't forward a conversation id; the gateway derives its own `conv-…`. Grab it from gateway logs and search Langfuse/Loki by that. |
 | Grafana "No data" on first run | Click "Run query" a second time. |

@@ -1,5 +1,5 @@
 # Domain Onboarding Standard
-# Meridian AI Gateway
+# Conduit AI Gateway
 
 > **Status:** Locked — agreed 2026-06-28.
 > This document defines what every domain team must provide before their agents

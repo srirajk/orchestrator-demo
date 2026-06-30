@@ -1,6 +1,6 @@
 # Registry — how to onboard a new business
 
-> This folder **is** the onboarding surface. Adding a business line to Meridian means adding
+> This folder **is** the onboarding surface. Adding a business line to Conduit means adding
 > files here (+ standing up its services) — **never changing gateway code.** This README
 > explains what each folder is and gives a step-by-step checklist. The full rationale lives in
 > [`../docs/domain-onboarding-standard.md`](../docs/domain-onboarding-standard.md).

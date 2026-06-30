@@ -1,4 +1,4 @@
-# Build Report — Meridian AI Gateway
+# Build Report — Conduit AI Gateway
 
 > Status & verification record: **what is built, what is proven, and how to re-verify it.**
 > For what the product is, see [`docs/PROJECT-OVERVIEW.md`](docs/PROJECT-OVERVIEW.md); to run it,

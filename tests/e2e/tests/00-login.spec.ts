@@ -102,8 +102,8 @@ test.describe('Login and registration', () => {
     await newConversation(page);
 
     const textarea = page.locator('#prompt-textarea').first();
-    await textarea.fill('Hello Meridian');
+    await textarea.fill('Hello Conduit');
     const value = await textarea.inputValue();
-    expect(value).toContain('Hello Meridian');
+    expect(value).toContain('Hello Conduit');
   });
 });

@@ -1,4 +1,4 @@
-# Meridian — Project Overview
+# Conduit — Project Overview
 
 > The one doc that explains **what this project is, why it matters, how it works, and what
 > every module does.** Start here. For running/demoing it, see
@@ -9,8 +9,8 @@
 
 ## 1. The one-liner
 
-**Meridian is an enterprise AI gateway for a bank.** A banker asks one plain-English question;
-Meridian figures out which specialist systems hold the answer, checks the banker is allowed to
+**Conduit is an enterprise AI gateway for a bank.** A banker asks one plain-English question;
+Conduit figures out which specialist systems hold the answer, checks the banker is allowed to
 see that data, calls those systems in parallel, and streams back **one grounded, attributed
 answer** — while showing the entire decision live in a glass-box panel.
 
@@ -29,7 +29,7 @@ systems has different access rules, different protocols, and different owners. G
 can't be trusted here: they hallucinate numbers, they don't enforce entitlements, and they're a
 black box to compliance.
 
-### What Meridian delivers
+### What Conduit delivers
 - **One question, one answer.** Natural language in; a single synthesized, **grounded** answer
   out — every number traceable to a source system, nothing invented.
 - **It respects entitlements.** A banker only ever sees data for relationships in their book of
@@ -42,14 +42,14 @@ black box to compliance.
 
 ### Why we win — the differentiator
 Most "AI gateway" projects hardcode each business line into the gateway. Adding insurance means
-a new release of the core. **Meridian is "World B": the gateway carries zero domain knowledge.**
+a new release of the core. **Conduit is "World B": the gateway carries zero domain knowledge.**
 A new business domain — insurance, lending, anything — is onboarded by **adding manifest files +
 a CRM/coverage service URL, with no change to gateway code.** That is the moat: the platform
 team ships once; domain teams self-onboard. We prove it in this very build — insurance was added
 to a wealth-and-servicing gateway by manifest alone.
 
 ### The maturity path (the forward story for the PO)
-Today Meridian is **read-only** (answer questions, enforce who-can-see-what). The same
+Today Conduit is **read-only** (answer questions, enforce who-can-see-what). The same
 architecture — manifest-described agents, entitlement-gated, glass-box-audited — extends to
 **write** actions (initiate a trade, open a case) by adding mutating agents behind the same
 guardrails. The read product earns the trust; the write product captures the workflow.
@@ -70,7 +70,7 @@ Every question flows through six stages. The glass-box renders them live, one pa
 | 6 | **Observe** | Spans, metrics, and glass-box events are emitted throughout; the answer's quality is scored asynchronously | PII-aware logging; data and instructions kept separate |
 
 A **deterministic clarify** sits across this: if the user's references don't cover what the
-agents require (`extracted ∩ required_context = ∅`), Meridian asks a scoped question instead of
+agents require (`extracted ∩ required_context = ∅`), Conduit asks a scoped question instead of
 guessing — and the decision is made in code, not by an LLM.
 
 ---
@@ -135,7 +135,7 @@ A standalone single-page app that subscribes to the gateway's `/trace/stream` (S
 the six-stage decision live. This is the demo's hero view and the compliance story.
 
 ### `librechat/` — the chat UI
-LibreChat via config + cosmetic Meridian rebrand only — **no code fork**. Points at the gateway's
+LibreChat via config + cosmetic Conduit rebrand only — **no code fork**. Points at the gateway's
 `/v1` as a custom endpoint.
 
 ### `admin-ui/` — registry admin
@@ -178,7 +178,7 @@ wiring. Changing *who can do what* or *what we chart* happens here, not in the g
 | Gateway runtime | Java 21+, Spring Boot 3.5, **virtual threads** (concurrency without thread-pool exhaustion) |
 | Routing + state | Redis Stack (RediSearch HNSW vector index + RedisJSON) |
 | Embeddings | DJL + all-MiniLM-L6-v2 (in-JVM, 384-dim) |
-| LLM (gateway + agents) | OpenAI-compatible, provider-swappable per call site (`MERIDIAN_LLM_*`) |
+| LLM (gateway + agents) | OpenAI-compatible, provider-swappable per call site (`CONDUIT_LLM_*`) |
 | Resilience | Resilience4j (circuit breakers, timeouts, partial join) |
 | Authorization | Cerbos PDP (structural) + coverage services (data-aware) |
 | Telemetry / eval | OTel → Langfuse + Tempo/Loki/Prometheus; DeepEval gate |

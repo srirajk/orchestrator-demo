@@ -1252,3 +1252,63 @@
 | 23:01 | Session end: 45 writes across 21 files (AnswerSynthesizer.java, langfuse_continuous.py, docker-compose.yml, TraceEventPublisher.java, SecurityConfig.java) | 23 reads | ~114544 tok |
 | 23:06 | Session end: 45 writes across 21 files (AnswerSynthesizer.java, langfuse_continuous.py, docker-compose.yml, TraceEventPublisher.java, SecurityConfig.java) | 23 reads | ~114544 tok |
 | 23:20 | Session end: 45 writes across 21 files (AnswerSynthesizer.java, langfuse_continuous.py, docker-compose.yml, TraceEventPublisher.java, SecurityConfig.java) | 23 reads | ~114544 tok |
+| 23:37 | Session end: 45 writes across 21 files (AnswerSynthesizer.java, langfuse_continuous.py, docker-compose.yml, TraceEventPublisher.java, SecurityConfig.java) | 23 reads | ~114544 tok |
+| 23:38 | Edited docs/PROJECT-OVERVIEW.md | inline fix | ~8 |
+| 23:38 | Edited docs/PROJECT-OVERVIEW.md | 2→2 lines | ~50 |
+| 23:39 | Edited docs/PROJECT-OVERVIEW.md | inline fix | ~7 |
+| 23:39 | Edited docs/PROJECT-OVERVIEW.md | inline fix | ~26 |
+| 23:39 | Edited docs/PROJECT-OVERVIEW.md | inline fix | ~23 |
+| 23:39 | Edited docs/PROJECT-OVERVIEW.md | inline fix | ~26 |
+| 23:39 | Edited docs/PROJECT-OVERVIEW.md | inline fix | ~26 |
+| 23:39 | Edited docs/AGENTS.md | 7→7 lines | ~165 |
+| 23:39 | Edited docs/AGENTS.md | inline fix | ~32 |
+| 23:39 | Edited docs/AGENTS.md | 2→2 lines | ~25 |
+| 23:39 | Edited docs/AGENTS.md | inline fix | ~26 |
+| 23:39 | Edited docs/AGENTS.md | 3→3 lines | ~48 |
+| 23:39 | Edited docs/OPERATOR-RUNBOOK.md | inline fix | ~12 |
+| 23:39 | Edited docs/OPERATOR-RUNBOOK.md | 3→3 lines | ~22 |
+| 23:40 | Edited docs/OPERATOR-RUNBOOK.md | inline fix | ~16 |
+| 23:40 | Edited docs/OPERATOR-RUNBOOK.md | inline fix | ~6 |
+| 23:40 | Edited docs/gateway-domain-architecture.md | inline fix | ~12 |
+| 23:40 | Edited docs/technical-architecture-clear-boundaries.md | inline fix | ~19 |
+| 23:40 | Edited docs/domain-onboarding-standard.md | inline fix | ~6 |
+| 23:40 | Edited docs/MODEL-SELECTION.md | inline fix | ~12 |
+| 23:40 | Edited docs/WORLD-B-LOCKDOWN.md | inline fix | ~17 |
+| 23:40 | Edited docs/WORLD-B-LOCKDOWN.md | inline fix | ~11 |
+| 23:40 | Edited docs/agent-catalog.md | inline fix | ~14 |
+| 23:41 | Edited BUILD_REPORT.md | inline fix | ~10 |
+| 23:41 | Edited CLAUDE.md | inline fix | ~24 |
+| 23:41 | Edited registry/README.md | inline fix | ~25 |
+| 23:41 | Edited tests/README.md | inline fix | ~6 |
+| 23:41 | Edited tests/README.md | inline fix | ~24 |
+| 23:41 | Edited tests/README.md | inline fix | ~23 |
+| 23:41 | Edited tests/README.md | inline fix | ~16 |
+| 23:41 | Edited README.md | inline fix | ~9 |
+| 23:41 | Edited README.md | inline fix | ~25 |
+| 23:41 | Edited README.md | modified chat() | ~28 |
+| 23:41 | Edited README.md | inline fix | ~22 |
+| 23:42 | Edited README.md | modified Logs() | ~153 |
+| 23:42 | Edited docs/authz-architecture-brief.md | "meridian.authz.decisions" → "conduit.authz.decisions" | ~17 |
+| 23:42 | Edited docs/authz-architecture-brief.md | "meridian.authz.degraded{s" → "conduit.authz.degraded{so" | ~20 |
+| 23:42 | Edited docs/authz-architecture-brief.md | inline fix | ~29 |
+| 23:42 | Edited docs/authz-architecture-brief.md | "meridian.authz.degraded" → "conduit.authz.degraded" | ~27 |
+| 23:42 | Edited docs/authz-architecture-brief.md | "meridian.authz.degraded" → "conduit.authz.degraded" | ~24 |
+| 23:42 | Edited docs/authz-architecture-brief.md | inline fix | ~29 |
+| 23:42 | Edited docs/authz-architecture-brief.md | "meridian.cerbos.fail-mode" → "conduit.cerbos.fail-mode" | ~39 |
+| 23:42 | Edited .claude/skills/meridian-agent/SKILL.md | inline fix | ~19 |
+| 23:42 | Edited .claude/skills/meridian-agent/SKILL.md | 3→3 lines | ~41 |
+| 23:43 | Edited .claude/skills/meridian-agent/SKILL.md | 3→3 lines | ~96 |
+| 23:43 | Edited .claude/skills/meridian-agent/SKILL.md | inline fix | ~20 |
+| 23:43 | Edited .claude/skills/meridian-agent/SKILL.md | inline fix | ~19 |
+| 23:43 | Edited .claude/skills/meridian-agent/SKILL.md | inline fix | ~8 |
+| 23:45 | Session end: 93 writes across 29 files (AnswerSynthesizer.java, langfuse_continuous.py, docker-compose.yml, TraceEventPublisher.java, SecurityConfig.java) | 35 reads | ~131769 tok |
+| 00:02 | Session end: 93 writes across 29 files (AnswerSynthesizer.java, langfuse_continuous.py, docker-compose.yml, TraceEventPublisher.java, SecurityConfig.java) | 35 reads | ~131769 tok |
+| 00:12 | Session end: 93 writes across 29 files (AnswerSynthesizer.java, langfuse_continuous.py, docker-compose.yml, TraceEventPublisher.java, SecurityConfig.java) | 35 reads | ~131769 tok |
+| 00:24 | Session end: 93 writes across 29 files (AnswerSynthesizer.java, langfuse_continuous.py, docker-compose.yml, TraceEventPublisher.java, SecurityConfig.java) | 37 reads | ~137851 tok |
+| 00:28 | Session end: 93 writes across 29 files (AnswerSynthesizer.java, langfuse_continuous.py, docker-compose.yml, TraceEventPublisher.java, SecurityConfig.java) | 37 reads | ~137851 tok |
+| 00:36 | Created iam-service/src/main/java/com/openwolf/iam/auth/OidcClaimEnricher.java | — | ~1284 |
+| 00:36 | Created iam-service/src/main/java/com/openwolf/iam/auth/JwtClaimsCustomizer.java | — | ~522 |
+| 00:38 | Session end: 95 writes across 31 files (AnswerSynthesizer.java, langfuse_continuous.py, docker-compose.yml, TraceEventPublisher.java, SecurityConfig.java) | 37 reads | ~139785 tok |
+| 00:42 | Session end: 95 writes across 31 files (AnswerSynthesizer.java, langfuse_continuous.py, docker-compose.yml, TraceEventPublisher.java, SecurityConfig.java) | 37 reads | ~139785 tok |
+| 00:42 | Session end: 95 writes across 31 files (AnswerSynthesizer.java, langfuse_continuous.py, docker-compose.yml, TraceEventPublisher.java, SecurityConfig.java) | 37 reads | ~139785 tok |
+| 00:45 | Session end: 95 writes across 31 files (AnswerSynthesizer.java, langfuse_continuous.py, docker-compose.yml, TraceEventPublisher.java, SecurityConfig.java) | 37 reads | ~139785 tok |

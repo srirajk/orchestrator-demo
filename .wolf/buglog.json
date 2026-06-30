@@ -2615,6 +2615,230 @@
       "related_bugs": [],
       "occurrences": 2,
       "last_seen": "2026-06-30T01:12:30.014Z"
+    },
+    {
+      "id": "bug-163",
+      "timestamp": "2026-06-30T03:38:52.845Z",
+      "error_message": "Wrong reference: Meridian should be Conduit",
+      "file": "docs/PROJECT-OVERVIEW.md",
+      "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
+      "fix": "Changed Meridian → Conduit",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 6,
+      "last_seen": "2026-06-30T03:39:17.777Z"
+    },
+    {
+      "id": "bug-164",
+      "timestamp": "2026-06-30T03:39:30.619Z",
+      "error_message": "Wrong reference: Meridian should be Conduit",
+      "file": "docs/AGENTS.md",
+      "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
+      "fix": "Changed Meridian → Conduit",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 3,
+      "last_seen": "2026-06-30T03:39:37.810Z"
+    },
+    {
+      "id": "bug-165",
+      "timestamp": "2026-06-30T03:39:53.233Z",
+      "error_message": "Wrong reference: Meridian should be Conduit",
+      "file": "docs/OPERATOR-RUNBOOK.md",
+      "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
+      "fix": "Changed Meridian → Conduit",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 3,
+      "last_seen": "2026-06-30T03:40:07.210Z"
+    },
+    {
+      "id": "bug-166",
+      "timestamp": "2026-06-30T03:40:14.423Z",
+      "error_message": "Wrong reference: Meridian should be Conduit",
+      "file": "docs/gateway-domain-architecture.md",
+      "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
+      "fix": "Changed Meridian → Conduit",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-30T03:40:14.423Z"
+    },
+    {
+      "id": "bug-167",
+      "timestamp": "2026-06-30T03:40:19.883Z",
+      "error_message": "Wrong reference: Meridian should be Conduit",
+      "file": "docs/technical-architecture-clear-boundaries.md",
+      "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
+      "fix": "Changed Meridian → Conduit",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-30T03:40:19.883Z"
+    },
+    {
+      "id": "bug-168",
+      "timestamp": "2026-06-30T03:40:27.668Z",
+      "error_message": "Wrong reference: Meridian should be Conduit",
+      "file": "docs/domain-onboarding-standard.md",
+      "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
+      "fix": "Changed Meridian → Conduit",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-30T03:40:27.668Z"
+    },
+    {
+      "id": "bug-169",
+      "timestamp": "2026-06-30T03:40:33.125Z",
+      "error_message": "Wrong reference: Meridian should be Conduit",
+      "file": "docs/MODEL-SELECTION.md",
+      "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
+      "fix": "Changed Meridian → Conduit",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-30T03:40:33.125Z"
+    },
+    {
+      "id": "bug-170",
+      "timestamp": "2026-06-30T03:40:43.909Z",
+      "error_message": "Wrong reference: meridian should be conduit",
+      "file": "docs/WORLD-B-LOCKDOWN.md",
+      "root_cause": "Used \"meridian\" instead of \"conduit\"",
+      "fix": "Changed meridian → conduit",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-06-30T03:40:50.245Z"
+    },
+    {
+      "id": "bug-171",
+      "timestamp": "2026-06-30T03:40:59.124Z",
+      "error_message": "Wrong reference: Meridian should be Conduit",
+      "file": "docs/agent-catalog.md",
+      "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
+      "fix": "Changed Meridian → Conduit",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-30T03:40:59.124Z"
+    },
+    {
+      "id": "bug-172",
+      "timestamp": "2026-06-30T03:41:05.798Z",
+      "error_message": "Wrong reference: Meridian should be Conduit",
+      "file": "BUILD_REPORT.md",
+      "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
+      "fix": "Changed Meridian → Conduit",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-30T03:41:05.798Z"
+    },
+    {
+      "id": "bug-173",
+      "timestamp": "2026-06-30T03:41:13.357Z",
+      "error_message": "Wrong reference: Meridian should be Conduit",
+      "file": "CLAUDE.md",
+      "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
+      "fix": "Changed Meridian → Conduit",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-30T03:41:13.357Z"
+    },
+    {
+      "id": "bug-174",
+      "timestamp": "2026-06-30T03:41:19.113Z",
+      "error_message": "Wrong reference: Meridian should be Conduit",
+      "file": "registry/README.md",
+      "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
+      "fix": "Changed Meridian → Conduit",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 8,
+      "last_seen": "2026-06-30T03:41:55.758Z"
+    },
+    {
+      "id": "bug-175",
+      "timestamp": "2026-06-30T03:42:13.599Z",
+      "error_message": "Incorrect value in code",
+      "file": "docs/authz-architecture-brief.md",
+      "root_cause": "Had `meridian.authz.decisions`",
+      "fix": "Changed to `conduit.authz.decisions`",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 7,
+      "last_seen": "2026-06-30T03:42:37.731Z"
+    },
+    {
+      "id": "bug-176",
+      "timestamp": "2026-06-30T03:42:52.336Z",
+      "error_message": "Wrong reference: Meridian should be Conduit",
+      "file": ".claude/skills/meridian-agent/SKILL.md",
+      "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
+      "fix": "Changed Meridian → Conduit",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 4,
+      "last_seen": "2026-06-30T03:43:29.841Z"
     }
   ]
 }

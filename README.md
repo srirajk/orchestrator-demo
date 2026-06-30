@@ -1,9 +1,9 @@
-# Meridian — Enterprise AI Gateway
+# Conduit — Enterprise AI Gateway
 
 > One plain-English question → the right specialist systems, across HTTP and MCP → one grounded,
 > attributed answer, with every routing and access decision visible live.
 
-**Meridian is an enterprise AI gateway for a bank.** A relationship manager asks a question in
+**Conduit is an enterprise AI gateway for a bank.** A relationship manager asks a question in
 plain English; the gateway figures out which specialist systems hold the answer, checks the user
 is entitled to that data, calls those systems in parallel, and streams back **one synthesized,
 grounded answer** — while showing the entire decision live in a glass-box panel.
@@ -19,16 +19,16 @@ map.
 
 <br>
 
-**The Meridian-branded chat (home):**
+**The Conduit-branded chat (home):**
 
-![Meridian — branded LibreChat home](docs/images/librechat-home.png)
+![Conduit — branded LibreChat home](docs/images/librechat-home.png)
 
 **A grounded answer to the hero prompt** — one synthesized reply, every number traceable to a
 source system (relationship `REL-00042`, `$1,967,000`, the actual positions):
 
-![Meridian — grounded Whitman portfolio answer](docs/images/librechat-answer.png)
+![Conduit — grounded Whitman portfolio answer](docs/images/librechat-answer.png)
 
-> These are captured live by `tests/e2e/tests/11-screenshots.spec.ts` — run it to regenerate
+> These are captured live by `tests/tests/e2e/tests/11-screenshots.spec.ts` — run it to regenerate
 > them, so the README never goes stale.
 
 </details>
@@ -53,7 +53,7 @@ and in the quality scores.
 ## Spin it up
 
 ```bash
-cp .env.example .env          # then set MERIDIAN_LLM_SYNTHESIZER_API_KEY (an OpenAI key)
+cp .env.example .env          # then set CONDUIT_LLM_SYNTHESIZER_API_KEY (an OpenAI key)
 docker compose up -d          # core stack
 bash scripts/seed-users.sh    # demo identities (rm_jane, uw_sam, …)
 docker compose --profile eval up -d eval-worker   # optional: continuous quality scoring
@@ -103,14 +103,14 @@ Open it beside the chat; confirm the top-right says **"Connected"**, then send a
 *Log in as `admin` / `changeme`.* Dashboards (left nav → Dashboards):
 | Dashboard | What it shows |
 |---|---|
-| **Meridian — Live Demo View** | the at-a-glance demo panel |
-| **Meridian Gateway — Performance** | request rate, success rate, **p50/p95/p99 latency**, outbound agent-call latency |
-| **Meridian — Agent Health** | per-agent success/error rates and latency (spot a failing agent) |
-| **Meridian — Business Overview** | intents, domains, cost-by-domain |
-| **Meridian — Conversation Trace Explorer** | drill a single conversation across the stack |
-| **Meridian — Resource Usage** | JVM CPU / memory |
+| **Conduit — Live Demo View** | the at-a-glance demo panel |
+| **Conduit Gateway — Performance** | request rate, success rate, **p50/p95/p99 latency**, outbound agent-call latency |
+| **Conduit — Agent Health** | per-agent success/error rates and latency (spot a failing agent) |
+| **Conduit — Business Overview** | intents, domains, cost-by-domain |
+| **Conduit — Conversation Trace Explorer** | drill a single conversation across the stack |
+| **Conduit — Resource Usage** | JVM CPU / memory |
 
-- **Logs (Loki):** Explore → Loki → query `{container="meridian-gateway"}`. The gateway logs the
+- **Logs (Loki):** Explore → Loki → query `{container="conduit-gateway"}`. The gateway logs the
   conversation id it derived (`conv-…`); grab it and filter by it to follow one conversation's
   logs. *(Tip: click "Run query" twice on first load if a panel says "No data".)*
 - **Distributed traces (Tempo):** Explore → Tempo → search recent traces to see the same request

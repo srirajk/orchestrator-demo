@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-30T01:25:03.436Z
-> Files: 658 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-30T04:36:46.482Z
+> Files: 660 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/
 
@@ -21,10 +21,10 @@
 - `.DS_Store` (~1640 tok)
 - `.gitignore` — Git ignore rules (~524 tok)
 - `agent-manifest.schema.json` (~1558 tok)
-- `BUILD_REPORT.md` — Build Report — Meridian AI Gateway (~1029 tok)
+- `BUILD_REPORT.md` — Build Report — Conduit AI Gateway (~1028 tok)
 - `CLAUDE.md` — OpenWolf (~1698 tok)
 - `docker-compose.yml` — Docker Compose services (~8284 tok)
-- `README.md` — Project documentation (~1935 tok)
+- `README.md` — Project documentation (~1932 tok)
 - `z.ai-tiers.md` — Declares Model (~778 tok)
 
 ## .claude/
@@ -43,7 +43,7 @@
 
 ## .claude/skills/meridian-agent/
 
-- `SKILL.md` — Meridian Agent Compliance Contract (~4795 tok)
+- `SKILL.md` — Conduit Agent Compliance Contract (~4793 tok)
 
 ## .claude/skills/meridian-agent/scripts/
 
@@ -252,28 +252,29 @@
 
 ## docs/
 
-- `agent-catalog.md` — Agent Catalog — The 9 Demo Agents (Meridian demo) (~1480 tok)
+- `agent-catalog.md` — Agent Catalog — The 9 Demo Agents (Conduit demo) (~1479 tok)
 - `agent-registration-schema-a2a-aligned.md` — Agent Registration Schema — Grounded in the A2A Agent Card Standard (~1795 tok)
 - `agent-registry-demo-spec.md` — Agent Registry — Demo Spec (~2333 tok)
-- `AGENTS.md` — Meridian AI — Agent Guide (~2840 tok)
+- `AGENTS.md` — Conduit AI — Agent Guide (~2838 tok)
 - `authorization-abac-cerbos-deep-spec.md` — Authorization (ABAC + Cerbos) — Deep Spec (~2218 tok)
 - `authorization-model.md` — Enterprise AI Gateway — Authorization Model (~5478 tok)
+- `authz-architecture-brief.md` — Enterprise AI Gateway — Authorization & User Management Architectural Brief (~7031 tok)
 - `clearance-tiers-and-agent-metadata.md` — Clearance Tiers — Tenant Schema, Agent Metadata & Policy (~2142 tok)
 - `domain-manifest-and-memory.md` — Domain Manifest + Contextual Memory Architecture (~2480 tok)
 - `domain-onboarding-standard.md` — Domain Onboarding Standard (~4115 tok)
 - `execution-orchestration-layer.md` — Execution / Orchestration Layer — Spec (~1323 tok)
-- `gateway-domain-architecture.md` — Meridian AI Gateway — Domain Architecture (~7276 tok)
+- `gateway-domain-architecture.md` — Conduit AI Gateway — Domain Architecture (~7275 tok)
 - `harness-and-telemetry-deep-spec.md` — Harness & Telemetry — Deep Spec (~2123 tok)
 - `implementation-checklist.md` — Implementation Checklist — Pre-Build Validation Spec (~4638 tok)
 - `input-synthesis-deep-spec.md` — Input Synthesis — Deep Spec (the one unproven piece) (~1951 tok)
 - `master-build-plan-consolidated.md` — Enterprise Intelligence Platform — Master Build Plan (Meridian) (~3833 tok)
-- `MODEL-SELECTION.md` — Model Selection Guide — Meridian AI Gateway (~2289 tok)
-- `OPERATOR-RUNBOOK.md` — Meridian Gateway — Operator & Demo Runbook (~3448 tok)
+- `MODEL-SELECTION.md` — Model Selection Guide — Conduit AI Gateway (~2289 tok)
+- `OPERATOR-RUNBOOK.md` — Conduit Gateway — Operator & Demo Runbook (~3446 tok)
 - `platform-vision-and-maturity-path.md` — Enterprise Intelligence Platform — Vision & Maturity Path (~1324 tok)
-- `PROJECT-OVERVIEW.md` — Meridian — Project Overview (~2937 tok)
+- `PROJECT-OVERVIEW.md` — Conduit — Project Overview (~2935 tok)
 - `PROMPT-AUDIT.md` — Prompt Contract Audit — every production prompt vs the 9-element framework (~1931 tok)
 - `technical-architecture-clear-boundaries.md` — Technical Architecture — Clear Boundaries (~1990 tok)
-- `WORLD-B-LOCKDOWN.md` — Meridian — World B Architecture Lockdown (~8941 tok)
+- `WORLD-B-LOCKDOWN.md` — Conduit — World B Architecture Lockdown (~8940 tok)
 
 ## e2e/test-results/.playwright-artifacts-0/traces/
 
@@ -682,7 +683,8 @@
 ## iam-service/src/main/java/com/openwolf/iam/auth/
 
 - `CustomUserDetailsService.java` — Loads {@link UserDetails} for Spring Security's {@link org.springframework.security.authentication.A (~674 tok)
-- `JwtClaimsCustomizer.java` — Enriches JWTs with mandated claims. Every issued access token carries: (~1639 tok)
+- `JwtClaimsCustomizer.java` — Enriches OIDC access tokens with mandated claims ({@code tenant_id}, {@code roles}, (~522 tok)
+- `OidcClaimEnricher.java` — Builds the enrichment claims for an access token <b>inside a read-only transaction</b>. (~1284 tok)
 
 ## iam-service/src/main/java/com/openwolf/iam/config/
 
@@ -1054,7 +1056,7 @@
 ## registry/
 
 - `agent-manifest.schema.json` (~1714 tok)
-- `README.md` — Project documentation (~1705 tok)
+- `README.md` — Project documentation (~1704 tok)
 
 ## registry/domains/
 
@@ -1125,7 +1127,7 @@
 ## tests/
 
 - `__init__.py` (~0 tok)
-- `README.md` — Master test index: E2E / load / integration / unit suites + how to run (~1400 tok)
+- `README.md` — Project documentation (~1979 tok)
 - `README.md` — Project documentation (~1980 tok)
 
 ## tests/e2e/

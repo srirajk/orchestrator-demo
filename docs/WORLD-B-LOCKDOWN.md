@@ -1,4 +1,4 @@
-# Meridian — World B Architecture Lockdown
+# Conduit — World B Architecture Lockdown
 
 > **Status:** Locked-in design intent — recorded 2026-06-29.
 > **Purpose:** The single source of truth for what "World B" is, why it's the product,
@@ -123,7 +123,7 @@ violation in a Python service. This is the precise inventory the refactor must c
 |---|---|---|
 | Entity extraction | `EntityExtractor.java` | Hardcoded LLM schema fields: `relationship_reference`, `fund_reference`, `ticker_references`, `period`. System prompt says "banking". Hardcoded regex `REL-\d+`, `FND-\w+`. Default period `"QTD"`. |
 | Entity bag | `EntityBag.java` | Fixed Java record with wealth fields. A new entity type (e.g. `deal_id`) requires a code change. |
-| Entity resolution | `EntityResolver.java` | `@Value("${meridian.crm.wealth.url}")` — one CRM URL baked in. Resolves only `"relationship"` and `"fund"`. |
+| Entity resolution | `EntityResolver.java` | `@Value("${conduit.crm.wealth.url}")` — one CRM URL baked in. Resolves only `"relationship"` and `"fund"`. |
 | Input synthesis | `InputSynthesizerImpl.java` | `switch(fieldName){ case "relationship_id"…; case "fund_id"… }`. Clarification copy hardcodes "client relationship". |
 | Session | `ConversationSession.java` | Named fields: `relationshipId`, `fundId`, `clientName`, `timePeriod` — all wealth-specific. |
 | Chat pipeline | `ChatService.java` | Hardcoded entity type `"relationship"` passed to coverage resolve. Hardcoded user-facing copy: "client relationship", "client relationships in your coverage", clarification examples ("holdings, performance, settlements"). Denial-reason map hardcodes "client". |
@@ -439,7 +439,7 @@ Each step keeps the existing **88/88 E2E green**. Ordered by dependency and by v
 
 | # | Step | Touches | Risk |
 |---|---|---|---|
-| 1 | **Fix the RESOLVE contract** — `resolve()` searches all entities, returns all candidates; CHECK is the gate. Then tighten the Okafor E2E from 14-phrase fallback to a specific denial phrase | `mock-agents/wealth-coverage/data.py`, `e2e/tests/10-coverage-flow.spec.ts` | low |
+| 1 | **Fix the RESOLVE contract** — `resolve()` searches all entities, returns all candidates; CHECK is the gate. Then tighten the Okafor E2E from 14-phrase fallback to a specific denial phrase | `mock-agents/wealth-coverage/data.py`, `tests/tests/e2e/tests/10-coverage-flow.spec.ts` | low |
 | 2 | **Deterministic CLARIFY** — move FETCH-vs-CLARIFY out of the LLM into a generic check over (extracted entities × manifest `required_context`) | `ChatService.java`, `EffectiveManifest.java` | **medium — highest leverage** |
 | 3 | **Generic entity context** — replace `EntityBag` (fixed record) with `EntityContext(Map<String,String> references, Map<String,String> resolved)`; replace `ConversationSession` wealth fields with `Map<String,String> resolvedEntities` + `primaryEntityType` | `EntityBag.java`, `ConversationSession.java`, `ConversationSessionStore.java`, all readers | medium |
 | 4 | **Manifest-driven entity extraction** — `EntityExtractor` builds its LLM function schema dynamically from the effective manifest's `entity_types`; no hardcoded field names, patterns, or defaults; configurable `domain_context` opener | `EntityExtractor.java` | **medium — needs regression suite** |

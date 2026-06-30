@@ -19,7 +19,7 @@ reading files.
 
 ## 1. What this is, in one paragraph
 
-Meridian is an enterprise AI gateway for a bank: one plain-English question fans out across
+Conduit is an enterprise AI gateway for a bank: one plain-English question fans out across
 specialist agents (HTTP + MCP) over multiple business domains, enforces entitlements, and
 streams back one grounded answer — with the whole decision visible live in a glass-box panel.
 The gateway is a **single Java/Spring Boot service**; the agents are Python stand-ins for
@@ -45,7 +45,7 @@ not increase that count.
 | Mock agents | Python — FastAPI (Wealth/Insurance HTTP) + FastMCP (Asset-Servicing MCP). The gateway stays Java; only these stand-ins are Python |
 | Routing + state | Redis Stack (RediSearch HNSW + RedisJSON) |
 | Embeddings | DJL + all-MiniLM-L6-v2 (in-JVM, 384-dim) behind `EmbeddingClient` |
-| LLM | OpenAI-compatible, provider-swappable per call site via `MERIDIAN_LLM_*` / `JUDGE_*` env, behind the `LLMClient` interface |
+| LLM | OpenAI-compatible, provider-swappable per call site via `CONDUIT_LLM_*` / `JUDGE_*` env, behind the `LLMClient` interface |
 | Resilience | Resilience4j |
 | Authorization | Cerbos PDP (structural) + coverage services (data-aware book) |
 | Identity | IAM service — OIDC, RS256/JWKS; verified at every hop |
@@ -117,7 +117,7 @@ No gateway Java changes. That's the whole point.
   includes `world-b-check.sh` as a hard gate).
 - **Run the stack:** `docker compose up -d` (core), then `bash scripts/seed-users.sh`. Continuous
   eval: `docker compose --profile eval up -d eval-worker`.
-- **Tests:** JUnit + Testcontainers (gateway), pytest (agents), Playwright (`e2e/`), k6 (`loadtest/`).
+- **Tests:** JUnit + Testcontainers (gateway), pytest (agents), Playwright (`tests/e2e/`), k6 (`tests/load/`).
 - Full URLs, logins, and the demo script are in [`docs/OPERATOR-RUNBOOK.md`](docs/OPERATOR-RUNBOOK.md).
 
 ## 8. Working agreement

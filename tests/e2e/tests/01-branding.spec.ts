@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { registerOrLogin, LIBRECHAT_URL } from './helpers';
 
 /**
- * Phase 5 / M12 — Meridian branding.
+ * Phase 5 / M12 — Conduit branding.
  * The LibreChat UI must present itself as "Conduit AI", not generic LibreChat.
  */
 test.describe('Branding', () => {
@@ -28,7 +28,7 @@ test.describe('Branding', () => {
     const placeholder = await page.locator('#prompt-textarea').evaluate(
       el => (el as HTMLTextAreaElement).placeholder
     );
-    expect(placeholder).toMatch(/Meridian/i);
+    expect(placeholder).toMatch(/Conduit/i);
   });
 
   test('model selector is hidden (modelSelect: false)', async ({ page }) => {

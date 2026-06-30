@@ -1,4 +1,4 @@
-# Meridian — Test Index
+# Conduit — Test Index
 
 The master map of every test in the repo: what it checks and where to look. Cross-cutting
 suites live under this `tests/` umbrella; fast unit tests stay co-located with the code they
@@ -6,7 +6,7 @@ cover (standard practice — see [Unit tests](#unit-tests-co-located)).
 
 ```
 tests/
-├── e2e/          Playwright — drives the real Meridian-branded LibreChat UI + gateway API
+├── e2e/          Playwright — drives the real Conduit-branded LibreChat UI + gateway API
 ├── load/         k6 — concurrency / latency / scenario load tests
 └── integration/  pytest — live gateway coverage-flow integration tests
 ```
@@ -15,7 +15,7 @@ tests/
 
 ## E2E suite — `tests/e2e/`
 
-Playwright (Chromium, headless) driving the **running** Meridian-branded LibreChat at
+Playwright (Chromium, headless) driving the **running** Conduit-branded LibreChat at
 `baseURL http://localhost:3080` plus direct gateway/IAM/Cerbos API assertions. Specs run
 **sequentially** (`workers: 1`) because they share LibreChat conversation state.
 
@@ -39,7 +39,7 @@ Override the UI target with `LIBRECHAT_URL`. Config: `tests/e2e/playwright.confi
 | Spec | What it verifies |
 |---|---|
 | `00-login.spec.ts` | Login/registration: login page renders, bad creds error, register/login lands on chat, session persists across reload, new-conversation button, input reflects typing. |
-| `01-branding.spec.ts` | Meridian rebrand: root page loads, chat placeholder text, model selector hidden (`modelSelect: false`). |
+| `01-branding.spec.ts` | Conduit rebrand: root page loads, chat placeholder text, model selector hidden (`modelSelect: false`). |
 | `02-hero-prompt.spec.ts` | Hero prompt streams an answer through the UI with grounded wealth-agent facts; `/v1/models` returns the model; SSE is well-formed and ends with `[DONE]`. |
 | `03-jwt-identity.spec.ts` | JWT identity (M15): IAM health UP, JWKS returns RSA key, `/auth/token` issues RS256 JWT for `rm_jane` with correct book; gateway accepts valid JWT, rejects tampered/expired with 401, allows no-token trusted hop; book edits reflect in new JWTs. |
 | `04-entitlements.spec.ts` | Entitlements (M8): Okafor query denied for `rm_jane` (intercepted SSE), Whitman (REL-00042) succeeds; book containing REL-00188 allows Okafor (200), absent book leaks no Okafor data. |

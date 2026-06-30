@@ -1,4 +1,4 @@
-# Model Selection Guide — Meridian AI Gateway
+# Model Selection Guide — Conduit AI Gateway
 
 > **Status:** Recommended configuration, 2026-06-29.
 > **Principle:** No single model for everything — because **each task is bound on a different
@@ -36,13 +36,13 @@ puts each task on the model that fits the axis it's bound on.
 
 | Call site | Runs | Volume | Latency-critical | Blocks? | User-facing | **Tier** | Model | Config key |
 |---|---|---|---|---|---|---|---|---|
-| **Intent classification + entity extraction** | every turn | High | **Yes** (p99) | — | No | **Fast** | `glm-4.5-flash` | `MERIDIAN_LLM_INTENT_CLASSIFIER_MODEL`, `MERIDIAN_LLM_ENTITY_EXTRACTOR_MODEL` |
-| **Answer synthesis** | every answered turn | Medium | TTFT (streamed) | — | **Yes** | **Quality** | `glm-4.6` | `MERIDIAN_LLM_SYNTHESIZER_MODEL` |
+| **Intent classification + entity extraction** | every turn | High | **Yes** (p99) | — | No | **Fast** | `glm-4.5-flash` | `CONDUIT_LLM_INTENT_CLASSIFIER_MODEL`, `CONDUIT_LLM_ENTITY_EXTRACTOR_MODEL` |
+| **Answer synthesis** | every answered turn | Medium | TTFT (streamed) | — | **Yes** | **Quality** | `glm-4.6` | `CONDUIT_LLM_SYNTHESIZER_MODEL` |
 | **Domain agents (mock)** | per fan-out | High | Yes | — | No | **Fast** | `glm-4.5-flash` | `WEALTH_AGENT_LLM_MODEL`, `SERVICING_AGENT_LLM_MODEL` |
 | **DeepEval faithfulness judge** (release gate) | offline, on a change | Low | No | **Yes — blocks deploy** | No | **Max** | `glm-4.6` | `DEEPEVAL_JUDGE_MODEL` |
 | **Langfuse continuous judge** (drift monitor) | async, off live traces | High (sampled) | No | No | No | **Fast/Mid** | `glm-4.6` | `JUDGE_MODEL` / `ZAI_EVAL_MODEL` |
 | **IAM policy generation** | admin drafts a policy | Very low | No | No (human-approved) | No (internal) | **Quality** | `glm-4.6` | `IAM_POLICY_GENERATION_MODEL` |
-| **Embeddings** (routing) | every turn | High | **Yes** | — | No | (non-LLM) | `all-MiniLM-L6-v2` (384d) | `MERIDIAN_EMBEDDING_*` |
+| **Embeddings** (routing) | every turn | High | **Yes** | — | No | (non-LLM) | `all-MiniLM-L6-v2` (384d) | `CONDUIT_EMBEDDING_*` |
 
 ---
 
@@ -141,10 +141,10 @@ on the user-facing answer. This is the current default in `application.yml`.
 
 ```bash
 # Fast tier (routing + extraction) — every turn, latency-critical
-MERIDIAN_LLM_INTENT_CLASSIFIER_MODEL=glm-4.5-flash
-MERIDIAN_LLM_ENTITY_EXTRACTOR_MODEL=glm-4.5-flash
+CONDUIT_LLM_INTENT_CLASSIFIER_MODEL=glm-4.5-flash
+CONDUIT_LLM_ENTITY_EXTRACTOR_MODEL=glm-4.5-flash
 # Quality tier (synthesis) — user-facing
-MERIDIAN_LLM_SYNTHESIZER_MODEL=glm-4.6
+CONDUIT_LLM_SYNTHESIZER_MODEL=glm-4.6
 # Max tier (release-gate judge) — blocks deploys, strongest model
 DEEPEVAL_JUDGE_MODEL=glm-4.6
 # Fast/Mid (async drift judge)

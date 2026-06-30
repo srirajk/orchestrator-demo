@@ -1,4 +1,4 @@
-# Meridian AI Gateway — Domain Architecture
+# Conduit AI Gateway — Domain Architecture
 
 > **Status:** Agreed design — decided 2026-06-28. Build order at bottom.
 > This document supersedes the earlier design sketches in `domain-manifest-and-memory.md`
