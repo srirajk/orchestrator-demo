@@ -102,11 +102,27 @@ seed_principal \
   '[]' \
   ""
 
-echo "[seed-users] Done. 3 principals seeded."
+# uw_sam — underwriter, insurance segment (proves the second domain's entitlement path).
+# Same relationship_manager role + the insurance segment gate added to agent_resource.yaml.
+# Book (POL-77001/77002 his; POL-88003 is uw_dana's) enforced by insurance-coverage service.
+seed_principal \
+  "uw_sam" \
+  "Sam Underwood" \
+  "sam.underwood@meridianbank.com" \
+  '["relationship_manager"]' \
+  "2" \
+  '["insurance"]' \
+  '["insurance-underwriting"]' \
+  '[]' \
+  "insurance-underwriting"
+
+echo "[seed-users] Done. 4 principals seeded."
 echo ""
 echo "  rm_jane   → segments: wealth+servicing | domains: wealth-private-banking"
 echo "  rm_carlos → segments: wealth           | domains: wealth-private-banking"
 echo "  rm_guest  → segments: wealth           | domains: (none)"
+echo "  uw_sam    → segments: insurance        | domains: insurance-underwriting"
 echo ""
-echo "  Book-of-business enforced by wealth-coverage service at runtime."
-echo "  REL-00188 (Okafor) is NOT in rm_jane coverage → denied by coverage service."
+echo "  Book-of-business enforced by coverage services at runtime."
+echo "  REL-00188 (Okafor) is NOT in rm_jane coverage → denied by wealth-coverage."
+echo "  POL-88003 (Zenith) is NOT in uw_sam coverage  → denied by insurance-coverage."

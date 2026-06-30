@@ -83,4 +83,5 @@ resourcePolicy:
               # Domain access via segment membership
               - expr: >
                   (R.attr.domain == "wealth-management" && P.attr.segments.exists(s, s == "wealth")) ||
-                  (R.attr.domain == "asset-servicing"  && P.attr.segments.exists(s, s == "servicing"))
+                  (R.attr.domain == "asset-servicing"  && P.attr.segments.exists(s, s == "servicing")) ||
+                  (R.attr.domain == "insurance"        && P.attr.segments.exists(s, s == "insurance"))
