@@ -2365,10 +2365,208 @@
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
       "root_cause": "handleFetchData derived coverageEntity from coverageEntityType() which uses manifestStore.requiredContextKeys()/entityTypes() — the cross-domain UNION across ALL sub-domains — and picked the first key (relationship_id from wealth). The coverage entity was never scoped to the routed sub-domain.",
       "fix": "Added DomainManifestStore.entityTypesFor(subDomainId) (single sub-domain's entity_types) and scoped overloads coverageEntityType(EffectiveManifest)/secondaryEntityType(EffectiveManifest). In handleFetchData, once the resource-scoped agent's EffectiveManifest em is known, re-scope coverageEntity/secondaryEntity/carriedCoverageId from em.requiredContext()+em.subDomainId() before the coverage resolve/check/bind. Follow-up/session paths now use carriedCoverageEntityType(session) which finds whichever required entity the session actually carries (domain-agnostic).",
-      "tags": ["multi-domain", "coverage", "world-b", "manifest-scoping", "java"],
+      "tags": [
+        "multi-domain",
+        "coverage",
+        "world-b",
+        "manifest-scoping",
+        "java"
+      ],
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-06-29T19:00:00.000Z"
+    },
+    {
+      "id": "bug-148",
+      "timestamp": "2026-06-29T19:32:57.599Z",
+      "error_message": "Significant refactor of ",
+      "file": "infra/promtail/promtail.yaml",
+      "root_cause": "3 lines replaced/restructured",
+      "fix": "Rewrote 12→18 lines (3 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "yaml"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T19:32:57.599Z"
+    },
+    {
+      "id": "bug-149",
+      "timestamp": "2026-06-29T19:34:35.250Z",
+      "error_message": "Null/undefined access in ",
+      "file": "gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
+      "root_cause": "Property access on potentially null/undefined value",
+      "fix": "Added null safety (optional chaining or null check)",
+      "tags": [
+        "auto-detected",
+        "null-safety",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T19:34:35.250Z"
+    },
+    {
+      "id": "bug-150",
+      "timestamp": "2026-06-29T19:51:13.496Z",
+      "error_message": "Wrong return value",
+      "file": "mock-agents/servicing/custody/tool.py",
+      "root_cause": "Was returning: json.dumps({\"error\": f\"Relationship '{relationship",
+      "fix": "Now returns: mcp_error_json(f\"Relationship '{relationship_id}' ",
+      "tags": [
+        "auto-detected",
+        "return-value",
+        "py"
+      ],
+      "related_bugs": [],
+      "occurrences": 5,
+      "last_seen": "2026-06-29T19:52:10.718Z"
+    },
+    {
+      "id": "bug-151",
+      "timestamp": "2026-06-29T19:51:16.393Z",
+      "error_message": "Incorrect value in code",
+      "file": "mock-agents/servicing/custody/tool.py",
+      "root_cause": "Had \"error\"",
+      "fix": "Changed to \"llm_unavailable: {type(exc).__name__}\"",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "py"
+      ],
+      "related_bugs": [],
+      "occurrences": 5,
+      "last_seen": "2026-06-29T19:52:14.423Z"
+    },
+    {
+      "id": "bug-152",
+      "timestamp": "2026-06-29T20:21:18.249Z",
+      "error_message": "Significant refactor of ",
+      "file": "mock-agents/tests/test_live.py",
+      "root_cause": "7 lines replaced/restructured",
+      "fix": "Rewrote 20→28 lines (7 removed) | Also: def test_empty_book_denies_all(self):; \"\"\"An RM with an empty book is denied every relati",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "py"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-06-29T20:21:34.767Z"
+    },
+    {
+      "id": "bug-153",
+      "timestamp": "2026-06-29T20:47:12.056Z",
+      "error_message": "Function not marked async",
+      "file": "eval/langfuse_continuous.py",
+      "root_cause": "Function uses await but wasn't declared async",
+      "fix": "Added async modifier",
+      "tags": [
+        "auto-detected",
+        "async-fix",
+        "py"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T20:47:12.056Z"
+    },
+    {
+      "id": "bug-154",
+      "timestamp": "2026-06-29T20:48:33.554Z",
+      "error_message": "Significant refactor of ",
+      "file": "eval/langfuse_continuous.py",
+      "root_cause": "5 lines replaced/restructured",
+      "fix": "Rewrote 39→57 lines (5 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "py"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T20:48:33.554Z"
+    },
+    {
+      "id": "bug-155",
+      "timestamp": "2026-06-29T23:16:46.869Z",
+      "error_message": "Missing error handling in unknown",
+      "file": "gateway/src/main/java/ai/meridian/gateway/infrastructure/telemetry/TraceEventPublisher.java",
+      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
+      "fix": "Added try/catch block",
+      "tags": [
+        "auto-detected",
+        "error-handling",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T23:16:46.869Z"
+    },
+    {
+      "id": "bug-156",
+      "timestamp": "2026-06-29T23:56:01.624Z",
+      "error_message": "Significant refactor of ",
+      "file": "eval/langfuse_continuous.py",
+      "root_cause": "3 lines replaced/restructured",
+      "fix": "Rewrote 23→27 lines (3 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "py"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T23:56:01.624Z"
+    },
+    {
+      "id": "bug-157",
+      "timestamp": "2026-06-29T23:57:18.513Z",
+      "error_message": "Null/undefined access in ",
+      "file": "gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
+      "root_cause": "Property access on potentially null/undefined value",
+      "fix": "Added null safety (optional chaining or null check)",
+      "tags": [
+        "auto-detected",
+        "null-safety",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-29T23:57:18.513Z"
+    },
+    {
+      "id": "bug-158",
+      "timestamp": "2026-06-30T00:02:55.957Z",
+      "error_message": "Significant refactor of ",
+      "file": "eval/langfuse_continuous.py",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 5→7 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "py"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-30T00:02:55.957Z"
+    },
+    {
+      "id": "bug-159",
+      "timestamp": "2026-06-30T00:06:20.724Z",
+      "error_message": "Significant refactor of ",
+      "file": "scripts/seed-users.sh",
+      "root_cause": "3 lines replaced/restructured",
+      "fix": "Rewrote 20→36 lines (3 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "sh"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-30T00:06:20.724Z"
     }
   ]
 }

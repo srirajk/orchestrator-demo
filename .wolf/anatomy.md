@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-29T18:46:00.799Z
-> Files: 642 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-30T00:14:07.748Z
+> Files: 650 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/
 
@@ -23,7 +23,7 @@
 - `agent-manifest.schema.json` (~1558 tok)
 - `BUILD_REPORT.md` — Build Report — Meridian AI Gateway (~15724 tok)
 - `CLAUDE.md` — OpenWolf (~6447 tok)
-- `docker-compose.yml` — Docker Compose services (~7624 tok)
+- `docker-compose.yml` — Docker Compose services (~8283 tok)
 - `README.md` — Project documentation (~4696 tok)
 - `z.ai-tiers.md` — Declares Model (~778 tok)
 
@@ -121,6 +121,22 @@
 - `conftest.py` — reset_db, app_client (~1052 tok)
 - `test_integration.py` — TestBankScenario: test_rm_jane_exists_with_correct_book, test_rm_jane_has_wealth_segment, test_rm_ja (~6065 tok)
 - `test_user_mgmt.py` — TestJWKS: test_jwks_has_correct_structure, test_jwks_e_is_65537, test_jwks_n_length, test_issue_toke (~7518 tok)
+
+## .claude/worktrees/agent-a5f8f4277b6a7131d/mock-agents/insurance/claim_status/
+
+- `handler.py` — Claim Status agent — GET /claim-status (~819 tok)
+
+## .claude/worktrees/agent-a5f8f4277b6a7131d/mock-agents/insurance/policy_details/
+
+- `handler.py` — Policy Details agent — GET /policy-details (~540 tok)
+
+## .claude/worktrees/agent-a5f8f4277b6a7131d/mock-agents/insurance/shared/
+
+- `validators.py` — validate_policy_id, validate_claim_id (~465 tok)
+
+## .claude/worktrees/agent-a5f8f4277b6a7131d/mock-agents/tests/
+
+- `test_insurance.py` — TestInsuranceAuth: test_no_auth_header_is_allowed, test_bearer_unused_is_allowed, test_empty_bearer_ (~3686 tok)
 
 ## .claude/worktrees/agent-acd21fbd8fbefdaf5/gateway/src/main/java/ai/meridian/gateway/domain/auth/
 
@@ -252,6 +268,7 @@
 - `input-synthesis-deep-spec.md` — Input Synthesis — Deep Spec (the one unproven piece) (~1951 tok)
 - `master-build-plan-consolidated.md` — Enterprise Intelligence Platform — Master Build Plan (Meridian) (~3833 tok)
 - `MODEL-SELECTION.md` — Model Selection Guide — Meridian AI Gateway (~2289 tok)
+- `OPERATOR-RUNBOOK.md` — Meridian Gateway — Operator & Demo Runbook (~3447 tok)
 - `platform-vision-and-maturity-path.md` — Enterprise Intelligence Platform — Vision & Maturity Path (~1324 tok)
 - `PROMPT-AUDIT.md` — Prompt Contract Audit — every production prompt vs the 9-element framework (~1931 tok)
 - `technical-architecture-clear-boundaries.md` — Technical Architecture — Clear Boundaries (~1990 tok)
@@ -381,7 +398,7 @@
 - `Dockerfile` — Docker container definition (~86 tok)
 - `eval_deepeval.py` — PartialHonestyMetric: configure_judge_model, measure, a_measure, is_successful + 6 more (~5444 tok)
 - `golden-prompts.json` (~3317 tok)
-- `langfuse_continuous.py` — check_grounding, check_partial_honesty, llm_judge, extract_trace_data (~5808 tok)
+- `langfuse_continuous.py` — check_grounding, check_partial_honesty, llm_judge (~7457 tok)
 - `langfuse_run_experiment.py` — Run a Langfuse experiment against the meridian-routing dataset. (~4132 tok)
 - `langfuse_seed_datasets.py` — Seed Langfuse datasets from eval/golden-prompts.json. (~3565 tok)
 - `requirements.txt` — Python dependencies (~41 tok)
@@ -454,7 +471,7 @@
 ## gateway/src/main/java/ai/meridian/gateway/config/
 
 - `AppConfig.java` — Shared RestTemplate used by outbound HTTP clients (EntityExtractor, (~296 tok)
-- `SecurityConfig.java` — Spring Security resource server + role-based URL authorization. (~3070 tok)
+- `SecurityConfig.java` — Spring Security resource server + role-based URL authorization. (~3489 tok)
 
 ## gateway/src/main/java/ai/meridian/gateway/domain/auth/
 
@@ -469,7 +486,7 @@
 
 ## gateway/src/main/java/ai/meridian/gateway/domain/chat/
 
-- `ChatService.java` — Entry point from the controller — called on a virtual thread after the async boundary. (~13210 tok)
+- `ChatService.java` — Entry point from the controller — called on a virtual thread after the async boundary. (~14773 tok)
 
 ## gateway/src/main/java/ai/meridian/gateway/domain/coverage/
 
@@ -488,7 +505,7 @@
 
 - `ClarificationSchema.java` — Class: ClarificationSchema (~112 tok)
 - `DomainManifest.java` — DomainManifest: Coverage, MemoryCompaction (~272 tok)
-- `DomainManifestStore.java` — Resolves ${VAR_NAME} placeholders in all Coverage URL fields using Spring Environment. (~3206 tok)
+- `DomainManifestStore.java` — Resolves ${VAR_NAME} placeholders in all Coverage URL fields using Spring Environment. (~3435 tok)
 - `DomainPrerequisiteValidator.java` — Service: DomainPrerequisiteValidator (~439 tok)
 - `EffectiveManifest.java` — Returns true if this effective manifest declares any required-context entity. (~706 tok)
 - `EntityType.java` — A manifest-declared entity type. This is the load-bearing declaration that makes the (~528 tok)
@@ -512,7 +529,7 @@
 - `RedisTraceStorageAdapter.java` — Redis-backed trace storage. (~1073 tok)
 - `RequestCorrelationFilter.java` — Sets MDC context keys on every inbound request so all log lines carry: (~1093 tok)
 - `TraceEvent.java` — A single structured event emitted by the request pipeline to the glass-box panel. (~642 tok)
-- `TraceEventPublisher.java` — In-memory pub/sub bus for glass-box trace events. (~986 tok)
+- `TraceEventPublisher.java` — In-memory pub/sub bus for glass-box trace events. (~1420 tok)
 - `TraceStorageAdapter.java` — Storage contract for trace events — allows the glass-box panel to replay past requests. (~306 tok)
 
 ## gateway/src/main/java/ai/meridian/gateway/infrastructure/telemetry/event/
@@ -581,7 +598,7 @@
 
 ## gateway/src/main/java/ai/meridian/gateway/synthesis/answer/
 
-- `AnswerSynthesizer.java` — Synthesizes a grounded, streamed answer from agent outputs using Z.AI GLM. (~7131 tok)
+- `AnswerSynthesizer.java` — Synthesizes a grounded, streamed answer from agent outputs using Z.AI GLM. (~7346 tok)
 
 ## gateway/src/main/java/ai/meridian/gateway/synthesis/input/
 
@@ -593,7 +610,7 @@
 
 ## gateway/src/main/resources/
 
-- `agent-manifest.schema.json` (~1677 tok)
+- `agent-manifest.schema.json` (~1714 tok)
 - `application.yml` (~1798 tok)
 
 ## gateway/src/main/resources/domains/
@@ -800,7 +817,7 @@
 ## infra/
 
 - `otel-collector.yaml` (~627 tok)
-- `prometheus.yml` (~107 tok)
+- `prometheus.yml` (~129 tok)
 - `tempo.yaml` (~97 tok)
 
 ## infra/cerbos/
@@ -809,7 +826,7 @@
 
 ## infra/cerbos/policies/
 
-- `agent_resource.yaml` (~1159 tok)
+- `agent_resource.yaml` (~1189 tok)
 - `domain_resource.yaml` (~358 tok)
 - `iam_derived_roles.yaml` (~542 tok)
 - `iam_resource.yaml` — Declares in (~1247 tok)
@@ -828,6 +845,7 @@
 - `gateway-performance.json` (~2835 tok)
 - `meridian-demo.json` (~10773 tok)
 - `meridian-gateway.json` (~2415 tok)
+- `resource-usage.json` (~1597 tok)
 
 ## infra/grafana/provisioning/datasources/
 
@@ -840,7 +858,7 @@
 
 ## infra/promtail/
 
-- `promtail.yaml` — Promtail Docker service discovery; extracts traceId/convId/userId as Loki labels (~110 tok)
+- `promtail.yaml` (~419 tok)
 - `promtail.yaml` (~218 tok)
 
 ## librechat/
@@ -884,6 +902,9 @@
 - `main.py` — API: 4 endpoints (~1078 tok)
 - `requirements.txt` — Python dependencies (~28 tok)
 
+## mock-agents/insurance-coverage/ (World B — DISCOVER/CHECK/RESOLVE, port 8088)
+
+
 ## mock-agents/insurance-coverage/tests/
 
 - `test_coverage.py` — TestDiscover: test_uw_sam_sees_his_two_policies, test_uw_dana_sees_zenith, test_unknown_principal_ge (~1562 tok)
@@ -894,6 +915,9 @@
 - `Dockerfile` — Docker container definition (~102 tok)
 - `main.py` — API: 1 endpoints (~846 tok)
 - `requirements.txt` — Python dependencies (~81 tok)
+
+## mock-agents/insurance/ (World B — second domain, FastAPI, port 8087)
+
 
 ## mock-agents/insurance/claim_status/
 
@@ -920,19 +944,19 @@
 - `Dockerfile` — Docker container definition (~63 tok)
 - `README.md` — Project documentation (~293 tok)
 - `requirements.txt` — Python dependencies (~99 tok)
-- `server.py` — JwtAuthMiddleware: get_custody_positions, get_settlements, get_corporate_actions, get_nav + 3 more (~1873 tok)
+- `server.py` — JwtAuthMiddleware: get_custody_positions, get_settlements, get_corporate_actions, get_nav + 3 more (~2036 tok)
 
 ## mock-agents/servicing/cash/
 
 - `__init__.py` (~1 tok)
 - `README.md` — Project documentation (~157 tok)
-- `tool.py` — Cash Management MCP tool — powered by OpenAI Agents SDK + Z.AI with guardrails. (~1050 tok)
+- `tool.py` — Cash Management MCP tool — powered by OpenAI Agents SDK + Z.AI with guardrails. (~1062 tok)
 
 ## mock-agents/servicing/corporate_actions/
 
 - `__init__.py` (~1 tok)
 - `README.md` — Project documentation (~248 tok)
-- `tool.py` — Corporate Actions MCP tool — powered by OpenAI Agents SDK + Z.AI with guardrails. (~1126 tok)
+- `tool.py` — Corporate Actions MCP tool — powered by OpenAI Agents SDK + Z.AI with guardrails. (~1138 tok)
 
 ## mock-agents/servicing/corporate_actions/knowledge_base/
 
@@ -944,25 +968,26 @@
 
 - `__init__.py` (~1 tok)
 - `README.md` — Project documentation (~166 tok)
-- `tool.py` — Custody Positions MCP tool — powered by OpenAI Agents SDK + Z.AI with guardrails. (~1112 tok)
+- `tool.py` — Custody Positions MCP tool — powered by OpenAI Agents SDK + Z.AI with guardrails. (~1124 tok)
 
 ## mock-agents/servicing/nav/
 
 - `__init__.py` (~1 tok)
 - `README.md` — Project documentation (~191 tok)
-- `tool.py` — NAV MCP tool — powered by OpenAI Agents SDK + Z.AI with guardrails. (~1000 tok)
+- `tool.py` — NAV MCP tool — powered by OpenAI Agents SDK + Z.AI with guardrails. (~1012 tok)
 
 ## mock-agents/servicing/settlements/
 
 - `__init__.py` (~1 tok)
 - `README.md` — Project documentation (~178 tok)
-- `tool.py` — Settlements MCP tool — powered by OpenAI Agents SDK + Z.AI with guardrails. (~1109 tok)
+- `tool.py` — Settlements MCP tool — powered by OpenAI Agents SDK + Z.AI with guardrails. (~1121 tok)
 
 ## mock-agents/servicing/shared/
 
 - `__init__.py` (~0 tok)
 - `agent_client.py` — Z.AI client setup for servicing agents. (~632 tok)
 - `canned_data.py` (~1799 tok)
+- `error_schema.py` — mcp_error_dict, mcp_error_json (~521 tok)
 - `fault_knobs.py` — maybe_fault (~246 tok)
 - `guardrails.py` — injection_guardrail, relationship_id_guardrail, fund_id_guardrail, length_guardrail + 1 more (~1417 tok)
 - `jwt_verify.py` — verify_bearer_token (~1103 tok)
@@ -971,10 +996,10 @@
 ## mock-agents/tests/
 
 - `__init__.py` (~0 tok)
-- `conftest.py` — whose: servicing_imports, mock_runner, suppress_otel_noise (~929 tok)
+- `conftest.py` — whose: servicing_imports, mock_runner, suppress_otel_noise (~1027 tok)
 - `test_agent_integration.py` — Tests: no_auth_header_is_allowed, bearer_unused_is_allowed, empty_bearer_is_allowed, malformed_token_too_many_dots_is_rejected + 16 more (~4637 tok)
 - `test_concurrent_multiturn.py` — Test file (~3525 tok)
-- `test_live.py` — Tests: health_endpoint, openapi_served, holdings_live, performance_live + 7 more (~13061 tok)
+- `test_live.py` — TestLiveWealthHttp: test_health_endpoint, test_openapi_served, test_holdings_live, test_performance_ (~13355 tok)
 - `test_servicing.py` — Tests: custody_positions_schema, settlements_schema, corporate_actions_schema, nav_schema + 6 more (~1385 tok)
 - `test_wealth.py` — Tests: health_ok, openapi_json_served, openapi_has_required_params, known_relationship + 11 more (~1200 tok)
 
@@ -1052,6 +1077,13 @@
 - `PHASE-8.md` — Phase 8 — Identity, Domains & End-to-End Authorization (~1741 tok)
 - `PHASE-9.md` — Next Test Run — Verify Identity, Authorization & Correlation Are *Real* (~2254 tok)
 
+## registry — insurance manifests (World B onboarding artifacts)
+
+
+## registry/
+
+- `agent-manifest.schema.json` (~1714 tok)
+
 ## registry/domains/
 
 - `insurance.json` (~138 tok)
@@ -1086,7 +1118,7 @@
 
 ## scripts/
 
-- `eval_agents.py` — TestHoldingsAgent: call_wealth, build_metrics, test_holdings_faithfulness, test_performance_faithfulness + 5 more (~3259 tok)
+- `eval_agents.py` — TestHoldingsAgent: call_wealth, build_metrics, test_holdings_faithfulness, test_performance_faithful (~5311 tok)
 - `eval-gate.sh` — Eval release gate — seeds Langfuse datasets, then runs the DeepEval routing (~753 tok)
 - `eval-routing.py` — mint_admin_token, load_prompts, resolve, f1 + 1 more (~1675 tok)
 - `integration-test.sh` — Curl-based integration tests against the running gateway. (~1352 tok)
@@ -1095,7 +1127,7 @@
 - `scenario-perf.py` — class: check_summary, mint_token, chat, resolve + 4 more (~14188 tok)
 - `seed-demo.py` — mint_token, chat, chat_multi, wait_for_gateway + 1 more (~2771 tok)
 - `seed-demo.sh` — Meridian Gateway — Phoenix/Tempo demo seed (~176 tok)
-- `seed-users.sh` — seed-users.sh — Idempotently seed demo principals into Redis. (~875 tok)
+- `seed-users.sh` — seed-users.sh — Idempotently seed demo principals into Redis. (~1048 tok)
 - `seed-users.sh` — seed-users.sh — Idempotently seed demo principals into Redis. (~910 tok)
 - `verify-telemetry-e2e.sh` — ───────────────────────────────────────────────────────────────────────────── (~1151 tok)
 - `verify.sh` — Full verification script — runs after each phase to confirm acceptance criteria. (~713 tok)
@@ -1154,25 +1186,3 @@
 ## user-mgmt/tests/
 
 - `test_user_mgmt.py` — Tests: jwks_has_correct_structure, jwks_e_is_65537, jwks_n_length, issue_token_returns_rs256_jwt + 20 more (~7203 tok)
-
-## mock-agents/insurance/ (World B — second domain, FastAPI, port 8087)
-
-- `main.py` — Insurance HTTP service; mounts policy_details + claim_status routers, JWT + fault-knob middleware, /health, OTel. (~0.4k tok)
-- `shared/canned_data.py` — POLICIES (POL-77001 Continental Freight, POL-77002 Aurora, POL-88003 Zenith) + CLAIMS (CLM-5501, CLM-5502); claims_for_policy(). (~0.6k tok)
-- `shared/{error_schema,fault_knobs,jwt_verify,telemetry}.py` — Meridian agent-contract shared modules (copied/adapted from wealth). (~1.5k tok)
-- `policy_details/handler.py` — GET /policy-details?policy_id (operation_id get_policy_details); returns canned policy JSON. (~0.3k tok)
-- `claim_status/handler.py` — GET /claim-status?claim_id|policy_id (operation_id get_claim_status); multi-entity. (~0.4k tok)
-- `Dockerfile`, `requirements.txt` — python:3.12-slim, no openai-agents (deterministic mock, no in-agent LLM).
-
-## mock-agents/insurance-coverage/ (World B — DISCOVER/CHECK/RESOLVE, port 8088)
-
-- `main.py` — coverage endpoints (discover/check/resolve, principal-agnostic resolve). (~0.5k tok)
-- `data.py` — POLICIES + BOOKS (uw_sam={POL-77001,POL-77002}; POL-88003 owned by uw_dana = denial case). (~0.6k tok)
-- `tests/test_coverage.py` — 20 tests (discover/check/resolve, uw_sam allowed, Zenith denied). (~1.3k tok)
-- `Dockerfile`, `requirements.txt`.
-
-## registry — insurance manifests (World B onboarding artifacts)
-
-- `domains/insurance.json` — coverage block (${INSURANCE_COVERAGE_URL}) + memory_compaction (policy_id/claim_id/domain).
-- `domains/insurance/claims-servicing.json` — resource_scoped sub-domain; entity_types policy_id(req)/claim_id(opt)/period; clarification + messages.
-- `manifests/acme.insurance.{policy_details,claim_status}.json` — http agent manifests, domain "insurance" (NOTE: fails bundled schema enum — see BUILD flag).

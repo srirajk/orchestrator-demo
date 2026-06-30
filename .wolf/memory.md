@@ -1133,3 +1133,84 @@
 | 15:32 | Edited infra/promtail/promtail.yaml | modified pattern() | ~274 |
 | 15:33 | Created infra/grafana/provisioning/dashboards/resource-usage.json | — | ~1597 |
 | 15:33 | wire Loki+Promtail+cAdvisor into compose, prom scrape, resource dashboard | docker-compose.yml, infra/promtail/promtail.yaml, infra/prometheus.yml, infra/grafana/.../resource-usage.json | compose config OK, YAML/JSON valid | ~6k |
+| 15:34 | Session end: 181 writes across 63 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 140 reads | ~276619 tok |
+| 15:34 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | added 2 condition(s) | ~265 |
+| 15:34 | Session end: 182 writes across 63 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 140 reads | ~276903 tok |
+| 15:41 | Session end: 182 writes across 63 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 146 reads | ~283734 tok |
+| 15:43 | Session end: 182 writes across 63 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 168 reads | ~321410 tok |
+| 15:47 | Session end: 182 writes across 63 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 169 reads | ~321410 tok |
+| 15:50 | Session end: 182 writes across 63 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 171 reads | ~325034 tok |
+| 15:51 | Created mock-agents/servicing/shared/error_schema.py | — | ~521 |
+| 15:51 | Edited mock-agents/servicing/custody/tool.py | added 1 import(s) | ~106 |
+| 15:51 | Edited mock-agents/servicing/custody/tool.py | dumps() → mcp_error_json() | ~65 |
+| 15:51 | Edited mock-agents/servicing/custody/tool.py | "error" → "llm_unavailable: {type(ex" | ~26 |
+| 15:51 | Edited mock-agents/servicing/settlements/tool.py | added 1 import(s) | ~104 |
+| 15:51 | Edited mock-agents/servicing/settlements/tool.py | dumps() → mcp_error_json() | ~62 |
+| 15:51 | Edited mock-agents/servicing/settlements/tool.py | "error" → "llm_unavailable: {type(ex" | ~26 |
+| 15:51 | Edited mock-agents/servicing/corporate_actions/tool.py | added 1 import(s) | ~106 |
+| 15:51 | Edited mock-agents/servicing/corporate_actions/tool.py | dumps() → mcp_error_json() | ~63 |
+| 15:51 | Edited mock-agents/servicing/corporate_actions/tool.py | "error" → "llm_unavailable: {type(ex" | ~26 |
+| 15:51 | Edited mock-agents/servicing/nav/tool.py | added 1 import(s) | ~99 |
+| 15:51 | Edited mock-agents/servicing/nav/tool.py | dumps() → mcp_error_json() | ~71 |
+| 15:52 | Session end: 194 writes across 64 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 171 reads | ~326309 tok |
+| 15:52 | Edited mock-agents/servicing/nav/tool.py | "error" → "llm_unavailable: {type(ex" | ~26 |
+| 15:52 | Edited mock-agents/servicing/cash/tool.py | added 1 import(s) | ~102 |
+| 15:52 | Edited mock-agents/servicing/cash/tool.py | dumps() → mcp_error_json() | ~65 |
+| 15:52 | Edited mock-agents/servicing/cash/tool.py | "error" → "llm_unavailable: {type(ex" | ~26 |
+| 15:52 | Created mock-agents/servicing/server.py | — | ~2036 |
+| 15:53 | Edited scripts/eval_agents.py | expanded (+19 lines) | ~305 |
+| 15:53 | Edited scripts/eval_agents.py | added 5 condition(s) | ~1840 |
+| 15:56 | Created .claude/worktrees/agent-a5f8f4277b6a7131d/mock-agents/insurance/shared/validators.py | — | ~465 |
+| 15:56 | Edited .claude/worktrees/agent-a5f8f4277b6a7131d/mock-agents/insurance/policy_details/handler.py | added 1 import(s) | ~50 |
+| 15:56 | Edited .claude/worktrees/agent-a5f8f4277b6a7131d/mock-agents/insurance/policy_details/handler.py | 2→5 lines | ~56 |
+| 15:56 | Edited .claude/worktrees/agent-a5f8f4277b6a7131d/mock-agents/insurance/claim_status/handler.py | added 1 import(s) | ~61 |
+| 15:56 | Edited .claude/worktrees/agent-a5f8f4277b6a7131d/mock-agents/insurance/claim_status/handler.py | expanded (+6 lines) | ~338 |
+| 15:57 | Created .claude/worktrees/agent-a5f8f4277b6a7131d/mock-agents/tests/test_insurance.py | — | ~3686 |
+| 15:59 | Session end: 207 writes across 68 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 173 reads | ~336594 tok |
+| 16:06 | Edited mock-agents/tests/conftest.py | expanded (+6 lines) | ~150 |
+| 16:11 | Session end: 208 writes across 69 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 173 reads | ~336744 tok |
+| 16:21 | Edited mock-agents/tests/test_live.py | modified test_rm_jane_okafor_structural_allow() | ~482 |
+| 16:21 | Edited mock-agents/tests/test_live.py | modified test_structural_role_gate_independent_of_book() | ~219 |
+| 16:26 | Session end: 210 writes across 70 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 173 reads | ~337445 tok |
+| 16:41 | Session end: 210 writes across 70 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 173 reads | ~337445 tok |
+| 16:47 | Edited eval/langfuse_continuous.py | expanded (+10 lines) | ~264 |
+| 16:48 | Edited eval/langfuse_continuous.py | added 1 import(s) | ~17 |
+| 16:48 | Edited eval/langfuse_continuous.py | modified range() | ~814 |
+| 16:49 | Edited eval/langfuse_continuous.py | 7→12 lines | ~128 |
+| 16:51 | Edited docker-compose.yml | expanded (+7 lines) | ~218 |
+| 16:53 | Session end: 215 writes across 71 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 173 reads | ~339909 tok |
+| 17:04 | Session end: 215 writes across 71 files (WORLD-B-LOCKDOWN.md, world-b-check.sh, world-b.md, ChatService.java, FlatPlanExecutor.java) | 173 reads | ~339909 tok |
+
+## Session: 2026-06-29 18:34
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 18:45 | Edited gateway/src/main/java/ai/meridian/gateway/synthesis/answer/AnswerSynthesizer.java | modified if() | ~169 |
+| 18:45 | Edited gateway/src/main/java/ai/meridian/gateway/synthesis/answer/AnswerSynthesizer.java | added 1 condition(s) | ~164 |
+| 18:55 | Edited eval/langfuse_continuous.py | added 1 condition(s) | ~268 |
+| 18:55 | Edited eval/langfuse_continuous.py | 2→5 lines | ~110 |
+| 19:01 | Edited docker-compose.yml | 13→15 lines | ~266 |
+| 19:16 | Edited gateway/src/main/java/ai/meridian/gateway/infrastructure/telemetry/TraceEventPublisher.java | added 5 import(s) | ~143 |
+| 19:16 | Edited gateway/src/main/java/ai/meridian/gateway/infrastructure/telemetry/TraceEventPublisher.java | added error handling | ~656 |
+| 19:19 | Edited gateway/src/main/java/ai/meridian/gateway/config/SecurityConfig.java | added 4 import(s) | ~120 |
+| 19:19 | Edited gateway/src/main/java/ai/meridian/gateway/config/SecurityConfig.java | expanded (+6 lines) | ~116 |
+| 19:19 | Edited gateway/src/main/java/ai/meridian/gateway/config/SecurityConfig.java | 3→4 lines | ~64 |
+| 19:19 | Edited gateway/src/main/java/ai/meridian/gateway/config/SecurityConfig.java | modified corsConfigurationSource() | ~252 |
+| 19:22 | Session end: 11 writes across 5 files (AnswerSynthesizer.java, langfuse_continuous.py, docker-compose.yml, TraceEventPublisher.java, SecurityConfig.java) | 7 reads | ~43882 tok |
+| 19:35 | Session end: 11 writes across 5 files (AnswerSynthesizer.java, langfuse_continuous.py, docker-compose.yml, TraceEventPublisher.java, SecurityConfig.java) | 7 reads | ~43882 tok |
+| 19:55 | Edited eval/langfuse_continuous.py | expanded (+9 lines) | ~303 |
+| 19:55 | Edited eval/langfuse_continuous.py | 9→12 lines | ~143 |
+| 19:55 | Edited eval/langfuse_continuous.py | 7→7 lines | ~77 |
+| 19:56 | Edited eval/langfuse_continuous.py | 23→27 lines | ~317 |
+| 19:57 | Edited gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java | added 1 condition(s) | ~174 |
+| 19:58 | Edited eval/langfuse_continuous.py | expanded (+6 lines) | ~211 |
+| 19:58 | Edited eval/langfuse_continuous.py | expanded (+21 lines) | ~296 |
+| 19:58 | Edited eval/langfuse_continuous.py | added 1 import(s) | ~8 |
+| 20:01 | Edited eval/langfuse_continuous.py | get_observations() → get_many() | ~43 |
+| 20:02 | Edited eval/langfuse_continuous.py | get_traces() → list() | ~68 |
+| 20:02 | Edited eval/langfuse_continuous.py | 5→7 lines | ~98 |
+| 20:06 | Edited infra/cerbos/policies/agent_resource.yaml | 4→5 lines | ~112 |
+| 20:06 | Edited scripts/seed-users.sh | expanded (+16 lines) | ~356 |
+| 20:14 | Created docs/OPERATOR-RUNBOOK.md | — | ~3677 |
+| 20:14 | Session end: 25 writes across 9 files (AnswerSynthesizer.java, langfuse_continuous.py, docker-compose.yml, TraceEventPublisher.java, SecurityConfig.java) | 11 reads | ~53777 tok |
+| 20:16 | Session end: 25 writes across 9 files (AnswerSynthesizer.java, langfuse_continuous.py, docker-compose.yml, TraceEventPublisher.java, SecurityConfig.java) | 11 reads | ~53777 tok |
