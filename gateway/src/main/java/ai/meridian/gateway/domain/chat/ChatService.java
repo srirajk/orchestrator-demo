@@ -619,6 +619,13 @@ public class ChatService {
                                  String requestId, long requestStart, Span rootSpan,
                                  String streamId) throws Exception {
         Span span = tracer.spanBuilder("chat.follow_up").startSpan();
+        // Carry the conversation's domain onto the trace so cost-by-domain and per-domain
+        // metrics include follow-up turns too (FETCH_DATA tags this from the resolved
+        // manifests; follow-ups answer from session, so use the session's stored domain).
+        if (session.domain() != null && !session.domain().isBlank()) {
+            rootSpan.setAttribute("langfuse.metadata.domain", session.domain());
+            rootSpan.setAttribute("meridian.domain", session.domain());
+        }
         try {
             if (session.hasFreshResults(RESULT_CACHE_TTL_MS)) {
                 List<NodeResult> cached = session.lastAgentResults();

@@ -10,7 +10,7 @@ For each trace in the lookback window:
   c. RELEVANCE      (LLM judge, GLM)     — does the answer address the question?
   d. SAFETY         (LLM judge, GLM)     — no injected instructions, no hallucinated advice
 
-Scores are posted back to Langfuse via lf.score() and a summary table is printed.
+Scores are posted back to Langfuse via lf.create_score() and a summary table is printed.
 
 Config (all from env — no hardcoding):
   LANGFUSE_PUBLIC_KEY   — Langfuse project public key
@@ -23,6 +23,7 @@ Config (all from env — no hardcoding):
 """
 
 import json
+import random
 import logging
 import os
 import re
@@ -63,6 +64,12 @@ EVAL_TRACE_LIMIT: int = int(os.environ.get("EVAL_TRACE_LIMIT", "50"))
 # Only score real conversation turns (the gateway tags these "chat-turn"); set blank
 # to score all traces. Keeps health/auto-title/denial noise out of the eval average.
 EVAL_TRACE_NAME: str = os.environ.get("EVAL_TRACE_NAME", "chat-turn")
+# Fraction of eligible traces to LLM-judge each cycle (1.0 = all). Lower it under high
+# volume so the judge cost/rate stays bounded; deterministic checks still run on all.
+EVAL_SAMPLE_RATE: float = float(os.environ.get("EVAL_SAMPLE_RATE", "1.0"))
+# Dedup: skip a trace that already carries this many scores (we post 3–4 per turn), so a
+# scheduled worker doesn't re-score — and re-append — the same traces every cycle.
+EVAL_DEDUP_MIN_SCORES: int = int(os.environ.get("EVAL_DEDUP_MIN_SCORES", "3"))
 
 # Words that constitute an acknowledgment of missing / failed data
 ACKNOWLEDGMENT_WORDS: list = [
@@ -354,8 +361,10 @@ def extract_trace_data(trace, lf) -> dict:
     failed_agents: list = []
 
     try:
-        obs_page = lf.get_observations(trace_id=trace.id)
-        observations = obs_page.data if hasattr(obs_page, "data") else []
+        # The observations v2 list API requires Langfuse "v4 write mode"; the trace DETAIL
+        # endpoint returns the same spans (with input/output) and works on all servers.
+        full_trace = lf.api.trace.get(trace.id)
+        observations = getattr(full_trace, "observations", None) or []
 
         for span in observations:
             span_name: str = getattr(span, "name", "") or ""
@@ -445,10 +454,10 @@ def run_continuous_eval() -> None:
         # scores GET /health probes, LibreChat auto-title calls, and other non-answer
         # traces, whose empty/irrelevant output drags relevance to 0.00. The gateway
         # tags every chat turn's root span langfuse.trace.name = "chat-turn".
-        traces_page = lf.get_traces(
+        traces_page = lf.api.trace.list(
             limit=EVAL_TRACE_LIMIT,
             from_timestamp=from_ts,
-            name=EVAL_TRACE_NAME,
+            name=EVAL_TRACE_NAME or None,
         )
         traces = traces_page.data if hasattr(traces_page, "data") else []
     except Exception as exc:
@@ -461,6 +470,27 @@ def run_continuous_eval() -> None:
 
     if not traces:
         logger.info("No traces found in the lookback window — nothing to score")
+        return
+
+    # Dedup: drop traces already scored in a previous cycle (avoids re-appending scores).
+    before = len(traces)
+    traces = [t for t in traces
+              if len(getattr(t, "scores", None) or []) < EVAL_DEDUP_MIN_SCORES]
+    skipped_dedup = before - len(traces)
+
+    # Sampling: judge only a fraction each cycle when configured (cost/rate control).
+    skipped_sample = 0
+    if EVAL_SAMPLE_RATE < 1.0 and traces:
+        kept = [t for t in traces if random.random() < EVAL_SAMPLE_RATE]
+        skipped_sample = len(traces) - len(kept)
+        traces = kept
+
+    if skipped_dedup or skipped_sample:
+        logger.info("Skipped %d already-scored + %d by sampling (rate=%.2f)",
+                    skipped_dedup, skipped_sample, EVAL_SAMPLE_RATE)
+
+    if not traces:
+        logger.info("No new traces to score this cycle")
         return
 
     logger.info("Evaluating %d traces...", len(traces))
@@ -495,25 +525,25 @@ def run_continuous_eval() -> None:
             # Grounding is N/A (None) for turns with no agent outputs — skip it rather
             # than record a misleading 0.0.
             if grounding_score is not None:
-                lf.score(
+                lf.create_score(
                     trace_id=trace_id,
                     name="grounding",
                     value=grounding_score,
                     comment=grounding_reason,
                 )
-            lf.score(
+            lf.create_score(
                 trace_id=trace_id,
                 name="partial_honesty",
                 value=honesty_score,
                 comment=honesty_reason,
             )
-            lf.score(
+            lf.create_score(
                 trace_id=trace_id,
                 name="relevance",
                 value=relevance_score,
                 comment=relevance_reason,
             )
-            lf.score(
+            lf.create_score(
                 trace_id=trace_id,
                 name="safety",
                 value=safety_score,
