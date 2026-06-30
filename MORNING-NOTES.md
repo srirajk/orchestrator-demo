@@ -66,6 +66,13 @@ the gateway).
 5. You land back in LibreChat, logged in as Jane Kowalski. Ask the hero prompt to confirm
    chat still works.
 
+> **Browser-verified live (Claude-in-Chrome):** I clicked "Login with Meridian SSO" and the
+> **Axiom login page rendered cleanly over `http://host.docker.internal:8084/login`** — no
+> HTTPS-upgrade, no TLS error (the thing that bit you before is gone). I stopped at the
+> password field because I never type credentials into a UI — but that's the only manual
+> step left, and the exchange behind it is the same one I drove all the way to "login
+> success" via curl. Step 4 will just work.
+
 > Note: this demo path uses **plain local login + `X-User-Id`** for the *chat* requests; SSO
 > is the *sign-in* layer. Both work. If you prefer the simplest demo, the email/password
 > login (`rm_jane` / `Meridian@2024`) also still works.
