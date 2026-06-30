@@ -1312,3 +1312,19 @@
 | 00:42 | Session end: 95 writes across 31 files (AnswerSynthesizer.java, langfuse_continuous.py, docker-compose.yml, TraceEventPublisher.java, SecurityConfig.java) | 37 reads | ~139785 tok |
 | 00:42 | Session end: 95 writes across 31 files (AnswerSynthesizer.java, langfuse_continuous.py, docker-compose.yml, TraceEventPublisher.java, SecurityConfig.java) | 37 reads | ~139785 tok |
 | 00:45 | Session end: 95 writes across 31 files (AnswerSynthesizer.java, langfuse_continuous.py, docker-compose.yml, TraceEventPublisher.java, SecurityConfig.java) | 37 reads | ~139785 tok |
+| 00:49 | Session end: 95 writes across 31 files (AnswerSynthesizer.java, langfuse_continuous.py, docker-compose.yml, TraceEventPublisher.java, SecurityConfig.java) | 37 reads | ~139785 tok |
+| 00:53 | Session end: 95 writes across 31 files (AnswerSynthesizer.java, langfuse_continuous.py, docker-compose.yml, TraceEventPublisher.java, SecurityConfig.java) | 37 reads | ~139785 tok |
+
+## Session: 2026-06-30 01:08
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 01:14 | Edited docker-compose.yml | 3→5 lines | ~72 |
+| 01:15 | Edited docker-compose.yml | 6→8 lines | ~108 |
+| 01:16 | Edited iam-service/src/main/java/com/openwolf/iam/config/SecurityConfig.java | 6→11 lines | ~236 |
+| 01:17 | Edited iam-service/src/main/java/com/openwolf/iam/auth/JwtClaimsCustomizer.java | added 1 import(s) | ~92 |
+| 01:17 | Edited iam-service/src/main/java/com/openwolf/iam/auth/JwtClaimsCustomizer.java | added 1 condition(s) | ~283 |
+| 01:17 | Edited iam-service/src/main/java/com/openwolf/iam/auth/OidcClaimEnricher.java | added 2 condition(s) | ~442 |
+| 01:20 | Edited docker-compose.yml | 5→3 lines | ~34 |
+| 01:20 | Edited docker-compose.yml | 4→2 lines | ~36 |
+| 01:22 | Created MORNING-NOTES.md | — | ~1247 |

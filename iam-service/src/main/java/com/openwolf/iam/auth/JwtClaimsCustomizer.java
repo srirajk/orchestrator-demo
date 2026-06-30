@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
@@ -32,16 +33,21 @@ public class JwtClaimsCustomizer {
     @Bean
     public OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer() {
         return context -> {
-            // Only enrich ACCESS_TOKEN — not REFRESH_TOKEN or ID_TOKEN
-            if (!OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())) {
-                return;
-            }
             String subject = context.getPrincipal().getName();
             if (subject == null) {
                 log.warn("JWT customizer: no subject in principal — skipping enrichment");
                 return;
             }
-            enricher.enrich(subject).forEach((k, v) -> context.getClaims().claim(k, v));
+            String tokenValue = context.getTokenType().getValue();
+            if (OAuth2TokenType.ACCESS_TOKEN.getValue().equals(tokenValue)) {
+                // Access token: authorization claims (roles, permissions, segments, …)
+                enricher.enrich(subject).forEach((k, v) -> context.getClaims().claim(k, v));
+            } else if (OidcParameterNames.ID_TOKEN.equals(tokenValue)) {
+                // ID token: OIDC identity claims (email, name, preferred_username) so the
+                // userinfo endpoint and SSO consumers (LibreChat) can create the user. Without
+                // these the id_token / userinfo carries only `sub` and LibreChat login fails.
+                enricher.enrichIdToken(subject).forEach((k, v) -> context.getClaims().claim(k, v));
+            }
         };
     }
 }

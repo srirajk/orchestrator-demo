@@ -244,11 +244,16 @@ public class SecurityConfig {
                         .build())
                 .build();
 
-        // LibreChat — OIDC SSO ("Login with Meridian" button)
+        // LibreChat — OIDC SSO ("Login with Meridian" button).
+        // Accept BOTH client_secret_basic and client_secret_post: the LibreChat openid-client
+        // sends the credentials in the request body (client_secret_post). Registering only
+        // CLIENT_SECRET_BASIC makes Spring reject the token call with
+        // "Client authentication failed: authentication_method" → invalid_client.
         RegisteredClient librechatClient = RegisteredClient.withId("librechat-client-id")
                 .clientId(librechatClientId)
                 .clientSecret(passwordEncoder.encode(librechatClientSecret))
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
                 .redirectUri(librechatRedirectUri)

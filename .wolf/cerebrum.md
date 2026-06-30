@@ -199,3 +199,21 @@ a specific bug is reported. Here is what it does:
 - **[2026-06-26] verify.py compliance checker exits 0 ONLY at 100% compliance.** `sys.exit(0 if score == 1.0 else 1)`. Any gap causes a non-zero exit. Standard error schema pattern: `agent_id.*trace_id|trace_id.*agent_id|ErrorResponse`. Structured logging pattern: `convId|conv_id|conversationId|traceId|trace_id`. Wealth agents initially scored 71% — fixed by adding `agent_id`+`trace_id`+`status_code` to fault_knob error response and `trace_id`+`convId` to JWT rejection log line.
 - **[2026-06-26] Pass 2 deliverables location:** eval/eval_deepeval.py (extended), eval/langfuse_continuous.py (NEW), eval/prompts/ (5 NEW contracts), .claude/skills/meridian-agent/SKILL.md + scripts/verify.py (NEW). eval/requirements.txt has both deepeval and langfuse.
 - **[2026-06-26] Pass 3 final state:** verify.py 7/7 on wealth agents (100%). eval/langfuse_seed_datasets.py and eval/langfuse_run_experiment.py both parse cleanly. eval/golden-prompts.json has 3 items (REL-00042, REL-00099, REL-00188). Langfuse experiment script entry point: `python3 eval/langfuse_run_experiment.py --run-name baseline --dry-run`.
+
+### Do-Not-Repeat — 2026-06-30 — LibreChat OIDC SSO with Spring Authorization Server
+- LibreChat's `openid-client` authenticates to the token endpoint with **`client_secret_post`**
+  (secret in the body), NOT HTTP Basic. A Spring AS `RegisteredClient` must declare
+  `ClientAuthenticationMethod.CLIENT_SECRET_POST` or the token call fails with
+  *"Client authentication failed: authentication_method"* → `invalid_client` → LibreChat shows
+  *"server responded with an error in the response body"* (generic; useless on its own).
+- To debug an opaque LibreChat OIDC failure, turn on `LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY=DEBUG`
+  on the **iam-service** (Axiom) — Axiom's log states the real reason. LibreChat's
+  `DEBUG_OPENID_REQUESTS` did NOT surface the error body.
+- LibreChat needs **`email`** (and ideally `name`) to provision the SSO user. Spring AS default
+  userinfo maps from the **id_token** claims, so enrich the **ID_TOKEN** (not just the access
+  token) — `email`, `email_verified`, `preferred_username`, `name`.
+- Validate browser OIDC flows headlessly by replicating them in curl with ONE cookie jar
+  across both hosts: `GET /oauth/openid` (capture authorize URL + LibreChat PKCE cookie) →
+  login → re-GET the authorize URL for the code → GET the callback so LibreChat does the
+  real exchange. Avoid the `&continue` resume (curl drops JSESSIONID → 400); re-GET the
+  original authorize URL instead.

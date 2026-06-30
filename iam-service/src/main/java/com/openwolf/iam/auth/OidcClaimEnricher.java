@@ -91,6 +91,41 @@ public class OidcClaimEnricher {
         return claims;
     }
 
+    /**
+     * OIDC standard identity claims for the <b>ID token</b> (and, by default mapping, the
+     * userinfo endpoint): {@code email}, {@code email_verified}, {@code preferred_username},
+     * {@code name}. SSO consumers (LibreChat) need at least an email to provision the user;
+     * without these the id_token/userinfo carries only {@code sub} and login fails.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> enrichIdToken(String subject) {
+        Map<String, Object> claims = new HashMap<>();
+
+        Principal principal = principalRepository.findById(subject)
+                .or(() -> principalRepository.findByUsername(subject))
+                .orElse(null);
+
+        if (principal == null) {
+            log.warn("ID-token enrich: no principal for sub={} — only sub will be present", subject);
+            return claims;
+        }
+
+        if (principal.getEmail() != null && !principal.getEmail().isBlank()) {
+            claims.put("email", principal.getEmail());
+            claims.put("email_verified", true);
+        }
+        claims.put("preferred_username", principal.getUsername());
+
+        Map<String, Object> attrs = parseAttributes(principal.getAttributes());
+        Object displayName = attrs.get("display_name");
+        claims.put("name", (displayName != null && !displayName.toString().isBlank())
+                ? displayName.toString() : principal.getUsername());
+
+        log.debug("ID-token enriched for sub={} email={} name={}",
+                subject, claims.get("email"), claims.get("name"));
+        return claims;
+    }
+
     private Map<String, Object> parseAttributes(String json) {
         if (json == null || json.isBlank()) return Map.of();
         try {

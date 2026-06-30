@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-30T04:36:46.482Z
-> Files: 660 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-30T05:22:16.820Z
+> Files: 661 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/
 
@@ -23,7 +23,8 @@
 - `agent-manifest.schema.json` (~1558 tok)
 - `BUILD_REPORT.md` — Build Report — Conduit AI Gateway (~1028 tok)
 - `CLAUDE.md` — OpenWolf (~1698 tok)
-- `docker-compose.yml` — Docker Compose services (~8284 tok)
+- `docker-compose.yml` — Docker Compose services (~8268 tok)
+- `MORNING-NOTES.md` — Morning notes — OIDC SSO is fixed ✅ (~1169 tok)
 - `README.md` — Project documentation (~1932 tok)
 - `z.ai-tiers.md` — Declares Model (~778 tok)
 
@@ -683,15 +684,15 @@
 ## iam-service/src/main/java/com/openwolf/iam/auth/
 
 - `CustomUserDetailsService.java` — Loads {@link UserDetails} for Spring Security's {@link org.springframework.security.authentication.A (~674 tok)
-- `JwtClaimsCustomizer.java` — Enriches OIDC access tokens with mandated claims ({@code tenant_id}, {@code roles}, (~522 tok)
-- `OidcClaimEnricher.java` — Builds the enrichment claims for an access token <b>inside a read-only transaction</b>. (~1284 tok)
+- `JwtClaimsCustomizer.java` — Enriches OIDC access tokens with mandated claims ({@code tenant_id}, {@code roles}, (~681 tok)
+- `OidcClaimEnricher.java` — Builds the enrichment claims for an access token <b>inside a read-only transaction</b>. (~1708 tok)
 
 ## iam-service/src/main/java/com/openwolf/iam/config/
 
 - `CerbosConfig.java` — Creates a {@link CerbosBlockingClient} when {@code iam.cerbos.authz-enabled=true}. (~450 tok)
 - `JacksonConfig.java` — Configures the primary {@link ObjectMapper}: (~297 tok)
 - `JpaConfig.java` — Enables JPA auditing so that {@code @CreatedDate} and {@code @LastModifiedDate} (~143 tok)
-- `SecurityConfig.java` — Security configuration for the IAM service. (~4443 tok)
+- `SecurityConfig.java` — Security configuration for the IAM service. (~4558 tok)
 - `VirtualThreadConfig.java` — Configures Tomcat to dispatch every request on a virtual thread. (~412 tok)
 
 ## iam-service/src/main/java/com/openwolf/iam/controller/
