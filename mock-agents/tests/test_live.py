@@ -952,7 +952,7 @@ class TestLiveLibreChat:
     LibreChat server health and configuration tests.
 
     Full chat flows (OIDC login → type prompt → see answer) require a browser
-    and are covered by the Playwright E2E tests in e2e/. These tests verify
+    and are covered by the Playwright E2E tests in tests/e2e/. These tests verify
     the REST API surface that LibreChat exposes so we know it's correctly
     configured before running E2E.
     """

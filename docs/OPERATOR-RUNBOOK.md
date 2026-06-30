@@ -200,7 +200,7 @@ async judge back to GLM, point `JUDGE_BASE_URL/JUDGE_API_KEY/JUDGE_MODEL` at Z.A
 Light concurrent test (ramp to 10 VUs, full pipeline on OpenAI):
 ```bash
 docker run --rm --network orchestrator-demo_default -e GATEWAY_URL=http://gateway:8080 \
-  -v "$(pwd)/loadtest:/scripts" grafana/k6 run /scripts/load-test-light.js
+  -v "$(pwd)/tests/load:/scripts" grafana/k6 run /scripts/load-test-light.js
 ```
 Last run: **error rate 0.00%** (0/146), **TTFT p95 7.5s** (median 1.72s), 292 checks 100%
 passed — virtual-thread gateway handled concurrent streaming with zero failures.

@@ -741,7 +741,7 @@ services:
     container_name: meridian-k6
     profiles: [scale]
     volumes:
-      - ./loadtest:/scripts
+      - ./tests/load:/scripts
     environment:
       K6_OUT: "experimental-prometheus-rw=http://prometheus:9090/api/v1/write"
     command: run /scripts/load-test.js

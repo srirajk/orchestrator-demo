@@ -14,6 +14,25 @@ changes.** (We prove it here: insurance was added to a wealth-and-servicing gate
 alone.) See [`docs/PROJECT-OVERVIEW.md`](docs/PROJECT-OVERVIEW.md) for the full story and module
 map.
 
+<details>
+<summary><b>📸 Screenshots — what it looks like when it comes up</b> (click to expand)</summary>
+
+<br>
+
+**The Meridian-branded chat (home):**
+
+![Meridian — branded LibreChat home](docs/images/librechat-home.png)
+
+**A grounded answer to the hero prompt** — one synthesized reply, every number traceable to a
+source system (relationship `REL-00042`, `$1,967,000`, the actual positions):
+
+![Meridian — grounded Whitman portfolio answer](docs/images/librechat-answer.png)
+
+> These are captured live by `tests/e2e/tests/11-screenshots.spec.ts` — run it to regenerate
+> them, so the README never goes stale.
+
+</details>
+
 ---
 
 ## What you can do with this demo

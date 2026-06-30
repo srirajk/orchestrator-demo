@@ -93,6 +93,8 @@ playwright-report/
 test-results/
 blob-report/
 .playwright/
+# E2E captures — never commit screenshots back into the repo
+**/screenshots/
 
 # ─────────────────────────────────────────────────────────────
 # Docker / runtime data

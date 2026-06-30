@@ -4,7 +4,7 @@
  * 3 VUs, 30 seconds. Verifies the gateway is up and serving SSE responses.
  * Runs before the full load test to catch obvious startup failures.
  *
- * Run:  GATEWAY_URL=http://localhost:8080 k6 run loadtest/smoke-test.js
+ * Run:  GATEWAY_URL=http://localhost:8080 k6 run tests/load/smoke-test.js
  */
 import http from 'k6/http';
 import { check, sleep } from 'k6';

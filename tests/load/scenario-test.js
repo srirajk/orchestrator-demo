@@ -11,7 +11,7 @@
  *
  * Run locally:
  *   GATEWAY_URL=http://localhost:8080 USER_MGMT_URL=http://localhost:8084 \
- *   k6 run loadtest/scenario-test.js
+ *   k6 run tests/load/scenario-test.js
  *
  * Or via docker compose:
  *   docker compose --profile scale run k6 run /scripts/scenario-test.js

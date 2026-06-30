@@ -51,9 +51,9 @@ The four demo beats and their exact prompts are in
   Cerbos allow/deny.
 - **Agents:** pytest + FastAPI TestClient + MCP smoke — schema-valid canned data, fault knobs,
   entity-ID validation.
-- **E2E:** Playwright (`e2e/`) — hero, glass-box, resilience, entitlement, clarification.
+- **E2E:** Playwright (`tests/e2e/`) — hero, glass-box, resilience, entitlement, clarification.
 - **Eval:** DeepEval routing-accuracy + faithfulness (`scripts/eval-gate.sh`).
-- **Load:** k6 (`loadtest/`).
+- **Load:** k6 (`tests/load/`).
 
 ## 4. Known limitations (none block the demo)
 

@@ -25,7 +25,7 @@ PYTEST_EXIT=$?
 
 echo ""
 echo "3. Running Playwright E2E (coverage flow spec)..."
-cd "$(dirname "$0")/../e2e"
+cd "$(dirname "$0")/../tests/e2e"
 npx playwright test tests/10-coverage-flow.spec.ts --reporter=list 2>&1
 PLAYWRIGHT_EXIT=$?
 

@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-30T00:32:57.377Z
-> Files: 652 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-30T01:25:03.436Z
+> Files: 658 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/
 
@@ -19,12 +19,12 @@
 ## ./
 
 - `.DS_Store` (~1640 tok)
-- `.gitignore` — Git ignore rules (~483 tok)
+- `.gitignore` — Git ignore rules (~524 tok)
 - `agent-manifest.schema.json` (~1558 tok)
-- `BUILD_REPORT.md` — Build Report — Meridian AI Gateway (~1027 tok)
+- `BUILD_REPORT.md` — Build Report — Meridian AI Gateway (~1029 tok)
 - `CLAUDE.md` — OpenWolf (~1698 tok)
-- `docker-compose.yml` — Docker Compose services (~8283 tok)
-- `README.md` — Project documentation (~1779 tok)
+- `docker-compose.yml` — Docker Compose services (~8284 tok)
+- `README.md` — Project documentation (~1935 tok)
 - `z.ai-tiers.md` — Declares Model (~778 tok)
 
 ## .claude/
@@ -268,19 +268,12 @@
 - `input-synthesis-deep-spec.md` — Input Synthesis — Deep Spec (the one unproven piece) (~1951 tok)
 - `master-build-plan-consolidated.md` — Enterprise Intelligence Platform — Master Build Plan (Meridian) (~3833 tok)
 - `MODEL-SELECTION.md` — Model Selection Guide — Meridian AI Gateway (~2289 tok)
-- `OPERATOR-RUNBOOK.md` — Meridian Gateway — Operator & Demo Runbook (~3447 tok)
+- `OPERATOR-RUNBOOK.md` — Meridian Gateway — Operator & Demo Runbook (~3448 tok)
 - `platform-vision-and-maturity-path.md` — Enterprise Intelligence Platform — Vision & Maturity Path (~1324 tok)
-- `PROJECT-OVERVIEW.md` — Meridian — Project Overview (~2932 tok)
+- `PROJECT-OVERVIEW.md` — Meridian — Project Overview (~2937 tok)
 - `PROMPT-AUDIT.md` — Prompt Contract Audit — every production prompt vs the 9-element framework (~1931 tok)
 - `technical-architecture-clear-boundaries.md` — Technical Architecture — Clear Boundaries (~1990 tok)
 - `WORLD-B-LOCKDOWN.md` — Meridian — World B Architecture Lockdown (~8941 tok)
-
-## e2e/
-
-- `package-lock.json` — npm lock file (~846 tok)
-- `package.json` — Node.js package manifest (~121 tok)
-- `playwright.config.ts` (~314 tok)
-- `tsconfig.json` — TypeScript configuration (~99 tok)
 
 ## e2e/test-results/.playwright-artifacts-0/traces/
 
@@ -374,22 +367,6 @@
 ## e2e/test-results/07-multi-turn-Multi-turn-c-f6fd6-ation-resets-client-context-chromium/
 
 - `error-context.md` — Instructions (~136 tok)
-
-## e2e/tests/
-
-- `00-login.spec.ts` — Login / registration flow. (~1152 tok)
-- `01-branding.spec.ts` — Phase 5 / M12 — Meridian branding. (~458 tok)
-- `02-hero-prompt.spec.ts` — Phase 4 / M6-M7 — End-to-end hero prompt. (~769 tok)
-- `03-jwt-identity.spec.ts` — Phase 8 / M15 — RS256/JWKS identity. (~1993 tok)
-- `04-entitlements.spec.ts` — Phase 5 / M8 — Cerbos ABAC entitlements. (~1738 tok)
-- `05-resilience.spec.ts` — Phase 6 / M11 — Resilience beat. (~927 tok)
-- `06-glassbox.spec.ts` — Phase 5 / M9 — Glass-box trace panel. (~345 tok)
-- `07-multi-turn.spec.ts` — Multi-turn conversation tests. (~2397 tok)
-- `08-domain-authz.spec.ts` — Phase 11 — Domain-scoped ABAC (segment × agent-domain). (~3237 tok)
-- `09-cerbos-authz.spec.ts` — Cerbos Authorization Matrix — direct PDP API tests (~5810 tok)
-- `10-coverage-flow.spec.ts` — Coverage-flow E2E tests (Phase 11+). (~2278 tok)
-- `admin-ui.spec.ts` — Declares BASE (~960 tok)
-- `helpers.ts` — Obtain a real RS256 JWT from the iam-service (~1961 tok)
 
 ## eval/
 
@@ -870,13 +847,6 @@
 
 - `openidStrategy.js` — API routes: GET (1 endpoints) (~9419 tok)
 
-## loadtest/
-
-- `load-test-light.js` — Meridian Gateway — Lightweight k6 Load Test (demo / CI) (~701 tok)
-- `load-test.js` — Meridian Gateway — k6 Phased Load Test (~1686 tok)
-- `scenario-test.js` — Meridian Gateway — Scenario Performance Test (~3794 tok)
-- `smoke-test.js` — Meridian Gateway — Smoke Test (fast CI check) (~649 tok)
-
 ## mock-agents/
 
 - `Dockerfile` — Docker container definition (~55 tok)
@@ -1000,7 +970,7 @@
 - `conftest.py` — whose: servicing_imports, mock_runner, suppress_otel_noise (~1027 tok)
 - `test_agent_integration.py` — Tests: no_auth_header_is_allowed, bearer_unused_is_allowed, empty_bearer_is_allowed, malformed_token_too_many_dots_is_rejected + 16 more (~4637 tok)
 - `test_concurrent_multiturn.py` — Test file (~3525 tok)
-- `test_live.py` — TestLiveWealthHttp: test_health_endpoint, test_openapi_served, test_holdings_live, test_performance_ (~13355 tok)
+- `test_live.py` — TestLiveWealthHttp: test_health_endpoint, test_openapi_served, test_holdings_live, test_performance_ (~13357 tok)
 - `test_servicing.py` — Tests: custody_positions_schema, settlements_schema, corporate_actions_schema, nav_schema + 6 more (~1385 tok)
 - `test_wealth.py` — Tests: health_ok, openapi_json_served, openapi_has_required_params, known_relationship + 11 more (~1200 tok)
 
@@ -1125,7 +1095,7 @@
 - `eval-routing.py` — mint_admin_token, load_prompts, resolve, f1 + 1 more (~1675 tok)
 - `integration-test.sh` — Curl-based integration tests against the running gateway. (~1352 tok)
 - `requirements-eval.txt` — Meridian eval dependencies (not runtime — install on dev/CI machine) (~33 tok)
-- `run-integration-tests.sh` (~353 tok)
+- `run-integration-tests.sh` (~354 tok)
 - `scenario-perf.py` — class: check_summary, mint_token, chat, resolve + 4 more (~14188 tok)
 - `seed-demo.py` — mint_token, chat, chat_multi, wait_for_gateway + 1 more (~2771 tok)
 - `seed-demo.sh` — Meridian Gateway — Phoenix/Tempo demo seed (~176 tok)
@@ -1155,12 +1125,48 @@
 ## tests/
 
 - `__init__.py` (~0 tok)
+- `README.md` — Master test index: E2E / load / integration / unit suites + how to run (~1400 tok)
+- `README.md` — Project documentation (~1980 tok)
+
+## tests/e2e/
+
+- `package-lock.json` — npm lock file (~846 tok)
+- `package.json` — Node.js package manifest (~121 tok)
+- `playwright.config.ts` (~314 tok)
+- `tsconfig.json` — TypeScript configuration (~99 tok)
+
+## tests/e2e/tests/
+
+- `00-login.spec.ts` — Login / registration flow. (~1152 tok)
+- `01-branding.spec.ts` — Phase 5 / M12 — Meridian branding. (~458 tok)
+- `02-hero-prompt.spec.ts` — Phase 4 / M6-M7 — End-to-end hero prompt. (~769 tok)
+- `03-jwt-identity.spec.ts` — Phase 8 / M15 — RS256/JWKS identity. (~1993 tok)
+- `04-entitlements.spec.ts` — Phase 5 / M8 — Cerbos ABAC entitlements. (~1738 tok)
+- `05-resilience.spec.ts` — Phase 6 / M11 — Resilience beat. (~927 tok)
+- `06-glassbox.spec.ts` — Phase 5 / M9 — Glass-box trace panel. (~345 tok)
+- `07-multi-turn.spec.ts` — Multi-turn conversation tests. (~2397 tok)
+- `08-domain-authz.spec.ts` — Phase 11 — Domain-scoped ABAC (segment × agent-domain). (~3237 tok)
+- `09-cerbos-authz.spec.ts` — Cerbos Authorization Matrix — direct PDP API tests (~5810 tok)
+- `10-coverage-flow.spec.ts` — Coverage-flow E2E tests (Phase 11+). (~2278 tok)
+- `11-screenshots.spec.ts` — Capture utility (and a smoke test): logs in, screenshots the branded home, sends the (~371 tok)
+- `admin-ui.spec.ts` — Declares BASE (~960 tok)
+- `helpers.ts` — Obtain a real RS256 JWT from the iam-service (~1961 tok)
 
 ## tests/integration/
 
 - `__init__.py` (~0 tok)
 - `requirements.txt` — Python dependencies (~13 tok)
 - `test_gateway_coverage.py` — get_jwt, collect_sse_text, chat, test_6_gateway_health_check (~2949 tok)
+
+## tests/load/
+
+- `load-test-light.js` — Meridian Gateway — Lightweight k6 Load Test (demo / CI) (~701 tok)
+- `load-test.js` — Meridian Gateway — k6 Phased Load Test (~1686 tok)
+- `load-test.js` — Meridian Gateway — k6 Phased Load Test (~1687 tok)
+- `scenario-test.js` — Meridian Gateway — Scenario Performance Test (~3794 tok)
+- `scenario-test.js` — Meridian Gateway — Scenario Performance Test (~3794 tok)
+- `smoke-test.js` — Meridian Gateway — Smoke Test (fast CI check) (~649 tok)
+- `smoke-test.js` — Meridian Gateway — Smoke Test (fast CI check) (~649 tok)
 
 ## user-mgmt/
 

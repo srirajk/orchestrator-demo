@@ -7,8 +7,8 @@
  *   Phase 3 (load)    — hold 25 VU for 60s, find steady-state throughput
  *   Phase 4 (stress)  — burst to 50 VU, verify error rate stays low
  *
- * Run locally:  GATEWAY_URL=http://localhost:8080 k6 run loadtest/load-test.js
- * Smoke only:   GATEWAY_URL=http://localhost:8080 k6 run loadtest/smoke-test.js
+ * Run locally:  GATEWAY_URL=http://localhost:8080 k6 run tests/load/load-test.js
+ * Smoke only:   GATEWAY_URL=http://localhost:8080 k6 run tests/load/smoke-test.js
  * In compose:   docker compose --profile scale run k6
  */
 import http from 'k6/http';

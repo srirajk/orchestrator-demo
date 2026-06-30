@@ -88,7 +88,7 @@ orchestrator-demo/
 ├── admin-ui/         ← agent/manifest registry admin
 ├── eval/             ← quality scoring (release gate + continuous)
 ├── infra/            ← Cerbos policies, Grafana, OTel collector configs
-├── loadtest/  e2e/   ← k6 load tests · Playwright end-to-end tests
+├── tests/            ← cross-cutting suites: e2e (Playwright) · load (k6) · integration
 ├── scripts/          ← run / seed / verify / world-b-check
 └── docs/             ← this overview, the runbook, the World-B spec
 ```

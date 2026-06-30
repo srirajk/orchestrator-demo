@@ -2567,6 +2567,54 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-06-30T00:06:20.724Z"
+    },
+    {
+      "id": "bug-160",
+      "timestamp": "2026-06-30T01:10:00.769Z",
+      "error_message": "Incorrect value in code",
+      "file": "scripts/run-integration-tests.sh",
+      "root_cause": "Had \")/../e2e\"",
+      "fix": "Changed to \")/../tests/e2e\"",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "sh"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-30T01:10:00.769Z"
+    },
+    {
+      "id": "bug-161",
+      "timestamp": "2026-06-30T01:12:18.938Z",
+      "error_message": "Incorrect value in code",
+      "file": "docs/OPERATOR-RUNBOOK.md",
+      "root_cause": "Had \"$(pwd)/loadtest:/scripts\"",
+      "fix": "Changed to \"$(pwd)/tests/load:/scripts\"",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-06-30T01:12:18.938Z"
+    },
+    {
+      "id": "bug-162",
+      "timestamp": "2026-06-30T01:12:25.269Z",
+      "error_message": "Incorrect value in code",
+      "file": "BUILD_REPORT.md",
+      "root_cause": "Had `e2e/`",
+      "fix": "Changed to `tests/e2e/`",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-06-30T01:12:30.014Z"
     }
   ]
 }
