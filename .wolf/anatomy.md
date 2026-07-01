@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-07-01T13:10:54.268Z
-> Files: 670 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-07-01T13:29:13.081Z
+> Files: 671 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/
 
@@ -269,6 +269,7 @@
 - `domain-manifest-and-memory.md` — Domain Manifest + Contextual Memory Architecture (~2480 tok)
 - `domain-onboarding-standard.md` — Domain Onboarding Standard (~4115 tok)
 - `EVAL-FRAMEWORK.md` — Conduit Eval Framework — an agent-agnostic evaluation worker (~2269 tok)
+- `EVAL-PRODUCT-VISION.md` — Eval — Product Vision (framework + app) (~1004 tok)
 - `execution-orchestration-layer.md` — Execution / Orchestration Layer — Spec (~1323 tok)
 - `gateway-domain-architecture.md` — Conduit AI Gateway — Domain Architecture (~7275 tok)
 - `harness-and-telemetry-deep-spec.md` — Harness & Telemetry — Deep Spec (~2123 tok)
