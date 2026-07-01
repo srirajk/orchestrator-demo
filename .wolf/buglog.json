@@ -7,7 +7,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/orchestration/harness/AgentHarness.java",
       "root_cause": "5 lines replaced/restructured",
-      "fix": "Rewrote 40→55 lines (5 removed)",
+      "fix": "Rewrote 40\u219255 lines (5 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -39,7 +39,7 @@
       "error_message": "Significant refactor of ",
       "file": "eval/eval_deepeval.py",
       "root_cause": "4 lines replaced/restructured",
-      "fix": "Rewrote 10→8 lines (4 removed) | Also: Spot-check 3 hero answers for faithfulness using d; print(f\" Faithfulness Spot-Check (3 hero prompts v",
+      "fix": "Rewrote 10\u21928 lines (4 removed) | Also: Spot-check 3 hero answers for faithfulness using d; print(f\" Faithfulness Spot-Check (3 hero prompts v",
       "tags": [
         "auto-detected",
         "refactor",
@@ -55,7 +55,7 @@
       "error_message": "Significant refactor of ",
       "file": "mock-agents/wealth/shared/fault_knobs.py",
       "root_cause": "17 lines replaced/restructured",
-      "fix": "Rewrote 42→28 lines (17 removed)",
+      "fix": "Rewrote 42\u219228 lines (17 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -103,7 +103,7 @@
       "error_message": "Wrong reference: false should be true",
       "file": "infra/cerbos/config.yaml",
       "root_cause": "Used \"false\" instead of \"true\"",
-      "fix": "Changed false → true",
+      "fix": "Changed false \u2192 true",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -167,7 +167,7 @@
       "error_message": "Significant refactor of ",
       "file": ".claude/worktrees/agent-a3c0915360f71cbe6/admin-ui/src/pages/Policies.tsx",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 7→5 lines (2 removed)",
+      "fix": "Rewrote 7\u21925 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -182,8 +182,8 @@
       "timestamp": "2026-06-27T20:51:11.435Z",
       "error_message": "CSS fix: data, queryKey",
       "file": ".claude/worktrees/agent-a3c0915360f71cbe6/admin-ui/src/pages/Policies.tsx",
-      "root_cause": "data: roles = [] → segmentsData; queryKey: ['roles'], queryFn: rolesApi.list → ['segments'], queryFn: adminApi.segments",
-      "fix": "Changed data: roles = [] → segmentsData; queryKey: ['roles'], queryFn: rolesApi.list → ['segments'], queryFn: adminApi.segments",
+      "root_cause": "data: roles = [] \u2192 segmentsData; queryKey: ['roles'], queryFn: rolesApi.list \u2192 ['segments'], queryFn: adminApi.segments",
+      "fix": "Changed data: roles = [] \u2192 segmentsData; queryKey: ['roles'], queryFn: rolesApi.list \u2192 ['segments'], queryFn: adminApi.segments",
       "tags": [
         "auto-detected",
         "style-fix",
@@ -199,7 +199,7 @@
       "error_message": "Significant refactor of ",
       "file": ".claude/worktrees/agent-a3c0915360f71cbe6/user-mgmt/main.py",
       "root_cause": "3 lines replaced/restructured",
-      "fix": "Rewrote 57→73 lines (3 removed) | Also: metadata_={; }, | Also: if not result.scalar_one_or_none():; .where(Group.type == \"team\")",
+      "fix": "Rewrote 57\u219273 lines (3 removed) | Also: metadata_={; }, | Also: if not result.scalar_one_or_none():; .where(Group.type == \"team\")",
       "tags": [
         "auto-detected",
         "refactor",
@@ -215,7 +215,7 @@
       "error_message": "Wrong reference: None should be team_meta_map",
       "file": ".claude/worktrees/agent-a3c0915360f71cbe6/user-mgmt/main.py",
       "root_cause": "Used \"None\" instead of \"team_meta_map\"",
-      "fix": "Changed None → team_meta_map",
+      "fix": "Changed None \u2192 team_meta_map",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -230,8 +230,8 @@
       "timestamp": "2026-06-28T00:25:07.599Z",
       "error_message": "CSS fix: to",
       "file": "admin-ui/src/components/Sidebar.tsx",
-      "root_cause": "to: '/policies',label: 'Policies',  icon: FileText → '/audit',   label: 'Audit Log', icon: Clock",
-      "fix": "Changed to: '/policies',label: 'Policies',  icon: FileText → '/audit',   label: 'Audit Log', icon: Clock",
+      "root_cause": "to: '/policies',label: 'Policies',  icon: FileText \u2192 '/audit',   label: 'Audit Log', icon: Clock",
+      "fix": "Changed to: '/policies',label: 'Policies',  icon: FileText \u2192 '/audit',   label: 'Audit Log', icon: Clock",
       "tags": [
         "auto-detected",
         "style-fix",
@@ -279,7 +279,7 @@
       "error_message": "Wrong reference: access_token should be accessToken",
       "file": "admin-ui/src/pages/Login.tsx",
       "root_cause": "Used \"access_token\" instead of \"accessToken\"",
-      "fix": "Changed access_token → accessToken",
+      "fix": "Changed access_token \u2192 accessToken",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -294,8 +294,8 @@
       "timestamp": "2026-06-28T00:58:37.542Z",
       "error_message": "CSS fix: EMPTY",
       "file": "admin-ui/src/pages/Users.tsx",
-      "root_cause": "EMPTY: Omit<UserType, 'id' | 'admin_domains'> = { → Omit<UserType, 'id' | 'adminDomains' | 'isActive' | 'createdAt'> = {",
-      "fix": "Changed EMPTY: Omit<UserType, 'id' | 'admin_domains'> = { → Omit<UserType, 'id' | 'adminDomains' | 'isActive' | 'createdAt'> = {",
+      "root_cause": "EMPTY: Omit<UserType, 'id' | 'admin_domains'> = { \u2192 Omit<UserType, 'id' | 'adminDomains' | 'isActive' | 'createdAt'> = {",
+      "fix": "Changed EMPTY: Omit<UserType, 'id' | 'admin_domains'> = { \u2192 Omit<UserType, 'id' | 'adminDomains' | 'isActive' | 'createdAt'> = {",
       "tags": [
         "auto-detected",
         "style-fix",
@@ -311,7 +311,7 @@
       "error_message": "Wrong reference: name should be username",
       "file": "admin-ui/src/pages/Users.tsx",
       "root_cause": "Used \"name\" instead of \"username\"",
-      "fix": "Changed name → username",
+      "fix": "Changed name \u2192 username",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -343,7 +343,7 @@
       "error_message": "Wrong reference: name should be username",
       "file": "admin-ui/src/pages/Dashboard.tsx",
       "root_cause": "Used \"name\" instead of \"username\"",
-      "fix": "Changed name → username",
+      "fix": "Changed name \u2192 username",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -359,7 +359,7 @@
       "error_message": "Wrong reference: name should be username",
       "file": "admin-ui/src/pages/Teams.tsx",
       "root_cause": "Used \"name\" instead of \"username\"",
-      "fix": "Changed name → username",
+      "fix": "Changed name \u2192 username",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -374,8 +374,8 @@
       "timestamp": "2026-06-28T01:08:12.473Z",
       "error_message": "CSS fix: EMPTY",
       "file": "admin-ui/src/pages/Teams.tsx",
-      "root_cause": "EMPTY: Omit<Team, 'member_count' | 'members'> = { → Omit<Team, 'memberCount' | 'members'> = {",
-      "fix": "Changed EMPTY: Omit<Team, 'member_count' | 'members'> = { → Omit<Team, 'memberCount' | 'members'> = {",
+      "root_cause": "EMPTY: Omit<Team, 'member_count' | 'members'> = { \u2192 Omit<Team, 'memberCount' | 'members'> = {",
+      "fix": "Changed EMPTY: Omit<Team, 'member_count' | 'members'> = { \u2192 Omit<Team, 'memberCount' | 'members'> = {",
       "tags": [
         "auto-detected",
         "style-fix",
@@ -455,7 +455,7 @@
       "error_message": "Wrong reference: total should be totalElements",
       "file": "admin-ui/src/pages/AuditLog.tsx",
       "root_cause": "Used \"total\" instead of \"totalElements\"",
-      "fix": "Changed total → totalElements",
+      "fix": "Changed total \u2192 totalElements",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -471,7 +471,7 @@
       "error_message": "Significant refactor of ",
       "file": "infra/cerbos/policies/agent_resource.yaml",
       "root_cause": "4 lines replaced/restructured",
-      "fix": "Rewrote 19→25 lines (4 removed)",
+      "fix": "Rewrote 19\u219225 lines (4 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -502,7 +502,7 @@
       "timestamp": "2026-06-28T01:41:32.258Z",
       "error_message": "Missing error handling in unknown",
       "file": "infra/cerbos/policies/iam_resource.yaml",
-      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
+      "root_cause": "Code path had no error handling \u2014 exceptions would propagate uncaught",
       "fix": "Added try/catch block",
       "tags": [
         "auto-detected",
@@ -519,7 +519,7 @@
       "error_message": "Significant refactor of ",
       "file": "infra/cerbos/policies/iam_derived_roles.yaml",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 9→12 lines (2 removed)",
+      "fix": "Rewrote 9\u219212 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -535,7 +535,7 @@
       "error_message": "Significant refactor of ",
       "file": "infra/cerbos/policies/iam_resource.yaml",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 10→12 lines (2 removed)",
+      "fix": "Rewrote 10\u219212 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -551,7 +551,7 @@
       "error_message": "Wrong reference: name should be id",
       "file": "e2e/tests/09-cerbos-authz.spec.ts",
       "root_cause": "Used \"name\" instead of \"id\"",
-      "fix": "Changed name → id",
+      "fix": "Changed name \u2192 id",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -567,7 +567,7 @@
       "error_message": "Significant refactor of ",
       "file": "iam-service/src/main/java/com/openwolf/iam/service/PolicyService.java",
       "root_cause": "7 lines replaced/restructured",
-      "fix": "Rewrote 14→35 lines (7 removed)",
+      "fix": "Rewrote 14\u219235 lines (7 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -599,7 +599,7 @@
       "error_message": "Significant refactor of ",
       "file": "docker-compose.yml",
       "root_cause": "4 lines replaced/restructured",
-      "fix": "Rewrote 4→6 lines (4 removed)",
+      "fix": "Rewrote 4\u21926 lines (4 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -630,7 +630,7 @@
       "timestamp": "2026-06-28T03:38:47.853Z",
       "error_message": "Missing error handling in unknown",
       "file": "iam-service/src/main/java/com/openwolf/iam/controller/AuthController.java",
-      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
+      "root_cause": "Code path had no error handling \u2014 exceptions would propagate uncaught",
       "fix": "Added try/catch block",
       "tags": [
         "auto-detected",
@@ -647,7 +647,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/config/SecurityConfig.java",
       "root_cause": "5 lines replaced/restructured",
-      "fix": "Rewrote 6→6 lines (5 removed)",
+      "fix": "Rewrote 6\u21926 lines (5 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -694,7 +694,7 @@
       "timestamp": "2026-06-28T04:06:03.501Z",
       "error_message": "Missing error handling in unknown",
       "file": "iam-service/src/main/java/com/openwolf/iam/controller/AuthController.java",
-      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
+      "root_cause": "Code path had no error handling \u2014 exceptions would propagate uncaught",
       "fix": "Added try/catch block",
       "tags": [
         "auto-detected",
@@ -708,7 +708,7 @@
     {
       "id": "bug-045",
       "timestamp": "2026-06-28T04:30:00.000Z",
-      "error_message": "E2E getJwt() sends {user_id} body and reads data.access_token — both wrong for Java iam-service API",
+      "error_message": "E2E getJwt() sends {user_id} body and reads data.access_token \u2014 both wrong for Java iam-service API",
       "file": "e2e/tests/helpers.ts",
       "root_cause": "Python user-mgmt POST /auth/token expected {user_id: string} and returned {access_token}. Java iam-service expects {username, password} and returns {accessToken}.",
       "fix": "Changed body to {username: userId, password: 'Meridian@2024'} and read data.accessToken",
@@ -870,7 +870,7 @@
     {
       "id": "bug-054",
       "timestamp": "2026-06-28T04:30:00.000Z",
-      "error_message": "04-entitlements.spec.ts:12 and :51 timeout — 'Target page, context or browser has been closed' at helpers.ts:109",
+      "error_message": "04-entitlements.spec.ts:12 and :51 timeout \u2014 'Target page, context or browser has been closed' at helpers.ts:109",
       "file": "e2e/playwright.config.ts",
       "root_cause": "Playwright test timeout was 90_000ms. LibreChat browser UI tests require ~15-20s login + ~60-80s LLM synthesis = 75-100s, exceeding the timeout. When timeout fires, Playwright closes the page context and page.waitForTimeout() throws 'page closed'.",
       "fix": "Increased timeout from 90_000 to 180_000ms in playwright.config.ts. Both UI tests now complete in ~90-96s and pass within 180s.",
@@ -890,7 +890,7 @@
       "error_message": "Significant refactor of ",
       "file": "docs/gateway-domain-architecture.md",
       "root_cause": "3 lines replaced/restructured",
-      "fix": "Rewrote 13→36 lines (3 removed)",
+      "fix": "Rewrote 13\u219236 lines (3 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -906,7 +906,7 @@
       "error_message": "Significant refactor of ",
       "file": "docs/gateway-domain-architecture.md",
       "root_cause": "6 lines replaced/restructured",
-      "fix": "Rewrote 12→18 lines (6 removed) | Also: | **0 — Foundation** | `DomainManifest` + `DomainM; | | `ConversationSession` extension (add clientNam",
+      "fix": "Rewrote 12\u219218 lines (6 removed) | Also: | **0 \u2014 Foundation** | `DomainManifest` + `DomainM; | | `ConversationSession` extension (add clientNam",
       "tags": [
         "auto-detected",
         "refactor",
@@ -954,7 +954,7 @@
       "error_message": "Wrong reference: false should be true",
       "file": "librechat/librechat.yaml",
       "root_cause": "Used \"false\" instead of \"true\"",
-      "fix": "Changed false → true",
+      "fix": "Changed false \u2192 true",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -970,7 +970,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityExtractor.java",
       "root_cause": "11 lines replaced/restructured",
-      "fix": "Rewrote 20→12 lines (11 removed)",
+      "fix": "Rewrote 20\u219212 lines (11 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1002,7 +1002,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/resources/application.yml",
       "root_cause": "9 lines replaced/restructured",
-      "fix": "Rewrote 16→19 lines (9 removed)",
+      "fix": "Rewrote 16\u219219 lines (9 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1018,7 +1018,7 @@
       "error_message": "Significant refactor of ",
       "file": "iam-service/src/main/java/com/openwolf/iam/auth/JwtClaimsCustomizer.java",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 7→8 lines (2 removed)",
+      "fix": "Rewrote 7\u21928 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1066,7 +1066,7 @@
       "error_message": "Wrong reference: HttpStatus should be HttpStatusCode",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/coverage/CoverageClient.java",
       "root_cause": "Used \"HttpStatus\" instead of \"HttpStatusCode\"",
-      "fix": "Changed HttpStatus → HttpStatusCode",
+      "fix": "Changed HttpStatus \u2192 HttpStatusCode",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -1097,8 +1097,8 @@
       "timestamp": "2026-06-29T01:35:43.813Z",
       "error_message": "Missing error handling in unknown",
       "file": "gateway/src/main/java/ai/meridian/gateway/synthesis/answer/AnswerSynthesizer.java",
-      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
-      "fix": "Added try/catch block | Also: // Role delta first — same pattern as synthesize() to avoid ; emitter.send(SseEmitter.event().data(roleDelta(completionId,",
+      "root_cause": "Code path had no error handling \u2014 exceptions would propagate uncaught",
+      "fix": "Added try/catch block | Also: // Role delta first \u2014 same pattern as synthesize() to avoid ; emitter.send(SseEmitter.event().data(roleDelta(completionId,",
       "tags": [
         "auto-detected",
         "error-handling",
@@ -1113,7 +1113,7 @@
       "timestamp": "2026-06-29T01:36:21.501Z",
       "error_message": "Missing error handling in unknown",
       "file": "e2e/tests/helpers.ts",
-      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
+      "root_cause": "Code path had no error handling \u2014 exceptions would propagate uncaught",
       "fix": "Added try/catch block",
       "tags": [
         "auto-detected",
@@ -1178,7 +1178,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 11→18 lines (2 removed)",
+      "fix": "Rewrote 11\u219218 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1194,7 +1194,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/manifest/DomainManifestStore.java",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 4→7 lines (2 removed)",
+      "fix": "Rewrote 4\u21927 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1226,7 +1226,7 @@
       "error_message": "Wrong reference: meridian_dev should be $",
       "file": "docker-compose.yml",
       "root_cause": "Used \"meridian_dev\" instead of \"$\"",
-      "fix": "Changed meridian_dev → $",
+      "fix": "Changed meridian_dev \u2192 $",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -1242,7 +1242,7 @@
       "error_message": "Significant refactor of ",
       "file": "docker-compose.yml",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 3→3 lines (2 removed) | Also: POSTGRES_USER: langfuse; POSTGRES_PASSWORD: langfuse | Also: CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:; CLICKHOUSE_USER: clickhouse | Also: LANGFUSE_INIT_PROJECT_PUBLIC_KEY: pk-lf-meridian-p; LANGFUSE_INIT_PROJECT_SECRET_KEY: sk-lf-meridian-s",
+      "fix": "Rewrote 3\u21923 lines (2 removed) | Also: POSTGRES_USER: langfuse; POSTGRES_PASSWORD: langfuse | Also: CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:; CLICKHOUSE_USER: clickhouse | Also: LANGFUSE_INIT_PROJECT_PUBLIC_KEY: pk-lf-meridian-p; LANGFUSE_INIT_PROJECT_SECRET_KEY: sk-lf-meridian-s",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1274,7 +1274,7 @@
       "error_message": "Wrong reference: EXPECTED_AUDIENCE should be expectedAudience",
       "file": "gateway/src/main/java/ai/meridian/gateway/config/SecurityConfig.java",
       "root_cause": "Used \"EXPECTED_AUDIENCE\" instead of \"expectedAudience\"",
-      "fix": "Changed EXPECTED_AUDIENCE → expectedAudience",
+      "fix": "Changed EXPECTED_AUDIENCE \u2192 expectedAudience",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -1306,7 +1306,7 @@
       "error_message": "Wrong reference: Meridian should be IAM_USER_PASSWORD",
       "file": "e2e/tests/helpers.ts",
       "root_cause": "Used \"Meridian\" instead of \"IAM_USER_PASSWORD\"",
-      "fix": "Changed Meridian → IAM_USER_PASSWORD",
+      "fix": "Changed Meridian \u2192 IAM_USER_PASSWORD",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -1322,7 +1322,7 @@
       "error_message": "Wrong reference: Meridian should be IAM_ADMIN_PASSWORD",
       "file": "e2e/tests/admin-ui.spec.ts",
       "root_cause": "Used \"Meridian\" instead of \"IAM_ADMIN_PASSWORD\"",
-      "fix": "Changed Meridian → IAM_ADMIN_PASSWORD",
+      "fix": "Changed Meridian \u2192 IAM_ADMIN_PASSWORD",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -1338,7 +1338,7 @@
       "error_message": "Wrong reference: Meridian should be IAM_USER_PASSWORD",
       "file": "e2e/tests/03-jwt-identity.spec.ts",
       "root_cause": "Used \"Meridian\" instead of \"IAM_USER_PASSWORD\"",
-      "fix": "Changed Meridian → IAM_USER_PASSWORD",
+      "fix": "Changed Meridian \u2192 IAM_USER_PASSWORD",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -1354,7 +1354,7 @@
       "error_message": "Wrong reference: Meridian should be IAM_USER_PASSWORD",
       "file": "e2e/tests/08-domain-authz.spec.ts",
       "root_cause": "Used \"Meridian\" instead of \"IAM_USER_PASSWORD\"",
-      "fix": "Changed Meridian → IAM_USER_PASSWORD",
+      "fix": "Changed Meridian \u2192 IAM_USER_PASSWORD",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -1370,7 +1370,7 @@
       "error_message": "Wrong reference: Meridian should be IAM_ADMIN_PASSWORD",
       "file": "e2e/tests/09-cerbos-authz.spec.ts",
       "root_cause": "Used \"Meridian\" instead of \"IAM_ADMIN_PASSWORD\"",
-      "fix": "Changed Meridian → IAM_ADMIN_PASSWORD",
+      "fix": "Changed Meridian \u2192 IAM_ADMIN_PASSWORD",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -1386,7 +1386,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/auth/PrincipalStore.java",
       "root_cause": "6 lines replaced/restructured",
-      "fix": "Rewrote 10→12 lines (6 removed)",
+      "fix": "Rewrote 10\u219212 lines (6 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1402,7 +1402,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
       "root_cause": "6 lines replaced/restructured",
-      "fix": "Rewrote 6→3 lines (6 removed)",
+      "fix": "Rewrote 6\u21923 lines (6 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1418,7 +1418,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/test/java/ai/meridian/gateway/domain/auth/AuthzFromMembershipTest.java",
       "root_cause": "10 lines replaced/restructured",
-      "fix": "Rewrote 16→10 lines (10 removed) | Also: void entitlementService_adminRole_grantsAccessRega; // platform_admin/admin: Cerbos returns ALLOW (pol | Also: void entitlementService_rmWithoutRelInBook_denied(; // Cerbos denies REL-00188 because it's not in rm_",
+      "fix": "Rewrote 16\u219210 lines (10 removed) | Also: void entitlementService_adminRole_grantsAccessRega; // platform_admin/admin: Cerbos returns ALLOW (pol | Also: void entitlementService_rmWithoutRelInBook_denied(; // Cerbos denies REL-00188 because it's not in rm_",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1464,7 +1464,7 @@
     {
       "id": "bug-091",
       "timestamp": "2026-06-29T03:00:00Z",
-      "error_message": "DomainManifestStore init fails: named capturing group is missing trailing } — Failed to parse domain manifest wealth-management.json",
+      "error_message": "DomainManifestStore init fails: named capturing group is missing trailing } \u2014 Failed to parse domain manifest wealth-management.json",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/manifest/DomainManifestStore.java",
       "root_cause": "resolveEnvVars() called Matcher.appendReplacement() with unquoted m.group(0) as fallback when env var was not set. m.group(0) contains ${WEALTH_COVERAGE_URL} which Matcher.appendReplacement interprets as a named back-reference, throwing IllegalArgumentException.",
       "fix": "Changed fallback to use Matcher.quoteReplacement(m.group(0)) so ${ is treated as literal text.",
@@ -1484,7 +1484,7 @@
       "error_message": "Significant refactor of ",
       "file": "e2e/tests/09-cerbos-authz.spec.ts",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 23→24 lines (2 removed) | Also: // SUITE 2 — Relationship resource (prune-before-f; test.describe('Relationship resource authz — book- | Also: * Calls the Cerbos PDP REST API at :3592 for every; * Cerbos policies enforce the correct decisions be",
+      "fix": "Rewrote 23\u219224 lines (2 removed) | Also: // SUITE 2 \u2014 Relationship resource (prune-before-f; test.describe('Relationship resource authz \u2014 book- | Also: * Calls the Cerbos PDP REST API at :3592 for every; * Cerbos policies enforce the correct decisions be",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1500,7 +1500,7 @@
       "error_message": "Significant refactor of ",
       "file": "e2e/tests/10-coverage-flow.spec.ts",
       "root_cause": "7 lines replaced/restructured",
-      "fix": "Rewrote 12→19 lines (7 removed)",
+      "fix": "Rewrote 12\u219219 lines (7 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1515,7 +1515,7 @@
       "timestamp": "2026-06-29T03:31:20.316Z",
       "error_message": "Missing error handling in unknown",
       "file": "e2e/tests/10-coverage-flow.spec.ts",
-      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
+      "root_cause": "Code path had no error handling \u2014 exceptions would propagate uncaught",
       "fix": "Added try/catch block",
       "tags": [
         "auto-detected",
@@ -1548,7 +1548,7 @@
       "error_message": "Wrong reference: 240_000 should be 360_000",
       "file": "e2e/tests/07-multi-turn.spec.ts",
       "root_cause": "Used \"240_000\" instead of \"360_000\"",
-      "fix": "Changed 240_000 → 360_000",
+      "fix": "Changed 240_000 \u2192 360_000",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -1564,7 +1564,7 @@
       "error_message": "Significant refactor of ",
       "file": "iam-service/src/main/java/com/openwolf/iam/config/SecurityConfig.java",
       "root_cause": "6 lines replaced/restructured",
-      "fix": "Rewrote 22→32 lines (6 removed)",
+      "fix": "Rewrote 22\u219232 lines (6 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1580,7 +1580,7 @@
       "error_message": "Significant refactor of ",
       "file": "iam-service/src/main/java/com/openwolf/iam/config/SecurityConfig.java",
       "root_cause": "11 lines replaced/restructured",
-      "fix": "Rewrote 16→10 lines (11 removed)",
+      "fix": "Rewrote 16\u219210 lines (11 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1596,7 +1596,7 @@
       "error_message": "Wrong reference: 75_000 should be 120_000",
       "file": "e2e/tests/helpers.ts",
       "root_cause": "Used \"75_000\" instead of \"120_000\"",
-      "fix": "Changed 75_000 → 120_000",
+      "fix": "Changed 75_000 \u2192 120_000",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -1644,7 +1644,7 @@
       "error_message": "Significant refactor of ",
       "file": "e2e/tests/10-coverage-flow.spec.ts",
       "root_cause": "8 lines replaced/restructured",
-      "fix": "Rewrote 13→24 lines (8 removed)",
+      "fix": "Rewrote 13\u219224 lines (8 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1659,7 +1659,7 @@
       "timestamp": "2026-06-29T16:02:52.746Z",
       "error_message": "Missing error handling in unknown",
       "file": "docs/WORLD-B-LOCKDOWN.md",
-      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
+      "root_cause": "Code path had no error handling \u2014 exceptions would propagate uncaught",
       "fix": "Added try/catch block",
       "tags": [
         "auto-detected",
@@ -1676,7 +1676,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/registry/loader/RegistryBootstrapLoader.java",
       "root_cause": "7 lines replaced/restructured",
-      "fix": "Rewrote 37→45 lines (7 removed)",
+      "fix": "Rewrote 37\u219245 lines (7 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1692,7 +1692,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityExtractor.java",
       "root_cause": "3 lines replaced/restructured",
-      "fix": "Rewrote 5→12 lines (3 removed)",
+      "fix": "Rewrote 5\u219212 lines (3 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1708,7 +1708,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/synthesis/answer/AnswerSynthesizer.java",
       "root_cause": "6 lines replaced/restructured",
-      "fix": "Rewrote 7→13 lines (6 removed)",
+      "fix": "Rewrote 7\u219213 lines (6 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1756,7 +1756,7 @@
       "error_message": "Wrong reference: RESOURCE_REL should be resourceType",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/auth/CerbosEntitlementAdapter.java",
       "root_cause": "Used \"RESOURCE_REL\" instead of \"resourceType\"",
-      "fix": "Changed RESOURCE_REL → resourceType",
+      "fix": "Changed RESOURCE_REL \u2192 resourceType",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -1772,7 +1772,7 @@
       "error_message": "Significant refactor of ",
       "file": "mock-agents/wealth-coverage/tests/test_coverage.py",
       "root_cause": "4 lines replaced/restructured",
-      "fix": "Rewrote 5→7 lines (4 removed)",
+      "fix": "Rewrote 5\u21927 lines (4 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1836,7 +1836,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 19→27 lines (2 removed)",
+      "fix": "Rewrote 19\u219227 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1884,7 +1884,7 @@
       "error_message": "Significant refactor of ",
       "file": "docs/MODEL-SELECTION.md",
       "root_cause": "8 lines replaced/restructured",
-      "fix": "Rewrote 15→29 lines (8 removed) | Also: It would (a) blow the p99 latency budget on routin; (b) cost ~10× on bounded tasks for no quality gain",
+      "fix": "Rewrote 15\u219229 lines (8 removed) | Also: It would (a) blow the p99 latency budget on routin; (b) cost ~10\u00d7 on bounded tasks for no quality gain",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1900,7 +1900,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/manifest/SubDomainManifest.java",
       "root_cause": "6 lines replaced/restructured",
-      "fix": "Rewrote 21→34 lines (6 removed)",
+      "fix": "Rewrote 21\u219234 lines (6 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1932,7 +1932,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/manifest/EffectiveManifest.java",
       "root_cause": "7 lines replaced/restructured",
-      "fix": "Rewrote 11→16 lines (7 removed)",
+      "fix": "Rewrote 11\u219216 lines (7 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1948,7 +1948,7 @@
       "error_message": "Wrong reference: requiresRelationship should be requiresContext",
       "file": "gateway/src/test/java/ai/meridian/gateway/domain/manifest/EffectiveManifestTest.java",
       "root_cause": "Used \"requiresRelationship\" instead of \"requiresContext\"",
-      "fix": "Changed requiresRelationship → requiresContext",
+      "fix": "Changed requiresRelationship \u2192 requiresContext",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -1980,7 +1980,7 @@
       "error_message": "Wrong reference: requiresRelationship should be requiresContext",
       "file": "gateway/src/test/java/ai/meridian/gateway/domain/manifest/EffectiveManifestMergeTest.java",
       "root_cause": "Used \"requiresRelationship\" instead of \"requiresContext\"",
-      "fix": "Changed requiresRelationship → requiresContext",
+      "fix": "Changed requiresRelationship \u2192 requiresContext",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2028,7 +2028,7 @@
       "error_message": "Wrong reference: SYSTEM_PROMPT should be systemPrompt",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java",
       "root_cause": "Used \"SYSTEM_PROMPT\" instead of \"systemPrompt\"",
-      "fix": "Changed SYSTEM_PROMPT → systemPrompt",
+      "fix": "Changed SYSTEM_PROMPT \u2192 systemPrompt",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2060,7 +2060,7 @@
       "error_message": "Wrong reference: SYSTEM_PROMPT should be systemPrompt",
       "file": "gateway/src/main/java/ai/meridian/gateway/synthesis/answer/AnswerSynthesizer.java",
       "root_cause": "Used \"SYSTEM_PROMPT\" instead of \"systemPrompt\"",
-      "fix": "Changed SYSTEM_PROMPT → systemPrompt",
+      "fix": "Changed SYSTEM_PROMPT \u2192 systemPrompt",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2076,7 +2076,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
       "root_cause": "4 lines replaced/restructured",
-      "fix": "Rewrote 8→13 lines (4 removed)",
+      "fix": "Rewrote 8\u219213 lines (4 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2124,7 +2124,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityResolver.java",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 11→21 lines (2 removed)",
+      "fix": "Rewrote 11\u219221 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2140,7 +2140,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/session/ConversationSessionStore.java",
       "root_cause": "4 lines replaced/restructured",
-      "fix": "Rewrote 32→49 lines (4 removed)",
+      "fix": "Rewrote 32\u219249 lines (4 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2252,7 +2252,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 6→10 lines (2 removed)",
+      "fix": "Rewrote 6\u219210 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2268,7 +2268,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/test/java/ai/meridian/gateway/domain/session/ConversationSessionTest.java",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 7→18 lines (2 removed)",
+      "fix": "Rewrote 7\u219218 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2284,7 +2284,7 @@
       "error_message": "Significant refactor of ",
       "file": "docs/WORLD-B-LOCKDOWN.md",
       "root_cause": "3 lines replaced/restructured",
-      "fix": "Rewrote 3→6 lines (3 removed)",
+      "fix": "Rewrote 3\u21926 lines (3 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2300,7 +2300,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/resources/agent-manifest.schema.json",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 4→4 lines (2 removed) | Also: \"description\": \"Coarse business bucket the resolve; \"enum\": [\"wealth-management\", \"asset-servicing\"]",
+      "fix": "Rewrote 4\u21924 lines (2 removed) | Also: \"description\": \"Coarse business bucket the resolve; \"enum\": [\"wealth-management\", \"asset-servicing\"]",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2363,7 +2363,7 @@
       "timestamp": "2026-06-29T19:00:00.000Z",
       "error_message": "Insurance query naming POL-77001 wrongly clarifies 'which policy?' once a second domain is onboarded; gateway checks relationship_id instead of policy_id",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
-      "root_cause": "handleFetchData derived coverageEntity from coverageEntityType() which uses manifestStore.requiredContextKeys()/entityTypes() — the cross-domain UNION across ALL sub-domains — and picked the first key (relationship_id from wealth). The coverage entity was never scoped to the routed sub-domain.",
+      "root_cause": "handleFetchData derived coverageEntity from coverageEntityType() which uses manifestStore.requiredContextKeys()/entityTypes() \u2014 the cross-domain UNION across ALL sub-domains \u2014 and picked the first key (relationship_id from wealth). The coverage entity was never scoped to the routed sub-domain.",
       "fix": "Added DomainManifestStore.entityTypesFor(subDomainId) (single sub-domain's entity_types) and scoped overloads coverageEntityType(EffectiveManifest)/secondaryEntityType(EffectiveManifest). In handleFetchData, once the resource-scoped agent's EffectiveManifest em is known, re-scope coverageEntity/secondaryEntity/carriedCoverageId from em.requiredContext()+em.subDomainId() before the coverage resolve/check/bind. Follow-up/session paths now use carriedCoverageEntityType(session) which finds whichever required entity the session actually carries (domain-agnostic).",
       "tags": [
         "multi-domain",
@@ -2382,7 +2382,7 @@
       "error_message": "Significant refactor of ",
       "file": "infra/promtail/promtail.yaml",
       "root_cause": "3 lines replaced/restructured",
-      "fix": "Rewrote 12→18 lines (3 removed)",
+      "fix": "Rewrote 12\u219218 lines (3 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2446,7 +2446,7 @@
       "error_message": "Significant refactor of ",
       "file": "mock-agents/tests/test_live.py",
       "root_cause": "7 lines replaced/restructured",
-      "fix": "Rewrote 20→28 lines (7 removed) | Also: def test_empty_book_denies_all(self):; \"\"\"An RM with an empty book is denied every relati",
+      "fix": "Rewrote 20\u219228 lines (7 removed) | Also: def test_empty_book_denies_all(self):; \"\"\"An RM with an empty book is denied every relati",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2478,7 +2478,7 @@
       "error_message": "Significant refactor of ",
       "file": "eval/langfuse_continuous.py",
       "root_cause": "5 lines replaced/restructured",
-      "fix": "Rewrote 39→57 lines (5 removed)",
+      "fix": "Rewrote 39\u219257 lines (5 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2493,7 +2493,7 @@
       "timestamp": "2026-06-29T23:16:46.869Z",
       "error_message": "Missing error handling in unknown",
       "file": "gateway/src/main/java/ai/meridian/gateway/infrastructure/telemetry/TraceEventPublisher.java",
-      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
+      "root_cause": "Code path had no error handling \u2014 exceptions would propagate uncaught",
       "fix": "Added try/catch block",
       "tags": [
         "auto-detected",
@@ -2510,7 +2510,7 @@
       "error_message": "Significant refactor of ",
       "file": "eval/langfuse_continuous.py",
       "root_cause": "3 lines replaced/restructured",
-      "fix": "Rewrote 23→27 lines (3 removed)",
+      "fix": "Rewrote 23\u219227 lines (3 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2542,7 +2542,7 @@
       "error_message": "Significant refactor of ",
       "file": "eval/langfuse_continuous.py",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 5→7 lines (2 removed)",
+      "fix": "Rewrote 5\u21927 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2558,7 +2558,7 @@
       "error_message": "Significant refactor of ",
       "file": "scripts/seed-users.sh",
       "root_cause": "3 lines replaced/restructured",
-      "fix": "Rewrote 20→36 lines (3 removed)",
+      "fix": "Rewrote 20\u219236 lines (3 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2622,7 +2622,7 @@
       "error_message": "Wrong reference: Meridian should be Conduit",
       "file": "docs/PROJECT-OVERVIEW.md",
       "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
-      "fix": "Changed Meridian → Conduit",
+      "fix": "Changed Meridian \u2192 Conduit",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2638,7 +2638,7 @@
       "error_message": "Wrong reference: Meridian should be Conduit",
       "file": "docs/AGENTS.md",
       "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
-      "fix": "Changed Meridian → Conduit",
+      "fix": "Changed Meridian \u2192 Conduit",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2654,7 +2654,7 @@
       "error_message": "Wrong reference: Meridian should be Conduit",
       "file": "docs/OPERATOR-RUNBOOK.md",
       "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
-      "fix": "Changed Meridian → Conduit",
+      "fix": "Changed Meridian \u2192 Conduit",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2670,7 +2670,7 @@
       "error_message": "Wrong reference: Meridian should be Conduit",
       "file": "docs/gateway-domain-architecture.md",
       "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
-      "fix": "Changed Meridian → Conduit",
+      "fix": "Changed Meridian \u2192 Conduit",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2686,7 +2686,7 @@
       "error_message": "Wrong reference: Meridian should be Conduit",
       "file": "docs/technical-architecture-clear-boundaries.md",
       "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
-      "fix": "Changed Meridian → Conduit",
+      "fix": "Changed Meridian \u2192 Conduit",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2702,7 +2702,7 @@
       "error_message": "Wrong reference: Meridian should be Conduit",
       "file": "docs/domain-onboarding-standard.md",
       "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
-      "fix": "Changed Meridian → Conduit",
+      "fix": "Changed Meridian \u2192 Conduit",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2718,7 +2718,7 @@
       "error_message": "Wrong reference: Meridian should be Conduit",
       "file": "docs/MODEL-SELECTION.md",
       "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
-      "fix": "Changed Meridian → Conduit",
+      "fix": "Changed Meridian \u2192 Conduit",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2734,7 +2734,7 @@
       "error_message": "Wrong reference: meridian should be conduit",
       "file": "docs/WORLD-B-LOCKDOWN.md",
       "root_cause": "Used \"meridian\" instead of \"conduit\"",
-      "fix": "Changed meridian → conduit",
+      "fix": "Changed meridian \u2192 conduit",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2750,7 +2750,7 @@
       "error_message": "Wrong reference: Meridian should be Conduit",
       "file": "docs/agent-catalog.md",
       "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
-      "fix": "Changed Meridian → Conduit",
+      "fix": "Changed Meridian \u2192 Conduit",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2766,7 +2766,7 @@
       "error_message": "Wrong reference: Meridian should be Conduit",
       "file": "BUILD_REPORT.md",
       "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
-      "fix": "Changed Meridian → Conduit",
+      "fix": "Changed Meridian \u2192 Conduit",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2782,7 +2782,7 @@
       "error_message": "Wrong reference: Meridian should be Conduit",
       "file": "CLAUDE.md",
       "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
-      "fix": "Changed Meridian → Conduit",
+      "fix": "Changed Meridian \u2192 Conduit",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2798,7 +2798,7 @@
       "error_message": "Wrong reference: Meridian should be Conduit",
       "file": "registry/README.md",
       "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
-      "fix": "Changed Meridian → Conduit",
+      "fix": "Changed Meridian \u2192 Conduit",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2830,7 +2830,7 @@
       "error_message": "Wrong reference: Meridian should be Conduit",
       "file": ".claude/skills/meridian-agent/SKILL.md",
       "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
-      "fix": "Changed Meridian → Conduit",
+      "fix": "Changed Meridian \u2192 Conduit",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2846,7 +2846,7 @@
       "error_message": "Significant refactor of ",
       "file": "iam-service/src/main/java/com/openwolf/iam/auth/JwtClaimsCustomizer.java",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 12→17 lines (2 removed)",
+      "fix": "Rewrote 12\u219217 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2878,7 +2878,7 @@
       "error_message": "Significant refactor of ",
       "file": "docker-compose.yml",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 5→3 lines (2 removed)",
+      "fix": "Rewrote 5\u21923 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2891,7 +2891,7 @@
     {
       "id": "bug-180",
       "timestamp": "2026-06-30T05:21:00.000Z",
-      "error_message": "LibreChat OIDC SSO: 'Callback authentication failed — server responded with an error in the response body'; login failed for rm_jane",
+      "error_message": "LibreChat OIDC SSO: 'Callback authentication failed \u2014 server responded with an error in the response body'; login failed for rm_jane",
       "file": "iam-service/src/main/java/com/openwolf/iam/config/SecurityConfig.java, auth/JwtClaimsCustomizer.java, auth/OidcClaimEnricher.java",
       "root_cause": "TWO bugs. (1) Client meridian-librechat registered only for CLIENT_SECRET_BASIC, but LibreChat's openid-client sends credentials via client_secret_post -> Spring AS rejected with 'Client authentication failed: authentication_method' -> invalid_client. (2) id_token/userinfo carried only `sub` because the JWT customizer enriched ACCESS_TOKEN only; LibreChat needs email/name to provision the user.",
       "fix": "(1) Added ClientAuthenticationMethod.CLIENT_SECRET_POST to the librechat RegisteredClient (alongside BASIC). (2) Extended JwtClaimsCustomizer to handle ID_TOKEN and added OidcClaimEnricher.enrichIdToken() returning email, email_verified, preferred_username, name (from principal + display_name attr). Verified full flow via curl: client_secret_post exchange -> HTTP 200, id_token+userinfo carry email/name, LibreChat callback -> 'login success', openid user created in Mongo.",
@@ -2915,7 +2915,7 @@
       "error_message": "Significant refactor of ",
       "file": "docs/DIAGRAM-PROMPTS.md",
       "root_cause": "3 lines replaced/restructured",
-      "fix": "Rewrote 4→17 lines (3 removed) | Also: user([\"Relationship Manager\"]); lc[\"LibreChat — chat UI<br/>OpenAI-compatible clie | Also: > Create a detailed technical architecture diagram; > Manager\" → a box \"LibreChat (chat UI, OpenAI-com",
+      "fix": "Rewrote 4\u219217 lines (3 removed) | Also: user([\"Relationship Manager\"]); lc[\"LibreChat \u2014 chat UI<br/>OpenAI-compatible clie | Also: > Create a detailed technical architecture diagram; > Manager\" \u2192 a box \"LibreChat (chat UI, OpenAI-com",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2931,7 +2931,7 @@
       "error_message": "Significant refactor of ",
       "file": "TODO.md",
       "root_cause": "4 lines replaced/restructured",
-      "fix": "Rewrote 7→11 lines (4 removed)",
+      "fix": "Rewrote 7\u219211 lines (4 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -3011,7 +3011,7 @@
       "error_message": "Significant refactor of ",
       "file": "infra/grafana/provisioning/dashboards/conduit-demo.json",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 18→10 lines (2 removed) | Also: },; {",
+      "fix": "Rewrote 18\u219210 lines (2 removed) | Also: },; {",
       "tags": [
         "auto-detected",
         "refactor",
@@ -3075,7 +3075,7 @@
       "error_message": "Wrong reference: List should be ArrayList",
       "file": "gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java",
       "root_cause": "Used \"List\" instead of \"ArrayList\"",
-      "fix": "Changed List → ArrayList",
+      "fix": "Changed List \u2192 ArrayList",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -3091,7 +3091,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java",
       "root_cause": "5 lines replaced/restructured",
-      "fix": "Rewrote 14→28 lines (5 removed)",
+      "fix": "Rewrote 14\u219228 lines (5 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -3100,6 +3100,43 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-07-01T13:08:50.010Z"
+    },
+    {
+      "id": "bug-193",
+      "timestamp": "2026-07-01T13:51:19.277Z",
+      "error_message": "Significant refactor of ",
+      "file": "docker-compose.yml",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 11\u219212 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "yml"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-01T13:51:19.277Z"
+    },
+    {
+      "id": "bug-194",
+      "timestamp": "2026-07-01T14:20:00.000Z",
+      "error_message": "Gateway /v1/chat/completions accepts unauthenticated requests: no-identity resolves to 'anonymous' (HTTP 200), and an unknown/forged X-User-Id is processed. Auth is permitAll; only entitlement gates data.",
+      "file": "gateway/src/main/java/ai/conduit/gateway/infrastructure/identity/IdentityExtractor.java, config/SecurityConfig.java, api/v1/chat/ChatCompletionsController.java",
+      "root_cause": "X-User-Id trusted-hop fallback exists because LibreChat can't forward the SSO JWT. permitAll + 'anonymous' default means requests without credentials still run (burn LLM calls); X-User-Id is forgeable. Safety currently rests on network isolation only.",
+      "fix": "DEFERRED to the planned LibreChat rewrite (new UI will forward the JWT). Then: require valid JWT / reject anonymous+unknown (401); drop Redis PrincipalStore + seed. The proper JWT path already works (Axiom token -> Bearer -> gateway resolves principal from claims, no Redis). Interim safeguard: keep gateway network-isolated (not publicly exposed).",
+      "tags": [
+        "security",
+        "auth",
+        "jwt",
+        "x-user-id",
+        "trusted-hop",
+        "tech-debt",
+        "deferred",
+        "librechat"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-01T14:20:00.000Z"
     }
   ]
 }

@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-07-01T13:29:13.081Z
-> Files: 671 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-07-01T14:10:16.715Z
+> Files: 674 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/
 
@@ -15,6 +15,7 @@
 - `feedback_workflow_parallelism.md` (~341 tok)
 - `MEMORY.md` — Memory Index (~207 tok)
 - `project_domain_manifest_strategy.md` — Agreed Architecture — Domain Manifest + Gateway Strategy (~958 tok)
+- `project_gateway_auth_model.md` (~548 tok)
 - `project_langfuse_observability_model.md` (~462 tok)
 - `project_meridian_gateway.md` — What this project is (~777 tok)
 - `reference_prompt_framework.md` (~323 tok)
@@ -26,7 +27,7 @@
 - `agent-manifest.schema.json` (~1558 tok)
 - `BUILD_REPORT.md` — Build Report — Conduit AI Gateway (~1028 tok)
 - `CLAUDE.md` — OpenWolf (~1698 tok)
-- `docker-compose.yml` — Docker Compose services (~8268 tok)
+- `docker-compose.yml` — Docker Compose services (~8743 tok)
 - `MORNING-NOTES.md` — Morning notes — OIDC SSO is fixed ✅ (~1292 tok)
 - `README.md` — Project documentation (~4394 tok)
 - `TODO.md` — Conduit — Open TODO / Backlog (~823 tok)
@@ -268,6 +269,7 @@
 - `DIAGRAM-PROMPTS.md` — Conduit — Diagram Prompts & Generation Guide (~4216 tok)
 - `domain-manifest-and-memory.md` — Domain Manifest + Contextual Memory Architecture (~2480 tok)
 - `domain-onboarding-standard.md` — Domain Onboarding Standard (~4115 tok)
+- `EVAL-EXTRACTION.md` — Eval — Extraction Record (lift into its own project) (~1425 tok)
 - `EVAL-FRAMEWORK.md` — Conduit Eval Framework — an agent-agnostic evaluation worker (~2269 tok)
 - `EVAL-PRODUCT-VISION.md` — Eval — Product Vision (framework + app) (~1004 tok)
 - `execution-orchestration-layer.md` — Execution / Orchestration Layer — Spec (~1323 tok)
@@ -281,6 +283,7 @@
 - `platform-vision-and-maturity-path.md` — Enterprise Intelligence Platform — Vision & Maturity Path (~1324 tok)
 - `PROJECT-OVERVIEW.md` — Conduit — Project Overview (~165 tok)
 - `PROMPT-AUDIT.md` — Prompt Contract Audit — every production prompt vs the 9-element framework (~1931 tok)
+- `QA-CODEX-PLAYBOOK.md` — Conduit — QA Playbook (for Codex / automated browser QA) (~3054 tok)
 - `technical-architecture-clear-boundaries.md` — Technical Architecture — Clear Boundaries (~1990 tok)
 - `WORLD-B-LOCKDOWN.md` — Conduit — World B Architecture Lockdown (~8940 tok)
 

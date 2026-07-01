@@ -225,3 +225,6 @@ a specific bug is reported. Here is what it does:
 
 ### Decision Log — 2026-07-01 — Langfuse observability model
 ONE Langfuse project + per-domain TAGS + curated per-domain datasets/dashboards — NOT project-per-domain. Per-domain drift/experiments need domain-tagged traces + datasets, not separate projects (those are for org isolation only). Per-domain OTel/gateway routing deferred (complexity). Load-bearing requirement: every trace carries its resolved `domain` tag. Serves the World B demo (onboard by manifest → observability lights up).
+
+### Decision Log — 2026-07-01 — Gateway auth model + deferral
+JWT/Axiom is the real public API path (gateway extracts principal from JWT claims, ~1ms, no Redis — verified). X-User-Id + Redis principal store is a LibreChat-only trusted-hop fallback (LibreChat can't forward the SSO JWT). KNOWN HOLE: /v1/chat/completions is permitAll; no-identity -> "anonymous" -> processed (200); unknown/forged X-User-Id accepted; safety rests on network isolation only. DEFERRED: harden to JWT-only + reject anonymous/unknown + drop Redis seed — to be done during the planned LibreChat rewrite (new UI forwards JWT). Keep Redis seed (provisioner) until then.
