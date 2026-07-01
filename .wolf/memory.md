@@ -1328,3 +1328,70 @@
 | 01:20 | Edited docker-compose.yml | 5→3 lines | ~34 |
 | 01:20 | Edited docker-compose.yml | 4→2 lines | ~36 |
 | 01:22 | Created MORNING-NOTES.md | — | ~1247 |
+| 01:23 | Edited MORNING-NOTES.md | modified live() | ~240 |
+| 01:24 | Session end: 10 writes across 5 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 2 reads | ~15697 tok |
+| 07:31 | Session end: 10 writes across 5 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 2 reads | ~15697 tok |
+| 07:32 | Session end: 10 writes across 5 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 2 reads | ~15697 tok |
+| 07:36 | Session end: 10 writes across 5 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 2 reads | ~15697 tok |
+| 07:50 | Session end: 10 writes across 5 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 3 reads | ~17495 tok |
+| 09:46 | Session end: 10 writes across 5 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 3 reads | ~17495 tok |
+| 12:07 | Session end: 10 writes across 5 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 3 reads | ~17495 tok |
+| 12:08 | Session end: 10 writes across 5 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 3 reads | ~17495 tok |
+| 12:16 | Created TODO.md | — | ~1022 |
+| 12:18 | Created README.md | — | ~4689 |
+| 12:18 | Edited README.md | 3→1 lines | ~11 |
+| 12:18 | Created docs/PROJECT-OVERVIEW.md | — | ~176 |
+| 12:18 | Session end: 14 writes across 8 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 5 reads | ~28682 tok |
+| 12:31 | Created docs/DIAGRAM-PROMPTS.md | — | ~3335 |
+| 12:32 | Session end: 15 writes across 9 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 5 reads | ~32255 tok |
+| 13:28 | Edited docs/DIAGRAM-PROMPTS.md | expanded (+13 lines) | ~292 |
+| 13:28 | Edited docs/DIAGRAM-PROMPTS.md | expanded (+22 lines) | ~848 |
+| 13:29 | Edited docs/DIAGRAM-PROMPTS.md | expanded (+34 lines) | ~1043 |
+| 13:29 | Session end: 18 writes across 9 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 7 reads | ~34595 tok |
+| 18:33 | Reviewed OpenWolf context plus README/build report to answer user's high-level assessment question | .wolf/OPENWOLF.md, .wolf/anatomy.md, .wolf/cerebrum.md, README.md, BUILD_REPORT.md | grounded opinion formed; no code changes | ~9000 |
+| 18:35 | Broadened architecture/technology assessment across model strategy, registry onboarding, runbook, deps, tests, compose, backlog | docs/MODEL-SELECTION.md, registry/README.md, docs/OPERATOR-RUNBOOK.md, gateway/pom.xml, iam-service/pom.xml, scripts/verify.sh, docker-compose.yml, TODO.md | full stack critique ready; no code changes | ~19000 |
+| 20:44 | Session end: 18 writes across 9 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 7 reads | ~34595 tok |
+| 20:53 | Session end: 18 writes across 9 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 8 reads | ~34711 tok |
+| 20:59 | Created iam-service/Dockerfile | — | ~216 |
+| 20:59 | Edited gateway/src/main/resources/application.yml | expanded (+8 lines) | ~129 |
+| 20:59 | Edited infra/otel-collector.yaml | expanded (+9 lines) | ~204 |
+| 21:00 | Created TODO.md | — | ~1251 |
+| 21:00 | Session end: 22 writes across 12 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 9 reads | ~37242 tok |
+| 21:05 | Edited TODO.md | 7→11 lines | ~200 |
+| 21:06 | Session end: 23 writes across 12 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 9 reads | ~37456 tok |
+| 21:16 | Session end: 23 writes across 12 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 9 reads | ~37456 tok |
+| 07:53 | Edited infra/grafana/provisioning/dashboards/conversation-trace.json | 2→2 lines | ~40 |
+| 07:53 | Edited infra/grafana/provisioning/dashboards/conduit-gateway.json | 2→2 lines | ~30 |
+| 07:53 | Edited infra/grafana/provisioning/dashboards/gateway-performance.json | 2→2 lines | ~39 |
+| 07:53 | Edited infra/grafana/provisioning/dashboards/conduit-demo.json | increase() → sum() | ~36 |
+| 07:54 | Edited infra/grafana/provisioning/dashboards/conduit-demo.json | 2→2 lines | ~30 |
+| 07:58 | Created TODO.md | — | ~878 |
+| 08:13 | Created ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/audit.py | — | ~1488 |
+| 08:14 | Edited infra/grafana/provisioning/dashboards/conduit-demo.json | reduced (-8 lines) | ~68 |
+| 08:14 | Created ../../.claude/projects/-Users-srirajkadimisetty-projects-orchestrator-demo/memory/feedback_workflow_parallelism.md | — | ~343 |
+| 08:16 | Edited infra/otel-collector.yaml | 2→6 lines | ~117 |
+| 08:18 | Edited infra/grafana/provisioning/dashboards/conduit-gateway.json | 2→2 lines | ~34 |
+| 08:18 | Edited infra/grafana/provisioning/dashboards/business-overview.json | 2→2 lines | ~30 |
+| 08:18 | Session end: 35 writes across 19 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 15 reads | ~68668 tok |
+| 08:18 | Edited infra/grafana/provisioning/dashboards/conduit-demo.json | 2→2 lines | ~30 |
+| 08:18 | Edited infra/grafana/provisioning/dashboards/conduit-demo.json | reduced (-8 lines) | ~42 |
+| 08:20 | Session end: 37 writes across 19 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 15 reads | ~68740 tok |
+| 08:28 | Session end: 37 writes across 19 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 15 reads | ~68740 tok |
+| 08:31 | Session end: 37 writes across 19 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 15 reads | ~68740 tok |
+| 08:34 | Created ../../.claude/projects/-Users-srirajkadimisetty-projects-orchestrator-demo/memory/project_langfuse_observability_model.md | — | ~473 |
+| 08:37 | Session end: 38 writes across 20 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 15 reads | ~69246 tok |
+| 08:42 | Session end: 38 writes across 20 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 15 reads | ~69246 tok |
+| 08:45 | Session end: 38 writes across 20 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 15 reads | ~69246 tok |
+| 08:48 | Session end: 38 writes across 20 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 15 reads | ~69246 tok |
+| 08:50 | Session end: 38 writes across 20 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 15 reads | ~69246 tok |
+| 08:53 | Session end: 38 writes across 20 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 15 reads | ~69246 tok |
+| 08:54 | Session end: 38 writes across 20 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 15 reads | ~69246 tok |
+| 08:57 | Session end: 38 writes across 20 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 15 reads | ~69246 tok |
+| 09:01 | Created docs/EVAL-FRAMEWORK.md | — | ~2376 |
+| 09:01 | Session end: 39 writes across 21 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 15 reads | ~71792 tok |
+| 09:03 | Session end: 39 writes across 21 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 15 reads | ~71792 tok |
+| 09:06 | Session end: 39 writes across 21 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 15 reads | ~71792 tok |
+| 09:08 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 1 import(s) | ~36 |
+| 09:08 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 1 import(s) | ~14 |
+| 09:08 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 1 condition(s) | ~448 |
+| 09:10 | Edited docs/EVAL-FRAMEWORK.md | modified DONE() | ~75 |

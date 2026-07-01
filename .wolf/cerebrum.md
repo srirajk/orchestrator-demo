@@ -217,3 +217,11 @@ a specific bug is reported. Here is what it does:
   login → re-GET the authorize URL for the code → GET the callback so LibreChat does the
   real exchange. Avoid the `&continue` resume (curl drops JSESSIONID → 400); re-GET the
   original authorize URL instead.
+
+### User Preferences — 2026-07-01 — Concurrency & model discipline
+- Work in PARALLEL: run long jobs (e2e, builds) in the background while doing other work; batch independent tool calls.
+- Use AGENT TEAMS (subagents) for independent, parallelizable work streams — don't do everything serially.
+- Match the MODEL to the job: mechanical/low-reasoning subagents (queries+classify, small deterministic edits, log/API investigation, greps) → Sonnet (Haiku for trivial). Reserve Opus/high-effort for genuinely hard reasoning. Do NOT default every subagent to the inherited Opus model.
+
+### Decision Log — 2026-07-01 — Langfuse observability model
+ONE Langfuse project + per-domain TAGS + curated per-domain datasets/dashboards — NOT project-per-domain. Per-domain drift/experiments need domain-tagged traces + datasets, not separate projects (those are for org isolation only). Per-domain OTel/gateway routing deferred (complexity). Load-bearing requirement: every trace carries its resolved `domain` tag. Serves the World B demo (onboard by manifest → observability lights up).

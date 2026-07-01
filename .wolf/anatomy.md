@@ -1,18 +1,21 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-30T05:22:16.820Z
-> Files: 661 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-07-01T13:10:54.268Z
+> Files: 670 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/
 
+- `audit.py` — query, subst, bare_metric (~1488 tok)
 - `V2__seed_demo_data.sql` — ============================================================================ (~4215 tok)
 
 ## ../../.claude/projects/-Users-srirajkadimisetty-projects-orchestrator-demo/memory/
 
 - `feedback_eval_framework.md` (~487 tok)
 - `feedback_gateway_rules.md` (~526 tok)
+- `feedback_workflow_parallelism.md` (~341 tok)
 - `MEMORY.md` — Memory Index (~207 tok)
 - `project_domain_manifest_strategy.md` — Agreed Architecture — Domain Manifest + Gateway Strategy (~958 tok)
+- `project_langfuse_observability_model.md` (~462 tok)
 - `project_meridian_gateway.md` — What this project is (~777 tok)
 - `reference_prompt_framework.md` (~323 tok)
 
@@ -24,8 +27,9 @@
 - `BUILD_REPORT.md` — Build Report — Conduit AI Gateway (~1028 tok)
 - `CLAUDE.md` — OpenWolf (~1698 tok)
 - `docker-compose.yml` — Docker Compose services (~8268 tok)
-- `MORNING-NOTES.md` — Morning notes — OIDC SSO is fixed ✅ (~1169 tok)
-- `README.md` — Project documentation (~1932 tok)
+- `MORNING-NOTES.md` — Morning notes — OIDC SSO is fixed ✅ (~1292 tok)
+- `README.md` — Project documentation (~4394 tok)
+- `TODO.md` — Conduit — Open TODO / Backlog (~823 tok)
 - `z.ai-tiers.md` — Declares Model (~778 tok)
 
 ## .claude/
@@ -261,8 +265,10 @@
 - `authorization-model.md` — Enterprise AI Gateway — Authorization Model (~5478 tok)
 - `authz-architecture-brief.md` — Enterprise AI Gateway — Authorization & User Management Architectural Brief (~7031 tok)
 - `clearance-tiers-and-agent-metadata.md` — Clearance Tiers — Tenant Schema, Agent Metadata & Policy (~2142 tok)
+- `DIAGRAM-PROMPTS.md` — Conduit — Diagram Prompts & Generation Guide (~4216 tok)
 - `domain-manifest-and-memory.md` — Domain Manifest + Contextual Memory Architecture (~2480 tok)
 - `domain-onboarding-standard.md` — Domain Onboarding Standard (~4115 tok)
+- `EVAL-FRAMEWORK.md` — Conduit Eval Framework — an agent-agnostic evaluation worker (~2269 tok)
 - `execution-orchestration-layer.md` — Execution / Orchestration Layer — Spec (~1323 tok)
 - `gateway-domain-architecture.md` — Conduit AI Gateway — Domain Architecture (~7275 tok)
 - `harness-and-telemetry-deep-spec.md` — Harness & Telemetry — Deep Spec (~2123 tok)
@@ -272,7 +278,7 @@
 - `MODEL-SELECTION.md` — Model Selection Guide — Conduit AI Gateway (~2289 tok)
 - `OPERATOR-RUNBOOK.md` — Conduit Gateway — Operator & Demo Runbook (~3446 tok)
 - `platform-vision-and-maturity-path.md` — Enterprise Intelligence Platform — Vision & Maturity Path (~1324 tok)
-- `PROJECT-OVERVIEW.md` — Conduit — Project Overview (~2935 tok)
+- `PROJECT-OVERVIEW.md` — Conduit — Project Overview (~165 tok)
 - `PROMPT-AUDIT.md` — Prompt Contract Audit — every production prompt vs the 9-element framework (~1931 tok)
 - `technical-architecture-clear-boundaries.md` — Technical Architecture — Clear Boundaries (~1990 tok)
 - `WORLD-B-LOCKDOWN.md` — Conduit — World B Architecture Lockdown (~8940 tok)
@@ -404,6 +410,10 @@
 
 - `Dockerfile` — Docker container definition (~135 tok)
 - `pom.xml` (~1494 tok)
+
+## gateway/src/main/java/ai/conduit/gateway/domain/chat/
+
+- `ChatService.java` — Entry point from the controller — called on a virtual thread after the async boundary. (~15007 tok)
 
 ## gateway/src/main/java/ai/meridian/gateway/
 
@@ -591,7 +601,7 @@
 ## gateway/src/main/resources/
 
 - `agent-manifest.schema.json` (~1714 tok)
-- `application.yml` (~1798 tok)
+- `application.yml` (~1871 tok)
 
 ## gateway/src/main/resources/domains/
 
@@ -660,7 +670,7 @@
 
 ## iam-service/
 
-- `Dockerfile` — Docker container definition (~116 tok)
+- `Dockerfile` — Docker container definition (~216 tok)
 - `Dockerfile` — eclipse-temurin:21-jre-alpine; ZGC+ZGenerational; port 8084 (~40 tok)
 - `pom.xml` (~1326 tok)
 - `pom.xml` — Spring Boot 3.5.3 parent POM; Java 21; deps: web, data-jpa, security, oauth2-authorization-server, actuator, validation, postgresql, flyway, jackson-jsr310, cerbos-sdk-java:0.12.0, h2(test) (~220 tok)
@@ -797,7 +807,7 @@
 
 ## infra/
 
-- `otel-collector.yaml` (~627 tok)
+- `otel-collector.yaml` (~869 tok)
 - `prometheus.yml` (~129 tok)
 - `tempo.yaml` (~97 tok)
 
@@ -820,10 +830,12 @@
 ## infra/grafana/provisioning/dashboards/
 
 - `agent-health.json` — "Meridian — Agent Health" — SRE ops dashboard: fleet overview (healthy/open stats, error rate timeseries, latency heatmap), repeated per-agent detail row ($agentId: calls/min, error%, p95ms, CB state, bulkhead gauges, timeout%), resilience story row (CB history, bulkhead pressure, HTTP vs MCP bar chart). schemaVersion 39, 10s refresh. (~6972 tok)
-- `business-overview.json` (~8940 tok)
-- `conversation-trace.json` — "Meridian — Conversation Trace Explorer" — ENHANCED: added $convId text-input variable; new "Conversation Logs" row with how-to text panel, Loki all-logs panel, and Loki errors/warnings panel. schemaVersion bumped to 39. (~2958 tok)
+- `business-overview.json` (~8926 tok)
+- `conduit-demo.json` (~10618 tok)
+- `conduit-gateway.json` (~2406 tok)
+- `conversation-trace.json` (~2953 tok)
 - `dashboards.yaml` (~55 tok)
-- `gateway-performance.json` (~2835 tok)
+- `gateway-performance.json` (~2829 tok)
 - `meridian-demo.json` (~10773 tok)
 - `meridian-gateway.json` (~2415 tok)
 - `resource-usage.json` (~1597 tok)

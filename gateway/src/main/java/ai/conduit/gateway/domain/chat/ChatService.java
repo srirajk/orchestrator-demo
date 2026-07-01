@@ -47,6 +47,7 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.opentelemetry.api.baggage.Baggage;
+import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
@@ -58,6 +59,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -341,18 +343,32 @@ public class ChatService {
             }
             final List<AgentManifest> finalManifests = allowedManifests;
 
-            // ── Domain tag on root span — cost-by-domain in Langfuse / Grafana ────
-            // Value is read from manifest.domain() — never hardcoded (WORLD-B §5).
-            // Uses the first allowed agent's domain; comma-joins when >1 domain is present.
+            // ── Domain + agent tags on the root span ──────────────────────────────
+            // First-class Langfuse filter chips (domain:*, agent:*) plus cost-by-domain
+            // metadata. All values come from manifest.domain()/agentId() — never hardcoded
+            // (WORLD-B §5). These tags drive observability slicing AND eval-suite resolution
+            // (see docs/EVAL-FRAMEWORK.md — the worker picks a domain/agent's suite by tag).
             if (!finalManifests.isEmpty()) {
-                String resolvedDomain = finalManifests.stream()
+                List<String> domains = finalManifests.stream()
                         .map(AgentManifest::domain)
                         .filter(d -> d != null && !d.isBlank())
                         .distinct()
-                        .collect(Collectors.joining(","));
+                        .toList();
+                String resolvedDomain = String.join(",", domains);
                 if (!resolvedDomain.isBlank()) {
                     rootSpan.setAttribute("langfuse.metadata.domain", resolvedDomain);
                     rootSpan.setAttribute("conduit.domain", resolvedDomain);
+                }
+                // First-class tags: one per distinct domain + one per invoked agent.
+                List<String> tags = new ArrayList<>();
+                domains.forEach(d -> tags.add("domain:" + d));
+                finalManifests.stream()
+                        .map(AgentManifest::agentId)
+                        .filter(a -> a != null && !a.isBlank())
+                        .distinct()
+                        .forEach(a -> tags.add("agent:" + a));
+                if (!tags.isEmpty()) {
+                    rootSpan.setAttribute(AttributeKey.stringArrayKey("langfuse.trace.tags"), tags);
                 }
             }
 
