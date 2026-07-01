@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-07-01T14:10:16.715Z
-> Files: 674 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-07-01T21:14:48.621Z
+> Files: 680 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/
 
@@ -12,6 +12,7 @@
 
 - `feedback_eval_framework.md` (~487 tok)
 - `feedback_gateway_rules.md` (~526 tok)
+- `feedback_observability_standard.md` (~364 tok)
 - `feedback_workflow_parallelism.md` (~341 tok)
 - `MEMORY.md` — Memory Index (~207 tok)
 - `project_domain_manifest_strategy.md` — Agreed Architecture — Domain Manifest + Gateway Strategy (~958 tok)
@@ -27,7 +28,7 @@
 - `agent-manifest.schema.json` (~1558 tok)
 - `BUILD_REPORT.md` — Build Report — Conduit AI Gateway (~1028 tok)
 - `CLAUDE.md` — OpenWolf (~1698 tok)
-- `docker-compose.yml` — Docker Compose services (~8743 tok)
+- `docker-compose.yml` — Docker Compose services (~8697 tok)
 - `MORNING-NOTES.md` — Morning notes — OIDC SSO is fixed ✅ (~1292 tok)
 - `README.md` — Project documentation (~4394 tok)
 - `TODO.md` — Conduit — Open TODO / Backlog (~823 tok)
@@ -283,7 +284,7 @@
 - `platform-vision-and-maturity-path.md` — Enterprise Intelligence Platform — Vision & Maturity Path (~1324 tok)
 - `PROJECT-OVERVIEW.md` — Conduit — Project Overview (~165 tok)
 - `PROMPT-AUDIT.md` — Prompt Contract Audit — every production prompt vs the 9-element framework (~1931 tok)
-- `QA-CODEX-PLAYBOOK.md` — Conduit — QA Playbook (for Codex / automated browser QA) (~3054 tok)
+- `QA-CODEX-PLAYBOOK.md` — Conduit — QA Playbook (for Codex / automated browser QA) (~4967 tok)
 - `technical-architecture-clear-boundaries.md` — Technical Architecture — Clear Boundaries (~1990 tok)
 - `WORLD-B-LOCKDOWN.md` — Conduit — World B Architecture Lockdown (~8940 tok)
 
@@ -415,9 +416,21 @@
 - `Dockerfile` — Docker container definition (~135 tok)
 - `pom.xml` (~1494 tok)
 
+## gateway/src/main/java/ai/conduit/gateway/api/v1/chat/
+
+- `ChatCompletionsController.java` — Non-streaming ({@code stream:false}) — runs the same pipeline into a buffering emitter, (~2296 tok)
+
 ## gateway/src/main/java/ai/conduit/gateway/domain/chat/
 
-- `ChatService.java` — Entry point from the controller — called on a virtual thread after the async boundary. (~15007 tok)
+- `ChatService.java` — Entry point from the controller — called on a virtual thread after the async boundary. (~15192 tok)
+
+## gateway/src/main/java/ai/conduit/gateway/domain/intent/
+
+- `IntentClassifier.java` — Stage A of the request pipeline: classifies the user's intent before routing. (~5667 tok)
+
+## gateway/src/main/java/ai/conduit/gateway/synthesis/answer/
+
+- `AnswerSynthesizer.java` — Synthesizes a grounded, streamed answer from agent outputs using Z.AI GLM. (~7401 tok)
 
 ## gateway/src/main/java/ai/meridian/gateway/
 
@@ -1116,10 +1129,12 @@
 - `requirements-eval.txt` — Meridian eval dependencies (not runtime — install on dev/CI machine) (~33 tok)
 - `run-integration-tests.sh` (~354 tok)
 - `scenario-perf.py` — class: check_summary, mint_token, chat, resolve + 4 more (~14188 tok)
+- `seed-datasets.sh` — seed-datasets.sh — boot provisioner step: seed the Langfuse golden datasets (~353 tok)
 - `seed-demo.py` — mint_token, chat, chat_multi, wait_for_gateway + 1 more (~2771 tok)
 - `seed-demo.sh` — Meridian Gateway — Phoenix/Tempo demo seed (~176 tok)
 - `seed-users.sh` — seed-users.sh — Idempotently seed demo principals into Redis. (~1048 tok)
 - `seed-users.sh` — seed-users.sh — Idempotently seed demo principals into Redis. (~910 tok)
+- `smoke.sh` — smoke.sh — full API/CLI smoke for Conduit. Run against a live stack (docker compose up). (~1581 tok)
 - `verify-telemetry-e2e.sh` — ───────────────────────────────────────────────────────────────────────────── (~1151 tok)
 - `verify.sh` — Full verification script — runs after each phase to confirm acceptance criteria. (~713 tok)
 - `wait-for-healthy.sh` — Wait until all core docker-compose services report healthy, then exit 0. (~323 tok)

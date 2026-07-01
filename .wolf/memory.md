@@ -1350,6 +1350,8 @@
 | 13:29 | Session end: 18 writes across 9 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 7 reads | ~34595 tok |
 | 18:33 | Reviewed OpenWolf context plus README/build report to answer user's high-level assessment question | .wolf/OPENWOLF.md, .wolf/anatomy.md, .wolf/cerebrum.md, README.md, BUILD_REPORT.md | grounded opinion formed; no code changes | ~9000 |
 | 18:35 | Broadened architecture/technology assessment across model strategy, registry onboarding, runbook, deps, tests, compose, backlog | docs/MODEL-SELECTION.md, registry/README.md, docs/OPERATOR-RUNBOOK.md, gateway/pom.xml, iam-service/pom.xml, scripts/verify.sh, docker-compose.yml, TODO.md | full stack critique ready; no code changes | ~19000 |
+| 11:11 | Ran QA-CODEX-PLAYBOOK sections 1-7 with Appendix A probes, browser checks, screenshots on failures, and clean-slate rebuild | docs/QA-CODEX-PLAYBOOK.md, tests/e2e/test-results/, .wolf/buglog.json, .wolf/cerebrum.md | preflight/API/Langfuse/rebuild mostly pass; browser §2 send-button and Grafana panel data failures recorded | ~45000 |
+| 12:49 | Started fresh QA run after clean rebuild; read OpenWolf context, Browser skill, current QA playbook, and ran smoke.sh | .wolf/OPENWOLF.md, .wolf/anatomy.md, .wolf/cerebrum.md, docs/QA-CODEX-PLAYBOOK.md, scripts/smoke.sh | smoke.sh passed 18/18 with SMOKE GREEN | ~25000 |
 | 20:44 | Session end: 18 writes across 9 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 7 reads | ~34595 tok |
 | 20:53 | Session end: 18 writes across 9 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 8 reads | ~34711 tok |
 | 20:59 | Created iam-service/Dockerfile | — | ~216 |
@@ -1395,3 +1397,90 @@
 | 09:08 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 1 import(s) | ~14 |
 | 09:08 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 1 condition(s) | ~448 |
 | 09:10 | Edited docs/EVAL-FRAMEWORK.md | modified DONE() | ~75 |
+| 09:12 | Session end: 43 writes across 22 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 16 reads | ~72405 tok |
+| 09:18 | Session end: 43 writes across 22 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 16 reads | ~72405 tok |
+| 09:22 | Session end: 43 writes across 22 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 16 reads | ~72405 tok |
+| 09:24 | Session end: 43 writes across 22 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 16 reads | ~72405 tok |
+| 09:29 | Created docs/EVAL-PRODUCT-VISION.md | — | ~1071 |
+| 09:30 | Session end: 44 writes across 23 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 16 reads | ~73553 tok |
+| 09:31 | Session end: 44 writes across 23 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 16 reads | ~73553 tok |
+| 09:34 | Session end: 44 writes across 23 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 16 reads | ~73553 tok |
+| 09:39 | Session end: 44 writes across 23 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 16 reads | ~73553 tok |
+| 09:45 | Created docs/EVAL-EXTRACTION.md | — | ~1520 |
+| 09:47 | Created docs/QA-CODEX-PLAYBOOK.md | — | ~3258 |
+| 09:51 | Edited docker-compose.yml | 11→12 lines | ~176 |
+| 09:51 | Edited docker-compose.yml | expanded (+38 lines) | ~470 |
+| 09:52 | Session end: 48 writes across 25 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 16 reads | ~79302 tok |
+| 09:58 | Session end: 48 writes across 25 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 16 reads | ~79302 tok |
+| 10:02 | Session end: 48 writes across 25 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 16 reads | ~79302 tok |
+| 10:09 | Session end: 48 writes across 25 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 17 reads | ~79302 tok |
+| 10:10 | Created ../../.claude/projects/-Users-srirajkadimisetty-projects-orchestrator-demo/memory/project_gateway_auth_model.md | — | ~564 |
+| 10:11 | Session end: 49 writes across 26 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 17 reads | ~79906 tok |
+| 10:13 | Session end: 49 writes across 26 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 17 reads | ~79906 tok |
+| 10:15 | Edited docs/QA-CODEX-PLAYBOOK.md | modified secret() | ~286 |
+| 10:15 | Edited docs/QA-CODEX-PLAYBOOK.md | expanded (+58 lines) | ~1056 |
+| 10:19 | Created scripts/seed-datasets.sh | — | ~353 |
+| 10:19 | Edited docker-compose.yml | 12→11 lines | ~116 |
+| 10:32 | Edited docs/QA-CODEX-PLAYBOOK.md | 3→3 lines | ~82 |
+| 10:32 | Edited docs/QA-CODEX-PLAYBOOK.md | reality() → index() | ~140 |
+| 10:32 | Edited docs/QA-CODEX-PLAYBOOK.md | acceptance() → verify() | ~293 |
+| 10:33 | Session end: 56 writes across 27 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 17 reads | ~82389 tok |
+| 10:35 | Session end: 56 writes across 27 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 17 reads | ~82389 tok |
+| 10:41 | Session end: 56 writes across 27 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 17 reads | ~82389 tok |
+| 10:45 | Edited docs/QA-CODEX-PLAYBOOK.md | modified tips() | ~509 |
+| 10:45 | Session end: 57 writes across 27 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 17 reads | ~82935 tok |
+| 11:22 | Session end: 57 writes across 27 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 17 reads | ~82935 tok |
+| 11:36 | Session end: 57 writes across 27 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 17 reads | ~82935 tok |
+| 11:45 | Session end: 57 writes across 27 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 18 reads | ~82935 tok |
+| 11:49 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java | inline fix | ~31 |
+| 11:49 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java | "[DONE]" → " [DONE]" | ~5 |
+| 11:49 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | 4→4 lines | ~67 |
+| 11:49 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | "[DONE]" → " [DONE]" | ~5 |
+| 11:56 | Session end: 61 writes across 28 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 18 reads | ~98056 tok |
+| 12:01 | Session end: 61 writes across 28 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 18 reads | ~98056 tok |
+| 12:01 | Session end: 61 writes across 28 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 18 reads | ~98056 tok |
+| 12:24 | Session end: 61 writes across 28 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 18 reads | ~98056 tok |
+| 12:26 | Created scripts/smoke.sh | — | ~1581 |
+| 12:26 | Session end: 62 writes across 29 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 18 reads | ~99750 tok |
+| 12:33 | Created gateway/src/main/java/ai/conduit/gateway/api/v1/chat/ChatCompletionsController.java | — | ~2296 |
+| 12:36 | Session end: 63 writes across 30 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 18 reads | ~102210 tok |
+| 12:44 | Session end: 63 writes across 30 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 19 reads | ~104203 tok |
+| 12:45 | Edited docs/QA-CODEX-PLAYBOOK.md | expanded (+12 lines) | ~155 |
+| 12:45 | Session end: 64 writes across 30 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 19 reads | ~104369 tok |
+| 13:05 | Brave browser QA verified hero completion + follow-up send; corrected empty-composer send-disabled false negative | .wolf/cerebrum.md updated | ~132 |
+| 13:14 | Diagnosed Brave auth failure as transient LibreChat OIDC state mismatch; Axiom token auth passes and local app renders authenticated | logs + curl + Brave | ~210 |
+| 14:27 | Session end: 64 writes across 30 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 19 reads | ~104369 tok |
+| 14:30 | Session end: 64 writes across 30 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 19 reads | ~104369 tok |
+| 14:35 | Session end: 64 writes across 30 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 19 reads | ~104369 tok |
+| 14:37 | Session end: 64 writes across 30 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 19 reads | ~104369 tok |
+| 14:37 | Session end: 64 writes across 30 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 19 reads | ~104369 tok |
+| 14:39 | Session end: 64 writes across 30 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 19 reads | ~104369 tok |
+| 14:40 | Session end: 64 writes across 30 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 19 reads | ~104369 tok |
+| 14:46 | Session end: 64 writes across 30 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 19 reads | ~104369 tok |
+| 14:54 | Session end: 64 writes across 30 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 19 reads | ~104369 tok |
+| 14:56 | Session end: 64 writes across 30 files (docker-compose.yml, SecurityConfig.java, JwtClaimsCustomizer.java, OidcClaimEnricher.java, MORNING-NOTES.md) | 19 reads | ~104369 tok |
+| 15:00 | Edited gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java | modified append() | ~214 |
+
+## Session: 2026-07-01 15:04
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 15:07 | Edited gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java | added 1 condition(s) | ~214 |
+| 15:07 | Edited gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java | added 2 condition(s) | ~257 |
+| 15:07 | Edited gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java | added 1 condition(s) | ~314 |
+| 15:07 | Edited gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java | added error handling | ~196 |
+| 15:12 | Edited gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java | 4→5 lines | ~62 |
+| 15:15 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | modified if() | ~490 |
+| 15:15 | Edited gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java | 4→3 lines | ~20 |
+| 15:20 | Session end: 7 writes across 2 files (IntentClassifier.java, ChatService.java) | 2 reads | ~22357 tok |
+| 15:53 | Session end: 7 writes across 2 files (IntentClassifier.java, ChatService.java) | 2 reads | ~22357 tok |
+| 16:33 | Session end: 7 writes across 2 files (IntentClassifier.java, ChatService.java) | 2 reads | ~22357 tok |
+| 16:37 | Session end: 7 writes across 2 files (IntentClassifier.java, ChatService.java) | 2 reads | ~22357 tok |
+| 16:59 | Session end: 7 writes across 2 files (IntentClassifier.java, ChatService.java) | 2 reads | ~22357 tok |
+| 17:01 | Session end: 7 writes across 2 files (IntentClassifier.java, ChatService.java) | 2 reads | ~22357 tok |
+| 17:02 | Session end: 7 writes across 2 files (IntentClassifier.java, ChatService.java) | 2 reads | ~22357 tok |
+| 17:02 | Ran full E2E suite unsandboxed and manual OIDC LibreChat pivot check | tests/e2e, Browser | 89 passed; Whitman then Okafor returned explicit access denial; World B CRITICAL 0 | ~18000 |
+| 17:04 | Session end: 7 writes across 2 files (IntentClassifier.java, ChatService.java) | 2 reads | ~22357 tok |
+| 17:06 | Session end: 7 writes across 2 files (IntentClassifier.java, ChatService.java) | 2 reads | ~22357 tok |
+| 17:12 | Session end: 7 writes across 2 files (IntentClassifier.java, ChatService.java) | 2 reads | ~22357 tok |
+| 17:14 | Created ../../.claude/projects/-Users-srirajkadimisetty-projects-orchestrator-demo/memory/feedback_observability_standard.md | — | ~368 |

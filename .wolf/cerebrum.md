@@ -116,6 +116,7 @@ client code, not 3592.
 
 ## Do-Not-Repeat
 
+- **[2026-07-01] QA playbook browser run can render the answer but leave LibreChat send disabled:** In the §2 SSO/browser path, the hero answer visibly rendered, but `#send-button` stayed disabled beyond 180s, preventing the follow-up. Post-rebuild logs showed 5/5 fan-out succeeded and synthesis began; investigate SSE `[DONE]` delivery / LibreChat generation completion state / summarize-title behavior before declaring browser chat green. Pre-rebuild, servicing MCP also emitted Starlette `AssertionError: Unexpected message: http.response.start` and the gateway timed out cash/settlement, causing an incomplete hero answer.
 - **[2026-06-28] Duplicate SSE role delta breaks LibreChat send button:** If ChatService.handleChat sends a role delta up-front (chatcmpl-A) and then streamTextAndComplete sends a SECOND role delta with a fresh newId() (chatcmpl-B), LibreChat tracks both in-flight completions and never re-enables the send button when chatcmpl-A receives no [DONE]. Fix: do NOT send a role delta up-front in handleChat; instead send it at the start of each synthesizer method (synthesize/synthesizeFromHistory) and let streamTextAndComplete's own role delta stand alone. Each SSE stream should have exactly one completionId throughout.
 - **[2026-06-28] Redis principal store must be seeded before gateway starts:** The gateway's PrincipalStore reads from Redis hashes at principal:{userId}. If these are absent (e.g. after a Redis restart), every user falls back to Principal.anonymous() which has empty segments → Cerbos denies all agents → every query returns "You do not have access". Fix: run scripts/seed-users.sh before running E2E tests.
 - **[2026-06-28] registerOrLogin() must handle re-registration redirect to /login:** If the TEST_EMAIL already exists, LibreChat's register form redirects back to /login. waitForURL(/\/(c\/|login)/) matches /login and the function returns while still on the login page. Fix: after registration attempt, try waitForURL('**/c/**') first; if that times out, do a fresh login attempt.
@@ -228,3 +229,11 @@ ONE Langfuse project + per-domain TAGS + curated per-domain datasets/dashboards 
 
 ### Decision Log — 2026-07-01 — Gateway auth model + deferral
 JWT/Axiom is the real public API path (gateway extracts principal from JWT claims, ~1ms, no Redis — verified). X-User-Id + Redis principal store is a LibreChat-only trusted-hop fallback (LibreChat can't forward the SSO JWT). KNOWN HOLE: /v1/chat/completions is permitAll; no-identity -> "anonymous" -> processed (200); unknown/forged X-User-Id accepted; safety rests on network isolation only. DEFERRED: harden to JWT-only + reject anonymous/unknown + drop Redis seed — to be done during the planned LibreChat rewrite (new UI forwards JWT). Keep Redis seed (provisioner) until then.
+
+### Do-Not-Repeat — 2026-07-01 — LibreChat send-button QA signal
+- A disabled `Send message` button with an empty composer is normal after completion. Do not call that a stuck stream.
+- Correct browser completion signal: the `Stop generating` control disappears, response action buttons appear, and the composer becomes send-enabled after follow-up text is present.
+- Brave real-browser run verified this: hero response completed, follow-up sent, and Conduit answered the follow-up (`JPM $487,500`, unsettled cash `$372,000`).
+
+### Key Learning — 2026-07-01 — E2E launch + pivot verification
+- On macOS in Codex sandbox, Playwright Chromium can fail before app logic with `MachPortRendezvousServer ... Permission denied`; rerun `cd tests/e2e && npx playwright test` with escalation/unsandboxed execution. Fresh rebuilt env on branch `rename/conduit-axiom` passed `89 passed (53.0m)`. Manual OIDC LibreChat login as `rm_jane` then same-conversation Whitman → Okafor pivot returned `Access denied for this client relationship.`
