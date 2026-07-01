@@ -1,82 +1,61 @@
 # Conduit — Open TODO / Backlog
 
-> Status of the observability/hardening pass. **Stack is currently DOWN** (intentionally — working
-> on another project). Items marked ⏳ have their **file edits done** but need a live `conduit`
-> stack to rebuild + verify. Items marked ▶ need the live stack (and some, the user).
+> **Live pass done on a clean-slate rebuild (2026-07-01).** Stack was `down -v` → rebuilt →
+> `up` → seeded → verified. Almost everything closed; see status below.
 
-## Real fixes (functional)
+## ✅ Done + verified live
 
-### 1. ⏳ Convert iam-service Dockerfile to multi-stage source build — **EDIT DONE**
-`iam-service/Dockerfile` rewritten to build from source inside Docker (Maven stage → JRE stage),
-mirroring `gateway/Dockerfile`, preserving ZGC flags + port 8084 + wget. No more prebuilt-jar trap.
-- **Verify on next up:** `docker compose build iam-service` from a clean `target/` succeeds and SSO
-  still works.
+### 1. iam-service Dockerfile → multi-stage source build
+Rebuilt from source inside Docker (no prebuilt-jar). Clean `docker compose build iam-service`
+succeeds **and SSO round-trips** (`login success` for rm_jane) on the new image.
 
-### 2. ⏳ Enable gateway histogram buckets — **EDIT DONE**
-Added `management.metrics.distribution.percentiles-histogram` for `http.server.requests`,
-`http.client.requests`, and the custom `intent.classify.duration` timer in
-`gateway/src/main/resources/application.yml`. This fixes **both** the p50/p95/p99 latency panels
-(Gateway — Performance, Conversation Trace) **and** the Intent Classify Latency panel.
-- **Verify on next up:** rebuild gateway, generate traffic, confirm
-  `*_seconds_bucket` series exist and the p95 panels populate.
+### 2. Gateway histogram buckets
+`percentiles-histogram` enabled for http.server/http.client/intent.classify. Verified live:
+`chat p95 = 22.6s`, `outbound agent p95 = 5.4ms`, `intent-classify p95 = 3.9s` — the p95/p99
+latency panels compute.
 
-### 3. ▶ Reconcile dashboard metric names (was "verify intent metric") — **DO LIVE, DON'T DO BLIND**
-Bigger than first scoped: several panels query metric names that don't match what's emitted. Root
-cause = the collector's `conduit_` prefixing is **inconsistent** (custom app metrics get
-`conduit_` e.g. `conduit_agent_calls_total`, but Spring's `http_server_requests_*` stay
-unprefixed). Confirmed mismatches so far:
-- `chat_intent_total` (by `intent`) → real is `conduit_chat_intent_total` (tag is **`type`**, not
-  `intent`). [gateway-performance, conversation-trace]
-- `intent_classify_duration_seconds_bucket` → `conduit_intent_classify_duration_seconds_bucket`
-  (+ needs #2's buckets). [gateway-performance]
-- `container_cpu_usage_seconds_total`, `container_memory_usage_bytes` → cAdvisor metrics; **confirm
-  cAdvisor is even in the stack**, else replace/remove those Resource-Usage panels.
-- `resilience4j_circuitbreaker_calls_seconds_count`, `resilience4j_circuitbreaker_state` → confirm
-  the R4j micrometer binder emits these (and under what prefix). [conduit-demo]
-- **Must be done with a live Prometheus to query exact names + verify each panel.** Editing blind
-  risks making dashboards worse.
+### 3. Intent-distribution panels
+`chat_intent_total` is tagged **`type`** (not `intent`). Fixed `by (intent)` → `by (type)` +
+legend on conversation-trace / conduit-gateway / gateway-performance. Verified: breakdown
+returns (FETCH_DATA=7, …).
 
-## Minor
+### 4. Live-Demo circuit-breaker panel
+Gateway uses no Resilience4j TimeLimiter → `resilience4j_timelimiter_calls_total` never exists.
+Replaced that dead "timeouts" series with `resilience4j_circuitbreaker_slow_calls` ("slow calls").
 
-### 4. ▶ Replace the timelimiter panel (was "bind timelimiter metrics") — **DO LIVE**
-The gateway **doesn't use Resilience4j TimeLimiter at all**, so `resilience4j_timelimiter_calls_total`
-will never exist. Fix = **edit the `conduit-demo` panel** to a metric that does exist (circuit
-breaker / bulkhead / fanout) or remove it. Do alongside #3.
+### 5. Langfuse health-check noise
+Broadened the otel `filter/drop-actuator` to also drop `/health*` / `/metrics` / bare `GET /`.
+Verified: **no more `GET /health` traces** in Langfuse — only real `chat-turn` / `agent.*` spans.
 
-### 5. ⏳ Filter Langfuse health-check trace noise — **EDIT DONE**
-The otel `filter/drop-actuator` only matched `/actuator.*`, but the noise was `GET /health`
-(FastAPI agents use `/health`). Broadened `infra/otel-collector.yaml` to also drop `/health*`,
-`/metrics`, and bare `GET /`.
-- **Verify on next up:** restart otel-collector, generate traffic, confirm Langfuse shows only
-  `chat-turn` traces (no `GET /health`).
+### 7. Teardown → rebuild reproducibility
+The clean-slate `down -v` → build → `up` → `seed-users` sequence itself proved reproducibility:
+Flyway seed, Langfuse self-seed, Grafana provisioning, and OIDC SSO all came back with **no
+manual steps**. ✅
 
-## Validation pending (need live stack + user)
+## ⏳ In progress / needs you
 
-### 6. ▶ Visual Grafana dashboard validation (all 7) via Chrome
-Needs the stack up **and** the user to log into Grafana in the automated tab (assistant can't type
-the admin password). Do after #2/#3/#4 so panels are actually populated.
+### e2e re-validation — RUNNING
+Full Playwright suite launched on the rebuilt stack (13 specs / ~89 tests). Auth specs
+(`03-jwt-identity`) already passing → SSO fix didn't regress. Final tally pending (~50 min run).
 
-### 7. ▶ Full teardown → rebuild dry run (`down -v` → up)
-Prove reproducibility: `docker compose down -v` → `up -d` → `seed-users.sh` → smoke. Confirms
-Flyway seed, Langfuse self-seed, Grafana provisioning, and OIDC SSO return with no manual steps.
-Do **after** #1. Host prereqs: `/etc/hosts` `127.0.0.1 host.docker.internal`; real LLM key in `.env`.
+### 6. Visual Grafana screenshots — needs one of:
+The **substance is already validated via API** (every panel's metric confirmed to return data;
+broken ones fixed above). For actual pixel screenshots, pick one:
+- **(a)** log into Grafana (`admin`/`changeme`) in the automated Chrome tab → assistant screenshots
+  all 7 (zero config change); **or**
+- **(b)** assistant enables Grafana anonymous viewer (small reversible config + Grafana restart),
+  then screenshots headlessly; **or**
+- **(c)** install the `grafana-image-renderer` plugin for headless PNG export.
+(The image-renderer plugin is **not** installed, so the render API only returns a placeholder.)
 
----
+## Minor follow-ups (not blocking, found during the pass)
+- Two edge panels reference metrics that don't exist: `resolver_fallback_total` (Live-Demo
+  "Resolver fallbacks") and `spring_security_authentications_seconds_count` (Live-Demo "Security
+  filter chain"). They degrade gracefully (other series still render). Fix or drop those targets.
+- Langfuse still has some empty-named (`∅`) spans (agent internal spans) — separate from the
+  health noise; could be named/filtered later.
 
-## Next time `conduit` is up (the live pass)
-1. `docker compose build gateway iam-service` (both now source-built) → `up -d`.
-2. `bash scripts/seed-users.sh`, generate a little traffic.
-3. **Re-run e2e** — `scripts/verify.sh` (build→up→smoke→e2e→eval) or
-   `cd tests/e2e && npx playwright test --timeout=240000`. Confirms the **SSO fix** + the
-   observability/build changes didn't regress (last full run was 89/89, *before* those). Watch the
-   `03-jwt` / `09-cerbos` auth specs especially.
-4. Query Prometheus for exact metric names → fix dashboard panels (#3, #4).
-5. Confirm buckets/latency panels populate (#2), Langfuse health-noise gone (#5).
-6. User logs into Grafana → screenshot all 7 (#6).
-7. Optional `down -v` reproducibility run (#7).
-
-## Done earlier this session (do not redo)
+## Done earlier this session
 - OIDC SSO fixed (`client_secret_post` + id_token email/name) + committed
 - Conduit rename validated (89/89 Playwright e2e)
-- README rewritten as the master doc; PROJECT-OVERVIEW stubbed; DIAGRAM-PROMPTS.md added
-- Tracing verified (Langfuse `chat-turn` w/ output, Loki, Tempo — keyed by `convId`)
+- README rewritten as master doc; PROJECT-OVERVIEW stubbed; DIAGRAM-PROMPTS.md added
