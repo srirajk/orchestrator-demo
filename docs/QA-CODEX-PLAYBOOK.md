@@ -29,6 +29,22 @@
 | `uw_sam` | `Meridian@2024` | insurance (Nakamura) | wealth |
 | `rm_guest` | `Meridian@2024` | none | everything |
 
+### 0.2.1 Credentials & keys — everything Codex needs, in one place
+All **dev defaults** (safe to use verbatim; already baked into the stack):
+
+| What | Value |
+|---|---|
+| LibreChat / Axiom login (all 4 users) | `rm_jane` · `rm_carlos` · `uw_sam` · `rm_guest` — password `Meridian@2024` |
+| Grafana | `admin` / `changeme` |
+| Langfuse UI | `admin@meridian.bank` / `changeme` |
+| **Langfuse API keys** | public `pk-lf-meridian-public` · secret `sk-lf-meridian-secret` |
+| Gateway | `http://localhost:8080` — `X-User-Id: <user>` header **or** `Authorization: Bearer <jwt>` |
+| Mint a JWT | `POST http://localhost:8084/auth/token` `{"username","password"}` → `accessToken` |
+
+**The one real secret (NOT in this doc — must be pre-set):** `.env` must hold a working LLM key —
+`CONDUIT_LLM_SYNTHESIZER_API_KEY` (OpenAI) **and** `ZAI_API_KEY`. Without it, synthesis + eval
+scores fail. Verify: `grep -cE '^(CONDUIT_LLM_SYNTHESIZER_API_KEY|ZAI_API_KEY)=' .env` → should be `2`.
+
 ### 0.3 Host prereqs (fail early if missing)
 - `/etc/hosts` contains `127.0.0.1 host.docker.internal` (required for browser SSO).
 - `.env` has a real judge/LLM key (`CONDUIT_LLM_SYNTHESIZER_API_KEY` and `ZAI_API_KEY`).
@@ -75,9 +91,9 @@ trace to a source system — none invented.)
 
 ### 2.3 Entitlement denial — pruned before fetch
 - **Send (as `rm_jane`):** *"Show me the Okafor relationship holdings."*
-- **Expected:** a **denial** ("not in your coverage" style) — Okafor (`REL-00188`) is not in rm_jane's
-  book, and it's denied **before** any agent/data call.
-- **PASS:** denial message, no holdings shown. **FAIL:** any Okafor data returned.
+- **Expected:** a **denial** — actual message: *"Access denied for this client relationship."* Okafor
+  (`REL-00188`) is not in rm_jane's book, and it's denied **before** any agent/data call.
+- **PASS:** response contains "denied" / "access denied", no holdings shown. **FAIL:** any Okafor data returned.
 
 ### 2.4 Clarify — deterministic, not a guess
 - **Send:** *"What's the latest on my client?"*
@@ -171,11 +187,12 @@ bash scripts/world-b-check.sh | grep "CRITICAL violations : 0"                 #
 **Goal:** tearing the volumes + env down and bringing it back yields a working product from
 **default templates/seeds** — no hand-editing.
 
-> **Current reality (documented honestly):** a plain `docker compose up` self-restores Grafana
-> dashboards/datasources, the Langfuse project+keys, the admin DB user, and the Redis routing index
-> (rebuilt from manifests on gateway boot). **Three steps are still manual** — `seed-users`, the
-> `--profile eval` workers, and dataset seeding. The **boot provisioner** (TODO) will fold these in;
-> until then they're explicit steps below.
+> **A single `docker compose up` self-restores EVERYTHING** (verified 2026-07-01). No manual steps:
+> Grafana dashboards/datasources, the Langfuse project+keys, the admin DB user, the Redis routing
+> index (rebuilt from manifests on gateway boot), **the demo principals** (`seed-users` init
+> container), **the Langfuse golden datasets** (`seed-datasets` init container — retries until they
+> land), and the **continuous eval scorer** (starts by default). *(The DeepEval release gate stays
+> opt-in under `--profile eval`.)*
 
 ### 7.1 Tear down (destroys volumes)
 ```bash
@@ -202,19 +219,21 @@ grafana, langfuse, prometheus, loki, tempo, otel, the agents + coverage).
 - Redis routing index rebuilt: `docker exec conduit-redis redis-cli FT._LIST` → shows `intent_idx`.
 - SSO works: repeat §1.
 
-### 7.5 The three currently-manual steps
+### 7.5 What the boot provisioner does automatically — verify (no manual steps)
+On `up`, init/default services self-seed. Confirm they succeeded:
 ```bash
-bash scripts/seed-users.sh                                   # rm_jane / rm_carlos / uw_sam / rm_guest
-docker compose --profile eval up -d                          # continuous scorer + gate worker
-docker exec conduit-eval-continuous python3 /app/langfuse_seed_datasets.py   # conduit-routing + conduit-synthesis
+docker inspect -f '{{.State.ExitCode}}' conduit-seed-users      # 0  → 4 principals seeded to Redis
+docker inspect -f '{{.State.ExitCode}}' conduit-seed-datasets   # 0  → conduit-routing + conduit-synthesis land
+docker inspect -f '{{.State.Status}}'   conduit-eval-continuous # running → scores live traces on its cycle
+docker exec conduit-redis redis-cli KEYS 'principal:*'          # rm_jane / rm_carlos / uw_sam / rm_guest
 ```
 
 ### 7.6 Re-verify the whole product
-- Re-run §1 (SSO) → §2 (a hero + a denial) → §4 (dashboards have data) → §5 (traces + tags + scores + datasets).
-- **PASS (clean-slate):** everything returns and behaves as before **with only the §7.2/§7.3 commands +
-  the three §7.5 steps** — no config hand-editing, no manual dashboard/import, no manual Langfuse setup.
-- **Provisioner acceptance (future):** once the boot provisioner lands, §7.5 collapses into `up`, and
-  §7.4+§7.6 pass after **`docker compose up` alone**.
+- Re-run §1 (SSO) → §2 (hero + denial) → §4 (dashboards) → §5 (traces + tags + scores + datasets).
+- **PASS (clean-slate):** after **`docker compose --profile eval down -v` → `docker compose up -d --build`
+  alone** (no seed/import/config steps), §7.4 + §7.5 + §1–§6 all pass. Verified 2026-07-01: users +
+  datasets + dashboards + Langfuse project + `domain:/agent:` tags + eval scores all self-restored.
+  *(Eval scores appear after the scorer's first cycle — up to ~5 min.)*
 
 ---
 
@@ -229,3 +248,61 @@ docker exec conduit-eval-continuous python3 /app/langfuse_seed_datasets.py   # c
 - Take a screenshot at each major PASS/FAIL for the report.
 - If a UI step fails 2–3× (element not found, page not loading), capture the state and report — don't loop.
 - The reference behaviors + exact prompts are in `README.md` and `docs/OPERATOR-RUNBOOK.md`.
+
+---
+
+## Appendix A — copy-paste verification commands
+Every check as a runnable command, so Codex can verify **programmatically** (not only by eye).
+
+```bash
+# ── Stack health ───────────────────────────────────────────────────────────────
+curl -s -o /dev/null -w "gateway=%{http_code}\n"  http://localhost:8080/v1/models          # 200
+curl -s -o /dev/null -w "librechat=%{http_code}\n" http://localhost:3080/oauth/openid       # 302
+curl -s -o /dev/null -w "grafana=%{http_code}\n"  http://localhost:3000/api/health          # 200
+curl -s -o /dev/null -w "langfuse=%{http_code}\n" http://localhost:3030/api/public/health   # 200
+
+# ── Proper API auth path: mint an Axiom JWT, call the gateway with ONLY the Bearer ──
+TOK=$(curl -s -X POST http://localhost:8084/auth/token -H 'Content-Type: application/json' \
+  -d '{"username":"rm_jane","password":"Meridian@2024"}' \
+  | python3 -c 'import sys,json;print(json.load(sys.stdin).get("accessToken",""))')
+curl -s -o /dev/null -w "jwt-path=%{http_code}\n" -X POST http://localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer $TOK" -H 'Content-Type: application/json' \
+  -d '{"model":"conduit-assistant","stream":false,"messages":[{"role":"user","content":"cash position for the Whitman relationship"}]}'   # 200
+
+# ── World-B chat via the header path (what LibreChat does) ──────────────────────
+curl -s -o /dev/null -w "chat=%{http_code}\n" -X POST http://localhost:8080/v1/chat/completions \
+  -H 'X-User-Id: rm_jane' -H 'Content-Type: application/json' \
+  -d '{"model":"conduit-assistant","stream":false,"messages":[{"role":"user","content":"holdings for the Whitman relationship"}]}'   # 200
+
+# ── Langfuse: scores flowing (grounding/relevance/safety/partial_honesty)? ──────
+curl -s -u pk-lf-meridian-public:sk-lf-meridian-secret "http://localhost:3030/api/public/scores?limit=20" \
+  | python3 -c 'import sys,json;from collections import Counter;print(dict(Counter(x["name"] for x in json.load(sys.stdin)["data"])))'
+
+# ── Langfuse: datasets seeded? (expect conduit-routing, conduit-synthesis) ──────
+curl -s -u pk-lf-meridian-public:sk-lf-meridian-secret "http://localhost:3030/api/public/datasets" \
+  | python3 -c 'import sys,json;print([d["name"] for d in json.load(sys.stdin)["data"]])'
+
+# ── Langfuse: a chat-turn trace carries domain:*/agent:* tags ──────────────────
+curl -s -u pk-lf-meridian-public:sk-lf-meridian-secret "http://localhost:3030/api/public/traces?limit=25&orderBy=timestamp.desc" \
+  | python3 -c 'import sys,json;[print(t["id"][:12],t.get("tags")) for t in json.load(sys.stdin)["data"] if t.get("name")=="chat-turn"][:3]'
+
+# ── Grafana: a dashboard metric returns data (via the datasource proxy) ─────────
+curl -s -u admin:changeme "http://localhost:3000/api/datasources/proxy/uid/prometheus/api/v1/query?query=conduit_agent_calls_total" \
+  | python3 -c 'import sys,json;print("agent_calls series:",len(json.load(sys.stdin)["data"]["result"]))'   # >0
+
+# ── World-B gate (no domain knowledge leaked into the gateway) ─────────────────
+bash scripts/world-b-check.sh | grep "CRITICAL violations : 0"    # must print
+
+# ── Seeded principals present (the LibreChat header path) ──────────────────────
+docker exec conduit-redis redis-cli KEYS 'principal:*'            # rm_jane, rm_carlos, uw_sam, rm_guest
+```
+
+## Appendix B — bring-up commands (the exact sequence)
+```bash
+# Clean-slate (wipes volumes) → rebuild → up. One command brings up the full stack + seeds.
+docker compose --profile eval down -v --remove-orphans     # tear down + WIPE data
+docker compose up -d --build                                # core + provisioner (seed-users,
+                                                            # seed-datasets) + continuous eval
+# The DeepEval release gate is opt-in:
+docker compose --profile eval up -d langfuse-eval-worker    # (optional) on-demand gate worker
+```

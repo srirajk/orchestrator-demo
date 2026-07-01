@@ -705,13 +705,14 @@ services:
 
   # Continuous trace scorer: fetches recent Langfuse traces on a loop and posts
   # grounding / partial-honesty / relevance / safety scores back (eval/langfuse_continuous.py).
-  # Passive (does not drive the gateway). Eval profile only — never starts with `core`.
+  # Passive (does not drive the gateway). Starts BY DEFAULT so live quality scores flow on `up`;
+  # the on-demand DeepEval release gate (langfuse-eval-worker, above) stays under `--profile eval`.
+  # (To run the gateway without continuous eval cost, add `profiles: [eval]` back here.)
   eval-worker:
     build:
       context: ./eval
       dockerfile: Dockerfile
     container_name: conduit-eval-continuous
-    profiles: [eval]
     depends_on:
       - langfuse
     environment:
@@ -733,6 +734,43 @@ services:
       EVAL_LOOKBACK_HOURS: ${EVAL_LOOKBACK_HOURS:-24}
       EVAL_TRACE_LIMIT: ${EVAL_TRACE_LIMIT:-50}
     restart: unless-stopped
+
+  # ── Boot provisioner ──────────────────────────────────────────────────────────
+  # Idempotent seeds so `docker compose up` yields a fully working stack with NO manual
+  # steps (World-B "sweet bring-up"). Each runs once and exits.
+
+  # Seed demo principals into Redis (rm_jane / rm_carlos / uw_sam / rm_guest).
+  seed-users:
+    image: redis/redis-stack-server:7.4.0-v3
+    container_name: conduit-seed-users
+    depends_on:
+      redis-stack:
+        condition: service_healthy
+    volumes:
+      - ./scripts:/scripts:ro
+    environment:
+      REDIS_HOST: redis-stack
+      REDIS_PORT: "6379"
+    command: ["bash", "/scripts/seed-users.sh"]
+    restart: "no"
+
+  # Seed the Langfuse golden datasets (conduit-routing, conduit-synthesis). Retries until
+  # Langfuse + its self-seeded project are ready; the seeder itself is idempotent.
+  seed-datasets:
+    build:
+      context: ./eval
+      dockerfile: Dockerfile
+    container_name: conduit-seed-datasets
+    depends_on:
+      - langfuse
+    volumes:
+      - ./scripts:/scripts:ro
+    environment:
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PROJECT_PUBLIC_KEY:-pk-lf-meridian-public}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_PROJECT_SECRET_KEY:-sk-lf-meridian-secret}
+      LANGFUSE_HOST: http://langfuse:3000
+    command: ["sh", "/scripts/seed-datasets.sh"]
+    restart: "no"
 
   # ── k6 load test — Phase 7 only (scale profile) ───────────────────────────────
 
