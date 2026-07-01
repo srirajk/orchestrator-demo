@@ -3137,6 +3137,192 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-07-01T14:20:00.000Z"
+    },
+    {
+      "id": "bug-195",
+      "timestamp": "2026-07-01T14:32:09.379Z",
+      "error_message": "Incorrect value in code",
+      "file": "docs/QA-CODEX-PLAYBOOK.md",
+      "root_cause": "Had \"not in your coverage\"",
+      "fix": "Changed to \"Access denied for this client relationship.\"",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-01T14:32:09.379Z"
+    },
+    {
+      "id": "bug-196",
+      "timestamp": "2026-07-01T15:11:00.000Z",
+      "error_message": "QA \u00a72 browser run: LibreChat hero answer rendered but #send-button stayed disabled beyond 180s, blocking follow-up. Pre-rebuild run also showed settlement/cash unavailable due MCP timeouts.",
+      "file": "librechat/librechat.yaml, gateway/src/main/java/ai/conduit/gateway/api/v1/chat/ChatCompletionsController.java, gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java, mock-agents/servicing/server.py",
+      "root_cause": "Not fixed in this session. Evidence: Playwright screenshot shows rendered answer with disabled send button; gateway logs show full fan-out succeeded post-rebuild and AnswerSynthesizer call started, but LibreChat did not consider the stream complete within the QA timeout. Pre-rebuild servicing MCP emitted Starlette AssertionError and gateway timed out both MCP tools.",
+      "fix": "Pending investigation. Check SSE completion/DONE delivery to LibreChat and whether LibreChat is waiting on a generation/title/summarize job despite titleConvo=false. Separately inspect servicing MCP ASGI middleware errors seen before rebuild.",
+      "tags": [
+        "qa",
+        "librechat",
+        "sse",
+        "send-button",
+        "mcp",
+        "playwright"
+      ],
+      "related_bugs": [
+        "bug-194"
+      ],
+      "occurrences": 2,
+      "last_seen": "2026-07-01T15:11:00.000Z"
+    },
+    {
+      "id": "bug-197",
+      "timestamp": "2026-07-01T15:11:00.000Z",
+      "error_message": "Inline Python SSE parser commands failed with SyntaxError: unexpected character after line continuation character.",
+      "file": "terminal command only",
+      "root_cause": "Used single-quoted python -c strings containing literal \\n sequences instead of shell $'...' quoting, so Python received backslash-n text.",
+      "fix": "Reran the checks with shell $'...' quoting so Python received real newlines.",
+      "tags": [
+        "qa",
+        "tooling",
+        "python",
+        "command"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-07-01T15:11:00.000Z"
+    },
+    {
+      "id": "bug-198",
+      "timestamp": "2026-07-01T15:49:00.873Z",
+      "error_message": "Wrong return value",
+      "file": "gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java",
+      "root_cause": "Was returning: m.writeValueAsString(root);",
+      "fix": "Now returns: \" \" + m.writeValueAsString(root);  // leading spac",
+      "tags": [
+        "auto-detected",
+        "return-value",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-01T15:49:00.873Z"
+    },
+    {
+      "id": "bug-199",
+      "timestamp": "2026-07-01T15:49:07.123Z",
+      "error_message": "Incorrect value in code",
+      "file": "gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java",
+      "root_cause": "Had \"[DONE]\"",
+      "fix": "Changed to \" [DONE]\"",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-01T15:49:07.123Z"
+    },
+    {
+      "id": "bug-200",
+      "timestamp": "2026-07-01T15:49:31.523Z",
+      "error_message": "Wrong return value",
+      "file": "gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java",
+      "root_cause": "Was returning: mapper.writeValueAsString(root);",
+      "fix": "Now returns: \" \" + mapper.writeValueAsString(root);  // leading",
+      "tags": [
+        "auto-detected",
+        "return-value",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-01T15:49:31.523Z"
+    },
+    {
+      "id": "bug-201",
+      "timestamp": "2026-07-01T15:49:35.977Z",
+      "error_message": "Incorrect value in code",
+      "file": "gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java",
+      "root_cause": "Had \"[DONE]\"",
+      "fix": "Changed to \" [DONE]\"",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-01T15:49:35.977Z"
+    },
+    {
+      "id": "bug-202",
+      "timestamp": "2026-07-01T19:07:24.977Z",
+      "error_message": "Missing guard clause",
+      "file": "gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java",
+      "root_cause": "No early return/throw for edge case: messages == null || messages.isEmpty(",
+      "fix": "Added guard clause: if (messages == null || messages.isEmpty()",
+      "tags": [
+        "auto-detected",
+        "guard-clause",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-01T19:07:24.977Z"
+    },
+    {
+      "id": "bug-203",
+      "timestamp": "2026-07-01T19:07:48.497Z",
+      "error_message": "Missing error handling in unknown",
+      "file": "gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java",
+      "root_cause": "Code path had no error handling \u2014 exceptions would propagate uncaught",
+      "fix": "Added try/catch block",
+      "tags": [
+        "auto-detected",
+        "error-handling",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-01T19:07:48.497Z"
+    },
+    {
+      "id": "bug-204",
+      "timestamp": "2026-07-01T19:15:12.442Z",
+      "error_message": "Significant refactor of ",
+      "file": "gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java",
+      "root_cause": "5 lines replaced/restructured",
+      "fix": "Rewrote 18\u219225 lines (5 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-01T19:15:12.442Z"
+    },
+    {
+      "id": "bug-205",
+      "timestamp": "2026-07-01",
+      "error_message": "Multi-turn client pivot: naming a new client (Okafor) after another (Whitman) answered against the prior client \u2014 no re-resolution, no entitlement re-check (Codex QA #2/#3)",
+      "file": "gateway/.../domain/intent/IntentClassifier.java, gateway/.../domain/chat/ChatService.java",
+      "root_cause": "(1) combined intent+extraction echoed the prior turn's resolved id from history as the entity reference; (2) coverage pipeline precedence inverted \u2014 session-carried id won over a client named this turn (resolve was only in the else-branch).",
+      "fix": "(1) scope extraction to the LATEST user message + deterministic guard dropping extracted values matching the manifest id_pattern absent from that message; (2) flip precedence \u2014 a client named THIS turn resolves + re-authorizes; carried id reused only when none named.",
+      "tags": [
+        "session",
+        "carry-forward",
+        "entitlement",
+        "world-b",
+        "intent-classifier",
+        "coverage",
+        "pivot"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-01"
     }
   ]
 }
