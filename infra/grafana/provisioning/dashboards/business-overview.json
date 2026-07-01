@@ -203,7 +203,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "http_server_requests_active_seconds_count{uri=\"/v1/chat/completions\"}",
+          "expr": "sum(http_server_requests_active_seconds_gcount)",
           "legendFormat": "active"
         }
       ]

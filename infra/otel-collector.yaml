@@ -38,6 +38,10 @@ processors:
         - 'IsMatch(name, "HEAD /health.*")'
         - 'IsMatch(name, "GET /metrics.*")'
         - 'IsMatch(name, "GET /$")'
+        # Drop orphaned Spring Security filter-chain spans. Their parent HTTP server span
+        # (GET /health, /actuator/*) is dropped above, so these leaked into Langfuse as
+        # parentless, empty-named ("∅") traces.
+        - 'IsMatch(name, "^(security filterchain (before|after)|secured request|authorize request)$")'
 
 exporters:
   # Traces → Tempo (gRPC) — full distributed trace picture incl. actuators

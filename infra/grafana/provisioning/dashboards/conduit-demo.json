@@ -259,7 +259,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "http_server_requests_active_seconds_count{uri=\"/v1/chat/completions\"}",
+          "expr": "sum(http_server_requests_active_seconds_gcount)",
           "legendFormat": "active"
         }
       ]
@@ -430,14 +430,6 @@
           },
           "expr": "rate(http_server_requests_seconds_count{uri=\"/v1/chat/completions\"}[1m])",
           "legendFormat": "req/s"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "http_server_requests_active_seconds_count{uri=\"/v1/chat/completions\"}",
-          "legendFormat": "active streams"
         }
       ]
     },
@@ -665,14 +657,6 @@
       "title": "Resolver fallbacks",
       "type": "timeseries",
       "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "increase(resolver_fallback_total[5m])",
-          "legendFormat": "fallbacks (5m)"
-        },
         {
           "datasource": {
             "type": "prometheus",
