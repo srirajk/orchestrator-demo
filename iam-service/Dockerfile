@@ -1,12 +1,25 @@
+# Stage 1 — build with Maven + JDK 21 (source build inside Docker; no prebuilt jar needed)
+FROM maven:3.9-eclipse-temurin-21 AS build
+
+WORKDIR /build
+
+# Pre-fetch deps in a separate layer so source changes don't retrigger downloads
+COPY pom.xml .
+RUN mvn dependency:go-offline -q
+
+COPY src ./src
+RUN mvn package -DskipTests -q
+
+# Stage 2 — lean runtime (JRE + wget for healthcheck)
 FROM eclipse-temurin:21-jre-alpine
 
 LABEL maintainer="Meridian Platform"
 LABEL description="OpenWolf IAM Service — OIDC provider, user management, entitlements"
 
-WORKDIR /app
+RUN apk add --no-cache wget
 
-# Copy the fat JAR produced by spring-boot-maven-plugin
-COPY target/iam-service-*.jar app.jar
+WORKDIR /app
+COPY --from=build /build/target/iam-service-*.jar app.jar
 
 EXPOSE 8084
 

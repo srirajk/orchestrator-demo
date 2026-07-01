@@ -29,6 +29,15 @@ processors:
         - 'IsMatch(name, "http get /actuator.*")'
         - 'IsMatch(name, "http head /actuator.*")'
         - 'IsMatch(name, "HEAD /actuator.*")'
+        # Also drop plain /health + /metrics probes (FastAPI agents & others use /health,
+        # not /actuator/health) — these were still flooding Langfuse as "GET /health".
+        - 'IsMatch(attributes["http.route"], "/health.*")'
+        - 'IsMatch(attributes["http.target"], "/health.*")'
+        - 'IsMatch(attributes["url.path"], "/health.*")'
+        - 'IsMatch(name, "GET /health.*")'
+        - 'IsMatch(name, "HEAD /health.*")'
+        - 'IsMatch(name, "GET /metrics.*")'
+        - 'IsMatch(name, "GET /$")'
 
 exporters:
   # Traces → Tempo (gRPC) — full distributed trace picture incl. actuators

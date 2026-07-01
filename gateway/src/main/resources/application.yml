@@ -20,6 +20,14 @@ management:
   endpoint:
     health:
       show-details: always
+  # Percentile histograms → so histogram_quantile() latency panels (p50/p95/p99) render.
+  # http.* are Spring's server/client request timers; intent.classify.duration is our custom timer.
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        http.client.requests: true
+        intent.classify.duration: true
   # Micrometer → OTel bridge: exports traces to the OTel Collector
   tracing:
     enabled: true
