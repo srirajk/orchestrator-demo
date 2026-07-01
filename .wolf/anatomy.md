@@ -267,6 +267,7 @@
 - `authorization-model.md` — Enterprise AI Gateway — Authorization Model (~5478 tok)
 - `authz-architecture-brief.md` — Enterprise AI Gateway — Authorization & User Management Architectural Brief (~7031 tok)
 - `clearance-tiers-and-agent-metadata.md` — Clearance Tiers — Tenant Schema, Agent Metadata & Policy (~2142 tok)
+- `CONDUIT-WORKBENCH-PLAN.md` — Conduit Workbench + Axiom Control Plane Plan (~1861 tok)
 - `DIAGRAM-PROMPTS.md` — Conduit — Diagram Prompts & Generation Guide (~4216 tok)
 - `domain-manifest-and-memory.md` — Domain Manifest + Contextual Memory Architecture (~2480 tok)
 - `domain-onboarding-standard.md` — Domain Onboarding Standard (~4115 tok)
