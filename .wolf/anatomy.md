@@ -216,6 +216,7 @@
 
 ## admin-ui/
 
+- `DESIGN-SYSTEM.md` — Axiom Admin UI Design Direction (~251 tok)
 - `Dockerfile` — Docker container definition (~103 tok)
 - `index.html` — Meridian Admin (~236 tok)
 - `nginx.conf` (~148 tok)
@@ -225,6 +226,17 @@
 - `tsconfig.json` — TypeScript configuration (~162 tok)
 - `tsconfig.node.json` (~61 tok)
 - `vite.config.ts` (~96 tok)
+
+## admin-ui/.wolf/
+
+- `memory.md` — OpenWolf DesignQC local memory (~40 tok)
+
+## admin-ui/.wolf/designqc-captures/
+
+- `login_desktop_top.jpg` — DesignQC screenshot: login desktop top viewport (~image)
+- `login_mobile_top.jpg` — DesignQC screenshot: login mobile top viewport (~image)
+- `root_desktop_top.jpg` — DesignQC screenshot: unauthenticated root desktop redirect (~image)
+- `root_mobile_top.jpg` — DesignQC screenshot: unauthenticated root mobile redirect (~image)
 
 ## admin-ui/src/
 

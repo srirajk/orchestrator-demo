@@ -21,7 +21,7 @@ const EMPTY: Omit<Team, 'memberCount' | 'members'> = {
 
 function SkeletonCard() {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-5">
+    <div className="bg-white rounded-lg border border-slate-200 p-5">
       <div className="flex items-start justify-between mb-3">
         <Skeleton className="w-9 h-9 rounded-lg" />
         <div className="flex gap-1">
@@ -170,7 +170,7 @@ export function Teams() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {teams.map(t => (
-            <div key={t.id} className="bg-white rounded-xl border border-slate-200 p-5 hover:border-slate-300 transition-colors group">
+            <div key={t.id} className="bg-white rounded-lg border border-slate-200 p-5 hover:border-slate-300 transition-colors group">
               <div className="flex items-start justify-between mb-3">
                 <div className="w-9 h-9 rounded-lg bg-violet-50 flex items-center justify-center">
                   <Users size={16} className="text-violet-600" />

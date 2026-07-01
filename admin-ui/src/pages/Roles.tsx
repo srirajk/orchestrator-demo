@@ -119,7 +119,7 @@ export function Roles() {
         </Button>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
         {isLoading ? (
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">

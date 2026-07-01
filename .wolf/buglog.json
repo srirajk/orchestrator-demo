@@ -3392,6 +3392,42 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-07-01T21:44:01Z"
+    },
+    {
+      "id": "bug-210",
+      "timestamp": "2026-07-01T21:33:55Z",
+      "error_message": "openwolf designqc --routes /login / failed because the auto-started dev server command `npm run dev` exited with code 127",
+      "file": ".wolf/designqc-captures",
+      "root_cause": "DesignQC's spawned dev-server environment could not execute npm even though npm and node are available on the interactive shell PATH.",
+      "fix": "Recorded the tooling failure; UI changes continued with npm build verification planned.",
+      "tags": ["designqc", "npm", "tooling", "admin-ui"],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-01T21:33:55Z"
+    },
+    {
+      "id": "bug-211",
+      "timestamp": "2026-07-01T21:41:08Z",
+      "error_message": "npm run build failed with `sh: tsc: command not found`",
+      "file": "admin-ui/node_modules",
+      "root_cause": "The admin-ui workspace had no installed node_modules, so the build script could not find the local TypeScript compiler.",
+      "fix": "Ran npm ci from admin-ui using the existing package-lock, then reran npm run build successfully.",
+      "tags": ["admin-ui", "build", "typescript", "npm"],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-01T21:41:08Z"
+    },
+    {
+      "id": "bug-212",
+      "timestamp": "2026-07-01T21:44:52Z",
+      "error_message": "Vite dev server failed with `listen EPERM: operation not permitted 127.0.0.1:5174`; sandboxed OpenWolf DesignQC browser launch also failed with `Failed to launch the browser process`",
+      "file": "admin-ui/.wolf/designqc-captures",
+      "root_cause": "The managed sandbox blocked local port listening and browser process launch for screenshot QA.",
+      "fix": "Reran npm run dev with approved escalation, then reran OpenWolf DesignQC with approved browser escalation and captured screenshots successfully.",
+      "tags": ["admin-ui", "designqc", "sandbox", "vite", "browser"],
+      "related_bugs": ["bug-206"],
+      "occurrences": 1,
+      "last_seen": "2026-07-01T21:44:52Z"
     }
   ]
 }

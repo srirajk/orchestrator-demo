@@ -217,7 +217,7 @@ export function AuditLog() {
       )}
 
       {/* Filters */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 mb-6">
+      <div className="bg-white rounded-lg border border-slate-200 p-5 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Input
             label="Date from"
@@ -262,7 +262,7 @@ export function AuditLog() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
         {isLoading ? (
           <div className="space-y-0">
             {[...Array(5)].map((_, i) => (

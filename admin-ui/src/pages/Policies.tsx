@@ -102,7 +102,7 @@ export function Policies() {
           <h2 className="text-sm font-semibold text-slate-700 mb-3">Active Policies ({policies.length})</h2>
           <div className="space-y-2">
             {policies.length === 0 ? (
-              <div className="bg-white rounded-xl border border-slate-200 py-10 text-center text-sm text-slate-400">No policies found</div>
+              <div className="bg-white rounded-lg border border-slate-200 py-10 text-center text-sm text-slate-400">No policies found</div>
             ) : policies.map(p => (
               <div key={p.filename} className="bg-white rounded-lg border border-slate-200 overflow-hidden">
                 <button
@@ -136,7 +136,7 @@ export function Policies() {
           <h2 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-1.5">
             <Sparkles size={14} className="text-brand-500" /> AI Policy Generator
           </h2>
-          <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+          <div className="bg-white rounded-lg border border-slate-200 p-5 space-y-4">
             {/* Resource */}
             <Select label="Resource" value={intent.resource}
               onChange={e => setIntent(i => ({ ...i, resource: e.target.value, actions: [] }))}>
@@ -222,7 +222,7 @@ export function Policies() {
 
           {/* Result */}
           {generatedYaml && (
-            <div className="mt-4 bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+            <div className="mt-4 bg-white rounded-lg border border-slate-200 p-5 space-y-4">
               {/* Explanation */}
               {explanation && (
                 <div className="bg-brand-50 border border-brand-100 rounded-lg p-3">
