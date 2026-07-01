@@ -86,6 +86,18 @@ docker compose ps            # all core containers Up/healthy; eval profile up f
 
 ---
 
+### 0.5 Fast full API smoke (one command — run this FIRST)
+```bash
+bash scripts/smoke.sh
+```
+Runs the entire API/CLI pass in ~2 min — health, the JWT auth path, **byte-exact SSE** (`data: {json}` /
+`data: [DONE]`), **`stream:false` → single `chat.completion` JSON**, all four World-B scenarios,
+Langfuse traces/tags/datasets/scores, Grafana metrics, the world-b gate, and seeded principals.
+Prints **`🟢 SMOKE GREEN`** (exit 0) or the failures. Do this **before** the browser suite (§1–§7) —
+if it's not green, fix that before touching the browser.
+
+---
+
 ## 1. SSO login (browser)
 1. Navigate to `http://localhost:3080` → click **"Login with Meridian SSO"**.
 2. **Expected:** redirect to the **Axiom** login page (`http://host.docker.internal:8084/login`),
