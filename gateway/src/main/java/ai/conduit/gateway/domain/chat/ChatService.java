@@ -158,7 +158,7 @@ public class ChatService {
             emitter.send(SseEmitter.event().data(roleDelta(id, ts)));
             emitter.send(SseEmitter.event().data(contentDelta(id, ts, "Meridian AI")));
             emitter.send(SseEmitter.event().data(stopDelta(id, ts)));
-            emitter.send(SseEmitter.event().data("[DONE]"));
+            emitter.send(SseEmitter.event().data(" [DONE]"));
             emitter.complete();
         } catch (Exception e) { emitter.completeWithError(e); }
     }
@@ -908,7 +908,7 @@ public class ChatService {
             emitter.send(SseEmitter.event().data(contentDelta(id, ts, word)));
         }
         emitter.send(SseEmitter.event().data(stopDelta(id, ts)));
-        emitter.send(SseEmitter.event().data("[DONE]"));
+        emitter.send(SseEmitter.event().data(" [DONE]"));
         emitter.complete();
     }
 
@@ -938,7 +938,7 @@ public class ChatService {
         w.write(delta);
         if (finishReason != null) choice.put("finish_reason", finishReason);
         else choice.putNull("finish_reason");
-        return mapper.writeValueAsString(root);
+        return " " + mapper.writeValueAsString(root);  // leading space → OpenAI-exact "data: {json}" (Spring omits it)
     }
 
     /** Increments the request outcome counter. Micrometer caches the Counter by key. */

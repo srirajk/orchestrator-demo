@@ -174,7 +174,7 @@ public class AnswerSynthesizer {
 
             // Send stop chunk and [DONE].
             emitter.send(SseEmitter.event().data(stopDelta(completionId, created, mapper)));
-            emitter.send(SseEmitter.event().data("[DONE]"));
+            emitter.send(SseEmitter.event().data(" [DONE]"));
             emitter.complete();
             emitterDone = true;
 
@@ -193,7 +193,7 @@ public class AnswerSynthesizer {
                     emitter.send(SseEmitter.event().data(
                             contentDelta(completionId, created, errorMsg, mapper)));
                     emitter.send(SseEmitter.event().data(stopDelta(completionId, created, mapper)));
-                    emitter.send(SseEmitter.event().data("[DONE]"));
+                    emitter.send(SseEmitter.event().data(" [DONE]"));
                     emitter.complete();
                 } catch (Exception inner) {
                     log.warn("Could not send error response to emitter", inner);
@@ -316,7 +316,7 @@ public class AnswerSynthesizer {
             if (histOutput.length() > 2000) histOutput = histOutput.substring(0, 2000) + "…";
             Span.current().setAttribute("langfuse.trace.output", histOutput);
             emitter.send(SseEmitter.event().data(stopDelta(completionId, created, mapper)));
-            emitter.send(SseEmitter.event().data("[DONE]"));
+            emitter.send(SseEmitter.event().data(" [DONE]"));
             emitter.complete();
 
         } catch (Exception e) {
@@ -327,7 +327,7 @@ public class AnswerSynthesizer {
                         contentDelta(completionId, created,
                                 "I couldn't process that. Please rephrase.", mapper)));
                 emitter.send(SseEmitter.event().data(stopDelta(completionId, created, mapper)));
-                emitter.send(SseEmitter.event().data("[DONE]"));
+                emitter.send(SseEmitter.event().data(" [DONE]"));
                 emitter.complete();
             } catch (Exception inner) {
                 try { emitter.completeWithError(e); } catch (Exception ignored) {}
@@ -501,7 +501,7 @@ public class AnswerSynthesizer {
         ObjectNode choice = (ObjectNode) root.path("choices").get(0);
         choice.putObject("delta").put("role", "assistant");
         choice.putNull("finish_reason");
-        return m.writeValueAsString(root);
+        return " " + m.writeValueAsString(root);  // leading space → OpenAI-exact "data: {json}" (Spring omits it)
     }
 
     private static String contentDelta(String id, long ts, String content, ObjectMapper m)
@@ -510,7 +510,7 @@ public class AnswerSynthesizer {
         ObjectNode choice = (ObjectNode) root.path("choices").get(0);
         choice.putObject("delta").put("content", content);
         choice.putNull("finish_reason");
-        return m.writeValueAsString(root);
+        return " " + m.writeValueAsString(root);  // leading space → OpenAI-exact "data: {json}" (Spring omits it)
     }
 
     private static String stopDelta(String id, long ts, ObjectMapper m) throws Exception {
@@ -518,7 +518,7 @@ public class AnswerSynthesizer {
         ObjectNode choice = (ObjectNode) root.path("choices").get(0);
         choice.putObject("delta");
         choice.put("finish_reason", "stop");
-        return m.writeValueAsString(root);
+        return " " + m.writeValueAsString(root);  // leading space → OpenAI-exact "data: {json}" (Spring omits it)
     }
 
     private HttpResponse<java.io.InputStream> sendWithRetry(String endpoint, String requestBody) throws Exception {
