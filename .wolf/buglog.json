@@ -3323,6 +3323,41 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-07-01"
+    },
+    {
+      "id": "bug-206",
+      "timestamp": "2026-07-01T21:45:01Z",
+      "error_message": "mvn -q -Dtest=JwtClaimsCustomizerTest test failed: Mockito could not initialize inline Byte Buddy mock maker / could not self-attach to current VM",
+      "file": "iam-service/src/test/java/com/openwolf/iam/auth/JwtClaimsCustomizerTest.java",
+      "root_cause": "The local JDK 23 runtime does not allow Mockito inline mock maker self-attachment in this sandboxed test run.",
+      "fix": "Replaced Mockito usage with a tiny CapturingEnricher test fake that overrides OidcClaimEnricher methods directly.",
+      "tags": [
+        "test",
+        "java",
+        "mockito",
+        "byte-buddy",
+        "oidc"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-01T21:45:01Z"
+    },
+    {
+      "id": "bug-207",
+      "timestamp": "2026-07-01T21:47:58Z",
+      "error_message": "mvn -q test failed: reference to assertThat is ambiguous for claims.getClaim(\"clearance\")",
+      "file": "iam-service/src/test/java/com/openwolf/iam/auth/JwtClaimsCustomizerTest.java",
+      "root_cause": "JwtClaimsSet#getClaim is generic, and AssertJ could not infer whether the raw numeric claim should use Predicate/IntPredicate overloads.",
+      "fix": "Cast the claim to Integer before asserting equality.",
+      "tags": [
+        "test",
+        "java",
+        "assertj",
+        "compile"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-01T21:47:58Z"
     }
   ]
 }

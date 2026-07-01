@@ -39,6 +39,14 @@
 - `settings.json` (~441 tok)
 - `settings.local.json` (~36 tok)
 
+## .wolf/
+
+- `OPENWOLF.md` — OpenWolf operating protocol for navigation, memory, bug logging, and session-end updates. (~1675 tok)
+- `anatomy.md` — Auto-maintained project file catalog with descriptions and token estimates. (~6443 tok)
+- `buglog.json` — OpenWolf JSON bug log for errors, failures, root causes, and fixes. (~2124 tok)
+- `cerebrum.md` — Long-term project learnings, user preferences, do-not-repeat notes, and decision log. (~6443 tok)
+- `memory.md` — Chronological action log for session work and outcomes. (~2771 tok)
+
 ## .claude/rules/
 
 - `openwolf.md` (~313 tok)
@@ -818,6 +826,10 @@
 ## iam-service/src/test/java/com/openwolf/iam/
 
 - `IamApplicationTests.java` — Placeholder test class. (~197 tok)
+
+## iam-service/src/test/java/com/openwolf/iam/auth/
+
+- `JwtClaimsCustomizerTest.java` — Tests Axiom OIDC access-token gateway audience customization and ID-token identity-only behavior. (~779 tok)
 
 ## iam-service/src/test/resources/
 

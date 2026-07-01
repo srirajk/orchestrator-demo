@@ -72,6 +72,7 @@ iam:
     gateway:
       client-id: ${IAM_GATEWAY_CLIENT_ID:gateway-client}
       client-secret: ${IAM_GATEWAY_CLIENT_SECRET:gateway-secret}
+      audience: ${IAM_GATEWAY_AUDIENCE:conduit-gateway}
 
 management:
   endpoints:

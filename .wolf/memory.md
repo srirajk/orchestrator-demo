@@ -3,6 +3,9 @@
 > Chronological action log. Hooks and AI append to this file automatically.
 > Old sessions are consolidated by the daemon weekly.
 
+| 17:36 | Audited LibreChat OIDC token path and local image source | librechat/librechat.yaml, librechat/patches/openidStrategy.js, docker-compose.yml, gateway auth files | confirmed config-only token-forwarding path via `{{LIBRECHAT_OPENID_ACCESS_TOKEN}}` headers; no gateway code needed | ~9000 |
+| 17:45 | Implemented LibreChat/Axiom OIDC forwarding and checks | librechat/librechat.yaml, docker-compose.yml, iam-service auth/config/test, .env.example | targeted + full IAM tests pass; docker compose config valid; world-b-check CRITICAL 0 | ~3500 |
+
 | 21:56 | Fixed 7 failing E2E Playwright tests (02-hero, 04-entitlements, 05-resilience, 10-coverage-flow) | ChatService.java, AnswerSynthesizer.java, e2e/tests/helpers.ts | 17/17 pass, 0 failures | ~8000 |
 
 | 11:19 | Wrote unit tests for domain manifest classes | gateway/src/test/java/ai/meridian/gateway/domain/manifest/EffectiveManifestMergeTest.java, domain/auth/RevocationCheckerTest.java, domain/session/ConversationSessionTest.java | created 3 test files, 15 tests total | ~800 tok |

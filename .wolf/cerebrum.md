@@ -237,3 +237,6 @@ JWT/Axiom is the real public API path (gateway extracts principal from JWT claim
 
 ### Key Learning — 2026-07-01 — E2E launch + pivot verification
 - On macOS in Codex sandbox, Playwright Chromium can fail before app logic with `MachPortRendezvousServer ... Permission denied`; rerun `cd tests/e2e && npx playwright test` with escalation/unsandboxed execution. Fresh rebuilt env on branch `rename/conduit-axiom` passed `89 passed (53.0m)`. Manual OIDC LibreChat login as `rm_jane` then same-conversation Whitman → Okafor pivot returned `Access denied for this client relationship.`
+
+### Key Learning — 2026-07-01 — LibreChat OIDC token forwarding
+- LibreChat custom endpoint headers can resolve `{{LIBRECHAT_OPENID_ACCESS_TOKEN}}`, but only when `OPENID_REUSE_TOKENS=true` lets the `openidJwt` auth path rehydrate `req.user.federatedTokens` on later API calls. The configured custom endpoint `baseURL` must remain admin-owned (not `user_provided`) or LibreChat intentionally drops identity-bearing headers to avoid token leakage. Axiom OIDC access tokens forwarded to the gateway must carry the same configured audience as `CONDUIT_AUTH_REQUIRED_AUDIENCE` plus the gateway's structural claims (`roles`, `segments`, `admin_domains`, `clearance`, `tenant_id`); ID tokens stay for LibreChat identity/userinfo only.

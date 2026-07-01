@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -54,6 +55,9 @@ public class AuthController {
 
     @Value("${spring.security.oauth2.authorizationserver.issuer:http://localhost:8084}")
     private String issuerUrl;
+
+    @Value("${iam.oauth2.gateway.audience:conduit-gateway}")
+    private String gatewayAudienceRaw;
 
     private final AuthenticationManager authenticationManager;
     private final JwtEncoder jwtEncoder;
@@ -149,7 +153,7 @@ public class AuthController {
                 .subject(principalId)
                 .issuedAt(now)
                 .expiresAt(expiry)
-                .audience(List.of("conduit-gateway"))
+                .audience(gatewayAudiences())
                 .claim("username", principal.getUsername())
                 .claim("email", principal.getEmail())
                 .claim("roles", roles)
@@ -165,6 +169,13 @@ public class AuthController {
         log.info("Issued JWT for user id={} username={}", principalId, principal.getUsername());
 
         return ResponseEntity.ok(new LoginResponse(tokenValue, "Bearer", TOKEN_TTL_SECONDS, userResponse));
+    }
+
+    private List<String> gatewayAudiences() {
+        return Arrays.stream(gatewayAudienceRaw.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .toList();
     }
 
     /**
