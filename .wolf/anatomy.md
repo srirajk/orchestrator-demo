@@ -243,6 +243,7 @@
 - `App.tsx` — Protected (~423 tok)
 - `index.css` — Styles: 5 rules (~228 tok)
 - `main.tsx` — queryClient (~141 tok)
+- `vite-env.d.ts` — Vite env typing for optional non-secret workbench gateway API base override (~65 tok)
 
 ## admin-ui/src/api/
 
@@ -267,6 +268,33 @@
 
 - `useAuth.tsx` — Ctx (~551 tok)
 
+## admin-ui/src/features/workbench/
+
+- `api.ts` — Typed gateway API boundary for trace health, domain/agent registry, auth-capable trace stream request metadata, and MVP non-streaming chat turns (~1070 tok)
+- `types.ts` — Workbench chat, trace, domain manifest, agent manifest, and UI tone types (~980 tok)
+- `WorkbenchPage.tsx` — Feature page composition for chat, trace, context ledger, coverage, and domain/agent health panels (~1230 tok)
+
+## admin-ui/src/features/workbench/components/
+
+- `ChatPanel.tsx` — Workbench chat composer/transcript panel labeled MVP non-streaming (~1450 tok)
+- `ContextLedger.tsx` — Request context ledger derived from trace events (~1080 tok)
+- `CoveragePanel.tsx` — Access check and manifest coverage status panel (~1260 tok)
+- `HealthPanel.tsx` — Domain/agent registry and indexed-status panel; liveness remains explicit placeholder (~1390 tok)
+- `Panel.tsx` — Shared workbench panel shell (~200 tok)
+- `StatusPill.tsx` — Shared green/slate status pill (~190 tok)
+- `TraceRail.tsx` — Live trace event rail renderer (~1120 tok)
+
+## admin-ui/src/features/workbench/hooks/
+
+- `useTraceStream.ts` — Fetch-based SSE reader with Authorization headers, parsing, reconnect, and request filtering (~1300 tok)
+- `useWorkbenchChat.ts` — Workbench conversation state and MVP non-streaming chat submission hook (~860 tok)
+
+## admin-ui/src/features/workbench/utils/
+
+- `format.ts` — Workbench value/time/duration formatting helpers (~230 tok)
+- `selectors.ts` — Domain, coverage, agent, and trace selector helpers (~430 tok)
+- `traceEvents.ts` — Trace event tone/title/detail presentation helpers (~780 tok)
+
 ## admin-ui/src/pages/
 
 - `AuditLog.tsx` — ACTION_COLORS — renders table (~3652 tok)
@@ -276,6 +304,7 @@
 - `Roles.tsx` — EMPTY — renders table, modal (~3469 tok)
 - `Teams.tsx` — EMPTY — renders modal (~3886 tok)
 - `Users.tsx` — EMPTY — renders table, modal (~5104 tok)
+- `Workbench.tsx` — Tiny route wrapper around features/workbench/WorkbenchPage (~30 tok)
 
 ## docs/
 

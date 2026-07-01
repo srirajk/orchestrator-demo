@@ -1499,3 +1499,10 @@
 | 17:41 | Added Axiom navy/gold design tokens, shell/login/dashboard styling, design direction doc, and ran admin build | admin-ui, .wolf/anatomy.md, .wolf/buglog.json | npm ci restored toolchain; npm run build passed | ~14800 |
 | 17:44 | Session summary: elevated admin-ui visual system and captured DesignQC login screenshots | admin-ui, admin-ui/.wolf/designqc-captures, .wolf/cerebrum.md | build green; screenshots captured after escalated Vite/browser run; unauthenticated root redirects to login | ~9000 |
 | 18:01 | Reviewer follow-up removed production-hostile default credential hint from login | admin-ui/src/pages/Login.tsx | keeps credentials in runbooks/config rather than on the sign-in surface | ~300 |
+| 17:33 | Loaded OpenWolf session rules and confirmed worktree branch | .wolf/OPENWOLF.md, .wolf/anatomy.md, .wolf/cerebrum.md | codex-conduit-workbench lane confirmed | ~10370 |
+| 17:38 | Added Conduit Workbench UI slice and gateway proxy scaffolding | admin-ui/src/pages/Workbench.tsx, admin-ui/src/api/workbench.ts, admin-ui route/proxy files | ready for TypeScript build pass | ~9200 |
+| 17:40 | Installed admin-ui dependencies, verified build, and logged missing-tsc build failure | admin-ui, .wolf/buglog.json, .wolf/cerebrum.md | npm run build passed | ~2600 |
+| 17:45 | Refreshed OpenWolf context for workbench production refactor request | .wolf/OPENWOLF.md, .wolf/anatomy.md, .wolf/cerebrum.md | ready to split feature module | ~11800 |
+| 17:53 | Refactored workbench into feature module and updated route lazy loading | admin-ui/src/features/workbench/*, admin-ui/src/pages/Workbench.tsx, admin-ui/src/App.tsx | old root API/page implementation split | ~18800 |
+| 17:54 | Fixed Vite env typing, reran admin-ui build, and logged review/build fixes | admin-ui/src/vite-env.d.ts, .wolf/buglog.json, .wolf/cerebrum.md | npm run build passed with Workbench lazy chunk | ~3200 |
+| 18:01 | Reviewer follow-up removed hardcoded demo client prompt from Workbench composer | admin-ui/src/features/workbench/hooks/useWorkbenchChat.ts, ChatPanel.tsx | production control-plane UI now opens with a neutral gateway prompt | ~350 |
