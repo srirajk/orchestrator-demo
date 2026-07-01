@@ -154,8 +154,8 @@
       "id": 21,
       "targets": [
         {
-          "expr": "sum(increase(chat_intent_total{job=\"conduit-gateway\"}[5m])) by (intent)",
-          "legendFormat": "intent: {{intent}}"
+          "expr": "sum(increase(chat_intent_total{job=\"conduit-gateway\"}[5m])) by (type)",
+          "legendFormat": "intent: {{type}}"
         }
       ],
       "title": "Intent Classifications (5m buckets)",

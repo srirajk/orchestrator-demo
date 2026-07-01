@@ -932,8 +932,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "increase(resilience4j_timelimiter_calls_total{kind=\"timeout\"}[1m])",
-          "legendFormat": "timeouts"
+          "expr": "sum(resilience4j_circuitbreaker_slow_calls)",
+          "legendFormat": "slow calls"
         }
       ]
     },

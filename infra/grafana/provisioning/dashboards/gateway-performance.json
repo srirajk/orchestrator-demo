@@ -134,8 +134,8 @@
       "id": 11,
       "targets": [
         {
-          "expr": "sum(rate(chat_intent_total{job=\"conduit-gateway\"}[$rate_window])) by (intent)",
-          "legendFormat": "{{intent}}"
+          "expr": "sum(rate(chat_intent_total{job=\"conduit-gateway\"}[$rate_window])) by (type)",
+          "legendFormat": "{{type}}"
         }
       ],
       "title": "Intent Distribution — by Type",

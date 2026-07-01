@@ -135,8 +135,8 @@
       },
       "targets": [
         {
-          "expr": "sum(increase(chat_intent_total[5m])) by (intent)",
-          "legendFormat": "{{intent}}"
+          "expr": "sum(increase(chat_intent_total[5m])) by (type)",
+          "legendFormat": "{{type}}"
         }
       ],
       "title": "Intents (last 5 min)",
