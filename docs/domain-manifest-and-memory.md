@@ -1,299 +1,304 @@
-# Domain Manifest + Contextual Memory Architecture
+# Governed Memory + Context Envelope Architecture
 
-> **Status:** Design — not yet built. Close user-mgmt refactor first.
-> These ideas represent the next major architectural layer after user-mgmt is clean.
-
----
-
-## The Core Idea
-
-When a business domain onboards to the AI gateway, it brings more than just agents.
-It brings a **contract** that tells the gateway:
-
-1. What context is required before any agent can be invoked
-2. Where to verify authorization for that context (external domain API — NOT Cerbos, NOT our DB)
-3. What to do when context is missing (business workflow steps)
-4. What facts must survive conversation compaction (domain-defined memory schema)
-
-The gateway is generic. It interprets these contracts. It never hardcodes domain knowledge.
+> **Status:** Design scaffold. No gateway implementation in this lane.
+> The gateway stays lean: it emits runtime events and consumes context envelopes. A separate
+> memory service owns the compaction ledger, governed summaries, retention, and summary prompts.
 
 ---
 
-## Two-Level Resolution
+## Non-Negotiable Split
 
-```
-Level 1 — Gateway Intent Resolver
-  Input:  natural language prompt
-  Output: which domains + agents are relevant
-  How:    vector search against agent catalog
+The gateway does not summarize conversations and does not own long-term memory. It only:
 
-Level 2 — Domain Prerequisite Validator  (NOT YET BUILT)
-  Input:  matched domain manifest + current session context
-  Output: proceed / run workflow / deny
-  How:    check required_context → call authorization_contract → run workflow if needed
-```
+1. Loads domain, sub-domain, and agent manifests.
+2. Requests a compact context envelope for the current conversation turn.
+3. Uses that envelope as generic context for extraction, routing, authorization, and synthesis.
+4. Emits append-only runtime events after each meaningful pipeline step.
 
-These run sequentially. Level 1 is about intent. Level 2 is about prerequisites and access rights.
+The memory service owns:
 
----
+1. The append-only compaction ledger.
+2. Domain-aware summary generation.
+3. Summary versioning, retention, redaction, and replay.
+4. Envelope assembly from manifests plus runtime gateway events.
 
-## Domain Manifest — Extended Schema
-
-```yaml
-domain_id: wealth-management
-display_name: Wealth Management
-
-# Already exists
-agents:
-  - portfolio-analytics-agent
-  - relationship-data-agent
-
-# NEW — what context must exist before any agent is invoked
-required_context:
-  - key: relationship_id
-    description: Which client relationship is this about?
-    source: entity_extraction   # gateway tries to extract from the prompt first
-    fallback: missing_context_workflow
-
-# NEW — external API to verify access (not Cerbos, not our DB)
-# Domain team owns this endpoint — could be CRM, portfolio system, HR system
-authorization_contract:
-  type: http_get
-  url: "${WEALTH_CRM_URL}/books/{principal_id}/relationships/{relationship_id}/access"
-  allow_field: allowed
-  cache_ttl_seconds: 30       # cache per session to avoid hammering the CRM
-
-# NEW — business steps when required context is missing
-# Not Temporal. Not a workflow engine. Declarative steps the gateway interprets.
-workflows:
-  missing_context_workflow:
-    steps:
-      - action: clarify
-        ask: "Which client would you like information about?"
-        resolves: client_name
-
-      - action: resolve_entity
-        from: client_name
-        to: relationship_id
-        using: entity_registry
-
-      - action: authorize
-        contract: authorization_contract
-        on_deny: "I can't access {client_name}'s information — this client is not in your relationship book."
-
-      - action: proceed
-
-# NEW — domain-defined memory compaction schema
-# Gateway uses this when summarizing long conversations
-# Ensures critical facts survive LibreChat's compaction
-memory_compaction:
-  must_preserve:
-    - field: relationship_id
-      reason: All agent calls depend on this
-    - field: client_name
-      reason: Human-readable reference for clarification and denial messages
-    - field: time_period
-      reason: Portfolio queries are time-specific — Q3 2024 ≠ Q4 2024
-    - field: domain
-      reason: Needed to restore domain context on next turn
-  can_drop:
-    - raw_agent_outputs       # numbers can be re-fetched
-    - routing_decisions       # internal, not user-facing
-    - intermediate_workflow_steps
-```
+This keeps World B intact: adding a domain changes manifests and external services, not gateway
+Java. Domain field names, preservation rules, and user-facing copy remain manifest data.
 
 ---
 
-## Domain Authorization Contract — Key Design Decisions
+## Contract Inputs
 
-**Why NOT Cerbos for this:**
-Cerbos handles structural authorization — "can an RM role invoke a wealth agent class?"
-It cannot query an external CRM to check if a specific RM manages a specific client.
-Cerbos is a policy evaluator, not a data-aware entitlement resolver.
+Governed memory is built from four sources. None require gateway domain logic.
 
-**Why NOT our database:**
-The book (which clients an RM manages) lives in the domain's CRM system.
-We should never duplicate it. We call it at runtime.
+| Source | Owner | What It Contributes |
+|---|---|---|
+| Domain manifest | Domain team | `memory_compaction` policy: envelope version, fields to preserve, fields to drop, summary budget, ledger retention. |
+| Sub-domain manifest | Domain team | `entity_types`, `required_context`, `clarification_schema`, `resource_scoped`, and agent membership. |
+| Agent manifest | Agent owner | `agent_id`, `domain`, `sub_domain`, skills, protocol, and `constraints.data_classification`. |
+| Runtime gateway events | Gateway | Facts observed during the turn: extracted/resolved entities, coverage checks, selected agents, agent outcomes, synthesis completion. |
 
-**Why the domain team owns the URL:**
-Different banks use different CRM systems (Salesforce, Microsoft Dynamics, custom).
-Different hospitals use different EHR systems.
-The pattern is universal. The implementation is domain-specific.
-
-**The contract interface (always the same shape):**
-```
-Request:  GET {url with principal_id and resource_id substituted}
-Response: { "allowed": true/false, "reason": "optional string" }
-```
+The memory service joins these sources by manifest identifiers (`domain`, `sub_domain`,
+`agent_id`) and event metadata. It never infers domain semantics from gateway code.
 
 ---
 
-## Session Context — Gateway-Maintained Layer
+## Domain Manifest Memory Contract
 
-The gateway maintains session context independently of LibreChat's conversation history.
-When LibreChat compacts old messages, the gateway's session context survives.
-
-**Storage:** Redis, TTL 30 minutes of inactivity
-**Key:** `session:{conversation_id}`
+Domain manifests declare governance policy, not summaries.
 
 ```json
 {
-  "established": {
-    "relationship_id": "REL-00042",
-    "client_name": "Jane Whitman",
-    "time_period": "Q3 2024",
-    "domain": "wealth-management"
+  "domain_id": "wealth-management",
+  "display_name": "Wealth Management",
+  "coverage": {
+    "discover_url": "${WEALTH_COVERAGE_URL}/coverage/{principal_id}",
+    "check_url": "${WEALTH_COVERAGE_URL}/coverage/{principal_id}/resources/{id}",
+    "resolve_url": "${WEALTH_COVERAGE_URL}/entities/resolve",
+    "cache_ttl_seconds": 30
   },
-  "authorization_cache": {
-    "REL-00042": {
-      "allowed": true,
-      "verified_at": "2026-06-27T14:32:01Z",
-      "expires_at": "2026-06-27T14:32:31Z"
+  "memory_compaction": {
+    "envelope_version": "context-envelope.v1",
+    "must_preserve": ["relationship_id", "client_name", "period", "domain"],
+    "can_drop": ["raw_agent_outputs", "routing_decisions"],
+    "summary_policy": {
+      "owner": "memory-service",
+      "max_summary_tokens": 600,
+      "refresh_after_turns": 8,
+      "ledger_retention_days": 90,
+      "include_runtime_events": [
+        "gateway.entity_resolved",
+        "gateway.coverage_checked",
+        "gateway.agent_completed",
+        "gateway.response_completed"
+      ],
+      "redact_fields": ["raw_agent_outputs"]
     }
-  },
-  "domain_workflow_state": {
-    "wealth-management": "context_satisfied"
-  },
-  "turn_count": 7
+  }
 }
 ```
 
-**Authorization cache benefit:**
-- Turn 1: verify RM has access to REL-00042 → cache it
-- Turns 2-7: skip the book API call → use cached decision
-- On expiry (30s): re-verify silently on next turn
-- On explicit revocation: evict from cache immediately
+Rules:
+
+- `owner` is always `memory-service`. The gateway may read this policy but must not execute
+  compaction itself.
+- `must_preserve` contains manifest-declared field keys or externally resolved labels that must
+  survive compaction.
+- `can_drop` names event payload fields the memory service should not copy into summaries.
+- `include_runtime_events` names gateway event types that are eligible summary inputs.
+- Domain-specific values are allowed here because manifests are the onboarding surface.
 
 ---
 
-## Memory Compaction — Three Layers
+## Context Envelope V1
 
-```
-Layer 1: LibreChat → MongoDB
-  Full conversation history. LibreChat manages.
-  Gets summarized when maxContextTokens exceeded.
-  Risk: generic summarization loses domain-critical facts.
+The context envelope is the only memory object the gateway consumes. It is compact, typed, and
+free of raw transcript or raw agent output.
 
-Layer 2: Gateway Session → Redis (TTL 30min)
-  Facts the gateway extracted this session.
-  Survives LibreChat compaction.
-  Injected as system context on every synthesis call.
-  Domain team's must_preserve fields always kept here.
-
-Layer 3: Domain Compaction Schema → Domain Manifest
-  What the domain team declared must never be lost.
-  Gateway injects this as explicit instructions when:
-    a) Building domain-aware conversation summary
-    b) Constructing synthesis prompt after compaction event
+```json
+{
+  "schema_version": "context-envelope.v1",
+  "envelope_id": "env_01J...",
+  "conversation_id": "conv_123",
+  "request_id": "req_456",
+  "created_at": "2026-07-01T21:30:00Z",
+  "manifest_version": "registry-sha256:...",
+  "principal": {
+    "principal_id": "rm_jane",
+    "tenant_id": "default"
+  },
+  "scope": {
+    "domains": ["wealth-management"],
+    "sub_domains": ["private-banking"],
+    "agents": ["acme.wealth.holdings"]
+  },
+  "context": {
+    "entities": {
+      "relationship_id": {
+        "value": "REL-00042",
+        "display": "Whitman Family Office",
+        "source_event_id": "evt_101",
+        "observed_at": "2026-07-01T21:28:10Z"
+      }
+    },
+    "literals": {
+      "period": {
+        "value": "QTD",
+        "source_event_id": "evt_102",
+        "observed_at": "2026-07-01T21:28:10Z"
+      }
+    },
+    "summaries": [
+      {
+        "summary_id": "sum_2026_07_01_001",
+        "domain": "wealth-management",
+        "sub_domain": "private-banking",
+        "text": "The active client context is Whitman Family Office (REL-00042), period QTD.",
+        "token_count": 21,
+        "covers_event_seq": { "from": 1, "to": 36 },
+        "created_at": "2026-07-01T21:29:00Z"
+      }
+    ]
+  },
+  "authorization_observations": [
+    {
+      "resource_key": "relationship_id",
+      "resource_id": "REL-00042",
+      "verdict": "allow",
+      "checked_at": "2026-07-01T21:28:11Z",
+      "expires_at": "2026-07-01T21:28:41Z",
+      "source_event_id": "evt_103"
+    }
+  ],
+  "ledger": {
+    "last_event_seq": 36,
+    "last_compaction_seq": 24,
+    "watermark": "ledger:conv_123:36"
+  }
+}
 ```
 
-**Domain-aware summary vs generic summary:**
-
-Generic (LibreChat default):
-```
-"The user asked about portfolio performance and received information about allocations."
-```
-→ relationship_id lost, time period lost, next turn re-extracts from scratch
-
-Domain-aware (gateway using must_preserve schema):
-```
-"User is asking about Jane Whitman (REL-00042), Q3 2024 portfolio in wealth-management domain.
- RM access verified this session. Prior discussion covered equity allocation (67%) and bond exposure."
-```
-→ All critical context preserved, no re-extraction needed
+Important: `authorization_observations` are continuity hints only. The gateway must still perform
+the live coverage/Cerbos checks required by the manifests. Session or memory state is never an
+authorization proof.
 
 ---
 
-## Request Lifecycle — Full Picture With These Layers
+## Runtime Event Contract
 
+The gateway emits append-only events. The memory service stores them in the ledger and decides
+when to compact.
+
+Required event shell:
+
+```json
+{
+  "schema_version": "memory-ledger-event.v1",
+  "event_id": "evt_103",
+  "event_seq": 12,
+  "conversation_id": "conv_123",
+  "request_id": "req_456",
+  "type": "gateway.coverage_checked",
+  "occurred_at": "2026-07-01T21:28:11Z",
+  "source": "conduit-gateway",
+  "manifest_refs": {
+    "domain": "wealth-management",
+    "sub_domain": "private-banking",
+    "agent_id": null
+  },
+  "payload": {
+    "resource_key": "relationship_id",
+    "resource_id": "REL-00042",
+    "verdict": "allow",
+    "expires_at": "2026-07-01T21:28:41Z"
+  }
+}
 ```
-Turn N request arrives
-        │
-        ▼
-1.  JWT validation
-        │
-        ▼
-2.  Load session context (Redis)
-    → established entities, auth cache, workflow state
-        │
-        ▼
-3.  Gateway intent resolver
-    → which domains + agents are relevant?
-        │
-        ▼
-4.  Structural authz (Cerbos)
-    → can this role invoke this agent class?
-        │
-        ▼
-5.  Domain prerequisite validator  ← NEW LAYER
-    For each matched domain:
-      a. Check required_context against session context
-      b. If satisfied → check authorization_cache
-         - Cache hit + not expired → proceed
-         - Cache miss → call authorization_contract API → cache result
-      c. If context missing → run domain workflow
-         (clarify → resolve → authorize → proceed or deny)
-        │
-        ▼
-6.  Entity extraction (Extract-Resolve-Bind)
-        │
-        ▼
-7.  Fan-out to authorized agents
-        │
-        ▼
-8.  Synthesis
-    → inject session context as system context
-    → inject domain must_preserve fields that are established
-        │
-        ▼
-9.  Update session context
-    → store any newly resolved entities
-    → update authorization cache
-    → update workflow state
-        │
-        ▼
-10. Stream response
-```
+
+Initial event types:
+
+| Event Type | Emitted When | Memory Use |
+|---|---|---|
+| `gateway.request_started` | A turn enters the gateway. | Starts turn boundary and idempotency scope. |
+| `gateway.intent_classified` | Intent and candidate domains are known. | Tags summaries by routed domain. |
+| `gateway.agents_resolved` | Candidate agents are selected. | Records agent manifest refs. |
+| `gateway.entity_extracted` | LLM extraction produces references/literals. | Stores non-authoritative observations. |
+| `gateway.entity_resolved` | Coverage resolver returns canonical IDs. | Updates envelope entity facts. |
+| `gateway.coverage_checked` | Coverage CHECK returns allow/deny. | Records advisory auth observations and TTL. |
+| `gateway.agent_completed` | An agent returns or fails. | Captures outcome metadata and summary-eligible facts. |
+| `gateway.response_completed` | SSE answer completes. | Closes turn and may trigger compaction. |
+| `gateway.compaction_requested` | Gateway detects token/window pressure. | Asks memory service to summarize; gateway does not summarize. |
+| `memory.summary_written` | Memory service writes a governed summary. | Advances ledger watermark. |
+
+Payloads are event-specific and may contain domain keys, but the event shell is stable.
 
 ---
 
-## Workflow Step Types (Gateway Interprets These)
+## Memory Service API Boundary
 
-The gateway has a small interpreter. Domain teams use these step types:
+The first implementation should live outside the gateway as its own service. The exact runtime
+stack can be chosen later; this lane only defines the contract.
 
-```
-clarify       Ask the user a question. Wait for response. Store result.
-resolve_entity Convert a human name/reference to a canonical ID using entity_registry.
-authorize     Call the domain's authorization_contract. On deny → respond with message.
-set_context   Explicitly set a context field to a value.
-proceed       All prerequisites met. Continue to agent fan-out.
-deny          Stop here. Respond with message. Do not invoke agents.
-```
+| Method | Path | Owner | Purpose |
+|---|---|---|---|
+| `POST` | `/v1/envelopes/resolve` | Memory service | Given conversation, request, principal, and manifest version, return the current context envelope. |
+| `POST` | `/v1/events` | Memory service | Append one gateway runtime event idempotently. |
+| `POST` | `/v1/compactions` | Memory service | Force or schedule compaction for a conversation range. |
+| `GET` | `/v1/conversations/{conversation_id}/ledger` | Memory service | Audit/replay endpoint for operators, not request path. |
 
-These are simple enough that no workflow engine is needed.
-The gateway's DomainWorkflowInterpreter processes them step by step.
-State is maintained in the session context between turns.
+The gateway request path only needs `resolve envelope` and `append event`. Audit/replay stays out
+of gateway code.
 
 ---
 
-## What Domain Teams Provide at Onboarding
+## Request Lifecycle
 
-1. Agent manifests (already exists)
-2. Domain manifest (required_context, authorization_contract, workflows, memory_compaction)
-3. Entity resolver registration (how to resolve "Jane Whitman" → REL-00042 in their system)
-4. Optional: authorization contract implementation (if it's not a simple HTTP GET)
+```
+Turn N arrives
+  |
+  | 1. Gateway validates identity and loads manifest refs
+  v
+Gateway -> Memory Service: POST /v1/envelopes/resolve
+  |
+  | 2. Memory service returns compact Context Envelope V1
+  v
+Gateway uses envelope as generic context
+  |
+  | 3. Gateway performs manifest-driven extraction, resolution, CHECK, fan-out, synthesis
+  |    The envelope can pre-fill context, but it cannot skip required authorization.
+  v
+Gateway -> Memory Service: POST /v1/events after each pipeline event
+  |
+  | 4. Memory service appends ledger entries
+  | 5. If compaction is due, memory service summarizes using domain memory_compaction policy
+  | 6. Memory service writes memory.summary_written and advances watermark
+  v
+Next turn receives a newer envelope
+```
 
-Gateway team provides: the interpreter, the session store, the synthesis injection.
-Domain team provides: the knowledge of what matters in their domain.
+The gateway can proceed if event append is transiently unavailable only if the product explicitly
+allows a degraded "no memory update" mode. It must never proceed on stale authorization if the
+coverage service itself is unavailable.
 
 ---
 
-## Build Order (After User-Mgmt Refactor)
+## Compaction Rules
 
-1. Domain manifest schema extension (add required_context, authorization_contract, workflows, memory_compaction)
-2. Session context store (Redis, with TTL and eviction on mutation events)
-3. Authorization contract HTTP adapter (generic URL template → GET → parse allow_field)
-4. Domain prerequisite validator (runs at step 5 in the lifecycle)
-5. Workflow interpreter (simple step-by-step, no engine needed)
-6. Memory compaction injection (synthesis prompt enhancement with must_preserve fields)
-7. LibreChat compaction config (summarize: true + custom summarization prompt using schema)
+The memory service compactor must:
+
+1. Read `memory_compaction` from the relevant domain manifests.
+2. Use sub-domain `entity_types` and `required_context` to classify facts.
+3. Use agent manifests to attach `agent_id`, `domain`, `sub_domain`, and data classification.
+4. Include only runtime event payload fields allowed by `include_runtime_events`.
+5. Preserve every available `must_preserve` field.
+6. Exclude `can_drop` and `redact_fields` payload fields from summaries.
+7. Write an append-only `memory.summary_written` ledger event with the covered event range.
+
+The compactor summarizes agent outputs as facts already observed by the gateway. Agent outputs
+remain untrusted DATA, not instructions.
+
+---
+
+## Build Order
+
+1. Registry schemas for domain manifests, sub-domain manifests, context envelopes, and ledger events.
+2. Registry validation tests that cross-check domain/sub-domain/agent references.
+3. Memory service API contract and storage design.
+4. Gateway adapter that calls `/v1/envelopes/resolve` and `/v1/events` behind an interface.
+5. Compactor implementation in the memory service.
+6. Replay/audit tooling for compaction ledger inspection.
+
+This lane covers steps 1 and 2 plus the design contract for step 3.
+
+---
+
+## What Must Not Happen
+
+```
+No domain-specific compaction code in gateway Java.
+No gateway-owned summary prompt per business domain.
+No memory service authorization shortcuts.
+No summaries built from raw agent output without manifest governance.
+No use of session state or memory state as proof of access.
+No domain onboarding that requires changing gateway Java.
+```

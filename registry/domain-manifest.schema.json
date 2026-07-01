@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://conduit.dev/schemas/domain-manifest.schema.json",
+  "title": "Conduit Domain Manifest",
+  "description": "Contract for registry/domains/<domain>.json. Domain teams declare coverage endpoints and governed memory policy. The gateway interprets this generically; compaction is owned by the external memory service.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["domain_id", "display_name", "memory_compaction"],
+  "properties": {
+    "domain_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "display_name": { "type": "string", "minLength": 1 },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["discover_url", "check_url", "resolve_url"],
+      "properties": {
+        "discover_url": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Template URL for DISCOVER. Must include {principal_id} when used by a resource-scoped sub-domain."
+        },
+        "check_url": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Template URL for CHECK. Must include {principal_id} and {id} when used by a resource-scoped sub-domain."
+        },
+        "resolve_url": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Template URL for RESOLVE."
+        },
+        "cache_ttl_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600,
+          "default": 30
+        }
+      }
+    },
+    "memory_compaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["envelope_version", "must_preserve", "summary_policy"],
+      "properties": {
+        "envelope_version": {
+          "type": "string",
+          "enum": ["context-envelope.v1"]
+        },
+        "must_preserve": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Manifest-declared fact keys or labels the memory service must preserve."
+        },
+        "can_drop": {
+          "type": "array",
+          "default": [],
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Payload fields safe to omit from governed summaries."
+        },
+        "summary_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["owner", "max_summary_tokens", "ledger_retention_days", "include_runtime_events"],
+          "properties": {
+            "owner": {
+              "type": "string",
+              "const": "memory-service",
+              "description": "Compaction ownership must remain outside the gateway."
+            },
+            "max_summary_tokens": {
+              "type": "integer",
+              "minimum": 64,
+              "maximum": 4000
+            },
+            "refresh_after_turns": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "ledger_retention_days": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3650
+            },
+            "include_runtime_events": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string", "pattern": "^(gateway|memory)\\.[a-z0-9_]+$" }
+            },
+            "redact_fields": {
+              "type": "array",
+              "default": [],
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    }
+  }
+}

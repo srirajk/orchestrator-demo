@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://conduit.dev/schemas/memory-ledger-event.schema.json",
+  "title": "Conduit Memory Ledger Event",
+  "description": "Append-only event shell emitted by the gateway and memory service. Payloads stay flexible so domain facts remain manifest/runtime data, not gateway code.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_id",
+    "event_seq",
+    "conversation_id",
+    "request_id",
+    "type",
+    "occurred_at",
+    "source",
+    "manifest_refs",
+    "payload"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "memory-ledger-event.v1" },
+    "event_id": { "type": "string", "minLength": 1 },
+    "event_seq": { "type": "integer", "minimum": 0 },
+    "conversation_id": { "type": "string", "minLength": 1 },
+    "request_id": { "type": "string", "minLength": 1 },
+    "type": {
+      "type": "string",
+      "enum": [
+        "gateway.request_started",
+        "gateway.intent_classified",
+        "gateway.agents_resolved",
+        "gateway.entity_extracted",
+        "gateway.entity_resolved",
+        "gateway.coverage_checked",
+        "gateway.agent_completed",
+        "gateway.response_completed",
+        "gateway.compaction_requested",
+        "memory.summary_written"
+      ]
+    },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "source": { "type": "string", "enum": ["conduit-gateway", "memory-service"] },
+    "manifest_refs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domain", "sub_domain", "agent_id"],
+      "properties": {
+        "domain": { "type": ["string", "null"] },
+        "sub_domain": { "type": ["string", "null"] },
+        "agent_id": { "type": ["string", "null"] }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "previous_event_hash": { "type": "string", "minLength": 1 },
+    "payload_sha256": { "type": "string", "minLength": 64, "maxLength": 64 }
+  }
+}

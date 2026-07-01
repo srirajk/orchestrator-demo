@@ -1489,3 +1489,9 @@
 | 17:14 | Created ../../.claude/projects/-Users-srirajkadimisetty-projects-orchestrator-demo/memory/feedback_observability_standard.md | — | ~368 |
 | 17:34 | Created Conduit Workbench/Axiom control-plane implementation contract for parallel lanes | docs/CONDUIT-WORKBENCH-PLAN.md, .wolf/anatomy.md | plan added; anatomy updated | ~1900 |
 | 17:36 | Added merge protocol and reviewer stance for parallel lane integration | docs/CONDUIT-WORKBENCH-PLAN.md | review bar hardened | ~350 |
+| 17:33 | Read OpenWolf instructions, anatomy/cerebrum, verified worktree branch | .wolf/OPENWOLF.md, .wolf/anatomy.md, .wolf/cerebrum.md | branch codex-governed-memory, clean worktree; use non-login shell to avoid jenv sandbox noise | ~12400 |
+| 17:44 | Designed governed memory boundary and manifest contract updates | docs/domain-manifest-and-memory.md, docs/domain-onboarding-standard.md, registry/README.md | gateway limited to context-envelope IO and runtime events; memory service owns ledger/summaries | ~7200 |
+| 17:44 | Added registry schemas and updated domain memory policies | registry/*.schema.json, registry/domains/*.json, agent-manifest.schema.json | context-envelope.v1 and memory-ledger-event.v1 contracts added; root agent schema aligned with registry | ~6200 |
+| 17:44 | Added and ran registry schema tests | tests/schema/test_registry_contracts.py, registry/manifests/acme.servicing.nav.json | 8 passed; fixed NAV sub_domain drift to corporate-actions | ~5200 |
+| 17:44 | Updated OpenWolf learning logs | .wolf/cerebrum.md, .wolf/buglog.json, .wolf/anatomy.md | recorded governed-memory decision, pytest sandbox gotcha, NAV manifest bug, and new file anatomy | ~2600 |
+| 18:01 | Reviewer follow-up fixed onboarding example drift from time_period to period | docs/domain-onboarding-standard.md | aligns example clarification_schema with current sub-domain entity key | ~250 |

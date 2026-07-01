@@ -37,9 +37,9 @@ It tells the user it cannot proceed and stops. No stale data. No guessing.
 DISCOVER returns options for display. CHECK is the gate. Both must happen.
 A user picking from a DISCOVER list does not skip the CHECK.
 
-**7. Session is continuity. Never authorization proof.**
-Resolved entity IDs are stored in session for multi-turn continuity.
-Authorization is re-checked live (within TTL) on every turn. Session state
+**7. Context is continuity. Never authorization proof.**
+Resolved entity IDs are stored in session/context envelopes for multi-turn continuity.
+Authorization is re-checked live (within TTL) on every turn. Session or memory state
 is never used as proof of access.
 
 ---
@@ -85,8 +85,22 @@ If your sub-domain is role-based (`resource_scoped: false`), item 4 is not requi
   },
 
   "memory_compaction": {
-    "must_preserve": ["relationship_id", "client_name", "time_period", "domain"],
-    "can_drop":      ["raw_agent_outputs", "routing_decisions"]
+    "envelope_version": "context-envelope.v1",
+    "must_preserve": ["relationship_id", "client_name", "period", "domain"],
+    "can_drop": ["raw_agent_outputs", "routing_decisions"],
+    "summary_policy": {
+      "owner": "memory-service",
+      "max_summary_tokens": 600,
+      "refresh_after_turns": 8,
+      "ledger_retention_days": 90,
+      "include_runtime_events": [
+        "gateway.entity_resolved",
+        "gateway.coverage_checked",
+        "gateway.agent_completed",
+        "gateway.response_completed"
+      ],
+      "redact_fields": ["raw_agent_outputs"]
+    }
   }
 }
 ```
@@ -101,8 +115,12 @@ If your sub-domain is role-based (`resource_scoped: false`), item 4 is not requi
 | `coverage.check_url` | if resource_scoped sub-domains exist | Gateway calls this to verify access to a specific resource. Must include `{principal_id}` and `{id}` templates. |
 | `coverage.resolve_url` | if resource_scoped sub-domains exist | Gateway calls this to resolve a human reference to a canonical ID. |
 | `coverage.cache_ttl_seconds` | NO | How long a CHECK result is cached per principal+tenant+entity. Default: 30. |
-| `memory_compaction.must_preserve` | YES | Fields the gateway must inject into any summarization call so multi-turn context survives. |
-| `memory_compaction.can_drop` | NO | Fields safe to omit from summaries. |
+| `memory_compaction.envelope_version` | YES | Context envelope schema version the memory service returns to the gateway. |
+| `memory_compaction.must_preserve` | YES | Fields the memory service must preserve in governed summaries/envelopes. |
+| `memory_compaction.can_drop` | NO | Fields safe for the memory service to omit from summaries. |
+| `memory_compaction.summary_policy.owner` | YES | Must be `memory-service`; the gateway does not own compaction or summary prompts. |
+| `memory_compaction.summary_policy.include_runtime_events` | YES | Gateway event types eligible as summary inputs. |
+| `memory_compaction.summary_policy.ledger_retention_days` | YES | Retention target for the compaction ledger. |
 
 **No coverage block needed for role-based domains (e.g. asset-servicing).**
 
@@ -131,7 +149,7 @@ If your sub-domain is role-based (`resource_scoped: false`), item 4 is not requi
       "options_source": "discover",
       "priority":       1
     },
-    "time_period": {
+    "period": {
       "question":       "Which period would you like to review?",
       "options_source": "agent_derived",
       "default":        "most recent quarter",
@@ -353,6 +371,9 @@ TURN ARRIVES
 │
 ├── JWT validated → principal, tenant, roles extracted
 │
+├── Context envelope resolved → gateway calls the external memory service
+│   The envelope may carry prior entities/summaries, but never authorization proof
+│
 ├── Intent classified → FETCH_DATA / FOLLOW_UP / CLARIFY / CHITCHAT
 │
 ├── Agents resolved → vector + BM25 search against example_prompts + capabilities
@@ -394,7 +415,10 @@ TURN ARRIVES
 │   Numeric grounding check: every number must appear in agent output
 │   Missing agents explicitly acknowledged
 │
-├── Update session → relationship_id, client_name, time_period, domain
+├── Emit governed-memory events → entity_resolved, coverage_checked,
+│   agent_completed, response_completed
+│
+├── Memory service owns compaction → ledger append, summaries, envelope watermark
 │
 └── Stream response (OpenAI SSE)
 ```
@@ -413,6 +437,7 @@ The gateway validates the full manifest tree at startup. It refuses to start if 
 □ Every resource_scoped sub_domain has a parent domain with coverage URLs declared
 □ Every required_context field has a corresponding clarification_schema entry
 □ No agent manifests reference unknown capability types
+□ Every domain memory_compaction block declares envelope_version and summary_policy.owner=memory-service
 ```
 
 Broken reference at boot = FAIL FAST with a clear message naming the missing piece.
@@ -433,6 +458,7 @@ These are hard constraints. If you are tempted to add any of these, do not.
 ✗ No fan-out before CHECK passes for resource_scoped sub-domains
 ✗ No agent receiving an entity ID that did not pass CHECK
 ✗ No fabricated IDs — resolve returns ambiguous/not-found → ask user, never guess
+✗ No gateway-owned compaction ledger, domain summary prompt, or domain-specific memory logic
 ```
 
 CI lint rule enforces the first two on every build.

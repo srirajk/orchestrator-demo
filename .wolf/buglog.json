@@ -3358,6 +3358,40 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-07-01T21:47:58Z"
+    },
+    {
+      "id": "bug-208",
+      "timestamp": "2026-07-01T21:44:01Z",
+      "error_message": "python3 -m pytest tests/schema failed during pytest_configure with PermissionError: [Errno 1] Operation not permitted while pytest_rerunfailures tried to bind 127.0.0.1",
+      "file": "tests/schema/test_registry_contracts.py",
+      "root_cause": "The sandbox blocks localhost socket binding during pytest plugin setup; the test suite itself had not collected yet.",
+      "fix": "Reran the same targeted pytest command with approved unsandboxed execution; tests then collected and ran normally.",
+      "tags": [
+        "pytest",
+        "sandbox",
+        "schema-tests",
+        "tooling"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-01T21:44:01Z"
+    },
+    {
+      "id": "bug-209",
+      "timestamp": "2026-07-01T21:44:01Z",
+      "error_message": "test_manifest_cross_references_are_consistent failed: acme.servicing.nav had sub_domain cash-management but was listed under corporate-actions",
+      "file": "registry/manifests/acme.servicing.nav.json",
+      "root_cause": "The agent manifest sub_domain field drifted from the sub-domain manifest membership and existing docs.",
+      "fix": "Changed acme.servicing.nav sub_domain to corporate-actions so agent, sub-domain manifest, and docs agree.",
+      "tags": [
+        "registry",
+        "manifest",
+        "schema-tests",
+        "world-b"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-01T21:44:01Z"
     }
   ]
 }

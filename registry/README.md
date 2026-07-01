@@ -12,7 +12,7 @@
 A business is described top-down in three nested levels:
 
 ```
-DOMAIN            "Insurance"            → which coverage service, display name, memory rules
+DOMAIN            "Insurance"            → which coverage service, display name, governed memory policy
   └─ SUB-DOMAIN   "Claims Servicing"     → entity types, what's required, clarify/denial copy,
        │                                    and the list of agents in this workflow
        └─ AGENT   "Policy Details"       → one capability: how to call it (HTTP/MCP), its skills
@@ -20,6 +20,8 @@ DOMAIN            "Insurance"            → which coverage service, display nam
 
 The gateway reads these at boot, embeds the agents' example prompts for routing, and from then
 on the business "exists" — it routes, resolves, entitles, and answers. No Java was touched.
+Governed memory follows the same rule: the gateway emits runtime events and consumes compact
+context envelopes, while the external memory service owns the compaction ledger and summaries.
 
 ## What each folder/file is
 
@@ -28,6 +30,11 @@ registry/
 ├── agent-manifest.schema.json     ← THE CONTRACT. Every agent manifest must validate against
 │                                     this (pinned, canonical — do not edit it to fit a manifest;
 │                                     fix the manifest).
+├── domain-manifest.schema.json    ← Contract for domains/<domain>.json, including coverage and
+│                                     governed memory policy.
+├── sub-domain-manifest.schema.json← Contract for domains/<domain>/<sub-domain>.json.
+├── context-envelope.schema.json   ← Envelope returned by the memory service to the gateway.
+├── memory-ledger-event.schema.json← Append-only event shell the gateway emits to memory service.
 │
 ├── domains/
 │   ├── <domain>.json              ← DOMAIN manifest — one per business line.
@@ -81,7 +88,24 @@ Say you're adding **Lending**.
     "check_url":    "${LENDING_COVERAGE_URL}/coverage/{principal_id}/resources/{id}",
     "resolve_url":  "${LENDING_COVERAGE_URL}/entities/resolve"
   },
-  "memory_compaction": { "...": "copy from an existing domain to start" }
+  "memory_compaction": {
+    "envelope_version": "context-envelope.v1",
+    "must_preserve": ["loan_id", "borrower_name", "domain"],
+    "can_drop": ["raw_agent_outputs", "routing_decisions"],
+    "summary_policy": {
+      "owner": "memory-service",
+      "max_summary_tokens": 600,
+      "refresh_after_turns": 8,
+      "ledger_retention_days": 90,
+      "include_runtime_events": [
+        "gateway.entity_resolved",
+        "gateway.coverage_checked",
+        "gateway.agent_completed",
+        "gateway.response_completed"
+      ],
+      "redact_fields": ["raw_agent_outputs"]
+    }
+  }
 }
 ```
 
@@ -139,6 +163,7 @@ Say you're adding **Lending**.
 
 **7. Verify:**
 ```bash
+python3 -m pytest tests/schema
 bash ../scripts/world-b-check.sh     # must stay CRITICAL 0 — proves no domain logic leaked into the gateway
 bash ../scripts/verify.sh
 ```

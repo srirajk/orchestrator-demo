@@ -277,8 +277,8 @@
 - `clearance-tiers-and-agent-metadata.md` — Clearance Tiers — Tenant Schema, Agent Metadata & Policy (~2142 tok)
 - `CONDUIT-WORKBENCH-PLAN.md` — Conduit Workbench + Axiom Control Plane Plan (~1861 tok)
 - `DIAGRAM-PROMPTS.md` — Conduit — Diagram Prompts & Generation Guide (~4216 tok)
-- `domain-manifest-and-memory.md` — Domain Manifest + Contextual Memory Architecture (~2480 tok)
-- `domain-onboarding-standard.md` — Domain Onboarding Standard (~4115 tok)
+- `domain-manifest-and-memory.md` — Governed Memory + Context Envelope Architecture (~1745 tok)
+- `domain-onboarding-standard.md` — Domain Onboarding Standard (~3140 tok)
 - `EVAL-EXTRACTION.md` — Eval — Extraction Record (lift into its own project) (~1425 tok)
 - `EVAL-FRAMEWORK.md` — Conduit Eval Framework — an agent-agnostic evaluation worker (~2269 tok)
 - `EVAL-PRODUCT-VISION.md` — Eval — Product Vision (framework + app) (~1004 tok)
@@ -1099,11 +1099,17 @@
 ## registry/
 
 - `agent-manifest.schema.json` (~1714 tok)
-- `README.md` — Project documentation (~1704 tok)
+- `context-envelope.schema.json` — Context envelope returned by the external memory service (~1900 tok)
+- `domain-manifest.schema.json` — Domain manifest contract with governed memory policy (~1200 tok)
+- `memory-ledger-event.schema.json` — Append-only gateway/memory event shell schema (~750 tok)
+- `README.md` — Registry onboarding and governed memory contract guide (~1160 tok)
+- `sub-domain-manifest.schema.json` — Sub-domain manifest contract for entity context and agents (~1050 tok)
 
 ## registry/domains/
 
-- `insurance.json` (~138 tok)
+- `asset-servicing.json` — Asset-servicing domain with memory-service summary policy (~160 tok)
+- `insurance.json` — Insurance domain with coverage URLs and memory-service summary policy (~210 tok)
+- `wealth-management.json` — Wealth domain with coverage URLs and memory-service summary policy (~210 tok)
 
 ## registry/domains/asset-servicing/
 
@@ -1174,6 +1180,11 @@
 - `__init__.py` (~0 tok)
 - `README.md` — Project documentation (~1979 tok)
 - `README.md` — Project documentation (~1980 tok)
+
+## tests/schema/
+
+- `requirements.txt` — Python dependencies for registry schema checks (~8 tok)
+- `test_registry_contracts.py` — Validates registry schemas, manifests, cross-references, context envelope and ledger event examples (~1100 tok)
 
 ## tests/e2e/
 
