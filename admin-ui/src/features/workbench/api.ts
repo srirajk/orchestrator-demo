@@ -5,6 +5,7 @@ import type {
   DomainManifest,
   TraceHealth,
 } from './types'
+import { readAdminToken } from '../../auth/tokenStorage'
 
 const DEFAULT_GATEWAY_BASE = '/gateway-api'
 
@@ -14,9 +15,7 @@ function gatewayBase(): string {
 }
 
 export function gatewayToken(): string {
-  return localStorage.getItem('meridian_admin_token')
-    || localStorage.getItem('conduit_admin_token')
-    || ''
+  return readAdminToken()
 }
 
 export function gatewayAuthHeaders(): Record<string, string> {

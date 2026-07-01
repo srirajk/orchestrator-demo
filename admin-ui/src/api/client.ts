@@ -1,7 +1,9 @@
+import { readAdminToken } from '../auth/tokenStorage'
+
 const BASE = '/api'
 
 function token(): string {
-  return localStorage.getItem('conduit_admin_token') || ''
+  return readAdminToken()
 }
 
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {

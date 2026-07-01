@@ -3481,6 +3481,23 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-07-01T21:54:19Z"
+    },
+    {
+      "id": "bug-216",
+      "timestamp": "2026-07-01T22:14:00Z",
+      "error_message": "Admin UI login stored JWT under meridian_admin_token, but the shared API client read conduit_admin_token, causing authenticated admin API calls to omit Authorization.",
+      "file": "admin-ui/src/api/client.ts, admin-ui/src/hooks/useAuth.tsx",
+      "root_cause": "Token storage key drift between the auth provider and API client.",
+      "fix": "Added admin-ui/src/auth/tokenStorage.ts and wired useAuth, the IAM API client, and Workbench gateway API to the same read/write/clear helpers with legacy key fallback.",
+      "tags": [
+        "admin-ui",
+        "auth",
+        "jwt",
+        "localStorage"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-01T22:14:00Z"
     }
   ]
 }

@@ -33,7 +33,7 @@ export function ChatPanel({
         {messages.length === 0 ? (
           <div className="h-full flex items-center justify-center">
             <div className="text-center max-w-sm">
-              <div className="mx-auto mb-3 h-10 w-10 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center">
+              <div className="mx-auto mb-3 h-10 w-10 rounded-md bg-axiom-50 text-axiom-700 ring-1 ring-axiom-600/10 flex items-center justify-center">
                 <MessageSquare size={18} />
               </div>
               <p className="text-sm font-medium text-slate-800">Ready</p>
@@ -50,7 +50,7 @@ export function ChatPanel({
                 <div className={clsx(
                   'max-w-[82%] rounded-lg px-3 py-2 text-sm shadow-sm border',
                   message.role === 'user'
-                    ? 'bg-brand-600 text-white border-brand-600'
+                    ? 'bg-axiom-900 text-white border-gold-400/50'
                     : message.status === 'error'
                       ? 'bg-red-50 text-red-800 border-red-200'
                       : 'bg-white text-slate-800 border-slate-200',
@@ -62,7 +62,7 @@ export function ChatPanel({
             {isSending && (
               <div className="max-w-[82%] rounded-lg px-3 py-2 text-sm bg-white border border-slate-200 shadow-sm">
                 <div className="flex items-center gap-2 text-slate-500">
-                  <span className="h-2 w-2 rounded-full bg-brand-500 animate-pulse" />
+                  <span className="h-2 w-2 rounded-full bg-gold-500 animate-pulse" />
                   Running
                 </div>
               </div>
@@ -77,7 +77,7 @@ export function ChatPanel({
             value={draft}
             onChange={(event) => onDraftChange(event.target.value)}
             rows={3}
-            className="flex-1 resize-none rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            className="flex-1 resize-none rounded-md border border-line px-3 py-2 text-sm text-ink-900 placeholder:text-slate-400 shadow-sm focus:border-axiom-700 focus:outline-none focus:ring-2 focus:ring-gold-300"
             placeholder="Ask a gateway question"
           />
           <Button type="submit" disabled={!draft.trim()} loading={isSending} className="h-10 px-3">

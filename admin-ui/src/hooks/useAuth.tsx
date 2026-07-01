@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from 'react'
 import type { User } from '../api/client'
+import { clearAdminToken, readAdminToken, writeAdminToken } from '../auth/tokenStorage'
 
 interface AuthCtx {
   user: User | null
@@ -36,20 +37,20 @@ function decodePayload(token: string): User | null {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [token, setToken] = useState(() => localStorage.getItem('meridian_admin_token') || '')
+  const [token, setToken] = useState(() => readAdminToken())
   const [user, setUser] = useState<User | null>(() => {
-    const t = localStorage.getItem('meridian_admin_token')
+    const t = readAdminToken()
     return t ? decodePayload(t) : null
   })
 
   const login = useCallback((t: string, u: User) => {
-    localStorage.setItem('meridian_admin_token', t)
+    writeAdminToken(t)
     setToken(t)
     setUser(u)
   }, [])
 
   const logout = useCallback(() => {
-    localStorage.removeItem('meridian_admin_token')
+    clearAdminToken()
     setToken('')
     setUser(null)
   }, [])

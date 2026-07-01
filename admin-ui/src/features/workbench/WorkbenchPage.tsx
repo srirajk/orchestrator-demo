@@ -39,11 +39,12 @@ export function WorkbenchPage() {
   )
 
   return (
-    <div className="px-6 py-6 max-w-[1500px]">
+    <div className="page-shell max-w-[1500px]">
       <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Conduit Workbench</h1>
-          <p className="text-sm text-slate-500 mt-1">Gateway operations / control plane</p>
+          <p className="page-kicker mb-2">Gateway Operations</p>
+          <h1 className="text-2xl font-semibold text-ink-900">Conduit Workbench</h1>
+          <p className="muted-copy mt-1">Live control plane for chat, traces, coverage, and agent registry state.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Badge color="slate">{user?.username || user?.id || 'principal'}</Badge>

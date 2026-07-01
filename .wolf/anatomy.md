@@ -227,17 +227,6 @@
 - `tsconfig.node.json` (~61 tok)
 - `vite.config.ts` (~96 tok)
 
-## admin-ui/.wolf/
-
-- `memory.md` — OpenWolf DesignQC local memory (~40 tok)
-
-## admin-ui/.wolf/designqc-captures/
-
-- `login_desktop_top.jpg` — DesignQC screenshot: login desktop top viewport (~image)
-- `login_mobile_top.jpg` — DesignQC screenshot: login mobile top viewport (~image)
-- `root_desktop_top.jpg` — DesignQC screenshot: unauthenticated root desktop redirect (~image)
-- `root_mobile_top.jpg` — DesignQC screenshot: unauthenticated root mobile redirect (~image)
-
 ## admin-ui/src/
 
 - `App.tsx` — Protected (~423 tok)
@@ -248,6 +237,10 @@
 ## admin-ui/src/api/
 
 - `client.ts` — Exports authApi, User, AuditEntry, PageResponse + 16 more (~1988 tok)
+
+## admin-ui/src/auth/
+
+- `tokenStorage.ts` — Canonical admin JWT localStorage helper with legacy key fallback (~120 tok)
 
 ## admin-ui/src/components/
 
