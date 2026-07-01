@@ -13,9 +13,9 @@ from agents import Agent
 from openinference.instrumentation.openai_agents import OpenAIAgentsInstrumentor
 
 # Service-level fallback defaults — used when a per-agent override is not set.
-LLM_BASE_URL  = os.environ.get("SERVICING_AGENT_LLM_BASE_URL", "https://api.openai.com/v1")
+LLM_BASE_URL  = os.environ.get("SERVICING_AGENT_LLM_BASE_URL", "https://api.z.ai/api/paas/v4")
 LLM_API_KEY   = os.environ.get("SERVICING_AGENT_LLM_API_KEY") or "not-configured"
-LLM_MODEL     = os.environ.get("SERVICING_AGENT_LLM_MODEL", "gpt-4o-mini")
+LLM_MODEL     = os.environ.get("SERVICING_AGENT_LLM_MODEL", "glm-4.5-flash")
 LLM_TIMEOUT_S = int(os.environ.get("SERVICING_AGENT_LLM_TIMEOUT_S", "30"))
 
 agents.set_default_openai_api("chat_completions")

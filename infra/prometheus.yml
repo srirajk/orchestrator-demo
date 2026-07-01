@@ -3,7 +3,7 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
-  - job_name: meridian-gateway
+  - job_name: conduit-gateway
     metrics_path: /actuator/prometheus
     static_configs:
       - targets: ["gateway:8080"]
@@ -15,3 +15,7 @@ scrape_configs:
   - job_name: prometheus
     static_configs:
       - targets: ["localhost:9090"]
+
+  - job_name: cadvisor
+    static_configs:
+      - targets: ["cadvisor:8080"]

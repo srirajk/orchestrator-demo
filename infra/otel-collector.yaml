@@ -29,6 +29,19 @@ processors:
         - 'IsMatch(name, "http get /actuator.*")'
         - 'IsMatch(name, "http head /actuator.*")'
         - 'IsMatch(name, "HEAD /actuator.*")'
+        # Also drop plain /health + /metrics probes (FastAPI agents & others use /health,
+        # not /actuator/health) — these were still flooding Langfuse as "GET /health".
+        - 'IsMatch(attributes["http.route"], "/health.*")'
+        - 'IsMatch(attributes["http.target"], "/health.*")'
+        - 'IsMatch(attributes["url.path"], "/health.*")'
+        - 'IsMatch(name, "GET /health.*")'
+        - 'IsMatch(name, "HEAD /health.*")'
+        - 'IsMatch(name, "GET /metrics.*")'
+        - 'IsMatch(name, "GET /$")'
+        # Drop orphaned Spring Security filter-chain spans. Their parent HTTP server span
+        # (GET /health, /actuator/*) is dropped above, so these leaked into Langfuse as
+        # parentless, empty-named ("∅") traces.
+        - 'IsMatch(name, "^(security filterchain (before|after)|secured request|authorize request)$")'
 
 exporters:
   # Traces → Tempo (gRPC) — full distributed trace picture incl. actuators
@@ -49,8 +62,9 @@ exporters:
   # Metrics → Prometheus (scraped from :8889/metrics)
   prometheus:
     endpoint: "0.0.0.0:8889"
-    namespace: meridian
+    namespace: conduit
 
+  # Logs → debug only (Promtail handles Docker→Loki log shipping directly)
   debug:
     verbosity: basic
 
@@ -72,3 +86,8 @@ service:
       receivers: [otlp]
       processors: [batch, resource]
       exporters: [prometheus]
+
+    logs:
+      receivers: [otlp]
+      processors: [batch, resource]
+      exporters: [debug]

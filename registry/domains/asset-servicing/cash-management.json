@@ -1,0 +1,40 @@
+{
+  "sub_domain_id": "cash-management",
+  "display_name": "Cash Management",
+  "parent_domain": "asset-servicing",
+  "resource_scoped": false,
+
+  "entity_types": [
+    {
+      "key": "fund_id",
+      "extract_as": "fund_reference",
+      "kind": "resolvable",
+      "display": "fund or portfolio",
+      "id_pattern": "FND-\\w+",
+      "resolve_type": "fund",
+      "required": false
+    },
+    {
+      "key": "account_id",
+      "extract_as": "account_id",
+      "kind": "literal",
+      "display": "cash account",
+      "id_pattern": "ACCT-\\w+",
+      "required": false
+    },
+    {
+      "key": "currency",
+      "extract_as": "currency",
+      "kind": "literal",
+      "display": "currency",
+      "id_pattern": "[A-Z]{3}",
+      "required": false
+    }
+  ],
+
+  "required_context": [],
+
+  "agents": [
+    "acme.servicing.cash_management"
+  ]
+}

@@ -5,4 +5,13 @@ storage:
   driver: disk
   disk:
     directory: /conf/policies
-    watchForChanges: false
+    watchForChanges: true
+audit:
+  enabled: true
+  backend: file
+  file:
+    path: /var/log/cerbos/audit.log
+  accessLogsEnabled: true
+  decisionLogFilters:
+    checkResources:
+      ignoreAllowAll: false

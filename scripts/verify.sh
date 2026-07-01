@@ -7,7 +7,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 echo ""
 echo "═══════════════════════════════════════════════════════════════════════"
-echo "  Meridian Gateway — Verify Script"
+echo "  Conduit Gateway — Verify Script"
 echo "═══════════════════════════════════════════════════════════════════════"
 
 # ── Phase 1: unit tests ───────────────────────────────────────────────────────
@@ -30,13 +30,13 @@ echo "▶  [3/3] API smoke tests..."
 
 # /v1/models
 MODELS=$(curl -sf http://localhost:8080/v1/models)
-echo "$MODELS" | grep -q '"id":"meridian-assistant"'
-echo "   ✅  GET /v1/models → meridian-assistant found"
+echo "$MODELS" | grep -q '"id":"conduit-assistant"'
+echo "   ✅  GET /v1/models → conduit-assistant found"
 
 # /v1/chat/completions — check SSE stream contains [DONE]
 STREAM=$(curl -sf -X POST http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -d '{"model":"meridian-assistant","messages":[{"role":"user","content":"hello"}],"stream":true}' \
+  -d '{"model":"conduit-assistant","messages":[{"role":"user","content":"hello"}],"stream":true}' \
   --max-time 15)
 
 echo "$STREAM" | grep -q '\[DONE\]'
@@ -44,6 +44,23 @@ echo "   ✅  POST /v1/chat/completions → SSE stream contains [DONE]"
 
 echo "$STREAM" | grep -q '"chat.completion.chunk"'
 echo "   ✅  POST /v1/chat/completions → chunks have correct object type"
+
+# ── World B gate: the gateway must carry zero domain knowledge ───────────────
+# Hard gate (the refactor reached CRITICAL 0). Fails the build if any domain
+# name / client name / entity-field literal / REL-/FND- pattern / domain copy
+# re-enters gateway/src/main/java. See docs/WORLD-B-LOCKDOWN.md.
+echo ""
+echo "▶  [world-b] checking the gateway carries no domain knowledge..."
+"$ROOT/scripts/world-b-check.sh" --quiet
+echo "   ✅  World B clean — no domain knowledge in the gateway."
+
+# ── Optional: eval release gate (set RUN_EVAL=1 to include) ──────────────────
+if [[ "${RUN_EVAL:-0}" == "1" ]]; then
+  echo ""
+  echo "▶  [eval] RUN_EVAL=1 — running the eval release gate..."
+  "$ROOT/scripts/eval-gate.sh"
+  echo "   ✅  Eval gate passed."
+fi
 
 echo ""
 echo "═══════════════════════════════════════════════════════════════════════"

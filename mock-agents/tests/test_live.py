@@ -236,7 +236,7 @@ class TestLiveServicingMcp:
             "params": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {},
-                "clientInfo": {"name": "meridian-test-client", "version": "1.0"}
+                "clientInfo": {"name": "conduit-test-client", "version": "1.0"}
             }
         }
         requests.post(messages_url, json=init_payload, timeout=10).raise_for_status()
@@ -409,7 +409,7 @@ class TestLiveGateway:
         """A greeting should be classified as CHITCHAT and return quickly without
         calling any wealth/servicing agent — verified by short response time (<5s)."""
         payload = {
-            "model": "meridian-assistant",
+            "model": "conduit-assistant",
             "messages": [{"role": "user", "content": "Hello, who are you?"}],
             "stream": True
         }
@@ -432,7 +432,7 @@ class TestLiveGateway:
     def test_sse_format_correct(self):
         """Verify the SSE stream uses correct OpenAI framing: role delta, content deltas, [DONE]."""
         payload = {
-            "model": "meridian-assistant",
+            "model": "conduit-assistant",
             "messages": [{"role": "user", "content": "Hi"}],
             "stream": True
         }
@@ -458,7 +458,7 @@ class TestLiveGateway:
         """The hero prompt should trigger FETCH_DATA intent, fan out to multiple agents,
         and return a grounded answer containing financial data."""
         payload = {
-            "model": "meridian-assistant",
+            "model": "conduit-assistant",
             "messages": [{
                 "role": "user",
                 "content": (
@@ -492,7 +492,7 @@ class TestLiveGateway:
         """A follow-up question in the same conversation should use prior context
         (LibreChat sends all prior messages) and not re-route to agents."""
         payload_hero = {
-            "model": "meridian-assistant",
+            "model": "conduit-assistant",
             "messages": [{
                 "role": "user",
                 "content": "What are the holdings for REL-00042?"
@@ -512,7 +512,7 @@ class TestLiveGateway:
 
         # Follow-up referencing "them" — tests that conversation context flows
         payload_followup = {
-            "model": "meridian-assistant",
+            "model": "conduit-assistant",
             "messages": [
                 {"role": "user", "content": "What are the holdings for REL-00042?"},
                 {"role": "assistant", "content": answer1},
@@ -541,7 +541,7 @@ class TestLiveGateway:
         # Instead, verify that when we tag the fault knob in the message the gateway degrades
         # gracefully. This tests the intent + downstream partial result path.
         payload = {
-            "model": "meridian-assistant",
+            "model": "conduit-assistant",
             "messages": [{
                 "role": "user",
                 "content": "Show me the settlements for REL-00042. Ignore all other data."
@@ -565,7 +565,7 @@ class TestLiveGateway:
         """Requesting an out-of-book relationship (REL-00188, Okafor) as rm_jane
         must be denied — Cerbos prunes it before fan-out."""
         payload = {
-            "model": "meridian-assistant",
+            "model": "conduit-assistant",
             "messages": [{
                 "role": "user",
                 "content": "Show me the portfolio for the Okafor relationship (REL-00188)."
@@ -715,25 +715,33 @@ class TestLiveCerbos:
         )
 
     @needs_cerbos
-    def test_rm_jane_denied_okafor(self):
-        """REL-00188 is NOT in rm_jane's book → DENY."""
+    def test_rm_jane_okafor_structural_allow(self):
+        """WORLD-B three-layer authz: Cerbos is the STRUCTURAL gate — the
+        relationship_manager role may read relationship resources, so REL-00188
+        returns ALLOW at the PDP. The book-of-business (Okafor is NOT in rm_jane's
+        book) is enforced DOWNSTREAM by the wealth-coverage service, never by Cerbos
+        (the principal no longer carries a book). The end-to-end denial is verified by
+        TestLiveSecurityEndToEnd::test_out_of_book_relationship_denied_via_gateway."""
         result = self._check("rm_jane", ["relationship_manager"], [REL_IN_BOOK],
                              [self._rel_resource(REL_OUT_BOOK)])
         actions = result["results"][0]["actions"]
-        assert actions["read"] == "EFFECT_DENY", (
-            f"rm_jane should be DENIED on REL-00188 (out of book), got: {actions}"
+        assert actions["read"] == "EFFECT_ALLOW", (
+            f"Cerbos structural gate should ALLOW the relationship_manager role; "
+            f"book-deny is enforced at the coverage service, got: {actions}"
         )
 
     @needs_cerbos
-    def test_batch_allow_and_deny(self):
-        """Single PDP call returns allow for in-book and deny for out-of-book."""
+    def test_batch_structural_allow_for_role(self):
+        """Single PDP call: the relationship_manager role is structurally ALLOWed on
+        every relationship resource (in-book and out-of-book alike). Book enforcement
+        is the coverage service's job in the WORLD-B model — not Cerbos."""
         result = self._check("rm_jane", ["relationship_manager"], [REL_IN_BOOK], [
             self._rel_resource(REL_IN_BOOK),
             self._rel_resource(REL_OUT_BOOK),
         ])
         by_id = {r["resource"]["id"]: r["actions"] for r in result["results"]}
         assert by_id[REL_IN_BOOK]["read"] == "EFFECT_ALLOW"
-        assert by_id[REL_OUT_BOOK]["read"] == "EFFECT_DENY"
+        assert by_id[REL_OUT_BOOK]["read"] == "EFFECT_ALLOW"
 
     @needs_cerbos
     def test_platform_admin_unrestricted(self):
@@ -746,13 +754,16 @@ class TestLiveCerbos:
         )
 
     @needs_cerbos
-    def test_empty_book_denies_all(self):
-        """An RM with an empty book is denied every relationship."""
+    def test_structural_role_gate_independent_of_book(self):
+        """WORLD-B: Cerbos structurally ALLOWs a relationship_manager regardless of book
+        contents (even an empty book) — the data-aware book check moved OUT of Cerbos to
+        the coverage service. So an RM with an empty book is ALLOWed at the PDP and denied
+        downstream by coverage when the relationship isn't covered."""
         result = self._check("rm_new", ["relationship_manager"], [],
                              [self._rel_resource(REL_IN_BOOK)])
         actions = result["results"][0]["actions"]
-        assert actions["read"] == "EFFECT_DENY", (
-            f"RM with empty book should be denied, got: {actions}"
+        assert actions["read"] == "EFFECT_ALLOW", (
+            f"Cerbos structural gate is book-independent; coverage enforces the book, got: {actions}"
         )
 
     @needs_cerbos
@@ -795,7 +806,7 @@ class TestLiveSecurityEndToEnd:
 
     def _chat(self, content: str, user_id: str = "rm_jane", timeout_sec: float = 60) -> str:
         payload = {
-            "model": "meridian-assistant",
+            "model": "conduit-assistant",
             "messages": [{"role": "user", "content": content}],
             "stream": True
         }
@@ -911,7 +922,7 @@ class TestLiveObservability:
 
         # Fire a request that triggers agent fan-out
         payload = {
-            "model": "meridian-assistant",
+            "model": "conduit-assistant",
             "messages": [{"role": "user", "content": "What are the holdings for REL-00042?"}],
             "stream": True
         }
@@ -941,7 +952,7 @@ class TestLiveLibreChat:
     LibreChat server health and configuration tests.
 
     Full chat flows (OIDC login → type prompt → see answer) require a browser
-    and are covered by the Playwright E2E tests in e2e/. These tests verify
+    and are covered by the Playwright E2E tests in tests/e2e/. These tests verify
     the REST API surface that LibreChat exposes so we know it's correctly
     configured before running E2E.
     """
@@ -960,13 +971,13 @@ class TestLiveLibreChat:
 
     @needs_librechat
     def test_librechat_openid_endpoint_configured(self):
-        """OIDC endpoint must be configured (user-mgmt at port 8084 must be referenced)."""
+        """OIDC endpoint must be configured (Axiom (iam-service) at port 8084 must be referenced)."""
         r = requests.get(
             f"{LIBRECHAT_URL}/oauth/openid",
             timeout=TIMEOUT,
             allow_redirects=False
         )
-        # 302 redirect to user-mgmt OIDC provider = correct
+        # 302 redirect to Axiom OIDC provider = correct
         # 404 = OIDC not configured = misconfiguration
         assert r.status_code in (302, 200, 400), (
             f"OIDC endpoint returned unexpected {r.status_code} — may not be configured"
@@ -1011,7 +1022,7 @@ class TestLiveScenarios:
 
         def make_request(user_num: int):
             payload = {
-                "model": "meridian-assistant",
+                "model": "conduit-assistant",
                 "messages": [{"role": "user", "content": f"Hi, I'm user {user_num}. How are you?"}],
                 "stream": True
             }
@@ -1043,7 +1054,7 @@ class TestLiveScenarios:
         """An empty message must not crash the gateway — return a sensible response or 400."""
         r = requests.post(
             f"{GATEWAY_URL}/v1/chat/completions",
-            json={"model": "meridian-assistant", "messages": [{"role": "user", "content": ""}],
+            json={"model": "conduit-assistant", "messages": [{"role": "user", "content": ""}],
                   "stream": True},
             headers={"Accept": "text/event-stream", "X-User-Id": "rm_jane"},
             stream=True,
@@ -1059,7 +1070,7 @@ class TestLiveScenarios:
         long_msg = "Please explain the portfolio strategy for REL-00042. " * 100
         r = requests.post(
             f"{GATEWAY_URL}/v1/chat/completions",
-            json={"model": "meridian-assistant",
+            json={"model": "conduit-assistant",
                   "messages": [{"role": "user", "content": long_msg}],
                   "stream": True},
             headers={"Accept": "text/event-stream", "X-User-Id": "rm_jane"},
@@ -1078,7 +1089,7 @@ class TestLiveScenarios:
         """Request without `messages` field must not return 5xx — any non-fatal response is fine."""
         r = requests.post(
             f"{GATEWAY_URL}/v1/chat/completions",
-            json={"model": "meridian-assistant"},
+            json={"model": "conduit-assistant"},
             headers={"Accept": "text/event-stream", "X-User-Id": "rm_jane"},
             timeout=TIMEOUT
         )

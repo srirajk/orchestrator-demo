@@ -1,0 +1,7 @@
+# Meridian eval dependencies
+# Install on dev/CI machine — not part of gateway runtime
+
+deepeval>=0.21.0
+langfuse>=2.0.0
+opentelemetry-sdk>=1.20.0
+httpx>=0.25.0

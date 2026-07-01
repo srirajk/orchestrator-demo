@@ -6,6 +6,7 @@ import asyncio
 import concurrent.futures
 from agents import Runner, function_tool, InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered
 from shared.canned_data import NAV
+from shared.error_schema import mcp_error_json
 from shared.fault_knobs import maybe_fault
 from shared.telemetry import agent_span
 from shared.agent_client import make_agent, LLM_MODEL, LLM_TIMEOUT_S
@@ -63,7 +64,7 @@ def get_nav(fund_id: str) -> str:
         data = NAV.get(fund_id)
         if data is None:
             span.set_attribute("error", True)
-            return json.dumps({"error": f"Fund '{fund_id}' not found. Known funds: {list(NAV)}"})
+            return mcp_error_json(f"Fund '{fund_id}' not found. Known funds: {list(NAV)}", AGENT_ID, 404)
         span.set_attribute("result.nav_per_unit", data.get("nav", 0))
         span.set_attribute("result.total_aum", data.get("aum", 0))
         try:
@@ -78,4 +79,4 @@ def get_nav(fund_id: str) -> str:
             return json.dumps({**data, "agent_narrative": narrative})
         except Exception as exc:
             log.error("Agent LLM call failed for %s: %s", fund_id, exc)
-            return json.dumps({"error": f"llm_unavailable: {type(exc).__name__}", "agent_id": AGENT_ID})
+            return mcp_error_json(f"llm_unavailable: {type(exc).__name__}", AGENT_ID, 503)

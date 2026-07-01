@@ -44,7 +44,7 @@ DeepEval itself does not yet natively push to Phoenix, but each test case genera
 an LLM call (the judge call) that can be observed in Phoenix if you configure the
 eval script's OpenAI client to route through the OTel collector:
   OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
-  OTEL_SERVICE_NAME=meridian-eval
+  OTEL_SERVICE_NAME=conduit-eval
 """
 
 import os
@@ -69,6 +69,25 @@ from deepeval.metrics import (
 
 WEALTH_URL = os.environ.get("WEALTH_AGENT_URL", "http://localhost:8081")
 EVAL_MODEL = os.environ.get("EVAL_JUDGE_MODEL", "glm-4.6")
+
+# ── Servicing tool imports (direct — no HTTP, avoids MCP protocol overhead) ──
+# Add servicing path before importing so shared/ resolves to servicing/shared/.
+# The wealth eval classes use HTTP (no Python imports), so there is no
+# shared/ namespace collision here.
+_SERVICING_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../mock-agents/servicing")
+if _SERVICING_PATH not in sys.path:
+    sys.path.insert(0, _SERVICING_PATH)
+
+_SERVICING_AVAILABLE = False
+try:
+    from custody.tool import get_custody_positions as _tool_custody
+    from settlements.tool import get_settlements as _tool_settlements
+    from corporate_actions.tool import get_corporate_actions as _tool_corporate_actions
+    from nav.tool import get_nav as _tool_nav
+    from cash.tool import get_cash as _tool_cash
+    _SERVICING_AVAILABLE = True
+except ImportError:
+    pass  # servicing deps not installed; servicing eval classes will be skipped
 
 # ── Faithfulness threshold: narrative must be 70%+ grounded in tool data ─────
 FAITHFULNESS_THRESHOLD = 0.7
@@ -247,6 +266,155 @@ class TestInputGuardrails:
         )
         # 404 from canned data lookup, or 422 from guardrail
         assert r.status_code in (404, 422), f"Expected 404 or 422, got {r.status_code}"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SERVICING MCP AGENT EVAL TESTS
+# ─────────────────────────────────────────────────────────────────────────────
+# These classes call the 5 servicing tool functions directly (no MCP protocol
+# overhead). Each class:
+#   • Skips entirely if the servicing imports failed (_SERVICING_AVAILABLE=False).
+#   • Skips per-test if no agent_narrative is returned — this happens when
+#     ZAI_API_KEY is absent or the LLM call fails, matching the wealth pattern.
+# ─────────────────────────────────────────────────────────────────────────────
+
+@pytest.mark.skipif(not _SERVICING_AVAILABLE, reason="servicing tool imports unavailable")
+class TestCustodyAgent:
+    """
+    Evaluates: acme.servicing.custody_positions
+    Ground truth: canned data for REL-00042 (Whitman) — the demo relationship.
+    """
+
+    @pytest.mark.parametrize("relationship_id", ["REL-00042", "REL-00099"])
+    def test_custody_faithfulness(self, relationship_id):
+        result_json = _tool_custody(relationship_id)
+        data = json.loads(result_json)
+        narrative = data.get("agent_narrative", "")
+        if not narrative:
+            pytest.skip("No agent_narrative returned (LLM may be offline or ZAI_API_KEY absent)")
+
+        context_data = {k: v for k, v in data.items() if k != "agent_narrative"}
+        context = [json.dumps(context_data, indent=2)]
+
+        test_case = LLMTestCase(
+            input=f"Retrieve and summarise custody positions for relationship_id={relationship_id}",
+            actual_output=narrative,
+            retrieval_context=context,
+            context=context,
+        )
+        assert_test(test_case, build_metrics())
+
+
+@pytest.mark.skipif(not _SERVICING_AVAILABLE, reason="servicing tool imports unavailable")
+class TestSettlementsAgent:
+    """
+    Evaluates: acme.servicing.settlement_status
+    Key check: pending/failed counts and trade references are grounded in canned data.
+    """
+
+    @pytest.mark.parametrize("relationship_id", ["REL-00042", "REL-00099"])
+    def test_settlements_faithfulness(self, relationship_id):
+        result_json = _tool_settlements(relationship_id)
+        data = json.loads(result_json)
+        narrative = data.get("agent_narrative", "")
+        if not narrative:
+            pytest.skip("No agent_narrative returned (LLM may be offline or ZAI_API_KEY absent)")
+
+        context_data = {k: v for k, v in data.items() if k != "agent_narrative"}
+        context = [json.dumps(context_data, indent=2)]
+
+        test_case = LLMTestCase(
+            input=f"Retrieve and summarise settlement status for relationship_id={relationship_id}",
+            actual_output=narrative,
+            retrieval_context=context,
+            context=context,
+        )
+        assert_test(test_case, build_metrics())
+
+
+@pytest.mark.skipif(not _SERVICING_AVAILABLE, reason="servicing tool imports unavailable")
+class TestCorporateActionsAgent:
+    """
+    Evaluates: acme.servicing.corporate_actions
+    Key check: action types, election deadlines, and dividend amounts must be
+    grounded in the canned upcoming_actions data.
+    """
+
+    def test_corporate_actions_faithfulness(self):
+        relationship_id = "REL-00042"
+        result_json = _tool_corporate_actions(relationship_id)
+        data = json.loads(result_json)
+        narrative = data.get("agent_narrative", "")
+        if not narrative:
+            pytest.skip("No agent_narrative returned (LLM may be offline or ZAI_API_KEY absent)")
+
+        # Exclude narrative from context; include actions and regulatory_context
+        context_data = {k: v for k, v in data.items() if k != "agent_narrative"}
+        context = [json.dumps(context_data, indent=2)]
+
+        test_case = LLMTestCase(
+            input=f"Retrieve and summarise upcoming corporate actions for relationship_id={relationship_id}",
+            actual_output=narrative,
+            retrieval_context=context,
+            context=context,
+        )
+        assert_test(test_case, build_metrics())
+
+
+@pytest.mark.skipif(not _SERVICING_AVAILABLE, reason="servicing tool imports unavailable")
+class TestNavAgent:
+    """
+    Evaluates: acme.servicing.nav
+    Note: keyed by fund_id (FND-7781), not relationship_id — this is intentional.
+    Key check: NAV per unit, AUM, and valuation date are grounded in canned data.
+    """
+
+    @pytest.mark.parametrize("fund_id", ["FND-7781"])
+    def test_nav_faithfulness(self, fund_id):
+        result_json = _tool_nav(fund_id)
+        data = json.loads(result_json)
+        narrative = data.get("agent_narrative", "")
+        if not narrative:
+            pytest.skip("No agent_narrative returned (LLM may be offline or ZAI_API_KEY absent)")
+
+        context_data = {k: v for k, v in data.items() if k != "agent_narrative"}
+        context = [json.dumps(context_data, indent=2)]
+
+        test_case = LLMTestCase(
+            input=f"Retrieve and summarise NAV for fund_id={fund_id}",
+            actual_output=narrative,
+            retrieval_context=context,
+            context=context,
+        )
+        assert_test(test_case, build_metrics())
+
+
+@pytest.mark.skipif(not _SERVICING_AVAILABLE, reason="servicing tool imports unavailable")
+class TestCashAgent:
+    """
+    Evaluates: acme.servicing.cash
+    Key check: settled/unsettled cash balances and projected USD position
+    must be grounded in the canned balance data.
+    """
+
+    @pytest.mark.parametrize("relationship_id", ["REL-00042", "REL-00099"])
+    def test_cash_faithfulness(self, relationship_id):
+        result_json = _tool_cash(relationship_id)
+        data = json.loads(result_json)
+        narrative = data.get("agent_narrative", "")
+        if not narrative:
+            pytest.skip("No agent_narrative returned (LLM may be offline or ZAI_API_KEY absent)")
+
+        context_data = {k: v for k, v in data.items() if k != "agent_narrative"}
+        context = [json.dumps(context_data, indent=2)]
+
+        test_case = LLMTestCase(
+            input=f"Retrieve and summarise cash position for relationship_id={relationship_id}",
+            actual_output=narrative,
+            retrieval_context=context,
+            context=context,
+        )
+        assert_test(test_case, build_metrics())
 
 
 # ─────────────────────────────────────────────────────────────────────────────

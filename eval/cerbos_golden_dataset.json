@@ -1,0 +1,546 @@
+{
+  "version": "1.0.0",
+  "description": "Golden dataset for Cerbos policy validation. Each case is a CheckResources scenario with an expected ALLOW or DENY. Run against the live Cerbos PDP to score any set of deployed policies.",
+  "cerbos_url": "http://localhost:3594",
+  "cases": [
+    {
+      "id": "AGT-001",
+      "description": "RM invokes internal-classified wealth agent — baseline happy path",
+      "tags": ["agent", "rm", "classification", "allow"],
+      "principal": {
+        "id": "rm_jane",
+        "roles": ["relationship_manager"],
+        "attr": { "tenant_id": "default", "segments": ["wealth"], "clearance": "1", "book": ["REL-00042"] }
+      },
+      "resource": {
+        "kind": "agent", "id": "wealth-holdings",
+        "attr": { "domain": "wealth-management", "is_mutating": false, "data_classification": "internal" }
+      },
+      "action": "invoke",
+      "expected": "ALLOW"
+    },
+    {
+      "id": "AGT-002",
+      "description": "RM (clearance 1) cannot invoke confidential-classified agent",
+      "tags": ["agent", "rm", "classification", "deny"],
+      "principal": {
+        "id": "rm_junior",
+        "roles": ["relationship_manager"],
+        "attr": { "tenant_id": "default", "segments": ["wealth"], "clearance": "1", "book": [] }
+      },
+      "resource": {
+        "kind": "agent", "id": "wealth-performance",
+        "attr": { "domain": "wealth-management", "is_mutating": false, "data_classification": "confidential" }
+      },
+      "action": "invoke",
+      "expected": "DENY"
+    },
+    {
+      "id": "AGT-003",
+      "description": "Senior RM (clearance 2) invokes confidential-classified agent",
+      "tags": ["agent", "rm", "classification", "allow"],
+      "principal": {
+        "id": "rm_senior",
+        "roles": ["relationship_manager"],
+        "attr": { "tenant_id": "default", "segments": ["wealth"], "clearance": "2", "book": [] }
+      },
+      "resource": {
+        "kind": "agent", "id": "wealth-performance",
+        "attr": { "domain": "wealth-management", "is_mutating": false, "data_classification": "confidential" }
+      },
+      "action": "invoke",
+      "expected": "ALLOW"
+    },
+    {
+      "id": "AGT-004",
+      "description": "Senior RM (clearance 2) cannot invoke confidential-pii agent",
+      "tags": ["agent", "rm", "classification", "deny"],
+      "principal": {
+        "id": "rm_senior",
+        "roles": ["relationship_manager"],
+        "attr": { "tenant_id": "default", "segments": ["wealth"], "clearance": "2", "book": [] }
+      },
+      "resource": {
+        "kind": "agent", "id": "wealth-pii-agent",
+        "attr": { "domain": "wealth-management", "is_mutating": false, "data_classification": "confidential-pii" }
+      },
+      "action": "invoke",
+      "expected": "DENY"
+    },
+    {
+      "id": "AGT-005",
+      "description": "Very senior RM (clearance 3) invokes confidential-pii agent",
+      "tags": ["agent", "rm", "classification", "allow"],
+      "principal": {
+        "id": "rm_vp",
+        "roles": ["relationship_manager"],
+        "attr": { "tenant_id": "default", "segments": ["wealth"], "clearance": "3", "book": [] }
+      },
+      "resource": {
+        "kind": "agent", "id": "wealth-pii-agent",
+        "attr": { "domain": "wealth-management", "is_mutating": false, "data_classification": "confidential-pii" }
+      },
+      "action": "invoke",
+      "expected": "ALLOW"
+    },
+    {
+      "id": "AGT-006",
+      "description": "RM cannot invoke mutating agent regardless of clearance",
+      "tags": ["agent", "rm", "mutating", "deny"],
+      "principal": {
+        "id": "rm_vp",
+        "roles": ["relationship_manager"],
+        "attr": { "tenant_id": "default", "segments": ["wealth"], "clearance": "5", "book": [] }
+      },
+      "resource": {
+        "kind": "agent", "id": "wealth-trade-exec",
+        "attr": { "domain": "wealth-management", "is_mutating": true, "data_classification": "internal" }
+      },
+      "action": "invoke",
+      "expected": "DENY"
+    },
+    {
+      "id": "AGT-007",
+      "description": "RM in wealth segment cannot invoke servicing agent — wrong segment",
+      "tags": ["agent", "rm", "segment", "deny"],
+      "principal": {
+        "id": "rm_jane",
+        "roles": ["relationship_manager"],
+        "attr": { "tenant_id": "default", "segments": ["wealth"], "clearance": "3", "book": [] }
+      },
+      "resource": {
+        "kind": "agent", "id": "custody-agent",
+        "attr": { "domain": "asset-servicing", "is_mutating": false, "data_classification": "internal" }
+      },
+      "action": "invoke",
+      "expected": "DENY"
+    },
+    {
+      "id": "AGT-008",
+      "description": "RM in servicing segment invokes asset-servicing agent",
+      "tags": ["agent", "rm", "segment", "allow"],
+      "principal": {
+        "id": "ops_rm",
+        "roles": ["relationship_manager"],
+        "attr": { "tenant_id": "default", "segments": ["servicing"], "clearance": "1", "book": [] }
+      },
+      "resource": {
+        "kind": "agent", "id": "custody-agent",
+        "attr": { "domain": "asset-servicing", "is_mutating": false, "data_classification": "internal" }
+      },
+      "action": "invoke",
+      "expected": "ALLOW"
+    },
+    {
+      "id": "AGT-009",
+      "description": "platform_admin can invoke any agent including restricted and mutating",
+      "tags": ["agent", "platform_admin", "bypass", "allow"],
+      "principal": {
+        "id": "admin",
+        "roles": ["platform_admin"],
+        "attr": { "tenant_id": "default", "segments": [], "clearance": "0", "book": [] }
+      },
+      "resource": {
+        "kind": "agent", "id": "restricted-agent",
+        "attr": { "domain": "wealth-management", "is_mutating": true, "data_classification": "restricted" }
+      },
+      "action": "invoke",
+      "expected": "ALLOW"
+    },
+    {
+      "id": "AGT-010",
+      "description": "platform_admin can register agents",
+      "tags": ["agent", "platform_admin", "register", "allow"],
+      "principal": {
+        "id": "admin",
+        "roles": ["platform_admin"],
+        "attr": { "tenant_id": "default", "segments": [], "clearance": "0", "book": [] }
+      },
+      "resource": {
+        "kind": "agent", "id": "new-agent",
+        "attr": { "domain": "wealth-management", "is_mutating": false, "data_classification": "internal" }
+      },
+      "action": "register",
+      "expected": "ALLOW"
+    },
+    {
+      "id": "AGT-011",
+      "description": "auditor cannot invoke any agent — not in scope for auditor role",
+      "tags": ["agent", "auditor", "deny"],
+      "principal": {
+        "id": "auditor_sarah",
+        "roles": ["auditor"],
+        "attr": { "tenant_id": "default", "segments": [], "clearance": "5", "book": [] }
+      },
+      "resource": {
+        "kind": "agent", "id": "wealth-holdings",
+        "attr": { "domain": "wealth-management", "is_mutating": false, "data_classification": "internal" }
+      },
+      "action": "invoke",
+      "expected": "DENY"
+    },
+    {
+      "id": "AGT-012",
+      "description": "policy_author cannot invoke any agent — policy role has no agent access",
+      "tags": ["agent", "policy_author", "deny"],
+      "principal": {
+        "id": "pol_author",
+        "roles": ["policy_author"],
+        "attr": { "tenant_id": "default", "segments": ["wealth"], "clearance": "5", "book": [] }
+      },
+      "resource": {
+        "kind": "agent", "id": "wealth-holdings",
+        "attr": { "domain": "wealth-management", "is_mutating": false, "data_classification": "internal" }
+      },
+      "action": "invoke",
+      "expected": "DENY"
+    },
+    {
+      "id": "REL-001",
+      "description": "rm_jane can read Whitman (REL-00042) — in her book",
+      "tags": ["relationship", "rm", "book", "allow"],
+      "principal": {
+        "id": "rm_jane",
+        "roles": ["relationship_manager"],
+        "attr": { "tenant_id": "default", "book": ["REL-00042", "REL-00099"], "segments": ["wealth"], "clearance": "2" }
+      },
+      "resource": { "kind": "relationship", "id": "REL-00042", "attr": {} },
+      "action": "read",
+      "expected": "ALLOW"
+    },
+    {
+      "id": "REL-002",
+      "description": "rm_jane cannot read Okafor (REL-00188) — not in her book — key demo scenario",
+      "tags": ["relationship", "rm", "book", "deny", "demo-scenario"],
+      "principal": {
+        "id": "rm_jane",
+        "roles": ["relationship_manager"],
+        "attr": { "tenant_id": "default", "book": ["REL-00042", "REL-00099"], "segments": ["wealth"], "clearance": "2" }
+      },
+      "resource": { "kind": "relationship", "id": "REL-00188", "attr": {} },
+      "action": "read",
+      "expected": "DENY"
+    },
+    {
+      "id": "REL-003",
+      "description": "rm_carlos can read Okafor (REL-00188) — in his book",
+      "tags": ["relationship", "rm", "book", "allow"],
+      "principal": {
+        "id": "rm_carlos",
+        "roles": ["relationship_manager"],
+        "attr": { "tenant_id": "default", "book": ["REL-00188"], "segments": ["wealth"], "clearance": "2" }
+      },
+      "resource": { "kind": "relationship", "id": "REL-00188", "attr": {} },
+      "action": "read",
+      "expected": "ALLOW"
+    },
+    {
+      "id": "REL-004",
+      "description": "platform_admin can read any relationship without being in book",
+      "tags": ["relationship", "platform_admin", "bypass", "allow"],
+      "principal": {
+        "id": "admin",
+        "roles": ["platform_admin"],
+        "attr": { "tenant_id": "default", "book": [], "segments": [], "clearance": "0" }
+      },
+      "resource": { "kind": "relationship", "id": "REL-00188", "attr": {} },
+      "action": "read",
+      "expected": "ALLOW"
+    },
+    {
+      "id": "REL-005",
+      "description": "auditor cannot read any relationship — not their scope",
+      "tags": ["relationship", "auditor", "deny"],
+      "principal": {
+        "id": "auditor_sarah",
+        "roles": ["auditor"],
+        "attr": { "tenant_id": "default", "book": ["REL-00042"], "segments": [], "clearance": "5" }
+      },
+      "resource": { "kind": "relationship", "id": "REL-00042", "attr": {} },
+      "action": "read",
+      "expected": "DENY"
+    },
+    {
+      "id": "REL-006",
+      "description": "RM with empty book cannot read any relationship",
+      "tags": ["relationship", "rm", "book", "deny"],
+      "principal": {
+        "id": "rm_new",
+        "roles": ["relationship_manager"],
+        "attr": { "tenant_id": "default", "book": [], "segments": ["wealth"], "clearance": "1" }
+      },
+      "resource": { "kind": "relationship", "id": "REL-00042", "attr": {} },
+      "action": "read",
+      "expected": "DENY"
+    },
+    {
+      "id": "IAM-001",
+      "description": "platform_admin can create users",
+      "tags": ["iam", "platform_admin", "allow"],
+      "principal": {
+        "id": "admin",
+        "roles": ["platform_admin"],
+        "attr": { "tenant_id": "default" }
+      },
+      "resource": {
+        "kind": "iam-resource", "id": "new-user",
+        "attr": { "resource_type": "user", "tenant_id": "default", "owner_id": "" }
+      },
+      "action": "create",
+      "expected": "ALLOW"
+    },
+    {
+      "id": "IAM-002",
+      "description": "tenant_admin can create users in same tenant",
+      "tags": ["iam", "tenant_admin", "same-tenant", "allow"],
+      "principal": {
+        "id": "ta_default",
+        "roles": ["tenant_admin"],
+        "attr": { "tenant_id": "default" }
+      },
+      "resource": {
+        "kind": "iam-resource", "id": "new-user",
+        "attr": { "resource_type": "user", "tenant_id": "default", "owner_id": "" }
+      },
+      "action": "create",
+      "expected": "ALLOW"
+    },
+    {
+      "id": "IAM-003",
+      "description": "tenant_admin from tenant-A cannot access tenant-B resources — cross-tenant isolation",
+      "tags": ["iam", "tenant_admin", "cross-tenant", "deny", "critical"],
+      "principal": {
+        "id": "ta_tenant_a",
+        "roles": ["tenant_admin"],
+        "attr": { "tenant_id": "tenant-a" }
+      },
+      "resource": {
+        "kind": "iam-resource", "id": "user-b",
+        "attr": { "resource_type": "user", "tenant_id": "tenant-b", "owner_id": "" }
+      },
+      "action": "create",
+      "expected": "DENY"
+    },
+    {
+      "id": "IAM-004",
+      "description": "auditor can read audit logs in same tenant",
+      "tags": ["iam", "auditor", "audit-log", "allow"],
+      "principal": {
+        "id": "auditor_sarah",
+        "roles": ["auditor"],
+        "attr": { "tenant_id": "default" }
+      },
+      "resource": {
+        "kind": "iam-resource", "id": "log-1",
+        "attr": { "resource_type": "audit_log", "tenant_id": "default", "owner_id": "" }
+      },
+      "action": "read",
+      "expected": "ALLOW"
+    },
+    {
+      "id": "IAM-005",
+      "description": "auditor cannot create users — read-only on audit logs only",
+      "tags": ["iam", "auditor", "user", "deny", "critical"],
+      "principal": {
+        "id": "auditor_sarah",
+        "roles": ["auditor"],
+        "attr": { "tenant_id": "default" }
+      },
+      "resource": {
+        "kind": "iam-resource", "id": "new-user",
+        "attr": { "resource_type": "user", "tenant_id": "default", "owner_id": "" }
+      },
+      "action": "create",
+      "expected": "DENY"
+    },
+    {
+      "id": "IAM-006",
+      "description": "auditor cannot read policies — restricted to audit_log resource type only",
+      "tags": ["iam", "auditor", "policy", "deny", "critical"],
+      "principal": {
+        "id": "auditor_sarah",
+        "roles": ["auditor"],
+        "attr": { "tenant_id": "default" }
+      },
+      "resource": {
+        "kind": "iam-resource", "id": "pol-1",
+        "attr": { "resource_type": "policy", "tenant_id": "default", "owner_id": "" }
+      },
+      "action": "read",
+      "expected": "DENY"
+    },
+    {
+      "id": "IAM-007",
+      "description": "policy_author can create and read policies via policy_drafter derived role",
+      "tags": ["iam", "policy_author", "policy", "allow"],
+      "principal": {
+        "id": "pol_author",
+        "roles": ["policy_author"],
+        "attr": { "tenant_id": "default" }
+      },
+      "resource": {
+        "kind": "iam-resource", "id": "pol-new",
+        "attr": { "resource_type": "policy", "tenant_id": "default", "owner_id": "" }
+      },
+      "action": "create",
+      "expected": "ALLOW"
+    },
+    {
+      "id": "IAM-008",
+      "description": "policy_author cannot deploy policies — four-eyes separation of duties",
+      "tags": ["iam", "policy_author", "deploy", "deny", "separation-of-duties", "critical"],
+      "principal": {
+        "id": "pol_author",
+        "roles": ["policy_author"],
+        "attr": { "tenant_id": "default" }
+      },
+      "resource": {
+        "kind": "iam-resource", "id": "pol-1",
+        "attr": { "resource_type": "policy", "tenant_id": "default", "owner_id": "" }
+      },
+      "action": "deploy_policy",
+      "expected": "DENY"
+    },
+    {
+      "id": "IAM-009",
+      "description": "policy_approver can approve and deploy policies",
+      "tags": ["iam", "policy_approver", "deploy", "allow"],
+      "principal": {
+        "id": "pol_approver",
+        "roles": ["policy_approver"],
+        "attr": { "tenant_id": "default" }
+      },
+      "resource": {
+        "kind": "iam-resource", "id": "pol-1",
+        "attr": { "resource_type": "policy", "tenant_id": "default", "owner_id": "" }
+      },
+      "action": "deploy_policy",
+      "expected": "ALLOW"
+    },
+    {
+      "id": "IAM-010",
+      "description": "policy_approver cannot create users — policy role has no user management access",
+      "tags": ["iam", "policy_approver", "user", "deny", "critical"],
+      "principal": {
+        "id": "pol_approver",
+        "roles": ["policy_approver"],
+        "attr": { "tenant_id": "default" }
+      },
+      "resource": {
+        "kind": "iam-resource", "id": "new-user",
+        "attr": { "resource_type": "user", "tenant_id": "default", "owner_id": "" }
+      },
+      "action": "create",
+      "expected": "DENY"
+    },
+    {
+      "id": "IAM-011",
+      "description": "relationship_manager has no access to any IAM resource",
+      "tags": ["iam", "rm", "deny", "critical"],
+      "principal": {
+        "id": "rm_jane",
+        "roles": ["relationship_manager"],
+        "attr": { "tenant_id": "default", "book": ["REL-00042"], "segments": ["wealth"], "clearance": "2" }
+      },
+      "resource": {
+        "kind": "iam-resource", "id": "any-user",
+        "attr": { "resource_type": "user", "tenant_id": "default", "owner_id": "" }
+      },
+      "action": "read",
+      "expected": "DENY"
+    },
+    {
+      "id": "IAM-012",
+      "description": "auditor cannot read audit logs in a different tenant — tenant isolation",
+      "tags": ["iam", "auditor", "cross-tenant", "deny", "critical"],
+      "principal": {
+        "id": "auditor_sarah",
+        "roles": ["auditor"],
+        "attr": { "tenant_id": "tenant-a" }
+      },
+      "resource": {
+        "kind": "iam-resource", "id": "log-1",
+        "attr": { "resource_type": "audit_log", "tenant_id": "tenant-b", "owner_id": "" }
+      },
+      "action": "read",
+      "expected": "DENY"
+    },
+    {
+      "id": "SEC-001",
+      "description": "INVARIANT: no role except platform_admin bypasses tenant isolation on iam-resource",
+      "tags": ["security", "cross-tenant", "deny", "critical", "invariant"],
+      "principal": {
+        "id": "super_tenant_admin",
+        "roles": ["tenant_admin", "domain_admin"],
+        "attr": { "tenant_id": "tenant-a" }
+      },
+      "resource": {
+        "kind": "iam-resource", "id": "user-b",
+        "attr": { "resource_type": "user", "tenant_id": "tenant-b", "owner_id": "" }
+      },
+      "action": "read",
+      "expected": "DENY"
+    },
+    {
+      "id": "SEC-002",
+      "description": "INVARIANT: policy_author cannot draft AND deploy — four-eyes check must hold",
+      "tags": ["security", "separation-of-duties", "deny", "critical", "invariant"],
+      "principal": {
+        "id": "combined_author",
+        "roles": ["policy_author"],
+        "attr": { "tenant_id": "default" }
+      },
+      "resource": {
+        "kind": "iam-resource", "id": "pol-1",
+        "attr": { "resource_type": "policy", "tenant_id": "default", "owner_id": "" }
+      },
+      "action": "deploy_policy",
+      "expected": "DENY"
+    },
+    {
+      "id": "SEC-003",
+      "description": "INVARIANT: clearance-1 RM cannot reach restricted-classified agent",
+      "tags": ["security", "classification", "deny", "critical", "invariant"],
+      "principal": {
+        "id": "rm_junior",
+        "roles": ["relationship_manager"],
+        "attr": { "tenant_id": "default", "segments": ["wealth"], "clearance": "1", "book": [] }
+      },
+      "resource": {
+        "kind": "agent", "id": "restricted-agent",
+        "attr": { "domain": "wealth-management", "is_mutating": false, "data_classification": "restricted" }
+      },
+      "action": "invoke",
+      "expected": "DENY"
+    },
+    {
+      "id": "SEC-004",
+      "description": "INVARIANT: auditor with any clearance cannot write to any resource",
+      "tags": ["security", "auditor", "deny", "critical", "invariant"],
+      "principal": {
+        "id": "auditor_sarah",
+        "roles": ["auditor"],
+        "attr": { "tenant_id": "default" }
+      },
+      "resource": {
+        "kind": "iam-resource", "id": "any-resource",
+        "attr": { "resource_type": "user", "tenant_id": "default", "owner_id": "" }
+      },
+      "action": "create",
+      "expected": "DENY"
+    },
+    {
+      "id": "SEC-005",
+      "description": "INVARIANT: relationship not in book is denied even for high-clearance RM",
+      "tags": ["security", "book", "deny", "critical", "invariant"],
+      "principal": {
+        "id": "rm_vp",
+        "roles": ["relationship_manager"],
+        "attr": { "tenant_id": "default", "book": ["REL-00042"], "segments": ["wealth"], "clearance": "5" }
+      },
+      "resource": { "kind": "relationship", "id": "REL-99999", "attr": {} },
+      "action": "read",
+      "expected": "DENY"
+    }
+  ]
+}

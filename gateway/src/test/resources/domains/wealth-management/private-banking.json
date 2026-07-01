@@ -1,0 +1,83 @@
+{
+  "sub_domain_id": "private-banking",
+  "display_name": "Private Banking",
+  "parent_domain": "wealth-management",
+  "resource_scoped": true,
+
+  "entity_types": [
+    {
+      "key": "relationship_id",
+      "extract_as": "relationship_reference",
+      "kind": "resolvable",
+      "display": "client relationship",
+      "id_pattern": "REL-\\d+",
+      "resolve_type": "relationship",
+      "required": true
+    },
+    {
+      "key": "fund_id",
+      "extract_as": "fund_reference",
+      "kind": "resolvable",
+      "display": "fund or investment strategy",
+      "id_pattern": "FND-\\w+",
+      "resolve_type": "fund",
+      "required": false
+    },
+    {
+      "key": "period",
+      "extract_as": "period",
+      "kind": "literal",
+      "display": "reporting period",
+      "id_pattern": "(Q[1-4]\\s+\\d{4}|YTD|QTD|MTD)",
+      "required": false,
+      "default": "QTD"
+    },
+    {
+      "key": "ticker_references",
+      "extract_as": "ticker_references",
+      "kind": "list",
+      "display": "stock tickers",
+      "id_pattern": "[A-Z]{2,5}",
+      "required": false
+    }
+  ],
+
+  "required_context": ["relationship_id"],
+
+  "denial_messages": {
+    "not-covered": "That client is not in your coverage.",
+    "coverage-transferred": "Coverage for that client has been transferred.",
+    "relationship-closed": "That client relationship is no longer active.",
+    "default": "Access denied for this client relationship."
+  },
+
+  "messages": {
+    "no_coverage": "You have no client relationships in your coverage.",
+    "reference_not_found": "I could not find a client relationship matching \"{reference}\". Please provide the relationship ID or a more specific name.",
+    "needs_more_detail": "I wasn't sure which services to consult. Please mention the client name and what you need.",
+    "specify_entity": "Please specify the client name or relationship ID.",
+    "missing_entity_question": "Which client relationship are you asking about? Please provide the relationship ID or client name to continue.",
+    "followup_clarification": "Could you clarify what you'd like to know about {entity}? For example: holdings, performance, settlements, or corporate actions."
+  },
+
+  "clarification_schema": {
+    "relationship_id": {
+      "question": "Which client relationship are you asking about?",
+      "options_source": "discover",
+      "priority": 1
+    },
+    "period": {
+      "question": "Which period would you like to review?",
+      "options_source": "agent_derived",
+      "default": "QTD",
+      "priority": 2
+    }
+  },
+
+  "agents": [
+    "acme.wealth.holdings",
+    "acme.wealth.performance",
+    "acme.wealth.risk_profile",
+    "acme.wealth.goal_planning"
+  ]
+}

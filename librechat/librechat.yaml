@@ -2,7 +2,7 @@ version: 1.3.13
 cache: true
 
 interface:
-  appTitle: "Meridian AI"
+  appTitle: "Conduit AI"
   modelSelect: false
   parameters: false
   presets: false
@@ -10,7 +10,7 @@ interface:
 
 endpoints:
   custom:
-    - name: "Meridian"
+    - name: "Conduit"
       # "user_provided": each logged-in user supplies their own gateway JWT as the API key.
       # After logging in via OIDC, users copy their access_token from
       # http://localhost:8084/auth/token and paste it in LibreChat endpoint settings once.
@@ -22,12 +22,12 @@ endpoints:
       baseURL: "http://gateway:8080/v1"
       models:
         default:
-          - "meridian-assistant"
+          - "conduit-assistant"
         fetch: false
       titleConvo: false
-      summarize: false
+      summarize: true
       forcePrompt: false
-      modelDisplayLabel: "Meridian AI"
+      modelDisplayLabel: "Conduit AI"
       dropParams:
         - "stop"
         - "user"

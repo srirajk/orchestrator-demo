@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Axiom — Meridian Identity Platform</title>
+  <link rel="stylesheet" th:href="@{/css/axiom-login.css}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="page">
+
+  <!-- Left: brand panel -->
+  <div class="brand-panel">
+    <div class="axiom-logo">
+      <div class="axiom-mark">Ax</div>
+      <span class="axiom-name">Axiom</span>
+    </div>
+
+    <div class="brand-body">
+      <h1 class="brand-headline">
+        Secure access<br>to <span class="accent">every<br>client relationship</span>
+      </h1>
+      <p class="brand-sub">
+        Axiom is Meridian's enterprise identity platform — single sign-on, fine-grained entitlements,
+        and real-time coverage enforcement across every banking domain.
+      </p>
+    </div>
+
+    <div class="trust-badges">
+      <div class="badge"><div class="badge-dot"></div>SOC 2 Type II</div>
+      <div class="badge"><div class="badge-dot"></div>FIPS 140-2</div>
+      <div class="badge"><div class="badge-dot"></div>RS256 / OIDC</div>
+    </div>
+  </div>
+
+  <!-- Right: login form -->
+  <div class="form-panel">
+    <div class="form-header">
+      <div class="for-label">Meridian Private Banking</div>
+      <h2 class="form-title">Sign in to your workspace</h2>
+      <p class="form-subtitle">Use your Meridian credentials to access the AI platform.</p>
+    </div>
+
+    <!-- Error banner (shown only when login fails) -->
+    <div class="error-banner" th:if="${param.error}">
+      <div class="error-icon">!</div>
+      <span>Incorrect username or password. Please try again.</span>
+    </div>
+
+    <form th:action="@{/login}" method="post">
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+
+      <div class="field">
+        <label for="username">Username</label>
+        <input id="username" name="username" type="text"
+               placeholder="e.g. rm_jane"
+               autocomplete="username" autofocus required>
+      </div>
+
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password"
+               placeholder="Your Meridian password"
+               autocomplete="current-password" required>
+      </div>
+
+      <button type="submit" class="btn-sign-in">Sign in &rarr;</button>
+    </form>
+
+    <div class="divider"></div>
+    <div class="meridian-byline">Meridian Private Banking &bull; Axiom Identity Platform</div>
+  </div>
+
+</div>
+</body>
+</html>

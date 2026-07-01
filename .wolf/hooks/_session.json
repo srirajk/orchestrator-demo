@@ -1,0 +1,76 @@
+{
+  "session_id": "session-2026-07-01-1504",
+  "started": "2026-07-01T19:04:54.562Z",
+  "files_read": {
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java": {
+      "count": 5,
+      "tokens": 5667,
+      "first_read": "2026-07-01T19:07:07.477Z"
+    },
+    "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java": {
+      "count": 1,
+      "tokens": 15027,
+      "first_read": "2026-07-01T19:14:15.150Z"
+    }
+  },
+  "files_written": [
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java",
+      "action": "edit",
+      "tokens": 229,
+      "at": "2026-07-01T19:07:12.862Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java",
+      "action": "edit",
+      "tokens": 275,
+      "at": "2026-07-01T19:07:24.977Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java",
+      "action": "edit",
+      "tokens": 336,
+      "at": "2026-07-01T19:07:36.876Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java",
+      "action": "edit",
+      "tokens": 210,
+      "at": "2026-07-01T19:07:48.496Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java",
+      "action": "edit",
+      "tokens": 66,
+      "at": "2026-07-01T19:12:21.182Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java",
+      "action": "edit",
+      "tokens": 525,
+      "at": "2026-07-01T19:15:12.441Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/projects/orchestrator-demo/gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java",
+      "action": "edit",
+      "tokens": 22,
+      "at": "2026-07-01T19:15:19.447Z"
+    },
+    {
+      "file": "/Users/srirajkadimisetty/.claude/projects/-Users-srirajkadimisetty-projects-orchestrator-demo/memory/feedback_observability_standard.md",
+      "action": "create",
+      "tokens": 394,
+      "at": "2026-07-01T21:14:48.628Z"
+    }
+  ],
+  "edit_counts": {
+    "gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java": 6,
+    "gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java": 1,
+    "../../.claude/projects/-Users-srirajkadimisetty-projects-orchestrator-demo/memory/feedback_observability_standard.md": 1
+  },
+  "anatomy_hits": 2,
+  "anatomy_misses": 0,
+  "repeated_reads_warned": 4,
+  "cerebrum_warnings": 0,
+  "stop_count": 10
+}

@@ -1,0 +1,186 @@
+{
+  "__inputs": [],
+  "__requires": [],
+  "annotations": {"list": []},
+  "description": "Conduit — per-container CPU / memory (cAdvisor) + gateway JVM heap (Micrometer)",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "tags": ["conduit", "resources", "cadvisor"],
+  "templating": {
+    "list": [
+      {
+        "current": {"value": "5m"},
+        "hide": 0,
+        "label": "Rate Window",
+        "name": "rate_window",
+        "options": [
+          {"selected": false, "text": "1m", "value": "1m"},
+          {"selected": true,  "text": "5m", "value": "5m"},
+          {"selected": false, "text": "10m","value": "10m"}
+        ],
+        "query": "1m,5m,10m",
+        "type": "custom"
+      },
+      {
+        "current": {},
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "definition": "label_values(container_cpu_usage_seconds_total{name=~\".+\"}, name)",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "label": "Container",
+        "name": "container",
+        "options": [],
+        "query": {
+          "query": "label_values(container_cpu_usage_seconds_total{name=~\".+\"}, name)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Conduit — Resource Usage",
+  "uid": "conduit-resources",
+  "version": 1,
+  "panels": [
+
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
+      "id": 1,
+      "title": "Container CPU",
+      "type": "row"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"lineWidth": 2, "fillOpacity": 8},
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 1},
+      "id": 2,
+      "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["mean", "max"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [
+        {
+          "expr": "sum by (name) (rate(container_cpu_usage_seconds_total{name=~\"$container\"}[$rate_window])) * 100",
+          "legendFormat": "{{name}}"
+        }
+      ],
+      "title": "CPU Usage % (per container core-seconds)",
+      "type": "timeseries"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 10},
+      "id": 10,
+      "title": "Container Memory",
+      "type": "row"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"lineWidth": 2, "fillOpacity": 8},
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 11},
+      "id": 11,
+      "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["mean", "max"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [
+        {
+          "expr": "sum by (name) (container_memory_usage_bytes{name=~\"$container\"})",
+          "legendFormat": "{{name}}"
+        }
+      ],
+      "title": "Memory Usage (RSS + cache)",
+      "type": "timeseries"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 20},
+      "id": 20,
+      "title": "Gateway JVM",
+      "type": "row"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"lineWidth": 2, "fillOpacity": 8},
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 21},
+      "id": 21,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"]}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {
+          "expr": "sum(jvm_memory_used_bytes{job=\"conduit-gateway\", area=\"heap\"})",
+          "legendFormat": "heap used"
+        },
+        {
+          "expr": "sum(jvm_memory_committed_bytes{job=\"conduit-gateway\", area=\"heap\"})",
+          "legendFormat": "heap committed"
+        },
+        {
+          "expr": "sum(jvm_memory_used_bytes{job=\"conduit-gateway\", area=\"nonheap\"})",
+          "legendFormat": "nonheap used"
+        }
+      ],
+      "title": "Gateway JVM Memory (heap / nonheap)",
+      "type": "timeseries"
+    },
+
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"lineWidth": 2, "fillOpacity": 8},
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 21},
+      "id": 22,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["last"]}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {
+          "expr": "sum(jvm_threads_live_threads{job=\"conduit-gateway\"})",
+          "legendFormat": "live threads"
+        },
+        {
+          "expr": "sum(jvm_threads_daemon_threads{job=\"conduit-gateway\"})",
+          "legendFormat": "daemon threads"
+        }
+      ],
+      "title": "Gateway JVM Threads",
+      "type": "timeseries"
+    }
+  ]
+}

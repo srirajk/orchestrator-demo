@@ -1,0 +1,14 @@
+{
+  "domain_id": "wealth-management",
+  "display_name": "Wealth Management",
+  "coverage": {
+    "discover_url": "${WEALTH_COVERAGE_URL}/coverage/{principal_id}",
+    "check_url": "${WEALTH_COVERAGE_URL}/coverage/{principal_id}/resources/{id}",
+    "resolve_url": "${WEALTH_COVERAGE_URL}/entities/resolve",
+    "cache_ttl_seconds": 30
+  },
+  "memory_compaction": {
+    "must_preserve": ["relationship_id", "client_name", "time_period", "domain"],
+    "can_drop": ["raw_agent_outputs", "routing_decisions"]
+  }
+}

@@ -1,12 +1,13 @@
 """Performance agent — GET /performance"""
 import os
 import logging
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 from agents import Runner, function_tool, InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered
 from shared.canned_data import PERFORMANCE
 from shared.telemetry import agent_span
 from shared.agent_client import make_agent, LLM_MODEL
 from shared.guardrails import injection_guardrail, relationship_id_guardrail, length_guardrail, make_grounding_guardrail
+from shared.error_schema import error_response
 
 # Per-agent LLM overrides — fall back to the service-level WEALTH_AGENT_LLM_* defaults.
 _LLM_BASE  = os.environ.get("PERFORMANCE_LLM_BASE_URL") or None
@@ -42,9 +43,10 @@ async def get_performance(
         if raw is None:
             span.set_attribute("error", True)
             span.set_attribute("error.type", "relationship_not_found")
-            raise HTTPException(
-                status_code=404,
-                detail=f"Relationship {relationship_id!r} not found. Known: {list(PERFORMANCE)}",
+            return error_response(
+                404,
+                f"Relationship {relationship_id!r} not found in performance system",
+                AGENT_ID,
             )
         span.set_attribute("result.total_return_pct", raw.get("total_return_pct", 0))
         span.set_attribute("result.alpha", raw.get("alpha", 0))
@@ -74,4 +76,4 @@ async def get_performance(
             return {**raw, "period": period, "agent_narrative": result.final_output}
         except Exception as exc:
             log.error("Agent LLM call failed for %s: %s", relationship_id, exc)
-            raise HTTPException(503, detail=f"Agent LLM unavailable: {type(exc).__name__}")
+            return error_response(503, f"Agent LLM unavailable: {type(exc).__name__}", AGENT_ID)

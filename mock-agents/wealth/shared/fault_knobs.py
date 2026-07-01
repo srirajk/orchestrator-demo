@@ -1,11 +1,17 @@
 """
 Fault-knob middleware for the Wealth HTTP service.
 Supports ?_delay_ms=<n> (inject latency) and ?_fail=true (force 503).
+
+Standard error schema (Meridian agent contract):
+  {error, agent_id, trace_id, status_code, detail}
 """
 import asyncio
 
 from fastapi import Request
-from fastapi.responses import JSONResponse
+from shared.error_schema import error_response
+
+
+AGENT_ID = "acme.wealth.http"
 
 
 async def fault_knob_middleware(request: Request, call_next):
@@ -17,13 +23,10 @@ async def fault_knob_middleware(request: Request, call_next):
         delay_ms = 0
 
     if fail:
-        return JSONResponse(
-            status_code=503,
-            content={
-                "error": "fault knob triggered",
-                "fault_knob": "_fail=true",
-                "detail": "This 503 is intentional — used to test resilience in the gateway.",
-            },
+        return error_response(
+            503,
+            "fault knob triggered — This 503 is intentional, used to test resilience in the gateway.",
+            AGENT_ID,
         )
 
     if delay_ms > 0:

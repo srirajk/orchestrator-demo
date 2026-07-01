@@ -2,15 +2,15 @@
   "__inputs": [],
   "__requires": [],
   "annotations": {"list": []},
-  "description": "Meridian AI Gateway — enter a Conversation ID (or Relationship ID) to inspect the full distributed trace: intent, agent fan-out, latency, auth decisions",
+  "description": "Conduit AI Gateway — enter a Conversation ID (or Relationship ID) to inspect the full distributed trace: intent, agent fan-out, latency, auth decisions",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": null,
   "links": [],
   "refresh": "30s",
-  "schemaVersion": 38,
-  "tags": ["meridian", "traces"],
+  "schemaVersion": 39,
+  "tags": ["conduit", "traces"],
   "templating": {
     "list": [
       {
@@ -21,14 +21,23 @@
         "name": "entity_id",
         "query": "REL-00042",
         "type": "textbox"
+      },
+      {
+        "current": {"value": ""},
+        "description": "Conversation ID emitted by the gateway as MDC key convId and W3C Baggage — paste a convId to filter Loki logs to a single conversation across all Conduit services",
+        "hide": 0,
+        "label": "Conversation ID",
+        "name": "convId",
+        "query": "",
+        "type": "textbox"
       }
     ]
   },
   "time": {"from": "now-3h", "to": "now"},
   "timepicker": {},
   "timezone": "browser",
-  "title": "Meridian — Conversation Trace Explorer",
-  "uid": "meridian-trace",
+  "title": "Conduit — Conversation Trace Explorer",
+  "uid": "conduit-trace",
   "version": 1,
   "panels": [
 
@@ -53,7 +62,7 @@
           "datasource": {"type": "tempo", "uid": "tempo"},
           "limit": 20,
           "queryType": "traceql",
-          "query": "{span.entity.relationship_id = \"$entity_id\" || resource.service.name = \"meridian-gateway\"}",
+          "query": "{span.entity.relationship_id = \"$entity_id\" || resource.service.name = \"conduit-gateway\"}",
           "tableType": "traces",
           "refId": "A"
         }
@@ -83,7 +92,7 @@
       "id": 11,
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(http_client_requests_seconds_bucket{job=\"meridian-gateway\"}[5m])) by (le, client_name, uri))",
+          "expr": "histogram_quantile(0.95, sum(rate(http_client_requests_seconds_bucket{job=\"conduit-gateway\"}[5m])) by (le, client_name, uri))",
           "legendFormat": "{{client_name}} {{uri}} p95"
         }
       ],
@@ -116,7 +125,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(http_client_requests_seconds_count{job=\"meridian-gateway\", outcome!=\"SUCCESS\"}[5m])) by (client_name, uri) / sum(rate(http_client_requests_seconds_count{job=\"meridian-gateway\"}[5m])) by (client_name, uri)",
+          "expr": "sum(rate(http_client_requests_seconds_count{job=\"conduit-gateway\", outcome!=\"SUCCESS\"}[5m])) by (client_name, uri) / sum(rate(http_client_requests_seconds_count{job=\"conduit-gateway\"}[5m])) by (client_name, uri)",
           "legendFormat": "{{client_name}} error rate"
         }
       ],
@@ -145,8 +154,8 @@
       "id": 21,
       "targets": [
         {
-          "expr": "sum(increase(chat_intent_total{job=\"meridian-gateway\"}[5m])) by (intent)",
-          "legendFormat": "intent: {{intent}}"
+          "expr": "sum(increase(chat_intent_total{job=\"conduit-gateway\"}[5m])) by (type)",
+          "legendFormat": "intent: {{type}}"
         }
       ],
       "title": "Intent Classifications (5m buckets)",
@@ -166,11 +175,11 @@
       "id": 22,
       "targets": [
         {
-          "expr": "sum(rate(http_client_requests_seconds_count{job=\"meridian-gateway\", client_name=\"cerbos\"}[5m]))",
+          "expr": "sum(rate(http_client_requests_seconds_count{job=\"conduit-gateway\", client_name=\"cerbos\"}[5m]))",
           "legendFormat": "Cerbos ABAC checks/s"
         },
         {
-          "expr": "sum(rate(http_client_requests_seconds_count{job=\"meridian-gateway\", client_name=\"cerbos\", outcome!=\"SUCCESS\"}[5m]))",
+          "expr": "sum(rate(http_client_requests_seconds_count{job=\"conduit-gateway\", client_name=\"cerbos\", outcome!=\"SUCCESS\"}[5m]))",
           "legendFormat": "Cerbos DENIED/s"
         }
       ],
@@ -196,6 +205,81 @@
       },
       "title": "How to use",
       "type": "text"
+    },
+
+    {
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 38},
+      "id": 40,
+      "title": "Conversation Logs (by convId) — requires Loki",
+      "type": "row"
+    },
+
+    {
+      "datasource": null,
+      "gridPos": {"h": 4, "w": 24, "x": 0, "y": 39},
+      "id": 41,
+      "options": {
+        "content": "## How to use Conversation Logs\n\n1. **Paste a Conversation ID** into the **Conversation ID** variable at the top of this dashboard (e.g. a UUID emitted by the gateway as MDC key `convId`).\n2. The **All Logs** panel below shows every log line across all `conduit-*` services that contain that conversation ID — gateway intent classification, Cerbos ABAC decisions, agent fan-out calls and synthesis steps.\n3. The **Errors & Warnings** panel filters to `ERROR` and `WARN` lines only — use this to diagnose a failed or degraded request.\n4. **Click a `traceId` value** in any log line to jump directly to the Tempo span waterfall for that request.\n5. If no logs appear, confirm that Promtail is running (`docker compose ps promtail`) and that the gateway emits `convId` in structured JSON logs.",
+        "mode": "markdown"
+      },
+      "title": "How to use Conversation Logs",
+      "type": "text"
+    },
+
+    {
+      "datasource": {"type": "loki", "uid": "loki"},
+      "description": "All log lines from every Conduit service that contain the selected conversation ID — including gateway request handling, intent classification, Cerbos decisions, agent fan-out and answer synthesis. Click a traceId value to open the corresponding Tempo trace.",
+      "gridPos": {"h": 12, "w": 24, "x": 0, "y": 43},
+      "id": 42,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": {"type": "loki", "uid": "loki"},
+          "expr": "{service=~\"conduit.*\"} |= \"$convId\"",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "All Logs for Conversation — $convId",
+      "type": "logs"
+    },
+
+    {
+      "datasource": {"type": "loki", "uid": "loki"},
+      "description": "ERROR and WARN log lines only for the selected conversation ID — surfaces exceptions, circuit breaker trips, Cerbos denials and synthesis failures without noise from INFO-level call tracing. Use this first when a banker reports an unexpected or incomplete answer.",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 55},
+      "id": 43,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": {"type": "loki", "uid": "loki"},
+          "expr": "{service=~\"conduit.*\"} |= \"$convId\" | level =~ \"ERROR|WARN\"",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "Errors and Warnings — $convId",
+      "type": "logs"
     }
+
   ]
 }

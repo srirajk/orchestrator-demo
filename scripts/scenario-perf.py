@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Meridian Gateway — Scenario Performance & Correctness Test
+Conduit Gateway — Scenario Performance & Correctness Test
 
 Each scenario fires REAL queries against the live gateway and validates the
 answer semantically against known ground truth from canned data.
@@ -129,7 +129,7 @@ def chat(prompt: str, user_id: str, token: str = "",
 
     body_messages = messages or [{"role": "user", "content": prompt}]
     body = json.dumps({
-        "model": "meridian-assistant",
+        "model": "conduit-assistant",
         "stream": True,
         "messages": body_messages,
     }).encode()
@@ -987,7 +987,7 @@ def report(results: list[ScenarioResult]):
     passed_count = sum(1 for r in results if r.passed)
 
     print(f"\n{'='*90}")
-    print(f"Meridian Gateway — Scenario Correctness Report")
+    print(f"Conduit Gateway — Scenario Correctness Report")
     print(f"{'='*90}")
     print(f"{'Scenario':<25} {'E2E':>9} {'TTFT':>8} {'Checks':>8}  {'Result'}")
     print(f"{'-'*90}")
@@ -1036,9 +1036,9 @@ def report(results: list[ScenarioResult]):
 def main():
     import argparse
     global GATEWAY_URL, USER_MGMT_URL
-    parser = argparse.ArgumentParser(description="Meridian gateway scenario correctness test")
+    parser = argparse.ArgumentParser(description="Conduit gateway scenario correctness test")
     parser.add_argument("--gateway-url",   default=GATEWAY_URL)
-    parser.add_argument("--user-mgmt-url", default=USER_MGMT_URL)
+    parser.add_argument("--iam-service-url", default=USER_MGMT_URL)
     parser.add_argument("--concurrency",   type=int, default=2,
                         help="Number of scenario workers to run in parallel (default: 2)")
     args = parser.parse_args()
@@ -1046,7 +1046,7 @@ def main():
     GATEWAY_URL   = args.gateway_url
     USER_MGMT_URL = args.user_mgmt_url
 
-    print(f"Meridian Gateway Scenario Test")
+    print(f"Conduit Gateway Scenario Test")
     print(f"Gateway:     {GATEWAY_URL}")
     print(f"Concurrency: {args.concurrency} parallel scenarios\n")
 

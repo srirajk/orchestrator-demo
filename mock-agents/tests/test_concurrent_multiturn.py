@@ -163,7 +163,7 @@ class ConversationResult:
 
 def stream_turn(conversation_id: str, messages: list[dict], gateway: str) -> tuple[str, float]:
     payload = {
-        "model": "meridian-assistant",
+        "model": "conduit-assistant",
         "messages": messages,
         "stream": True,
         "conversation_id": conversation_id,

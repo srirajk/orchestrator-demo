@@ -4,7 +4,7 @@ services:
 
   redis-stack:
     image: redis/redis-stack-server:7.4.0-v3
-    container_name: meridian-redis
+    container_name: conduit-redis
     ports:
       - "6379:6379"
       - "8001:8001"    # RedisInsight (optional dev UI)
@@ -19,7 +19,7 @@ services:
 
   mongodb:
     image: mongo:8.0.20
-    container_name: meridian-mongodb
+    container_name: conduit-mongodb
     command: mongod --noauth
     volumes:
       - mongo-data:/data/db
@@ -34,7 +34,7 @@ services:
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:latest
-    container_name: meridian-otel
+    container_name: conduit-otel
     volumes:
       - ./infra/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
     ports:
@@ -48,7 +48,7 @@ services:
 
   tempo:
     image: grafana/tempo:2.6.1
-    container_name: meridian-tempo
+    container_name: conduit-tempo
     command: ["-config.file=/etc/tempo.yaml"]
     volumes:
       - ./infra/tempo.yaml:/etc/tempo.yaml:ro
@@ -60,7 +60,7 @@ services:
 
   prometheus:
     image: prom/prometheus:v2.55.1
-    container_name: meridian-prometheus
+    container_name: conduit-prometheus
     volumes:
       - ./infra/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
@@ -69,7 +69,7 @@ services:
 
   grafana:
     image: grafana/grafana:11.3.1
-    container_name: meridian-grafana
+    container_name: conduit-grafana
     ports:
       - "3000:3000"
     environment:
@@ -82,6 +82,57 @@ services:
     depends_on:
       - prometheus
       - tempo
+      - loki
+    restart: unless-stopped
+
+  # ── Logs: Loki (store) + Promtail (Docker log shipper) ───────────────────────
+
+  loki:
+    image: grafana/loki:2.9.8
+    container_name: conduit-loki
+    command: ["-config.file=/etc/loki/config.yaml"]
+    volumes:
+      - ./infra/loki/config.yaml:/etc/loki/config.yaml:ro
+      - loki-data:/loki
+    ports:
+      - "3100:3100"   # Loki HTTP (push + query API)
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  promtail:
+    image: grafana/promtail:2.9.8
+    container_name: conduit-promtail
+    command: ["-config.file=/etc/promtail/promtail.yaml"]
+    volumes:
+      - ./infra/promtail/promtail.yaml:/etc/promtail/promtail.yaml:ro
+      # Docker socket — promtail uses docker_sd_configs to discover containers and
+      # stream their stdout/stderr via the Docker API (no host log-file mount needed).
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - loki
+    restart: unless-stopped
+
+  # ── Container resource metrics: cAdvisor (CPU/mem per container → Prometheus) ──
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: conduit-cadvisor
+    ports:
+      - "8090:8080"   # cAdvisor UI + /metrics (host 8090 — 8085/8086 taken by mocks)
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    privileged: true
+    devices:
+      - /dev/kmsg
     restart: unless-stopped
 
   # ── Gateway (Java/Spring Boot — the thing we're building) ────────────────────
@@ -90,32 +141,42 @@ services:
     build:
       context: ./gateway
       dockerfile: Dockerfile
-    container_name: meridian-gateway
+    container_name: conduit-gateway
     ports:
       - "8080:8080"
     environment:
-      MERIDIAN_LLM_INTENT_CLASSIFIER_BASE_URL: ${MERIDIAN_LLM_INTENT_CLASSIFIER_BASE_URL:-https://api.openai.com/v1}
-      MERIDIAN_LLM_INTENT_CLASSIFIER_API_KEY: ${MERIDIAN_LLM_INTENT_CLASSIFIER_API_KEY:-}
-      MERIDIAN_LLM_INTENT_CLASSIFIER_MODEL: ${MERIDIAN_LLM_INTENT_CLASSIFIER_MODEL:-gpt-4o-mini}
-      MERIDIAN_LLM_ENTITY_EXTRACTOR_BASE_URL: ${MERIDIAN_LLM_ENTITY_EXTRACTOR_BASE_URL:-https://api.openai.com/v1}
-      MERIDIAN_LLM_ENTITY_EXTRACTOR_API_KEY: ${MERIDIAN_LLM_ENTITY_EXTRACTOR_API_KEY:-}
-      MERIDIAN_LLM_ENTITY_EXTRACTOR_MODEL: ${MERIDIAN_LLM_ENTITY_EXTRACTOR_MODEL:-gpt-4o-mini}
-      MERIDIAN_LLM_SYNTHESIZER_BASE_URL: ${MERIDIAN_LLM_SYNTHESIZER_BASE_URL:-https://api.openai.com/v1}
-      MERIDIAN_LLM_SYNTHESIZER_API_KEY: ${MERIDIAN_LLM_SYNTHESIZER_API_KEY:-}
-      MERIDIAN_LLM_SYNTHESIZER_MODEL: ${MERIDIAN_LLM_SYNTHESIZER_MODEL:-gpt-4o-mini}
+      CONDUIT_LLM_INTENT_CLASSIFIER_BASE_URL: ${CONDUIT_LLM_INTENT_CLASSIFIER_BASE_URL:-https://api.z.ai/api/paas/v4}
+      CONDUIT_LLM_INTENT_CLASSIFIER_API_KEY: ${CONDUIT_LLM_INTENT_CLASSIFIER_API_KEY:-}
+      CONDUIT_LLM_INTENT_CLASSIFIER_MODEL: ${CONDUIT_LLM_INTENT_CLASSIFIER_MODEL:-glm-4.5-flash}
+      CONDUIT_LLM_ENTITY_EXTRACTOR_BASE_URL: ${CONDUIT_LLM_ENTITY_EXTRACTOR_BASE_URL:-https://api.z.ai/api/paas/v4}
+      CONDUIT_LLM_ENTITY_EXTRACTOR_API_KEY: ${CONDUIT_LLM_ENTITY_EXTRACTOR_API_KEY:-}
+      CONDUIT_LLM_ENTITY_EXTRACTOR_MODEL: ${CONDUIT_LLM_ENTITY_EXTRACTOR_MODEL:-glm-4.5-flash}
+      CONDUIT_LLM_SYNTHESIZER_BASE_URL: ${CONDUIT_LLM_SYNTHESIZER_BASE_URL:-https://api.z.ai/api/paas/v4}
+      CONDUIT_LLM_SYNTHESIZER_API_KEY: ${CONDUIT_LLM_SYNTHESIZER_API_KEY:-}
+      CONDUIT_LLM_SYNTHESIZER_MODEL: ${CONDUIT_LLM_SYNTHESIZER_MODEL:-glm-4.6}
       SPRING_DATA_REDIS_HOST: redis-stack
       SPRING_DATA_REDIS_PORT: 6379
-      MERIDIAN_EMBEDDING_PROVIDER: remote
-      MERIDIAN_EMBEDDING_REMOTE_URL: http://embeddings:8083/v1/embeddings
-      MERIDIAN_EMBEDDING_DIMENSION: 384
+      CONDUIT_EMBEDDING_PROVIDER: remote
+      CONDUIT_EMBEDDING_REMOTE_URL: http://embeddings:8083/v1/embeddings
+      CONDUIT_EMBEDDING_DIMENSION: 384
       # OTel export — all signals through the collector; collector fans out to Tempo + Langfuse.
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       MANAGEMENT_OTLP_TRACING_ENDPOINT: http://otel-collector:4318/v1/traces
       MANAGEMENT_OTLP_METRICS_EXPORT_URL: http://otel-collector:4318/v1/metrics
       CERBOS_HOST: cerbos
       CERBOS_HTTP_PORT: 3592
-      # Phase 8: RS256 JWKS endpoint — gateway fetches public key for JWT verification
-      MERIDIAN_AUTH_JWKS_URL: http://user-mgmt:8084/.well-known/jwks.json
+      # Phase 8: RS256 JWKS endpoint — use direct /oauth2/jwks (no redirect hop)
+      CONDUIT_AUTH_JWKS_URL: http://iam-service:8084/oauth2/jwks
+      WEALTH_COVERAGE_URL: http://wealth-coverage:8086
+      # World B: second domain (insurance) onboarded by manifests + services only —
+      # no gateway code change. The insurance domain manifest references these URLs.
+      INSURANCE_HTTP_URL: http://insurance-http:8087
+      INSURANCE_COVERAGE_URL: http://insurance-coverage:8088
+      # World B: agent + domain manifests are read from the mounted ./registry volume,
+      # NOT baked into the image. Onboard a domain by dropping JSON here + restart.
+      CONDUIT_REGISTRY_LOCATION: file:/registry/
+    volumes:
+      - ./registry:/registry:ro
     depends_on:
       redis-stack:
         condition: service_healthy
@@ -123,7 +184,11 @@ services:
         condition: service_healthy
       cerbos:
         condition: service_healthy
-      user-mgmt:
+      iam-service:
+        condition: service_healthy
+      insurance-http:
+        condition: service_healthy
+      insurance-coverage:
         condition: service_healthy
       otel-collector:
         condition: service_started
@@ -141,7 +206,7 @@ services:
     build:
       context: ./mock-agents/embeddings
       dockerfile: Dockerfile
-    container_name: meridian-embeddings
+    container_name: conduit-embeddings
     ports:
       - "8083:8083"
     healthcheck:
@@ -158,7 +223,7 @@ services:
     build:
       context: ./mock-agents/wealth
       dockerfile: Dockerfile
-    container_name: meridian-wealth-http
+    container_name: conduit-wealth-http
     ports:
       - "8081:8081"
     environment:
@@ -188,7 +253,7 @@ services:
     build:
       context: ./mock-agents/servicing
       dockerfile: Dockerfile
-    container_name: meridian-servicing-mcp
+    container_name: conduit-servicing-mcp
     ports:
       - "8082:8082"
     environment:
@@ -222,11 +287,61 @@ services:
       start_period: 15s
     restart: unless-stopped
 
+  wealth-coverage:
+    build:
+      context: ./mock-agents/wealth-coverage
+      dockerfile: Dockerfile
+    container_name: wealth-coverage
+    ports:
+      - "8086:8086"
+    environment:
+      PYTHONUNBUFFERED: "1"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8086/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── World B: second domain (Insurance) — onboarded by manifests + services only ──
+
+  insurance-http:
+    build:
+      context: ./mock-agents/insurance
+      dockerfile: Dockerfile
+    container_name: conduit-insurance-http
+    ports:
+      - "8087:8087"
+    environment:
+      PYTHONUNBUFFERED: "1"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8087/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  insurance-coverage:
+    build:
+      context: ./mock-agents/insurance-coverage
+      dockerfile: Dockerfile
+    container_name: insurance-coverage
+    ports:
+      - "8088:8088"
+    environment:
+      PYTHONUNBUFFERED: "1"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8088/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   # ── Chat UI (LibreChat — config + cosmetic only; no code fork) ────────────────
 
   librechat:
     image: registry.librechat.ai/danny-avila/librechat-dev:latest
-    container_name: meridian-librechat
+    container_name: conduit-librechat
     ports:
       - "3080:3080"
     environment:
@@ -246,8 +361,8 @@ services:
       DOMAIN_SERVER: "http://localhost:3080"
       OPENID_CLIENT_ID: "meridian-librechat"
       OPENID_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-meridian-client-secret-dev}
-      # LibreChat (inside Docker) fetches discovery from user-mgmt on Docker network
-      OPENID_ISSUER: "http://user-mgmt:8084"
+      # Must match IAM_ISSUER_URL — LibreChat validates the JWT `iss` claim against this.
+      OPENID_ISSUER: ${IAM_ISSUER_URL:-http://host.docker.internal:8084}
       # Path only — LibreChat prepends DOMAIN_SERVER
       OPENID_CALLBACK_URL: "/oauth/openid/callback"
       OPENID_BUTTON_LABEL: "Login with Meridian SSO"
@@ -257,6 +372,9 @@ services:
       # Allow HTTP issuers in dev (production must use HTTPS)
       OPENID_ALLOW_HTTP: "true"
       NO_INDEX: "true"
+      # Increase rate limits for E2E test environment — many rapid login attempts
+      LOGIN_MAX: "200"
+      LOGIN_WINDOW: "1"
     volumes:
       - ./.env:/app/.env:ro
       - ./librechat/librechat.yaml:/app/librechat.yaml:ro
@@ -269,10 +387,10 @@ services:
         condition: service_healthy
       gateway:
         condition: service_healthy
-      user-mgmt:
+      iam-service:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3080/"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3080/"]
       interval: 15s
       timeout: 10s
       retries: 20
@@ -282,7 +400,7 @@ services:
   # ── Cerbos PDP — policy enforcement point for ABAC entitlements ──────────────
   cerbos:
     image: ghcr.io/cerbos/cerbos:latest
-    container_name: meridian-cerbos
+    container_name: conduit-cerbos
     ports:
       - "3594:3592"   # HTTP API (host 3594 to avoid conflict with other cerbos instances)
       - "3595:3593"   # gRPC
@@ -297,34 +415,84 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  # ── User Management Service — separate admin plane (JWT issuance + user CRUD) ─
-  user-mgmt:
+  # ── Postgres — primary data store for iam-service (principals, roles, domains) ──
+  postgres:
+    image: postgres:16-alpine
+    container_name: conduit-postgres
+    environment:
+      POSTGRES_USER: meridian
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-meridian_dev}
+      POSTGRES_DB: meridian
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U meridian"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # ── IAM Service — Java 21 + Spring Boot 3.5 (JWT issuance + user CRUD + OIDC) ──
+  iam-service:
     build:
-      context: ./user-mgmt
+      context: ./iam-service
       dockerfile: Dockerfile
-    container_name: meridian-user-mgmt
+    image: conduit/iam-service:latest
+    container_name: conduit-iam-service
     ports:
       - "8084:8084"
     environment:
-      REDIS_HOST: redis-stack
-      REDIS_PORT: 6379
-      # OIDC: issuer URL used inside Docker network (must match OPENID_ISSUER in LibreChat)
-      OIDC_ISSUER: "http://user-mgmt:8084"
-      # Browser-accessible URL for the /oauth/authorize redirect
-      OIDC_BASE_URL: "http://localhost:8084"
-      OIDC_CLIENT_ID: "meridian-librechat"
-      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-meridian-client-secret-dev}
-      # Demo default password for all seeded users (override to customize)
-      DEMO_PASSWORD: ${DEMO_PASSWORD:-Meridian@2024}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/meridian
+      SPRING_DATASOURCE_USERNAME: meridian
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-meridian_dev}
+      IAM_ISSUER_URL: ${IAM_ISSUER_URL:-http://host.docker.internal:8084}
+      IAM_ADMIN_PASSWORD: ${IAM_ADMIN_PASSWORD:-Meridian@2024}
+      CERBOS_HOST: cerbos
+      CERBOS_PORT: "3593"
+      CERBOS_AUTHZ_ENABLED: ${CERBOS_AUTHZ_ENABLED:-true}
+      IAM_SEED_ENABLED: "true"
+      ZAI_API_KEY: ${ZAI_API_KEY:-}
+      IAM_POLICY_GENERATION_ENABLED: ${IAM_POLICY_GENERATION_ENABLED:-true}
+      # Quality tier: policy drafting is rare + human-approved, so a strong (not max)
+      # model is right. Reconciled to glm-4.6 to match the Java default and the
+      # model-selection guide; override to a stronger model when one is available.
+      IAM_POLICY_GENERATION_MODEL: ${IAM_POLICY_GENERATION_MODEL:-glm-4.6}
+      # OAuth2 client registration — must match LibreChat's OPENID_CLIENT_ID/SECRET
+      IAM_LIBRECHAT_CLIENT_ID: "meridian-librechat"
+      IAM_LIBRECHAT_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-meridian-client-secret-dev}
+      IAM_LIBRECHAT_REDIRECT_URI: ${IAM_LIBRECHAT_REDIRECT_URI:-http://localhost:3080/oauth/openid/callback}
     depends_on:
-      redis-stack:
+      postgres:
+        condition: service_healthy
+      cerbos:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8084/health')"]
+      test: ["CMD","wget","--no-verbose","--tries=1","--spider","http://localhost:8084/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 60s
+    restart: unless-stopped
+
+  # ── Admin UI — React SPA for user/role management (served by nginx) ─────────
+  admin-ui:
+    build:
+      context: ./admin-ui
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8084
+    container_name: conduit-admin-ui
+    ports:
+      - "5180:80"
+    depends_on:
+      iam-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/"]
       interval: 10s
       timeout: 5s
-      retries: 10
-      start_period: 15s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
 
   # ── Glass-box live decision trace panel ───────────────────────────────────────
@@ -332,7 +500,7 @@ services:
     build:
       context: ./glassbox
       dockerfile: Dockerfile
-    container_name: meridian-glassbox
+    container_name: conduit-glassbox
     ports:
       - "4000:4000"
     depends_on:
@@ -345,11 +513,11 @@ services:
   # ── MinIO — S3-compatible blob store for Langfuse v3 event/media storage ────────
   minio:
     image: minio/minio:latest
-    container_name: meridian-minio
+    container_name: conduit-minio
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: minio
-      MINIO_ROOT_PASSWORD: miniosecret
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-miniosecret}
     volumes:
       - minio-data:/data
     healthcheck:
@@ -362,13 +530,13 @@ services:
   # Create the required Langfuse bucket in MinIO at startup
   minio-init:
     image: minio/mc:latest
-    container_name: meridian-minio-init
+    container_name: conduit-minio-init
     depends_on:
       minio:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-      mc alias set local http://minio:9000 minio miniosecret &&
+      mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minio} ${MINIO_ROOT_PASSWORD:-miniosecret} &&
       mc mb --ignore-existing local/langfuse-events &&
       mc mb --ignore-existing local/langfuse-media &&
       echo 'MinIO buckets ready'
@@ -377,10 +545,10 @@ services:
 
   clickhouse:
     image: clickhouse/clickhouse-server:24.3.3
-    container_name: meridian-clickhouse
+    container_name: conduit-clickhouse
     environment:
-      CLICKHOUSE_USER: clickhouse
-      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-clickhouse}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhouse}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
     volumes:
       - clickhouse-data:/var/lib/clickhouse
@@ -394,10 +562,10 @@ services:
 
   langfuse-db:
     image: postgres:16-alpine
-    container_name: meridian-langfuse-db
+    container_name: conduit-langfuse-db
     environment:
-      POSTGRES_USER: langfuse
-      POSTGRES_PASSWORD: langfuse
+      POSTGRES_USER: ${LANGFUSE_DB_USER:-langfuse}
+      POSTGRES_PASSWORD: ${LANGFUSE_DB_PASSWORD:-langfuse}
       POSTGRES_DB: langfuse
     volumes:
       - langfuse-db-data:/var/lib/postgresql/data
@@ -410,7 +578,7 @@ services:
 
   langfuse:
     image: langfuse/langfuse:3
-    container_name: meridian-langfuse
+    container_name: conduit-langfuse
     depends_on:
       langfuse-db:
         condition: service_healthy
@@ -423,33 +591,33 @@ services:
     ports:
       - "3030:3000"
     environment:
-      DATABASE_URL: postgresql://langfuse:langfuse@langfuse-db:5432/langfuse
-      NEXTAUTH_SECRET: meridian-langfuse-nextauth-secret
+      DATABASE_URL: postgresql://${LANGFUSE_DB_USER:-langfuse}:${LANGFUSE_DB_PASSWORD:-langfuse}@langfuse-db:5432/langfuse
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-meridian-langfuse-nextauth-secret}
       NEXTAUTH_URL: http://localhost:3030
-      SALT: meridian-langfuse-salt-changeme
-      ENCRYPTION_KEY: fb53c0e05d8044c734a1b20044e89f6c33783e489635b6e4bba69b231ce47bd8
+      SALT: ${LANGFUSE_SALT:-meridian-langfuse-salt-changeme}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-fb53c0e05d8044c734a1b20044e89f6c33783e489635b6e4bba69b231ce47bd8}
       TELEMETRY_ENABLED: "false"
       LANGFUSE_LOG_LEVEL: warn
       LANGFUSE_WORKER_HOST: http://langfuse-worker:3030
       # ClickHouse — columnar trace store (required in v3)
-      CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:clickhouse@clickhouse:9000
+      CLICKHOUSE_MIGRATION_URL: clickhouse://${CLICKHOUSE_USER:-clickhouse}:${CLICKHOUSE_PASSWORD:-clickhouse}@clickhouse:9000
       CLICKHOUSE_URL: http://clickhouse:8123
-      CLICKHOUSE_USER: clickhouse
-      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-clickhouse}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhouse}
       # MinIO — S3-compatible blob store for event/media uploads
       LANGFUSE_S3_EVENT_UPLOAD_ENABLED: "true"
       LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse-events
       LANGFUSE_S3_EVENT_UPLOAD_REGION: us-east-1
       LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
-      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
-      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: miniosecret
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-miniosecret}
       LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
       LANGFUSE_S3_MEDIA_UPLOAD_ENABLED: "true"
       LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse-media
       LANGFUSE_S3_MEDIA_UPLOAD_REGION: us-east-1
       LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://minio:9000
-      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: minio
-      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: miniosecret
+      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-miniosecret}
       LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
       LANGFUSE_S3_BATCH_EXPORT_ENABLED: "false"
       # Redis — required for OTLP ingestion queue (BullMQ)
@@ -461,16 +629,16 @@ services:
       LANGFUSE_INIT_ORG_NAME: "Meridian Bank"
       LANGFUSE_INIT_PROJECT_ID: meridian-gateway
       LANGFUSE_INIT_PROJECT_NAME: "Meridian AI Gateway"
-      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: pk-lf-meridian-public
-      LANGFUSE_INIT_PROJECT_SECRET_KEY: sk-lf-meridian-secret
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_PROJECT_PUBLIC_KEY:-pk-lf-meridian-public}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_PROJECT_SECRET_KEY:-sk-lf-meridian-secret}
       LANGFUSE_INIT_USER_EMAIL: admin@meridian.bank
       LANGFUSE_INIT_USER_NAME: Admin
-      LANGFUSE_INIT_USER_PASSWORD: changeme
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_ADMIN_PASSWORD:-changeme}
     restart: unless-stopped
 
   langfuse-worker:
     image: langfuse/langfuse-worker:3
-    container_name: meridian-langfuse-worker
+    container_name: conduit-langfuse-worker
     depends_on:
       langfuse-db:
         condition: service_healthy
@@ -481,30 +649,30 @@ services:
       redis-stack:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://langfuse:langfuse@langfuse-db:5432/langfuse
-      NEXTAUTH_SECRET: meridian-langfuse-nextauth-secret
-      SALT: meridian-langfuse-salt-changeme
-      ENCRYPTION_KEY: fb53c0e05d8044c734a1b20044e89f6c33783e489635b6e4bba69b231ce47bd8
+      DATABASE_URL: postgresql://${LANGFUSE_DB_USER:-langfuse}:${LANGFUSE_DB_PASSWORD:-langfuse}@langfuse-db:5432/langfuse
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-meridian-langfuse-nextauth-secret}
+      SALT: ${LANGFUSE_SALT:-meridian-langfuse-salt-changeme}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-fb53c0e05d8044c734a1b20044e89f6c33783e489635b6e4bba69b231ce47bd8}
       PORT: "3030"
       LANGFUSE_LOG_LEVEL: warn
       TELEMETRY_ENABLED: "false"
-      CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:clickhouse@clickhouse:9000
+      CLICKHOUSE_MIGRATION_URL: clickhouse://${CLICKHOUSE_USER:-clickhouse}:${CLICKHOUSE_PASSWORD:-clickhouse}@clickhouse:9000
       CLICKHOUSE_URL: http://clickhouse:8123
-      CLICKHOUSE_USER: clickhouse
-      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-clickhouse}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhouse}
       LANGFUSE_S3_EVENT_UPLOAD_ENABLED: "true"
       LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse-events
       LANGFUSE_S3_EVENT_UPLOAD_REGION: us-east-1
       LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
-      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
-      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: miniosecret
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-miniosecret}
       LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
       LANGFUSE_S3_MEDIA_UPLOAD_ENABLED: "true"
       LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse-media
       LANGFUSE_S3_MEDIA_UPLOAD_REGION: us-east-1
       LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://minio:9000
-      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: minio
-      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: miniosecret
+      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-miniosecret}
       LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
       LANGFUSE_S3_BATCH_EXPORT_ENABLED: "false"
       REDIS_HOST: redis-stack
@@ -518,30 +686,100 @@ services:
     build:
       context: ./scripts/eval-worker
       dockerfile: Dockerfile
-    container_name: meridian-eval-worker
+    container_name: conduit-eval-worker
+    profiles: [eval]
     depends_on:
       - langfuse
       - gateway
     environment:
-      LANGFUSE_PUBLIC_KEY: pk-lf-meridian-public
-      LANGFUSE_SECRET_KEY: sk-lf-meridian-secret
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PROJECT_PUBLIC_KEY:-pk-lf-meridian-public}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_PROJECT_SECRET_KEY:-sk-lf-meridian-secret}
       LANGFUSE_HOST: http://langfuse:3000
       GATEWAY_HOST: http://gateway:8080
-      USER_MGMT_HOST: http://user-mgmt:8084
+      USER_MGMT_HOST: http://iam-service:8084
       ZAI_API_KEY: ${ZAI_API_KEY}
       ZAI_BASE_URL: ${ZAI_BASE_URL:-https://api.z.ai/api/paas/v4}
       ZAI_EVAL_MODEL: ${ZAI_EVAL_MODEL:-glm-4.5-flash}
-      EVAL_POLL_INTERVAL_SECONDS: ${EVAL_POLL_INTERVAL_SECONDS:-60}
+      EVAL_POLL_INTERVAL_SECONDS: ${EVAL_POLL_INTERVAL_SECONDS:-300}
     restart: unless-stopped
+
+  # Continuous trace scorer: fetches recent Langfuse traces on a loop and posts
+  # grounding / partial-honesty / relevance / safety scores back (eval/langfuse_continuous.py).
+  # Passive (does not drive the gateway). Starts BY DEFAULT so live quality scores flow on `up`;
+  # the on-demand DeepEval release gate (langfuse-eval-worker, above) stays under `--profile eval`.
+  # (To run the gateway without continuous eval cost, add `profiles: [eval]` back here.)
+  eval-worker:
+    build:
+      context: ./eval
+      dockerfile: Dockerfile
+    container_name: conduit-eval-continuous
+    depends_on:
+      - langfuse
+    environment:
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PROJECT_PUBLIC_KEY:-pk-lf-meridian-public}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_PROJECT_SECRET_KEY:-sk-lf-meridian-secret}
+      LANGFUSE_HOST: http://langfuse:3000
+      ZAI_API_KEY: ${ZAI_API_KEY}
+      # Async/background judge. It is sequential + low-volume (a handful of calls per
+      # interval) — NOT concurrent load — so it runs on OpenAI for reliable structured
+      # output. The funnel (throttle + exponential backoff) is retained for whichever
+      # provider is set. To run it on GLM instead, point JUDGE_* at the Z.AI values.
+      JUDGE_BASE_URL: ${JUDGE_BASE_URL:-https://api.openai.com/v1}
+      JUDGE_API_KEY: ${JUDGE_API_KEY:-${CONDUIT_LLM_SYNTHESIZER_API_KEY}}
+      JUDGE_MODEL: ${JUDGE_MODEL:-gpt-4o-mini}
+      EVAL_TRACE_NAME: ${EVAL_TRACE_NAME:-chat-turn}
+      EVAL_JUDGE_THROTTLE_MS: ${EVAL_JUDGE_THROTTLE_MS:-300}
+      EVAL_JUDGE_MAX_RETRIES: ${EVAL_JUDGE_MAX_RETRIES:-4}
+      EVAL_INTERVAL_SECONDS: ${EVAL_INTERVAL_SECONDS:-300}
+      EVAL_LOOKBACK_HOURS: ${EVAL_LOOKBACK_HOURS:-24}
+      EVAL_TRACE_LIMIT: ${EVAL_TRACE_LIMIT:-50}
+    restart: unless-stopped
+
+  # ── Boot provisioner ──────────────────────────────────────────────────────────
+  # Idempotent seeds so `docker compose up` yields a fully working stack with NO manual
+  # steps (World-B "sweet bring-up"). Each runs once and exits.
+
+  # Seed demo principals into Redis (rm_jane / rm_carlos / uw_sam / rm_guest).
+  seed-users:
+    image: redis/redis-stack-server:7.4.0-v3
+    container_name: conduit-seed-users
+    depends_on:
+      redis-stack:
+        condition: service_healthy
+    volumes:
+      - ./scripts:/scripts:ro
+    environment:
+      REDIS_HOST: redis-stack
+      REDIS_PORT: "6379"
+    command: ["bash", "/scripts/seed-users.sh"]
+    restart: "no"
+
+  # Seed the Langfuse golden datasets (conduit-routing, conduit-synthesis). Retries until
+  # Langfuse + its self-seeded project are ready; the seeder itself is idempotent.
+  seed-datasets:
+    build:
+      context: ./eval
+      dockerfile: Dockerfile
+    container_name: conduit-seed-datasets
+    depends_on:
+      - langfuse
+    volumes:
+      - ./scripts:/scripts:ro
+    environment:
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PROJECT_PUBLIC_KEY:-pk-lf-meridian-public}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_PROJECT_SECRET_KEY:-sk-lf-meridian-secret}
+      LANGFUSE_HOST: http://langfuse:3000
+    command: ["sh", "/scripts/seed-datasets.sh"]
+    restart: "no"
 
   # ── k6 load test — Phase 7 only (scale profile) ───────────────────────────────
 
   k6:
     image: grafana/k6:latest
-    container_name: meridian-k6
+    container_name: conduit-k6
     profiles: [scale]
     volumes:
-      - ./loadtest:/scripts
+      - ./tests/load:/scripts
     environment:
       K6_OUT: "experimental-prometheus-rw=http://prometheus:9090/api/v1/write"
     command: run /scripts/load-test.js
@@ -556,3 +794,5 @@ volumes:
   langfuse-db-data:
   clickhouse-data:
   minio-data:
+  postgres_data:
+  loki-data:

@@ -1,0 +1,54 @@
+{
+  "agent_id": "acme.insurance.claim_status",
+  "name": "Insurance Claim Status",
+  "description": "Returns the status of an insurance claim: claim amount, status, incident date, and adjuster. Looks up a single claim by claim_id, or all claims filed against a policy by policy_id.",
+  "version": "1.0.0",
+  "provider": {
+    "organization": "Meridian Demo Bank"
+  },
+  "domain": "insurance",
+  "sub_domain": "claims-servicing",
+  "max_response_tokens": 1500,
+  "protocol": "http",
+  "connection": {
+    "openapi_url": "http://insurance-http:8087/openapi.json",
+    "operation_id": "get_claim_status"
+  },
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false
+  },
+  "skills": [
+    {
+      "id": "get_claim_status",
+      "name": "get_claim_status",
+      "description": "Retrieve the status of an insurance claim — amount, status, incident date, and adjuster — by claim ID, or list all claims on a policy.",
+      "tags": [
+        "claim",
+        "claim-status",
+        "claims",
+        "adjuster",
+        "loss",
+        "insurance"
+      ],
+      "examples": [
+        "what is the claim status for CLM-5501",
+        "show me the status of the claim",
+        "are there any open claims on this policy",
+        "who is the adjuster on this claim",
+        "what is the claim amount for the Continental Freight policy"
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    }
+  ],
+  "constraints": {
+    "is_mutating": false,
+    "data_classification": "confidential-pii",
+    "sla_timeout_ms": 30000
+  }
+}

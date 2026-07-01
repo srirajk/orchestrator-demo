@@ -33,3 +33,22 @@ datasources:
         enabled: true
       search:
         hide: false
+
+  - name: Loki
+    type: loki
+    uid: loki
+    access: proxy
+    url: http://loki:3100
+    editable: false
+    jsonData:
+      derivedFields:
+        - name: traceId
+          matcherRegex: 'traceId=([a-f0-9]{32})'
+          url: '${__value.raw}'
+          datasourceUid: tempo
+          urlDisplayLabel: 'Open in Tempo'
+        - name: traceId_json
+          matcherRegex: '"traceId":"([a-f0-9]{32})"'
+          url: '${__value.raw}'
+          datasourceUid: tempo
+          urlDisplayLabel: 'Open in Tempo'

@@ -1,4 +1,4 @@
-# Agent Catalog — The 9 Demo Agents (Meridian demo)
+# Agent Catalog — The 9 Demo Agents (Conduit demo)
 
 *Every agent the demo registers, fully specified, in one place. Two domains, split by
 protocol so the hero prompt fans across HTTP **and** MCP live.*

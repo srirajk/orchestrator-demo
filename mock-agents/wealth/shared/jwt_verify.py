@@ -1,7 +1,7 @@
 """
 Shared JWT verification for mock agents.
 
-Verifies RS256 JWTs issued by user-mgmt using the JWKS endpoint.
+Verifies RS256 JWTs issued by Axiom (iam-service) using the JWKS endpoint.
 Policy:
   - No Authorization header  → allow (gateway is trust boundary; startup introspection has no token)
   - Authorization: Bearer <token> present but invalid → 401
@@ -17,9 +17,9 @@ from jwt.algorithms import RSAAlgorithm
 
 log = logging.getLogger(__name__)
 
-JWKS_URL = os.getenv("JWKS_URL", "http://user-mgmt:8084/.well-known/jwks.json")
-VALID_ISSUERS = {"meridian-user-mgmt", "http://user-mgmt:8084"}
-EXPECTED_AUDIENCE = os.getenv("AGENT_JWT_AUDIENCE", "meridian-gateway")
+JWKS_URL = os.getenv("JWKS_URL", "http://iam-service:8084/.well-known/jwks.json")
+VALID_ISSUERS = {"http://host.docker.internal:8084", "http://iam-service:8084", "http://localhost:8084"}
+EXPECTED_AUDIENCE = os.getenv("AGENT_JWT_AUDIENCE", "conduit-gateway")
 
 # Simple in-process JWKS cache: {kid: public_key_pem, "_fetched_at": float}
 _jwks_cache: dict = {}

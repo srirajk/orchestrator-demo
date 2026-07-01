@@ -2,7 +2,7 @@
   "__inputs": [],
   "__requires": [],
   "annotations": {"list": []},
-  "description": "Meridian AI Gateway — request throughput, latency percentiles, intent distribution, agent call health",
+  "description": "Conduit AI Gateway — request throughput, latency percentiles, intent distribution, agent call health",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -10,7 +10,7 @@
   "links": [],
   "refresh": "10s",
   "schemaVersion": 38,
-  "tags": ["meridian", "performance"],
+  "tags": ["conduit", "performance"],
   "templating": {
     "list": [
       {
@@ -31,8 +31,8 @@
   "time": {"from": "now-1h", "to": "now"},
   "timepicker": {},
   "timezone": "browser",
-  "title": "Meridian Gateway — Performance",
-  "uid": "meridian-perf",
+  "title": "Conduit Gateway — Performance",
+  "uid": "conduit-perf",
   "version": 1,
   "panels": [
 
@@ -64,11 +64,11 @@
       "options": {"tooltip": {"mode": "multi"}},
       "targets": [
         {
-          "expr": "sum(rate(http_server_requests_seconds_count{job=\"meridian-gateway\", uri=\"/v1/chat/completions\", outcome=\"SUCCESS\"}[$rate_window]))",
+          "expr": "sum(rate(http_server_requests_seconds_count{job=\"conduit-gateway\", uri=\"/v1/chat/completions\", outcome=\"SUCCESS\"}[$rate_window]))",
           "legendFormat": "success"
         },
         {
-          "expr": "sum(rate(http_server_requests_seconds_count{job=\"meridian-gateway\", uri=\"/v1/chat/completions\", outcome!=\"SUCCESS\"}[$rate_window]))",
+          "expr": "sum(rate(http_server_requests_seconds_count{job=\"conduit-gateway\", uri=\"/v1/chat/completions\", outcome!=\"SUCCESS\"}[$rate_window]))",
           "legendFormat": "errors"
         }
       ],
@@ -97,15 +97,15 @@
       "id": 3,
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum(rate(http_server_requests_seconds_bucket{job=\"meridian-gateway\", uri=\"/v1/chat/completions\"}[$rate_window])) by (le))",
+          "expr": "histogram_quantile(0.50, sum(rate(http_server_requests_seconds_bucket{job=\"conduit-gateway\", uri=\"/v1/chat/completions\"}[$rate_window])) by (le))",
           "legendFormat": "p50"
         },
         {
-          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{job=\"meridian-gateway\", uri=\"/v1/chat/completions\"}[$rate_window])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{job=\"conduit-gateway\", uri=\"/v1/chat/completions\"}[$rate_window])) by (le))",
           "legendFormat": "p95"
         },
         {
-          "expr": "histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{job=\"meridian-gateway\", uri=\"/v1/chat/completions\"}[$rate_window])) by (le))",
+          "expr": "histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{job=\"conduit-gateway\", uri=\"/v1/chat/completions\"}[$rate_window])) by (le))",
           "legendFormat": "p99"
         }
       ],
@@ -134,8 +134,8 @@
       "id": 11,
       "targets": [
         {
-          "expr": "sum(rate(chat_intent_total{job=\"meridian-gateway\"}[$rate_window])) by (intent)",
-          "legendFormat": "{{intent}}"
+          "expr": "sum(rate(chat_intent_total{job=\"conduit-gateway\"}[$rate_window])) by (type)",
+          "legendFormat": "{{type}}"
         }
       ],
       "title": "Intent Distribution — by Type",
@@ -155,11 +155,11 @@
       "id": 12,
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum(rate(intent_classify_duration_seconds_bucket{job=\"meridian-gateway\"}[$rate_window])) by (le))",
+          "expr": "histogram_quantile(0.50, sum(rate(intent_classify_duration_seconds_bucket{job=\"conduit-gateway\"}[$rate_window])) by (le))",
           "legendFormat": "classify p50"
         },
         {
-          "expr": "histogram_quantile(0.95, sum(rate(intent_classify_duration_seconds_bucket{job=\"meridian-gateway\"}[$rate_window])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(intent_classify_duration_seconds_bucket{job=\"conduit-gateway\"}[$rate_window])) by (le))",
           "legendFormat": "classify p95"
         }
       ],
@@ -194,11 +194,11 @@
       "id": 21,
       "targets": [
         {
-          "expr": "sum(rate(http_client_requests_seconds_count{job=\"meridian-gateway\", outcome=\"SUCCESS\"}[$rate_window])) by (client_name, uri)",
+          "expr": "sum(rate(http_client_requests_seconds_count{job=\"conduit-gateway\", outcome=\"SUCCESS\"}[$rate_window])) by (client_name, uri)",
           "legendFormat": "{{client_name}} {{uri}}"
         },
         {
-          "expr": "sum(rate(http_client_requests_seconds_count{job=\"meridian-gateway\", outcome!=\"SUCCESS\"}[$rate_window])) by (client_name, uri)",
+          "expr": "sum(rate(http_client_requests_seconds_count{job=\"conduit-gateway\", outcome!=\"SUCCESS\"}[$rate_window])) by (client_name, uri)",
           "legendFormat": "ERROR {{client_name}} {{uri}}"
         }
       ],
@@ -219,7 +219,7 @@
       "id": 22,
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(http_client_requests_seconds_bucket{job=\"meridian-gateway\"}[$rate_window])) by (le, client_name))",
+          "expr": "histogram_quantile(0.95, sum(rate(http_client_requests_seconds_bucket{job=\"conduit-gateway\"}[$rate_window])) by (le, client_name))",
           "legendFormat": "{{client_name}} p95"
         }
       ],
@@ -247,7 +247,7 @@
       "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background"},
       "targets": [
         {
-          "expr": "sum(increase(http_server_requests_seconds_count{job=\"meridian-gateway\", uri=\"/v1/chat/completions\"}[1h]))",
+          "expr": "sum(increase(http_server_requests_seconds_count{job=\"conduit-gateway\", uri=\"/v1/chat/completions\"}[1h]))",
           "legendFormat": "Total Requests (1h)"
         }
       ],
@@ -271,7 +271,7 @@
       "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background"},
       "targets": [
         {
-          "expr": "sum(rate(http_server_requests_seconds_count{job=\"meridian-gateway\", uri=\"/v1/chat/completions\", outcome=\"SUCCESS\"}[$rate_window])) / sum(rate(http_server_requests_seconds_count{job=\"meridian-gateway\", uri=\"/v1/chat/completions\"}[$rate_window]))",
+          "expr": "sum(rate(http_server_requests_seconds_count{job=\"conduit-gateway\", uri=\"/v1/chat/completions\", outcome=\"SUCCESS\"}[$rate_window])) / sum(rate(http_server_requests_seconds_count{job=\"conduit-gateway\", uri=\"/v1/chat/completions\"}[$rate_window]))",
           "legendFormat": "Success Rate"
         }
       ],
@@ -295,7 +295,7 @@
       "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background"},
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{job=\"meridian-gateway\", uri=\"/v1/chat/completions\"}[$rate_window])) by (le))",
+          "expr": "histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{job=\"conduit-gateway\", uri=\"/v1/chat/completions\"}[$rate_window])) by (le))",
           "legendFormat": "p99 Latency"
         }
       ],

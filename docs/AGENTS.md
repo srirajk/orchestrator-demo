@@ -1,10 +1,10 @@
-# Meridian AI — Agent Guide
+# Conduit AI — Agent Guide
 
-## What is Meridian?
+## What is Conduit?
 
-Meridian is an AI assistant built for relationship managers at a private bank. A relationship manager (RM) looks after a book of high-net-worth clients — family offices, trusts, and individuals — and needs a unified view of each client's financial picture every day.
+Conduit is an AI assistant built for relationship managers at a private bank. A relationship manager (RM) looks after a book of high-net-worth clients — family offices, trusts, and individuals — and needs a unified view of each client's financial picture every day.
 
-That picture lives across two separate back-office systems that do not talk to each other. Meridian bridges them. An RM types one plain-English question. Meridian figures out which systems to ask, calls them in parallel, and returns one coherent answer — grounded entirely in real data, never invented.
+That picture lives across two separate back-office systems that do not talk to each other. Conduit bridges them. An RM types one plain-English question. Conduit figures out which systems to ask, calls them in parallel, and returns one coherent answer — grounded entirely in real data, never invented.
 
 ---
 
@@ -12,7 +12,7 @@ That picture lives across two separate back-office systems that do not talk to e
 
 **Relationship Manager (RM)** — the primary user. Sits with clients, manages their portfolio, handles their banking needs. Needs fast answers without toggling between six systems.
 
-**Example user: rm_jane** — a senior RM at Meridian Bank. Her book includes the Whitman Family Office and the Calderon Trust. She does not have access to the Okafor account (that belongs to a different RM). Meridian enforces this automatically.
+**Example user: rm_jane** — a senior RM at Meridian Bank. Her book includes the Whitman Family Office and the Calderon Trust. She does not have access to the Okafor account (that belongs to a different RM). Conduit enforces this automatically.
 
 ---
 
@@ -199,7 +199,7 @@ Both domains are accessed in a single question. An RM does not need to know whic
 
 > *"Give me a unified relationship briefing on the Whitman Family Office — current holdings, performance, and risk on the wealth side, plus any pending settlements, upcoming corporate actions, and cash position on the servicing side."*
 
-Meridian:
+Conduit:
 1. Identifies the client: "Whitman Family Office" → `REL-00042`, owned by `rm_jane`
 2. Confirms `rm_jane` is authorised to view this relationship (Cerbos check)
 3. Selects 7 of the 9 agents — all except `goal_planning` (not asked) and `nav` (no fund mentioned)
@@ -213,7 +213,7 @@ Total time from question to first word of answer: approximately 2–3 seconds.
 
 ## Entitlement — why Jane can't see Okafor
 
-If `rm_jane` asks about the **Okafor account** (`REL-00188`), Meridian does not return that data. The Okafor relationship belongs to a different RM (`rm_ken`). Jane is not in Okafor's authorised book.
+If `rm_jane` asks about the **Okafor account** (`REL-00188`), Conduit does not return that data. The Okafor relationship belongs to a different RM (`rm_ken`). Jane is not in Okafor's authorised book.
 
 This is enforced by **Cerbos** — a policy engine — before any agent is called. The request is pruned at the gateway level. The response tells Jane explicitly that access was denied, and the reason appears in the glass-box observability panel.
 
@@ -221,9 +221,9 @@ This is not a UI restriction. It is enforced at the data layer, on every request
 
 ---
 
-## What Meridian does not do
+## What Conduit does not do
 
-- **It does not invent data.** Every number in every answer comes from an agent. If an agent fails, Meridian says so explicitly rather than guessing.
+- **It does not invent data.** Every number in every answer comes from an agent. If an agent fails, Conduit says so explicitly rather than guessing.
 - **It does not execute trades or mutations.** All agents are read-only in this phase.
 - **It does not search the internet.** It is grounded entirely in the bank's own systems.
 - **It does not answer questions outside its domain.** Off-topic questions (weather, general knowledge) are handled as chitchat without routing to any agent.
