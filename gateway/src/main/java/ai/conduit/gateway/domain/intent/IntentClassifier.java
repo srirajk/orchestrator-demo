@@ -76,6 +76,10 @@ public class IntentClassifier {
             if (et.extractAs() == null) continue;
             p.append(extractionRule(et)).append("\n");
         }
+        p.append("- Extract ONLY from the user's LATEST message. If it names a NEW entity, extract THAT one.\n")
+         .append("  NEVER carry over a name or id that appears only in an earlier turn or a prior assistant\n")
+         .append("  reply — even if the current topic seems related. If the latest message names no entity,\n")
+         .append("  return null (the system carries prior context forward itself; do not fill it from history).\n");
         p.append("- NEVER invent identifiers; copy verbatim from the user's words\n\n");
 
         // Generic guardrail — kept verbatim (domain-invariant).
@@ -205,6 +209,16 @@ public class IntentClassifier {
         // Build conversation tail (last 6 messages) for context
         String conversationContext = buildContext(messages);
 
+        // The latest user message is the extraction target — spell it out so the model extracts
+        // the entity named THIS turn, not an id echoed from an earlier assistant reply. Prior
+        // context still informs classification (follow-up detection); it must NOT seed extraction.
+        String latestUser = latestUserMessage(messages);
+        if (!latestUser.isBlank()) {
+            conversationContext = conversationContext
+                + "\n\n--- LATEST USER MESSAGE (classify THIS message; extract entities ONLY from this text) ---\n"
+                + latestUser;
+        }
+
         // Compile the prompt from the manifest's entity_types + the configured domain context.
         List<EntityType> entityTypes = manifestStore.entityTypes();
         String systemPrompt = buildSystemPrompt(entityTypes, domainContext);
@@ -312,6 +326,16 @@ public class IntentClassifier {
                     if (val == null && et.defaultValue() != null && !et.defaultValue().isBlank()) {
                         val = et.defaultValue();
                     }
+                    // Deterministic anti-carryover guard (World-B: the LLM never produces an id).
+                    // If the value looks like a resolved id (matches the manifest's id_pattern) but
+                    // the user did NOT type it in their latest message, it was echoed from an earlier
+                    // turn — drop it so a stale entity can't silently survive a client pivot.
+                    if (val != null && et.isResolvable() && matchesIdPattern(et, val)
+                            && !latestUser.toLowerCase().contains(val.toLowerCase())) {
+                        log.debug("Dropping carried id '{}' for field '{}' — absent from latest user message '{}'",
+                                val, field, truncate(latestUser, 80));
+                        val = null;
+                    }
                     if (val != null && !val.isBlank()) references.put(field, val);
                 }
             }
@@ -328,6 +352,17 @@ public class IntentClassifier {
         return (v == null || v.isBlank() || "null".equalsIgnoreCase(v)) ? null : v;
     }
 
+    /** True if {@code val} contains a match for the entity's manifest-declared id_pattern. */
+    private static boolean matchesIdPattern(EntityType et, String val) {
+        String pattern = et.idPattern();
+        if (pattern == null || pattern.isBlank()) return false;
+        try {
+            return java.util.regex.Pattern.compile(pattern).matcher(val).find();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private String buildContext(List<Message> messages) {
         if (messages == null || messages.isEmpty()) return "(empty conversation)";
         int start = Math.max(0, messages.size() - 6);
@@ -335,6 +370,18 @@ public class IntentClassifier {
                 .filter(m -> m.content() != null && !m.content().isBlank())
                 .map(m -> m.role().toUpperCase() + ": " + truncate(m.content(), 400))
                 .collect(Collectors.joining("\n"));
+    }
+
+    /** The most recent user message text (the extraction target), or "" if none. */
+    private String latestUserMessage(List<Message> messages) {
+        if (messages == null) return "";
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            Message m = messages.get(i);
+            if (m.content() != null && !m.content().isBlank() && "user".equalsIgnoreCase(m.role())) {
+                return m.content().strip();
+            }
+        }
+        return "";
     }
 
     private String truncate(String s, int max) {

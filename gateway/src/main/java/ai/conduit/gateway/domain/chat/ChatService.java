@@ -407,8 +407,15 @@ public class ChatService {
 
                 if (coverage != null) {
                     try {
-                        if (carriedCoverageId != null) {
-                            // Session already carries a verified relationship — just re-check.
+                        // A client named in THIS turn takes precedence over any session-carried id.
+                        // Otherwise an explicit pivot ("show me the Okafor relationship") would be
+                        // silently answered against the previous client, skipping its re-resolution
+                        // and entitlement re-check. Only reuse the carried id when no new client is named.
+                        boolean namedThisTurn = coverageEntity != null && preExtracted != null
+                                && preExtracted.reference(coverageEntity.extractAs()) != null;
+
+                        if (carriedCoverageId != null && !namedThisTurn) {
+                            // No new client named — reuse the session's verified relationship, just re-check.
                             CoverageCheckResult check = coverageClient.check(
                                 principalId, tenantId, carriedCoverageId, coverage);
                             if (!check.allowed()) {
@@ -420,9 +427,9 @@ public class ChatService {
                             }
                             coverageRelId = carriedCoverageId;
 
-                        } else if (coverageEntity != null && preExtracted != null
-                                && preExtracted.reference(coverageEntity.extractAs()) != null) {
-                            // RM named a client — resolve the text to a canonical relationship ID.
+                        } else if (namedThisTurn) {
+                            // RM named a client this turn — resolve the text to a canonical relationship ID
+                            // (precedence over any carried id, so pivots re-resolve AND re-authorize).
                             CoverageResolveResult resolveResult = coverageClient.resolve(
                                 preExtracted.reference(coverageEntity.extractAs()),
                                 coverageEntity.resolveType(), principalId, coverage);
