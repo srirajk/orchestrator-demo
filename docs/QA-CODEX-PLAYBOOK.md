@@ -9,6 +9,31 @@
 
 ---
 
+## Executor briefing — read this FIRST
+- **The env is already UP and pre-seeded.** Run **§1–§6 on the running stack first.** Only run
+  **§7 (`down -v`) LAST** — running it first wipes the pristine state and costs ~10 min to rebuild.
+- **Timing / be patient:** chat answers take **20–90s** (7-agent LLM fan-out — *not* a hang); eval
+  **scores appear only after the scorer's cycle, up to ~5 min** after traffic; after `up`, Langfuse
+  needs ~30–60s and the gateway ~15s to be ready.
+- **The gateway ALWAYS streams SSE** (even with `"stream":false`) — parse `data:` lines and
+  concatenate `delta.content`; don't expect a single JSON body.
+- **You CAN type credentials** into login forms (SSO / Grafana / Langfuse) — that's expected here.
+- **Assertion tips (avoid false negatives):** the denial message is exactly *"Access denied for this
+  client relationship."* (assert on "denied"); some Grafana panels are in-flight gauges (**0 at rest
+  is OK**) or need failure traffic; multi-domain requests carry **multiple** `domain:`/`agent:` tags.
+- **convId gotcha:** the Grafana *Conversation Trace* dashboard variable is the **gateway-derived
+  `conv-…` id** (a trace's `sessionId`), **NOT** the LibreChat URL UUID.
+- **If Axiom SSO shows a TLS / "invalid character" error:** Chrome is auto-upgrading
+  `http://host.docker.internal:8084` → https. Fix: clear HSTS for `host.docker.internal` at
+  `chrome://net-internals/#hsts`, and ensure `/etc/hosts` has `127.0.0.1 host.docker.internal`.
+- **Do NOT:** touch the separate `backend-*` containers (a different project on this host); modify
+  `.env`; commit or push; or delete data beyond the `down -v` in §7. On a failing step, capture a
+  screenshot + the actual response and report — **don't loop**.
+- **Green bar:** §1–§6 pass on the live stack → then §7 (`down -v` → `up -d --build`) self-restores
+  everything and §1–§6 pass again.
+
+---
+
 ## 0. Preflight
 
 ### 0.1 URLs & logins
