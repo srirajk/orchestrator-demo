@@ -66,10 +66,14 @@ Do **after** #1. Host prereqs: `/etc/hosts` `127.0.0.1 host.docker.internal`; re
 ## Next time `conduit` is up (the live pass)
 1. `docker compose build gateway iam-service` (both now source-built) → `up -d`.
 2. `bash scripts/seed-users.sh`, generate a little traffic.
-3. Query Prometheus for exact metric names → fix dashboard panels (#3, #4).
-4. Confirm buckets/latency panels populate (#2), Langfuse health-noise gone (#5).
-5. User logs into Grafana → screenshot all 7 (#6).
-6. Optional `down -v` reproducibility run (#7).
+3. **Re-run e2e** — `scripts/verify.sh` (build→up→smoke→e2e→eval) or
+   `cd tests/e2e && npx playwright test --timeout=240000`. Confirms the **SSO fix** + the
+   observability/build changes didn't regress (last full run was 89/89, *before* those). Watch the
+   `03-jwt` / `09-cerbos` auth specs especially.
+4. Query Prometheus for exact metric names → fix dashboard panels (#3, #4).
+5. Confirm buckets/latency panels populate (#2), Langfuse health-noise gone (#5).
+6. User logs into Grafana → screenshot all 7 (#6).
+7. Optional `down -v` reproducibility run (#7).
 
 ## Done earlier this session (do not redo)
 - OIDC SSO fixed (`client_secret_post` + id_token email/name) + committed
