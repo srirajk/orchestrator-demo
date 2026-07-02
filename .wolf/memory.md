@@ -1501,3 +1501,6 @@
 | 01:15 | Edited docs/GTM-DESIGN-BRIEF.md | 4→8 lines | ~170 |
 | 01:15 | Edited docs/GTM-DESIGN-BRIEF.md | 1→2 lines | ~31 |
 | 01:15 | De-jargonized GTM brief: World B -> zero-code domain onboarding in external copy; stack footer reframed to standards/operability, no language versions | docs/GTM-DESIGN-BRIEF.md | edited | ~300 |
+| 01:16 | Session end: 6 writes across 1 files (GTM-DESIGN-BRIEF.md) | 3 reads | ~9409 tok |
+| 01:20 | Created docs/GTM-DESIGN-BRIEF.md | — | ~4448 |
+| 01:21 | Rewrote Claude Design prompt as context-first (room, trace material, one big idea, interactive hero sim); added diagram guidance | docs/GTM-DESIGN-BRIEF.md | edited | ~1500 |

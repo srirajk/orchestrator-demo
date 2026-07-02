@@ -76,88 +76,174 @@ the answer still arrives and states what's missing), multi-turn context carry-fo
 7. **Proof, not promises:** the four live demo beats (hero answer / kill an agent / denied
    entitlement / ambiguous → clarify).
 
-## 4. Ready-to-paste Claude Design prompt
+## 4. Prompting philosophy (why the prompt below is shaped this way)
+
+Design models produce their worst work when handed a section list — they comply, and the
+result is a competent generic SaaS page. They produce their best work when they *understand*:
+who is in the room, what those people have been burned by, what single idea the page must
+land, and what real material they can render. So the prompt below is built as
+**context → one big idea → non-negotiables → explicit creative freedom**, and it feeds
+Claude Design a real request trace (actual IDs, dollar values, verdicts, plausible latencies)
+so the mockups look alive instead of lorem-ipsum. Two deliberate "mind-blow" instructions:
+
+- **The page IS the product.** Instead of screenshots, the hero is a working simulation of
+  the glass box: the question types itself, six stages light up with latencies and verdicts,
+  the answer streams with numbers visibly traced to source agents — and the visitor can
+  *kill an agent* or *ask outside their book* and watch the machinery respond honestly.
+- **The page practices what the product preaches.** Every stat on the page carries a small
+  provenance mark — a marketing page with an audit trail. That's the brand in one gesture.
+
+## 5. Architecture diagram — yes or no?
+
+**Not the engineering one, not on the marketing page.** A component diagram (Redis, Cerbos,
+collectors, vendor names) answers a question nobody on the page has asked yet, and reads as
+complexity. The recommendation, encoded in the prompt below:
+
+- **On the page:** the six-stage trace *is* the architecture visual — one question fanning
+  out through a gate to specialist systems and returning as one attributed answer. If a
+  diagram appears at all, it's that conceptual flow.
+- **In the technical leave-behind / CISO brief (section 7 variants):** yes, a real component
+  diagram belongs there — identity provider, policy engine, coverage services, protocol
+  adapters, observability plane. Bank technical diligence will ask for it; give it to them
+  at the evaluation stage, not the attraction stage.
+- The prompt still *teaches* Claude Design the true topology (in one paragraph) so anything
+  it draws is faithful — understanding the real system prevents decorative-but-wrong visuals.
+
+## 6. Ready-to-paste Claude Design prompt
 
 Paste everything inside the block below into Claude Design as-is. It's self-contained.
+(The trace latencies and routing scores are representative values for the simulation —
+swap in a captured trace later if you want them exact.)
 
 ```text
-Design a product marketing site (single scrolling page + matching one-pager layout) for
-"Conduit — the Enterprise AI Gateway for banks."
+You are designing the launch surface for "Conduit — the Enterprise AI Gateway." Before any
+layout work: understand the product and the room it has to win. Then design the page YOU
+believe wins that room. The structure suggestions below are a starting proposal, not a cage
+— if you have a stronger idea that keeps the non-negotiables true, take it.
 
-WHAT THE PRODUCT IS
-Conduit sits between a chat box and a bank's specialist systems. A relationship manager asks
-one plain-English question — "Give me a complete overview of the Whitman relationship:
-holdings, performance, settlement status, and cash position." Conduit classifies the intent,
-extracts the human references (never inventing IDs), routes semantically to the right
-specialist agents across HTTP and MCP protocols, checks entitlements BEFORE fetching any
-data (role-based + "is this client in your book?"), fans out in parallel, and streams back
-one synthesized answer where every number traces to a source system. The entire decision
-renders live in a "glass-box" audit panel: intent, chosen AND rejected routes, entitlement
-verdicts, per-agent latency, and what's missing if a system was down.
+THE ROOM YOU ARE DESIGNING FOR
+A bank's innovation committee: the CTO / head of platform (economic buyer), the CISO and a
+compliance officer (the veto), and two senior engineers who have seen everything. Every
+vendor deck they see says "AI-powered." Every one of them has watched a chatbot demo invent
+a client's portfolio value. In a bank, a number that is almost right is worse than no
+answer — it is a mis-advised client, a fired banker, a regulator letter. These people do
+not want magic; they want machinery. The page wins if the compliance officer — normally
+the person who kills AI projects — leaves wanting to champion this one.
 
-POSITIONING
-Category: enterprise AI gateway — trust infrastructure, NOT a chatbot, NOT RAG.
-Tagline direction: "One question. Every system. Every number real. Every decision visible."
-Audience: bank CTOs / heads of platform; compliance and CISO as the skeptics the design must
-win over. Tone: institutional confidence — precise, calm, engineered. Think "trading-floor
-infrastructure," not "AI startup gradient hype."
+WHAT CONDUIT IS (understand it — don't just render it)
+A relationship manager asks one plain-English question: "Give me a complete overview of
+the Whitman relationship: holdings, performance, settlement status, and cash position."
+Today that means logging into five portals across two business segments. Conduit is the
+gateway between the chat box and the bank's specialist systems. Here is what actually
+happens to that one question — this is real product behavior; use it as design material:
 
-PAGE STRUCTURE
-1. HERO — the one-liner, the hero question typed into a minimal chat input, and beside it a
-   stylized glass-box panel lighting up six stages: Intent → Route → Entitle → Fan-out →
-   Synthesize → Observe. The split-screen "answer + why" is the signature visual; make the
-   glass box the hero, not the chat.
-2. THE THREE FEARS — a three-column objection/answer section, verbatim:
-   • "It'll make up a number." → Agent outputs are the only ground truth. The LLM never
-     computes, recalls, or invents — and never produces an ID.
-   • "It'll leak data across books." → Entitlements are checked before any data is fetched —
-     structural (role × resource) and data-aware (is this entity in your book?).
-   • "We can't audit it." → A live glass box shows the whole decision: what was asked, how it
-     routed, what it was allowed to see, which systems answered, how long each took.
-3. HOW IT WORKS — the six-stage pipeline as a horizontal flow, each stage paired with its
-   guardrail (e.g. Fan-out: "a failed agent never cancels its siblings; the answer states
-   what's missing").
-4. THE PLATFORM CLAIM — ZERO-CODE DOMAIN ONBOARDING. The gateway carries zero domain
-   knowledge. A new business line is onboarded with configuration (domain manifests + one
-   coverage-service URL) — no gateway code. Proof line: "Insurance was added to a
-   wealth-and-servicing gateway by configuration alone. An automated check verifies zero
-   domain coupling on every change." Visualize as: domain manifests plugging into an
-   unchanged core. This is the cost-curve story: domain #2 costs config, not a project.
-5. MATURITY LADDER — Stage 1 (today, read-only): federated retrieval, "five portals → one
-   question," near-zero operational risk. Stage 2 (the expansion, same substrate): write
-   actions — resolve a settlement break, initiate a rebalance — each gated by human-in-the-
-   loop confirmation. Caption: "Same front door. Growing power behind it. Read earns the
-   trust; write captures the workflow."
-6. PROOF STRIP — four live demo beats as compact cards:
-   • Hero question → one grounded answer across HTTP + MCP agents, follow-ups answered from
-     conversation memory.
-   • Kill an agent mid-question → the answer still arrives and honestly states what's missing.
-   • Ask about a client outside your book → denied before any data is fetched.
-   • Ask something ambiguous → a scoped clarifying question, never a guess.
-   Plus stat chips: "0% errors under concurrent load" · "3 business domains live" · "zero
-   domain coupling, verified on every change" · "every answer scored for grounding, honesty,
-   relevance, and safety."
-7. INTEGRATION & OPERATIONS FOOTER — quiet labels about standards and operability, not
-   implementation tech: "Open protocols: MCP + OpenAPI" · "Policy-as-code authorization" ·
-   "OpenTelemetry-native observability" · "OIDC identity, verified at every hop" · optional
-   single reassurance line for platform teams: "Runs as one JVM service — the stack your
-   bank already operates." No language/framework version numbers.
-8. CTA — "See the glass box live" (demo request).
+1. INTENT + ENTITIES — an LLM classifies the ask (fetch / follow-up / clarify) and
+   extracts the human references: "the Whitman relationship." The LLM never produces an
+   ID; a deterministic lookup resolves "Whitman" → REL-00042. An unresolvable reference
+   triggers a scoped clarifying question — decided in code, never guessed.
+2. ROUTE — the question is vector-matched against every registered agent's declared
+   capabilities. Four agents selected (holdings 0.91 · performance 0.88 · settlement 0.84
+   · cash 0.82) and five rejected, with scores shown for BOTH lists. Rejection
+   transparency is a feature, not debug output.
+3. ENTITLE — before any data moves, two checks: structural (does this role get this
+   resource class — policy-as-code) and data-aware (is REL-00042 in rm_jane's book of
+   business?). Verdict: ALLOWED. Had it been denied, the request dies here — the data is
+   never fetched, not fetched-then-hidden.
+4. FAN-OUT — the four agents are called in parallel over their native protocols (REST and
+   MCP), each behind its own circuit breaker: holdings 240ms · performance 210ms ·
+   settlement 310ms · cash 190ms. A failed agent never cancels its siblings.
+5. SYNTHESIZE — an LLM merges the four payloads into one streamed answer. Agent outputs
+   are the ONLY truth: the model never computes, recalls, or invents a number. Total
+   portfolio value $1,967,000 — traceable to the holdings agent. If the settlement agent
+   was down, the answer says so, plainly.
+6. OBSERVE — all of the above renders live in the "glass box," an audit panel beside the
+   chat: what was asked, how it routed, what it was allowed to see, who answered, how
+   long each took, and what is missing.
 
-VISUAL DIRECTION
-Dark, precise, auditable. The glass-box motif should drive the system: thin luminous stage
-indicators, monospaced trace details (timestamps, latencies, verdict chips like ALLOWED /
-DENIED / DEGRADED), against a restrained institutional base — deep navy/graphite, one
-confident accent for "verified/grounded" moments. Data elements (numbers, IDs like
-REL-00042) render in mono with a subtle "traced to source" underline treatment. No generic
-robot/sparkle AI clichés. Accessibility: WCAG AA contrast throughout.
+THE ONE BIG IDEA (organize the entire page around this)
+The answer and the reason for the answer, side by side. Every AI vendor shows the chat;
+Conduit's product is the right-hand panel — the machinery of trust made visible. Tagline
+direction: "One question. Every system. Every number real. Every decision visible."
+
+MAKE THE PAGE *BE* THE PRODUCT
+Do not use static screenshots. The hero is a working simulation: the Whitman question
+types itself into a minimal chat input; beside it the six stages light up in sequence with
+verdict chips and latencies (ALLOWED · 0.91 · 240ms); the answer streams in with each
+number visibly traced to its source agent. Then hand the visitor the two killer
+interactions as toggles on the simulation:
+  • KILL AN AGENT — drop the settlement agent mid-request. The other three complete, the
+    answer still arrives, and it honestly states what is missing. Partial-failure honesty,
+    felt rather than claimed.
+  • ASK OUTSIDE YOUR BOOK — switch the client to one this banker does not cover. The
+    request dies at stage 3, DENIED, before any data is fetched. Show the stages after it
+    never lighting up.
+And let the page practice what the product preaches: every stat and claim on the page
+carries a small provenance mark (what it traces to), mirroring the product's grounding
+ethic. A marketing page with its own audit trail — that is the brand in one gesture.
+
+WHAT MUST BE TRUE ON THE PAGE (non-negotiables — the rest is yours)
+• The three fears, answered head-on, verbatim:
+  – "It'll make up a number." → Agent outputs are the only ground truth. The LLM never
+    computes, recalls, or invents — and never produces an ID.
+  – "It'll leak data across books." → Entitlements are checked before any data is fetched
+    — structural (role × resource) and data-aware (is this client in your book?).
+  – "We can't audit it." → A live glass box shows the whole decision: what was asked, how
+    it routed, what it was allowed to see, which systems answered, how long each took.
+• Zero-code domain onboarding: a new business line is onboarded with configuration
+  (domain manifests + one coverage-service URL) — no gateway code. Proof line: "Insurance
+  was added to a wealth-and-servicing gateway by configuration alone; an automated check
+  verifies zero domain coupling on every change." Cost-curve caption: "Domain #2 costs
+  config, not a project."
+• The maturity ladder: Stage 1 (today, read-only) — federated retrieval, five portals →
+  one question, near-zero operational risk. Stage 2 (the expansion, same substrate) —
+  write actions like resolving a settlement break, each gated by human-in-the-loop
+  confirmation. Caption: "Read earns the trust; write captures the workflow. Same front
+  door, growing verbs."
+• Proof chips: "0% errors under concurrent load" · "3 business domains live" · "zero
+  domain coupling, verified on every change" · "every answer scored for grounding,
+  honesty, relevance, and safety."
+• Standards footer (operability, not implementation tech): "Open protocols: MCP +
+  OpenAPI" · "Policy-as-code authorization" · "OpenTelemetry-native observability" ·
+  "OIDC identity, verified at every hop" · optional single reassurance line for platform
+  teams: "Runs as one JVM service — the stack your bank already operates." No language
+  or framework version numbers anywhere.
+• CTA: "See the glass box live."
+
+ARCHITECTURE DIAGRAM GUIDANCE
+Do NOT put an engineering component diagram (databases, collectors, vendor boxes) on this
+page. The six-stage trace IS the architecture visual: one question fanning out through a
+gate to specialist systems and returning as one attributed answer — if you draw a diagram,
+draw that flow. For your own understanding, so anything you draw is faithful: the true
+topology is chat UI → gateway (intent → route → entitle → fan-out → synthesize → observe)
+→ specialist agents over REST and MCP, with an OIDC identity provider verifying every hop,
+coverage services answering "is this client in your book?", a policy engine for structural
+authorization, and an observability plane scoring every answer for quality. A proper
+component diagram exists but belongs in the technical appendix for the CISO, not here.
+
+VISUAL DIRECTION (direction, not handcuffs)
+Institutional confidence — the aesthetic of trading infrastructure, not AI-startup
+sparkle. Dark, precise base (graphite / deep navy). One confident accent color, reserved
+exclusively for verified/grounded moments so the eye learns that color = trust. Monospace
+for anything that is data — REL-00042, $1,967,000, latencies, verdict chips ALLOWED /
+DENIED / DEGRADED — with a subtle traced-to-source underline treatment. Motion is
+meaning: things animate only when the machinery is doing something (stages lighting,
+answers streaming) — never decoration. WCAG AA contrast throughout. No robots, no
+sparkles, no gradient hype.
+
+DELIVERABLES
+1. The scrolling launch page with the working hero simulation described above.
+2. A matching static one-pager layout (print-friendly leave-behind).
+Where a structural suggestion above conflicts with a stronger design instinct, follow the
+instinct and keep the non-negotiables.
 ```
 
-## 5. Variants to ask Claude Design for after the first pass
+## 7. Variants to ask Claude Design for after the first pass
 
 - A 10–12 slide **pitch deck** using the same narrative spine (slide 1 = hero split-screen,
   slide for each fear, zero-code domain onboarding as the "why we win" slide, ladder as the
   "why now / roadmap").
-- A one-page **compliance brief** aimed at the CISO: the six guardrails, the glass box, and
-  the entitlement-before-fetch sequence diagram.
+- A one-page **compliance brief** aimed at the CISO: the six guardrails, the glass box, the
+  entitlement-before-fetch sequence — **this is where the real component diagram goes**
+  (identity provider, policy engine, coverage services, protocol adapters, observability
+  plane).
 - A **demo-day leave-behind**: the four beats as a card, QR to the runbook.

@@ -1,6 +1,6 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-07-02T01:15:43.599Z
+> Auto-maintained by OpenWolf. Last scanned: 2026-07-02T01:20:55.880Z
 > Files: 681 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/
@@ -275,7 +275,7 @@
 - `EVAL-PRODUCT-VISION.md` — Eval — Product Vision (framework + app) (~1004 tok)
 - `execution-orchestration-layer.md` — Execution / Orchestration Layer — Spec (~1323 tok)
 - `gateway-domain-architecture.md` — Conduit AI Gateway — Domain Architecture (~7275 tok)
-- `GTM-DESIGN-BRIEF.md` — Conduit — GTM & Design Brief (~2698 tok)
+- `GTM-DESIGN-BRIEF.md` — Conduit — GTM & Design Brief (~4170 tok)
 - `harness-and-telemetry-deep-spec.md` — Harness & Telemetry — Deep Spec (~2123 tok)
 - `implementation-checklist.md` — Implementation Checklist — Pre-Build Validation Spec (~4638 tok)
 - `input-synthesis-deep-spec.md` — Input Synthesis — Deep Spec (the one unproven piece) (~1951 tok)
