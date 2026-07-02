@@ -73,6 +73,13 @@ public class SecurityConfig {
     @Value("${spring.security.oauth2.authorizationserver.issuer:http://localhost:8084}")
     private String issuerUrl;
 
+    // Browser origins allowed to call this IAM cross-origin (Axiom's own admin/chat UIs).
+    // Comma-separated, env-overridable. Adding an origin here is CORS allowlist config only,
+    // not a change to auth logic. Default covers: legacy admin-ui (5180), Axiom admin console
+    // (5182), and LibreChat (3080).
+    @Value("${iam.cors.allowed-origins:http://localhost:5180,http://localhost:5182,http://localhost:3080}")
+    private List<String> corsAllowedOrigins;
+
     @Value("${iam.oauth2.librechat.client-id:librechat}")
     private String librechatClientId;
 
@@ -197,10 +204,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(
-                "http://localhost:5180",  // admin-ui
-                "http://localhost:3080"   // LibreChat
-        ));
+        config.setAllowedOrigins(corsAllowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);

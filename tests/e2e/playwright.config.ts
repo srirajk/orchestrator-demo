@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests',
-  fullyParallel: false,          // run sequentially — shared LibreChat state
+  fullyParallel: false,          // run sequentially — shared chat session state
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   workers: 1,
@@ -10,7 +10,7 @@ export default defineConfig({
   outputDir: 'test-results',
 
   use: {
-    baseURL: process.env.LIBRECHAT_URL || 'http://localhost:3080',
+    baseURL: process.env.CHAT_URL || 'http://localhost:8099',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',

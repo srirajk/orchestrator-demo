@@ -1,42 +1,26 @@
 import { test, expect } from '@playwright/test';
-import { registerOrLogin, LIBRECHAT_URL } from './helpers';
+import { registerOrLogin, CHAT_URL } from './helpers';
 
 /**
- * Phase 5 / M12 — Conduit branding.
- * The LibreChat UI must present itself as "Conduit AI", not generic LibreChat.
+ * Conduit branding — the canonical chat SPA (:8099) must present itself as "Conduit".
+ * (Replaces the legacy LibreChat placeholder-branding checks on :3080.)
  */
-test.describe('Branding', () => {
+test.describe('Branding (Conduit chat SPA)', () => {
 
-  test('root page is accessible', async ({ page }) => {
-    const resp = await page.goto(LIBRECHAT_URL, { waitUntil: 'domcontentloaded' });
-    expect(resp?.status()).toBeLessThan(400);
+  test('root page is reachable', async ({ page }) => {
+    const resp = await page.goto(`${CHAT_URL}/`, { waitUntil: 'domcontentloaded' });
+    // AuthGate may 302 to the IAM login, but the initial document must load without a server error.
+    expect((resp?.status() ?? 200)).toBeLessThan(400);
   });
 
-  test('chat textarea placeholder shows "Conduit AI"', async ({ page }) => {
+  test('document title is "Conduit"', async ({ page }) => {
     await registerOrLogin(page);
-
-    // Wait for the textarea to exist and its placeholder to be populated by React
-    await page.waitForFunction(
-      () => {
-        const el = document.querySelector('#prompt-textarea') as HTMLTextAreaElement | null;
-        return el !== null && el.placeholder.length > 0;
-      },
-      { timeout: 25_000 }
-    );
-
-    // React sets placeholder as a DOM property: "Message Conduit AI" — confirmed via live debug
-    const placeholder = await page.locator('#prompt-textarea').evaluate(
-      el => (el as HTMLTextAreaElement).placeholder
-    );
-    expect(placeholder).toMatch(/Conduit/i);
+    await expect(page).toHaveTitle(/Conduit/i, { timeout: 15_000 });
   });
 
-  test('model selector is hidden (modelSelect: false)', async ({ page }) => {
+  test('app chrome shows the Conduit brand', async ({ page }) => {
     await registerOrLogin(page);
-
-    // The model-select UI must not be visible — locked to Conduit AI in librechat.yaml
-    const modelSelect = page.locator('[data-testid="model-select"], button[aria-label*="Model"]').first();
-    const visible = await modelSelect.isVisible().catch(() => false);
-    expect(visible).toBe(false);
+    // The sidebar renders the Conduit wordmark once authenticated.
+    await expect(page.getByText(/Conduit/i).first()).toBeVisible({ timeout: 20_000 });
   });
 });

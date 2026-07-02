@@ -22,6 +22,18 @@ ask(){ local t; t=$(tok "$1"); curl -s -X POST "$GW/v1/chat/completions" -H "Con
   -d "{\"model\":\"conduit-assistant\",\"stream\":true,\"messages\":[{\"role\":\"user\",\"content\":\"$2\"}]}" 2>/dev/null \
   | python3 -c 'import sys,json;print("".join(json.loads(l[5:]).get("choices",[{}])[0].get("delta",{}).get("content","") for l in sys.stdin if l.startswith("data:") and l[5:].strip() not in ("","[DONE]")))' 2>/dev/null; }
 
+# ── Tier-1 fast gate: URLs + CORS preflights + persona logins (seconds, no LLM). ──
+# Run first so integration breakage (dead UI, CORS reject on a browser login path, broken
+# persona login) fails fast before the slow LLM/eval tiers below.
+echo "═══ TIER-1 FAST GATE (scripts/smoke-ui.sh) ═══"
+if bash "$(dirname "$0")/smoke-ui.sh"; then
+  echo "  🟢 Tier-1 passed — continuing to full smoke."
+else
+  echo "  🔴 Tier-1 failed — integration breakage; skipping slower LLM/eval tiers."
+  exit 1
+fi
+echo ""
+
 echo "═══ A. HEALTH ═══"
 [ "$(curl -s -o /dev/null -w '%{http_code}' $GW/v1/models)" = "200" ] && pass "gateway 200" || fail "gateway"
 [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3080/oauth/openid)" = "302" ] && pass "librechat 302" || fail "librechat"

@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.ExecutorService;
 
 /**
  * Pipes the gateway's SSE stream through to the client byte-for-byte while
@@ -41,13 +42,16 @@ public class ChatStreamService {
     private final MessageService messageService;
     private final ConversationService conversationService;
     private final ObjectMapper objectMapper;
+    private final ExecutorService backgroundExecutor;
 
     public ChatStreamService(MessageService messageService,
                              ConversationService conversationService,
-                             ObjectMapper objectMapper) {
+                             ObjectMapper objectMapper,
+                             ExecutorService backgroundExecutor) {
         this.messageService = messageService;
         this.conversationService = conversationService;
         this.objectMapper = objectMapper;
+        this.backgroundExecutor = backgroundExecutor;
     }
 
     /**
@@ -126,16 +130,55 @@ public class ChatStreamService {
         }
     }
 
+    /**
+     * Persists the turn <em>off the request thread</em>. On a client-abort (browser closes
+     * mid-stream) the request's virtual thread is interrupted; a Mongo save on an interrupted
+     * thread fails its lock acquisition with "Interrupted waiting for lock". Handing the save to
+     * a fresh, non-interrupted background thread lets the assistant message still persist, and
+     * turns a genuine abort into a clean no-op instead of an ERROR-level stack-trace spam.
+     */
     private void persist(Conversation conversation, String userId, String assistantContent, String userMessage) {
+        backgroundExecutor.execute(() -> savePersistently(conversation, userId, assistantContent, userMessage));
+    }
+
+    private void savePersistently(Conversation conversation, String userId, String assistantContent, String userMessage) {
         try {
-            messageService.append(conversation.getId(), userId, MessageService.ROLE_ASSISTANT, assistantContent);
+            if (assistantContent != null && !assistantContent.isEmpty()) {
+                messageService.append(conversation.getId(), userId, MessageService.ROLE_ASSISTANT, assistantContent);
+            }
             conversationService.touchAndMaybeTitle(conversation, userMessage);
         } catch (Exception ex) {
-            // The stream has already been delivered; a persistence error must not surface to the
-            // client. Log and continue, mirroring the reference Node BFF.
-            log.error("[stream] post-stream persistence failed for {}: {}",
-                    conversation.getId(), ex.getMessage(), ex);
+            if (isInterruption(ex)) {
+                // Client aborted mid-stream and the save was interrupted before it could complete.
+                // Expected and benign — not an error. Restore the interrupt flag and move on.
+                Thread.currentThread().interrupt();
+                log.debug("[stream] post-stream persistence interrupted (client abort) for {}: {}",
+                        conversation.getId(), ex.getMessage());
+            } else {
+                // The stream has already been delivered; a genuine persistence error must not
+                // surface to the client. Log and continue, mirroring the reference Node BFF.
+                log.error("[stream] post-stream persistence failed for {}: {}",
+                        conversation.getId(), ex.getMessage(), ex);
+            }
         }
+    }
+
+    /**
+     * True when a throwable chain is rooted in thread interruption / lock-wait interruption, or
+     * the current thread's interrupt flag is set. Covers {@link InterruptedException} however it
+     * is wrapped (e.g. Mongo's "Interrupted waiting for lock" {@code MongoInterruptedException}).
+     */
+    private static boolean isInterruption(Throwable ex) {
+        for (Throwable t = ex; t != null; t = t.getCause()) {
+            if (t instanceof InterruptedException) {
+                return true;
+            }
+            String message = t.getMessage();
+            if (message != null && message.toLowerCase().contains("interrupted")) {
+                return true;
+            }
+        }
+        return Thread.currentThread().isInterrupted();
     }
 
     private static String stripTrailingCr(String s) {

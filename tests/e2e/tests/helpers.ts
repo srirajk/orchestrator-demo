@@ -1,12 +1,20 @@
 import { Page, expect } from '@playwright/test';
 
-export const LIBRECHAT_URL  = process.env.LIBRECHAT_URL  || 'http://localhost:3080';
+// Canonical Conduit chat SPA (Axiom-authenticated BFF). This is the current UI.
+export const CHAT_URL       = process.env.CHAT_URL       || 'http://localhost:8099';
 export const GATEWAY_URL    = process.env.GATEWAY_URL    || 'http://localhost:8080';
 export const USER_MGMT_URL  = process.env.USER_MGMT_URL  || 'http://localhost:8084';
 export const GLASSBOX_URL   = process.env.GLASSBOX_URL   || 'http://localhost:4000';
 
-export const TEST_EMAIL    = 'meridian.e2e@test.local';
-export const TEST_PASSWORD = 'Meridian@E2E#2025!';
+// Legacy LibreChat origin — retained only for specs explicitly about the legacy UI.
+// The canonical path is CHAT_URL (:8099). Do not use this for new assertions.
+export const LIBRECHAT_URL  = process.env.LIBRECHAT_URL  || 'http://localhost:3080';
+
+// Axiom (IAM) is now the identity provider — there is no self-service registration in the
+// chat SPA. Log in as a seeded persona. rm_jane is the default golden-path RM.
+export const TEST_USER     = process.env.TEST_USER     || 'rm_jane';
+export const TEST_EMAIL    = TEST_USER;                 // back-compat alias (username, not an email)
+export const TEST_PASSWORD = process.env.IAM_USER_PASSWORD || 'Meridian@2024';
 
 // IAM service passwords — set via env to support rotated or CI-specific credentials.
 // These match the seeds in iam-service/src/main/resources/data.sql (bootstrap defaults).
@@ -34,117 +42,94 @@ export async function getJwt(userId: string): Promise<string> {
   return data.accessToken as string;
 }
 
-/** Register then login, or just login if account already exists. */
-export async function registerOrLogin(page: Page): Promise<void> {
-  // LibreChat is a React SPA — use 'load' not 'networkidle' (background sockets never go idle)
-  await page.goto('/login', { waitUntil: 'load', timeout: 45_000 });
+/**
+ * Log into the canonical chat SPA (:8099) via the Axiom OIDC flow.
+ *
+ * Flow: the SPA's AuthGate redirects an unauthenticated visitor to `/api/auth/login`
+ * → `/oauth2/authorization/conduit-chat` → the Axiom login page at
+ * `host.docker.internal:8084/login` (Spring form login, `#username` / `#password`)
+ * → OIDC callback → back to `:8099`, session established.
+ *
+ * Named `registerOrLogin` for back-compat with existing specs; Axiom is the IdP now, so
+ * there is no in-app registration — this simply logs in as a seeded persona.
+ */
+export async function registerOrLogin(
+  page: Page,
+  username: string = TEST_USER,
+  password: string = TEST_PASSWORD,
+): Promise<void> {
+  await page.goto(`${CHAT_URL}/`, { waitUntil: 'load', timeout: 45_000 });
 
-  // Wait for React to render the login form
-  await page.waitForSelector('#email', { state: 'visible', timeout: 25_000 });
-
-  await page.fill('#email', TEST_EMAIL);
-  await page.fill('#password', TEST_PASSWORD);
-  await page.click('button[type="submit"]');
-
-  // After a successful login LibreChat redirects to /c/new
-  try {
-    await page.waitForURL('**/c/**', { timeout: 12_000 });
+  // Already authenticated (session reused across tests)? The composer will be present.
+  const composer = page.locator('textarea').first();
+  if (await composer.isVisible({ timeout: 3_000 }).catch(() => false)) {
     return;
-  } catch {
-    // Login failed — account may not exist yet, try to register
   }
 
-  await page.goto('/register', { waitUntil: 'load', timeout: 45_000 });
-  await page.waitForSelector('#name, input[name="name"]', { state: 'visible', timeout: 20_000 });
+  // Otherwise AuthGate has bounced us to the Axiom login page (on :8084).
+  await page.waitForSelector('#username', { state: 'visible', timeout: 30_000 });
+  await page.fill('#username', username);
+  await page.fill('#password', password);
+  await page.click('button[type="submit"], input[type="submit"]');
 
-  await page.fill('#name', 'Meridian E2E Tester').catch(async () => {
-    await page.fill('input[name="name"]', 'Meridian E2E Tester');
-  });
-  await page.fill('#email', TEST_EMAIL);
-  await page.fill('#password', TEST_PASSWORD);
-
-  // LibreChat register form may have a confirm_password field
-  const confirmSel = '#confirm_password, #confirmPassword, input[name="confirm_password"]';
-  const confirmEl = page.locator(confirmSel).first();
-  if (await confirmEl.isVisible({ timeout: 3_000 }).catch(() => false)) {
-    await confirmEl.fill(TEST_PASSWORD);
+  // First login for a client may show a Spring Authorization Server consent screen.
+  // Approve it if present; otherwise this is a no-op.
+  const consent = page.locator('button:has-text("Submit"), button:has-text("Allow"), input[type="submit"]');
+  if (await consent.first().isVisible({ timeout: 3_000 }).catch(() => false)) {
+    // Only click if we're still on the IAM origin (consent), not already back on the SPA.
+    if (page.url().includes(':8084')) {
+      await consent.first().click().catch(() => {});
+    }
   }
 
-  await page.click('button[type="submit"]');
-  // Wait for either success (/c/...) or redirect back to /login (if email already exists).
-  try {
-    await page.waitForURL('**/c/**', { timeout: 20_000 });
-    return;  // registration succeeded
-  } catch {
-    // Registration may have failed (e.g., email already registered).
-    // Fall through to a final login attempt.
-  }
-
-  // Last resort — the account may already exist (created in a prior test run).
-  // Try logging in one more time before giving up.
-  await page.goto('/login', { waitUntil: 'load', timeout: 30_000 });
-  await page.waitForSelector('#email', { state: 'visible', timeout: 15_000 });
-  await page.fill('#email', TEST_EMAIL);
-  await page.fill('#password', TEST_PASSWORD);
-  await page.click('button[type="submit"]');
-  await page.waitForURL('**/c/**', { timeout: 20_000 });
+  // Back on the chat SPA with the composer rendered.
+  await page.waitForURL(/localhost:8099/, { timeout: 30_000 });
+  await composer.waitFor({ state: 'visible', timeout: 30_000 });
 }
 
 /** Send a message in the currently open conversation and wait for the reply. */
 export async function sendMessage(page: Page, text: string): Promise<string> {
-  // Confirmed selector from live inspection: #prompt-textarea (data-testid="text-input")
-  const inputBox = page.locator('#prompt-textarea').first();
+  // Conduit composer: a single <textarea> (placeholder "Ask anything…"); Enter sends.
+  const inputBox = page.locator('textarea').first();
   await inputBox.waitFor({ state: 'visible', timeout: 30_000 });
 
-  // Wait for any prior streaming reply to settle before sending the next message.
-  // Gateway responds in 16-20s; 45s gives comfortable buffer without bloating test time.
-  // This is a pre-send guard — waitForReply handles the post-send wait separately.
-  await expect(page.locator('#send-button')).toBeEnabled({ timeout: 45_000 }).catch(() => {});
+  // Wait for any prior streaming reply to settle (textarea is disabled while streaming).
+  await expect(inputBox).toBeEnabled({ timeout: 45_000 }).catch(() => {});
 
   await inputBox.click();
   await inputBox.fill(text);
-
-  // Send — #send-button confirmed from live inspection
-  await page.click('#send-button');
+  await inputBox.press('Enter');
 
   return waitForReply(page);
 }
 
-/** Wait for the streaming reply to complete and return the full page visible text.
+/**
+ * Wait for the streaming reply to complete and return the full page visible text.
  *
- * LibreChat v0.8.x uses aria-label="Message N" containers (not data-message-author-role).
- * The most reliable signal is: #send-button is re-enabled after streaming ends.
- * We then return the full body innerText so callers can search it for their expected content.
+ * The Conduit composer disables its textarea and swaps the Send button for a "Stop" button
+ * while streaming. Streaming is done when the "Stop" button is gone and the textarea is
+ * enabled again.
  */
 export async function waitForReply(page: Page, timeoutMs = 120_000): Promise<string> {
-  const deadline = Date.now() + timeoutMs;
-
-  // Wait until the send button is no longer disabled.
-  // LibreChat sets disabled="" on #send-button while streaming.
+  const inputBox = page.locator('textarea').first();
   try {
-    await expect(page.locator('#send-button')).toBeEnabled({ timeout: timeoutMs });
+    // "Stop" only exists while streaming — wait for it to disappear.
+    await page.locator('button:has-text("Stop")').waitFor({ state: 'hidden', timeout: timeoutMs });
+    await expect(inputBox).toBeEnabled({ timeout: timeoutMs });
   } catch {
-    // If the button check times out, fall through — collect whatever is on the page
+    // Fall through — collect whatever is on the page.
   }
 
-  // Extra buffer for React to flush the last rendered token
+  // Extra buffer for React to flush the last rendered token.
   await page.waitForTimeout(2_000);
 
-  // Return the full visible text of the page; callers search within it.
-  // This is robust across LibreChat versions and doesn't depend on internal selectors.
   const bodyText = await page.evaluate(() => document.body.innerText).catch(() => '');
   return bodyText;
 }
 
-/** Click the "New chat" button to start a fresh conversation. */
+/** Start a fresh conversation (the Conduit sidebar "New chat" navigates to /c/new). */
 export async function newConversation(page: Page): Promise<void> {
-  // Confirmed selector from live inspection: button[aria-label="New chat"]
-  const btn = page.locator('button[aria-label="New chat"]').first();
-  if (await btn.isVisible({ timeout: 5_000 }).catch(() => false)) {
-    await btn.click();
-    // Wait for LibreChat to navigate to a new conversation URL and render the input
-    await page.waitForURL('**/c/**', { timeout: 10_000 }).catch(() => {});
-    await page.locator('#prompt-textarea').first()
-        .waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
-  }
+  await page.goto(`${CHAT_URL}/c/new`, { waitUntil: 'load', timeout: 30_000 }).catch(() => {});
+  await page.locator('textarea').first()
+      .waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
 }
