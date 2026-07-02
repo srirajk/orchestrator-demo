@@ -31,15 +31,22 @@ export function Policies() {
   const [validResult, setValidResult]     = useState<{ valid: boolean; errors: string[] } | null>(null)
   const [expandedPolicy, setExpandedPolicy] = useState<string | null>(null)
 
-  const { data: polRes, refetch } = useQuery({ queryKey: ['policies'], queryFn: policiesApi.list })
-  const { data: roles = [] } = useQuery({ queryKey: ['roles'], queryFn: rolesApi.list })
-  const { data: resourcesData } = useQuery({ queryKey: ['policy-resources'], queryFn: adminApi.policyResources })
-  const { data: segmentsData } = useQuery({ queryKey: ['segments'], queryFn: adminApi.segments })
+  const policiesQuery = useQuery({ queryKey: ['policies'], queryFn: policiesApi.list })
+  const rolesQuery = useQuery({ queryKey: ['roles'], queryFn: rolesApi.list })
+  const resourcesQuery = useQuery({ queryKey: ['policy-resources'], queryFn: adminApi.policyResources })
+  const segmentsQuery = useQuery({ queryKey: ['segments'], queryFn: adminApi.segments })
 
-  const policies = polRes?.policies ?? []
-  const RESOURCES = resourcesData?.resources ?? ['agent', 'relationship', 'domain']
-  const SEGMENTS = segmentsData?.segments ?? ['wealth', 'servicing']
+  const policies = policiesQuery.data?.policies ?? []
+  const roles = rolesQuery.data ?? []
+  const RESOURCES = resourcesQuery.data?.resources ?? ['agent', 'relationship', 'domain']
+  const SEGMENTS = segmentsQuery.data?.segments ?? ['wealth', 'servicing']
   const actions = ACTIONS_MAP[intent.resource] ?? []
+  const loadErrors = [
+    policiesQuery.isError ? 'policies' : null,
+    rolesQuery.isError ? 'roles' : null,
+    resourcesQuery.isError ? 'resources' : null,
+    segmentsQuery.isError ? 'segments' : null,
+  ].filter((item): item is string => Boolean(item))
 
   const generateMut = useMutation({
     mutationFn: () => policiesApi.generate(intent),
@@ -60,7 +67,7 @@ export function Policies() {
 
   const applyMut = useMutation({
     mutationFn: () => policiesApi.apply(generatedYaml, intent.policy_name || 'generated_policy'),
-    onSuccess: () => { refetch(); toast('success', 'Policy applied — Cerbos will hot-reload') },
+    onSuccess: () => { void policiesQuery.refetch(); toast('success', 'Policy applied — Cerbos will hot-reload') },
     onError: (e: Error) => toast('error', e.message),
   })
 
@@ -71,10 +78,10 @@ export function Policies() {
     }))
   }
 
-  function toggleRole(roleId: string) {
+  function toggleRole(roleName: string) {
     setIntent(i => ({
       ...i,
-      subject_roles: i.subject_roles.includes(roleId) ? i.subject_roles.filter(r => r !== roleId) : [...i.subject_roles, roleId],
+      subject_roles: i.subject_roles.includes(roleName) ? i.subject_roles.filter(r => r !== roleName) : [...i.subject_roles, roleName],
     }))
   }
 
@@ -96,13 +103,25 @@ export function Policies() {
         <p className="text-sm text-slate-500 mt-0.5">Manage Cerbos authorization policies</p>
       </div>
 
+      {loadErrors.length > 0 && (
+        <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900" role="alert">
+          <div className="flex items-center gap-2 font-medium">
+            <AlertTriangle size={16} />
+            Some policy data could not be loaded
+          </div>
+          <p className="mt-1 text-amber-800">
+            Affected sources: {loadErrors.join(', ')}. Existing cached/default values are shown where available.
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left: existing policies */}
         <div>
           <h2 className="text-sm font-semibold text-slate-700 mb-3">Active Policies ({policies.length})</h2>
           <div className="space-y-2">
             {policies.length === 0 ? (
-              <div className="bg-white rounded-xl border border-slate-200 py-10 text-center text-sm text-slate-400">No policies found</div>
+              <div className="bg-white rounded-lg border border-slate-200 py-10 text-center text-sm text-slate-400">No policies found</div>
             ) : policies.map(p => (
               <div key={p.filename} className="bg-white rounded-lg border border-slate-200 overflow-hidden">
                 <button
@@ -134,9 +153,9 @@ export function Policies() {
         {/* Right: generator */}
         <div>
           <h2 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-1.5">
-            <Sparkles size={14} className="text-brand-500" /> AI Policy Generator
+            <Sparkles size={14} className="text-gold-600" /> AI Policy Generator
           </h2>
-          <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+          <div className="bg-white rounded-lg border border-slate-200 p-5 space-y-4">
             {/* Resource */}
             <Select label="Resource" value={intent.resource}
               onChange={e => setIntent(i => ({ ...i, resource: e.target.value, actions: [] }))}>
@@ -149,8 +168,8 @@ export function Policies() {
               <div className="flex flex-wrap gap-2">
                 {roles.map(r => (
                   <label key={r.id} className="flex items-center gap-1.5 text-sm cursor-pointer">
-                    <input type="checkbox" checked={intent.subject_roles.includes(r.id)} onChange={() => toggleRole(r.id)}
-                      className="rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
+                    <input type="checkbox" checked={intent.subject_roles.includes(r.name)} onChange={() => toggleRole(r.name)}
+                      className="rounded border-slate-300 text-axiom-700 focus:ring-gold-300" />
                     <span>{r.name}</span>
                   </label>
                 ))}
@@ -164,7 +183,7 @@ export function Policies() {
                 {actions.map(a => (
                   <label key={a} className="flex items-center gap-1.5 text-sm cursor-pointer">
                     <input type="checkbox" checked={intent.actions.includes(a)} onChange={() => toggleAction(a)}
-                      className="rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
+                      className="rounded border-slate-300 text-axiom-700 focus:ring-gold-300" />
                     <code className="text-xs">{a}</code>
                   </label>
                 ))}
@@ -178,7 +197,7 @@ export function Policies() {
                 <label className="text-sm text-slate-700 w-28 shrink-0">Min. clearance</label>
                 <input type="range" min={0} max={5} value={intent.conditions.clearance_min ?? 0}
                   onChange={e => setIntent(i => ({ ...i, conditions: { ...i.conditions, clearance_min: Number(e.target.value) || undefined } }))}
-                  className="flex-1 accent-brand-600" />
+                  className="flex-1 accent-axiom-700" />
                 <span className="text-sm font-medium text-slate-700 w-6">{intent.conditions.clearance_min || 'Any'}</span>
               </div>
               <div className="flex items-center gap-3">
@@ -187,7 +206,7 @@ export function Policies() {
                   {SEGMENTS.map(s => (
                     <label key={s} className="flex items-center gap-1 text-sm cursor-pointer">
                       <input type="checkbox" checked={(intent.conditions.segments ?? []).includes(s)} onChange={() => toggleSegment(s)}
-                        className="rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
+                        className="rounded border-slate-300 text-axiom-700 focus:ring-gold-300" />
                       {s}
                     </label>
                   ))}
@@ -196,7 +215,7 @@ export function Policies() {
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="checkbox" checked={!!intent.conditions.non_mutating_only}
                   onChange={e => setIntent(i => ({ ...i, conditions: { ...i.conditions, non_mutating_only: e.target.checked || undefined } }))}
-                  className="rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
+                  className="rounded border-slate-300 text-axiom-700 focus:ring-gold-300" />
                 Non-mutating (read-only) only
               </label>
               <Input
@@ -222,12 +241,12 @@ export function Policies() {
 
           {/* Result */}
           {generatedYaml && (
-            <div className="mt-4 bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+            <div className="mt-4 bg-white rounded-lg border border-slate-200 p-5 space-y-4">
               {/* Explanation */}
               {explanation && (
-                <div className="bg-brand-50 border border-brand-100 rounded-lg p-3">
-                  <p className="text-xs font-medium text-brand-700 mb-1">What this policy does</p>
-                  <p className="text-sm text-brand-800">{explanation}</p>
+                <div className="bg-axiom-50 border border-axiom-100 rounded-lg p-3">
+                  <p className="text-xs font-medium text-axiom-700 mb-1">What this policy does</p>
+                  <p className="text-sm text-axiom-800">{explanation}</p>
                 </div>
               )}
 

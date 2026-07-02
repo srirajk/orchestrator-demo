@@ -37,6 +37,8 @@ test.describe('Admin UI', () => {
     await page.waitForURL(`${BASE}/`)
     await page.getByRole('link', { name: /users/i }).click()
     await page.waitForURL(`${BASE}/users`)
+    await expect(page.getByRole('heading', { name: /^users$/i })).toBeVisible()
+    await expect(page.getByText(/this view could not render/i)).toHaveCount(0)
     await page.screenshot({ path: 'test-results/admin-04-users.png', fullPage: true })
   })
 
@@ -71,5 +73,19 @@ test.describe('Admin UI', () => {
     await page.getByRole('link', { name: /policies/i }).click()
     await page.waitForURL(`${BASE}/policies`)
     await page.screenshot({ path: 'test-results/admin-07-policies.png', fullPage: true })
+  })
+
+  test('workbench loads with persona selector', async ({ page }) => {
+    await page.goto(`${BASE}/login`)
+    await page.getByLabel(/username/i).fill('admin')
+    await page.getByLabel(/password/i).fill(IAM_ADMIN_PASSWORD)
+    await page.getByRole('button', { name: /sign in/i }).click()
+    await page.waitForURL(`${BASE}/`)
+    await page.getByRole('link', { name: /workbench/i }).click()
+    await page.waitForURL(`${BASE}/workbench`)
+    await expect(page.getByRole('heading', { name: /conduit workbench/i })).toBeVisible()
+    await expect(page.getByLabel(/workbench persona/i)).toBeVisible()
+    await expect(page.getByText(/this view could not render/i)).toHaveCount(0)
+    await page.screenshot({ path: 'test-results/admin-08-workbench.png', fullPage: true })
   })
 })

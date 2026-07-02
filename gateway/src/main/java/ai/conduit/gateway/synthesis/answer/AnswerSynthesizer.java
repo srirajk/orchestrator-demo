@@ -235,11 +235,11 @@ public class AnswerSynthesizer {
         // System: grounding rules
         messages.addObject().put("role", "system").put("content", systemPrompt);
 
-        // Include prior conversation turns (max 6) so the LLM has context for follow-ups.
+        // Include the exact prior conversation turns the client sent. The client owns
+        // transcript/window/summary policy; the gateway does not hard-truncate here.
         // We exclude the last user message (it becomes the final data+question message below).
         if (history != null && history.size() > 1) {
-            int start = Math.max(0, history.size() - 7); // keep last 6 + current
-            for (int i = start; i < history.size() - 1; i++) {
+            for (int i = 0; i < history.size() - 1; i++) {
                 Message m = history.get(i);
                 if (m.content() != null && !m.content().isBlank()) {
                     messages.addObject()
@@ -262,7 +262,7 @@ public class AnswerSynthesizer {
      *
      * <p>Used for:
      * <ul>
-     *   <li>{@code FOLLOW_UP} when session cache is stale and no entity carryforward is available</li>
+     *   <li>{@code FOLLOW_UP} questions answerable from the client-sent conversation</li>
      *   <li>{@code CHITCHAT} direct answers</li>
      * </ul>
      */
@@ -296,8 +296,7 @@ public class AnswerSynthesizer {
                     "the conversation, say so politely and ask the user for the missing detail.");
 
             if (history != null) {
-                int start = Math.max(0, history.size() - 8);
-                for (int i = start; i < history.size(); i++) {
+                for (int i = 0; i < history.size(); i++) {
                     Message m = history.get(i);
                     if (m.content() != null && !m.content().isBlank()) {
                         messages.addObject().put("role", m.role()).put("content", m.content());

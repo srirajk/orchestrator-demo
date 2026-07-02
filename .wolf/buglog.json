@@ -3323,6 +3323,264 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-07-01"
+    },
+    {
+      "id": "bug-206",
+      "timestamp": "2026-07-01T21:45:01Z",
+      "error_message": "mvn -q -Dtest=JwtClaimsCustomizerTest test failed: Mockito could not initialize inline Byte Buddy mock maker / could not self-attach to current VM",
+      "file": "iam-service/src/test/java/com/openwolf/iam/auth/JwtClaimsCustomizerTest.java",
+      "root_cause": "The local JDK 23 runtime does not allow Mockito inline mock maker self-attachment in this sandboxed test run.",
+      "fix": "Replaced Mockito usage with a tiny CapturingEnricher test fake that overrides OidcClaimEnricher methods directly.",
+      "tags": [
+        "test",
+        "java",
+        "mockito",
+        "byte-buddy",
+        "oidc"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-01T21:45:01Z"
+    },
+    {
+      "id": "bug-207",
+      "timestamp": "2026-07-01T21:47:58Z",
+      "error_message": "mvn -q test failed: reference to assertThat is ambiguous for claims.getClaim(\"clearance\")",
+      "file": "iam-service/src/test/java/com/openwolf/iam/auth/JwtClaimsCustomizerTest.java",
+      "root_cause": "JwtClaimsSet#getClaim is generic, and AssertJ could not infer whether the raw numeric claim should use Predicate/IntPredicate overloads.",
+      "fix": "Cast the claim to Integer before asserting equality.",
+      "tags": [
+        "test",
+        "java",
+        "assertj",
+        "compile"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-01T21:47:58Z"
+    },
+    {
+      "id": "bug-208",
+      "timestamp": "2026-07-01T21:44:01Z",
+      "error_message": "python3 -m pytest tests/schema failed during pytest_configure with PermissionError: [Errno 1] Operation not permitted while pytest_rerunfailures tried to bind 127.0.0.1",
+      "file": "tests/schema/test_registry_contracts.py",
+      "root_cause": "The sandbox blocks localhost socket binding during pytest plugin setup; the test suite itself had not collected yet.",
+      "fix": "Reran the same targeted pytest command with approved unsandboxed execution; tests then collected and ran normally.",
+      "tags": [
+        "pytest",
+        "sandbox",
+        "schema-tests",
+        "tooling"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-01T21:44:01Z"
+    },
+    {
+      "id": "bug-209",
+      "timestamp": "2026-07-01T21:44:01Z",
+      "error_message": "test_manifest_cross_references_are_consistent failed: acme.servicing.nav had sub_domain cash-management but was listed under corporate-actions",
+      "file": "registry/manifests/acme.servicing.nav.json",
+      "root_cause": "The agent manifest sub_domain field drifted from the sub-domain manifest membership and existing docs.",
+      "fix": "Changed acme.servicing.nav sub_domain to corporate-actions so agent, sub-domain manifest, and docs agree.",
+      "tags": [
+        "registry",
+        "manifest",
+        "schema-tests",
+        "world-b"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-01T21:44:01Z"
+    },
+    {
+      "id": "bug-210",
+      "timestamp": "2026-07-01T21:33:55Z",
+      "error_message": "openwolf designqc --routes /login / failed because the auto-started dev server command `npm run dev` exited with code 127",
+      "file": ".wolf/designqc-captures",
+      "root_cause": "DesignQC's spawned dev-server environment could not execute npm even though npm and node are available on the interactive shell PATH.",
+      "fix": "Recorded the tooling failure; UI changes continued with npm build verification planned.",
+      "tags": ["designqc", "npm", "tooling", "admin-ui"],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-01T21:33:55Z"
+    },
+    {
+      "id": "bug-211",
+      "timestamp": "2026-07-01T21:41:08Z",
+      "error_message": "npm run build failed with `sh: tsc: command not found`",
+      "file": "admin-ui/node_modules",
+      "root_cause": "The admin-ui workspace had no installed node_modules, so the build script could not find the local TypeScript compiler.",
+      "fix": "Ran npm ci from admin-ui using the existing package-lock, then reran npm run build successfully.",
+      "tags": ["admin-ui", "build", "typescript", "npm"],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-01T21:41:08Z"
+    },
+    {
+      "id": "bug-212",
+      "timestamp": "2026-07-01T21:44:52Z",
+      "error_message": "Vite dev server failed with `listen EPERM: operation not permitted 127.0.0.1:5174`; sandboxed OpenWolf DesignQC browser launch also failed with `Failed to launch the browser process`",
+      "file": "admin-ui/.wolf/designqc-captures",
+      "root_cause": "The managed sandbox blocked local port listening and browser process launch for screenshot QA.",
+      "fix": "Reran npm run dev with approved escalation, then reran OpenWolf DesignQC with approved browser escalation and captured screenshots successfully.",
+      "tags": ["admin-ui", "designqc", "sandbox", "vite", "browser"],
+      "related_bugs": ["bug-206"],
+      "occurrences": 1,
+      "last_seen": "2026-07-01T21:44:52Z"
+    },
+    {
+      "id": "bug-213",
+      "timestamp": "2026-07-01T21:40:05Z",
+      "error_message": "npm run build failed in admin-ui: sh: tsc: command not found",
+      "file": "admin-ui/package-lock.json",
+      "root_cause": "admin-ui node_modules were absent in this worktree, so the local TypeScript binary from devDependencies was not installed.",
+      "fix": "Ran npm ci in admin-ui, then reran npm run build successfully.",
+      "tags": [
+        "admin-ui",
+        "npm",
+        "build",
+        "dependencies"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-01T21:40:05Z"
+    },
+    {
+      "id": "bug-214",
+      "timestamp": "2026-07-01T21:54:19Z",
+      "error_message": "Workbench slice review: not mergeable as a giant page/root API file; native EventSource cannot send Authorization headers; non-streaming chat should be labeled MVP.",
+      "file": "admin-ui/src/features/workbench/*",
+      "root_cause": "Initial slice concentrated page state, API types, formatting, trace parsing, and panel components in admin-ui/src/pages/Workbench.tsx and used native EventSource.",
+      "fix": "Refactored into a feature module with typed api.ts/types.ts, hooks, utilities, focused components, a tiny page wrapper, route-level lazy loading, fetch-based SSE with Authorization headers, and an explicit MVP non-streaming chat label.",
+      "tags": [
+        "admin-ui",
+        "workbench",
+        "react",
+        "structure",
+        "sse",
+        "auth"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-01T21:54:19Z"
+    },
+    {
+      "id": "bug-215",
+      "timestamp": "2026-07-01T21:54:19Z",
+      "error_message": "npm run build failed in admin-ui: src/features/workbench/api.ts(12,34): error TS2339: Property 'env' does not exist on type 'ImportMeta'.",
+      "file": "admin-ui/src/vite-env.d.ts",
+      "root_cause": "The app did not have Vite client env typings, so TypeScript did not know import.meta.env.",
+      "fix": "Added admin-ui/src/vite-env.d.ts with vite/client reference and a typed non-secret VITE_GATEWAY_API_BASE override.",
+      "tags": [
+        "admin-ui",
+        "vite",
+        "typescript",
+        "build"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-01T21:54:19Z"
+    },
+    {
+      "id": "bug-216",
+      "timestamp": "2026-07-01T22:14:00Z",
+      "error_message": "Admin UI login stored JWT under meridian_admin_token, but the shared API client read conduit_admin_token, causing authenticated admin API calls to omit Authorization.",
+      "file": "admin-ui/src/api/client.ts, admin-ui/src/hooks/useAuth.tsx",
+      "root_cause": "Token storage key drift between the auth provider and API client.",
+      "fix": "Added admin-ui/src/auth/tokenStorage.ts and wired useAuth, the IAM API client, and Workbench gateway API to the same read/write/clear helpers with legacy key fallback.",
+      "tags": [
+        "admin-ui",
+        "auth",
+        "jwt",
+        "localStorage"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-01T22:14:00Z"
+    },
+    {
+      "id": "bug-217",
+      "timestamp": "2026-07-02T06:31:38Z",
+      "error_message": "Gateway used cross-turn ConversationSession memory despite exposing a stateless OpenAI-compatible API, manufacturing pivot/precedence/reset bugs.",
+      "file": "gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java, gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java, gateway/src/main/java/ai/conduit/gateway/domain/session/*",
+      "root_cause": "Resolved entities and last agent results were stored by conversationId in Redis, then reused on later turns. A stale carried entity could override a newly named entity or survive a client reset.",
+      "fix": "Made gateway a pure per-request function of messages[] + JWT: removed session store reads/writes, deleted ConversationSession/ConversationSessionStore, removed fixed history truncation, enforced latest user mention wins over user-authored messages, re-resolve/re-check coverage every turn, and clarify deterministically when no user-authored resource reference exists.",
+      "tags": [
+        "gateway",
+        "stateless",
+        "session",
+        "world-b",
+        "coverage",
+        "entitlement",
+        "openai-api"
+      ],
+      "related_bugs": [
+        "bug-205",
+        "bug-196"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T06:31:38Z"
+    },
+    {
+      "id": "bug-218",
+      "timestamp": "2026-07-02T07:56:34Z",
+      "error_message": "Workbench sent the logged-in admin JWT to the gateway, so entitlement decisions reflected admin instead of the selected demo persona.",
+      "file": "admin-ui/src/features/workbench/WorkbenchPage.tsx, admin-ui/src/features/workbench/api.ts, iam-service/src/main/java/com/openwolf/iam/controller/AuthController.java",
+      "root_cause": "Workbench had no Axiom-minted persona token exchange and reused readAdminToken() for chat and trace requests.",
+      "fix": "Added platform-admin-gated /auth/impersonate with audited short-lived JWTs, wired Workbench persona selection from usersApi.list(), and send persona Bearer tokens to chat plus trace stream.",
+      "tags": ["admin-ui", "workbench", "auth", "impersonation", "jwt", "world-b"],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T07:56:34Z"
+    },
+    {
+      "id": "bug-219",
+      "timestamp": "2026-07-02T07:56:34Z",
+      "error_message": "Users page rendered blank because the UI consumed /users as User[] while IAM returns PageResponse<UserResponse>.",
+      "file": "admin-ui/src/api/client.ts, admin-ui/src/pages/Users.tsx",
+      "root_cause": "usersApi.list() returned the raw paginated response, so Users.tsx called array methods on an object and crashed the route without a boundary.",
+      "fix": "Mapped usersApi.list() to PageResponse.content, added route ErrorBoundary, visible users error state, and corrected create/update payloads to match IAM DTOs.",
+      "tags": ["admin-ui", "users", "pagination", "api-contract", "crash"],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T07:56:34Z"
+    },
+    {
+      "id": "bug-220",
+      "timestamp": "2026-07-02T07:56:34Z",
+      "error_message": "Trace rail could show events from other conversations and retained old events after New conversation.",
+      "file": "admin-ui/src/features/workbench/hooks/useTraceStream.ts, gateway/src/main/java/ai/conduit/gateway/infrastructure/telemetry/TraceEventPublisher.java, gateway/src/main/java/ai/conduit/gateway/api/v1/trace/TraceStreamController.java",
+      "root_cause": "Client whitelisted null conversationId events and the gateway trace stream broadcast every event to every subscriber; local event state was append-only across conversation resets.",
+      "fix": "Added optional server-side conversationId filtering for trace subscribers, made Workbench connect with the current conversationId, dropped non-matching events, and cleared events/request tracking when persona or conversation changes.",
+      "tags": ["admin-ui", "gateway", "trace", "sse", "isolation"],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T07:56:34Z"
+    },
+    {
+      "id": "bug-221",
+      "timestamp": "2026-07-02T07:56:34Z",
+      "error_message": "PolicyForge submitted role UUIDs as subject_roles instead of Cerbos role names.",
+      "file": "admin-ui/src/pages/Policies.tsx",
+      "root_cause": "The UI treated RoleResponse.id as the policy role identifier, but Cerbos policies and the policy generator expect role names.",
+      "fix": "Changed policy role selection to store role.name, surfaced policy data load errors, and kept the Axiom/gold visual treatment consistent.",
+      "tags": ["admin-ui", "policies", "cerbos", "policyforge"],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T07:56:34Z"
+    },
+    {
+      "id": "bug-222",
+      "timestamp": "2026-07-02T07:56:34Z",
+      "error_message": "Sandboxed smoke/Maven/Python test attempts produced localhost socket errors unrelated to product behavior.",
+      "file": "scripts/smoke.sh, gateway/pom.xml, tests/integration/test_gateway_coverage.py",
+      "root_cause": "macOS Codex sandbox denied localhost sockets for curl/Python/Redis-backed tests.",
+      "fix": "Stopped/reran the invalid smoke attempt and reran smoke, Maven gateway tests, Playwright, and pytest integration with approved unsandboxed execution.",
+      "tags": ["testing", "sandbox", "localhost", "verification"],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T07:56:34Z"
     }
   ]
 }

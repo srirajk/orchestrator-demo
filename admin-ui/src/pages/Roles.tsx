@@ -45,6 +45,7 @@ export function Roles() {
   const [editing, setEdit] = useState<Role | null>(null)
   const [form, setForm] = useState<Role>({ ...EMPTY })
   const [permInput, setPermInput] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<Role | null>(null)
 
   const { data: roles = [], isLoading } = useQuery({
     queryKey: ['roles'],
@@ -75,6 +76,7 @@ export function Roles() {
     mutationFn: (id: string) => rolesApi.delete(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['roles'] })
+      setDeleteTarget(null)
       toast('success', 'Role deleted')
     },
     onError: (e: Error) => toast('error', e.message),
@@ -119,7 +121,7 @@ export function Roles() {
         </Button>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
         {isLoading ? (
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
@@ -206,16 +208,18 @@ export function Roles() {
                     </Badge>
                   </td>
                   <td className="px-5 py-3.5">
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                       <button
                         onClick={() => openEdit(r)}
-                        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
+                        aria-label={`Edit ${r.name}`}
+                        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-300"
                       >
                         <Edit2 size={14} />
                       </button>
                       <button
-                        onClick={() => deleteMut.mutate(r.id)}
-                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                        onClick={() => setDeleteTarget(r)}
+                        aria-label={`Delete ${r.name}`}
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-300"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -230,16 +234,6 @@ export function Roles() {
 
       <Dialog open={open} onClose={close} title={editing ? `Edit ${editing.name}` : 'New role'}>
         <div className="space-y-4">
-          {!editing && (
-            <Input
-              label="Role ID"
-              placeholder="senior_rm"
-              value={form.id}
-              onChange={e => setForm(f => ({ ...f, id: e.target.value }))}
-              hint="Lowercase, underscores only. Used in Cerbos policies."
-              required
-            />
-          )}
           <Input
             label="Name"
             placeholder="Senior Relationship Manager"
@@ -262,13 +256,13 @@ export function Roles() {
               max={5}
               value={form.clearance_required}
               onChange={e => setForm(f => ({ ...f, clearance_required: Number(e.target.value) }))}
-              className="w-full accent-brand-600"
+              className="w-full accent-axiom-700"
             />
             <div className="flex justify-between text-xs text-slate-500 mt-1">
               {[1, 2, 3, 4, 5].map(n => (
                 <span
                   key={n}
-                  className={form.clearance_required === n ? 'font-bold text-brand-600' : ''}
+                  className={form.clearance_required === n ? 'font-bold text-axiom-700' : ''}
                 >
                   {n}
                 </span>
@@ -279,7 +273,7 @@ export function Roles() {
             <label className="text-sm font-medium text-slate-700">Permissions</label>
             <div className="flex gap-2">
               <input
-                className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500"
+                className="flex-1 px-3 py-2 text-sm border border-line rounded-md focus:outline-none focus:ring-2 focus:ring-gold-300 focus:border-axiom-700"
                 placeholder="invoke:wealth-agents"
                 value={permInput}
                 onChange={e => setPermInput(e.target.value)}
@@ -297,6 +291,8 @@ export function Roles() {
                 >
                   {p}
                   <button
+                    type="button"
+                    aria-label={`Remove ${p}`}
                     onClick={() =>
                       setForm(f => ({
                         ...f,
@@ -325,6 +321,34 @@ export function Roles() {
               onClick={() => (editing ? updateMut.mutate() : createMut.mutate())}
             >
               {editing ? 'Save changes' : 'Create role'}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      <Dialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="Delete role"
+        description={deleteTarget ? `Remove ${deleteTarget.name}` : undefined}
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm leading-6 text-ink-600">
+            This removes the role definition. Existing policy references should be reviewed before proceeding.
+          </p>
+          <div className="flex gap-2 border-t border-line pt-4">
+            <Button type="button" variant="secondary" className="flex-1" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              className="flex-1"
+              loading={deleteMut.isPending}
+              onClick={() => deleteTarget && deleteMut.mutate(deleteTarget.id)}
+            >
+              Delete
             </Button>
           </div>
         </div>

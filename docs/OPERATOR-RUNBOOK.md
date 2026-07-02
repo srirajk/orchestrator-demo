@@ -136,7 +136,7 @@ settlement status, and cash position."*
 settlement, cash). Glass-box shows intent 95%, **5 agents selected** (and which were *not*),
 entitlement **ALLOWED**, fan-out across **HTTP + MCP** with per-agent latencies, synthesis
 complete. Then ask a follow-up — *"Which single holding is the largest, and how much cash is
-unsettled?"* — answered from session memory (multi-turn carry-forward).
+unsettled?"* — answered from the client-sent message history (multi-turn context).
 
 ### Beat 2 — Resilience (kill an agent mid-request)
 ```bash

@@ -167,6 +167,7 @@ services:
       CERBOS_HTTP_PORT: 3592
       # Phase 8: RS256 JWKS endpoint — use direct /oauth2/jwks (no redirect hop)
       CONDUIT_AUTH_JWKS_URL: http://iam-service:8084/oauth2/jwks
+      CONDUIT_AUTH_REQUIRED_AUDIENCE: ${IAM_GATEWAY_AUDIENCE:-conduit-gateway}
       WEALTH_COVERAGE_URL: http://wealth-coverage:8086
       # World B: second domain (insurance) onboarded by manifests + services only —
       # no gateway code change. The insurance domain manifest references these URLs.
@@ -369,6 +370,9 @@ services:
       OPENID_SCOPE: "openid profile email"
       # Required for LibreChat to configure the OIDC session store
       OPENID_SESSION_SECRET: ${OPENID_SESSION_SECRET:-meridian-openid-session-secret-dev}
+      # Rehydrate req.user.federatedTokens on LibreChat API calls so custom endpoint
+      # headers can resolve {{LIBRECHAT_OPENID_ACCESS_TOKEN}} server-side.
+      OPENID_REUSE_TOKENS: "true"
       # Allow HTTP issuers in dev (production must use HTTPS)
       OPENID_ALLOW_HTTP: "true"
       NO_INDEX: "true"
@@ -461,6 +465,8 @@ services:
       IAM_LIBRECHAT_CLIENT_ID: "meridian-librechat"
       IAM_LIBRECHAT_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-meridian-client-secret-dev}
       IAM_LIBRECHAT_REDIRECT_URI: ${IAM_LIBRECHAT_REDIRECT_URI:-http://localhost:3080/oauth/openid/callback}
+      # Audience stamped on Axiom access tokens that are forwarded to the gateway.
+      IAM_GATEWAY_AUDIENCE: ${IAM_GATEWAY_AUDIENCE:-conduit-gateway}
     depends_on:
       postgres:
         condition: service_healthy
@@ -488,7 +494,7 @@ services:
       iam-service:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost/"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
       interval: 10s
       timeout: 5s
       retries: 5

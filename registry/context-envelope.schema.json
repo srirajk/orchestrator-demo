@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://conduit.dev/schemas/context-envelope.schema.json",
+  "title": "Conduit Context Envelope",
+  "description": "Compact context object returned by the external memory service and consumed by the gateway. It may carry continuity facts and summaries, but never authorization proof.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "envelope_id",
+    "conversation_id",
+    "request_id",
+    "created_at",
+    "manifest_version",
+    "principal",
+    "scope",
+    "context",
+    "authorization_observations",
+    "ledger"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "context-envelope.v1" },
+    "envelope_id": { "type": "string", "minLength": 1 },
+    "conversation_id": { "type": "string", "minLength": 1 },
+    "request_id": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "manifest_version": { "type": "string", "minLength": 1 },
+    "principal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["principal_id", "tenant_id"],
+      "properties": {
+        "principal_id": { "type": "string", "minLength": 1 },
+        "tenant_id": { "type": "string", "minLength": 1 },
+        "roles_hash": { "type": "string", "minLength": 1 }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domains", "sub_domains", "agents"],
+      "properties": {
+        "domains": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "sub_domains": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "agents": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entities", "literals", "summaries"],
+      "properties": {
+        "entities": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/context_fact" }
+        },
+        "literals": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/context_fact" }
+        },
+        "summaries": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/summary" }
+        }
+      }
+    },
+    "authorization_observations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["resource_key", "resource_id", "verdict", "checked_at", "source_event_id"],
+        "properties": {
+          "resource_key": { "type": "string", "minLength": 1 },
+          "resource_id": { "type": "string", "minLength": 1 },
+          "verdict": { "type": "string", "enum": ["allow", "deny", "unknown"] },
+          "checked_at": { "type": "string", "format": "date-time" },
+          "expires_at": { "type": "string", "format": "date-time" },
+          "source_event_id": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "ledger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["last_event_seq", "watermark"],
+      "properties": {
+        "last_event_seq": { "type": "integer", "minimum": 0 },
+        "last_compaction_seq": { "type": "integer", "minimum": 0 },
+        "watermark": { "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "$defs": {
+    "context_fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "source_event_id", "observed_at"],
+      "properties": {
+        "value": {
+          "type": ["string", "number", "boolean", "array", "object"]
+        },
+        "display": { "type": "string" },
+        "source_event_id": { "type": "string", "minLength": 1 },
+        "observed_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary_id", "text", "token_count", "covers_event_seq", "created_at"],
+      "properties": {
+        "summary_id": { "type": "string", "minLength": 1 },
+        "domain": { "type": "string", "minLength": 1 },
+        "sub_domain": { "type": "string", "minLength": 1 },
+        "text": { "type": "string", "minLength": 1 },
+        "token_count": { "type": "integer", "minimum": 1 },
+        "covers_event_seq": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["from", "to"],
+          "properties": {
+            "from": { "type": "integer", "minimum": 0 },
+            "to": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

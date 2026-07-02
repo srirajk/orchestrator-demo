@@ -6,40 +6,62 @@ import { useAuth } from '../hooks/useAuth'
 import { Skeleton } from '../components/ui/Skeleton'
 import { EmptyState } from '../components/ui/EmptyState'
 
+const STAT_TONES = {
+  navy: {
+    icon: 'bg-axiom-900 text-gold-200 ring-1 ring-gold-400/30',
+    accent: 'bg-gold-400',
+  },
+  gold: {
+    icon: 'bg-gold-100 text-gold-800 ring-1 ring-gold-500/25',
+    accent: 'bg-gold-500',
+  },
+  emerald: {
+    icon: 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-600/20',
+    accent: 'bg-emerald-500',
+  },
+  sky: {
+    icon: 'bg-sky-100 text-sky-800 ring-1 ring-sky-600/20',
+    accent: 'bg-sky-500',
+  },
+}
+
 function StatCard({
   label,
   value,
   icon: Icon,
-  color,
+  tone,
   onClick,
 }: {
   label: string
   value: number | string
   icon: React.ElementType
-  color: string
+  tone: keyof typeof STAT_TONES
   onClick?: () => void
 }) {
+  const toneClasses = STAT_TONES[tone]
+
   return (
     <button
       onClick={onClick}
-      className="text-left w-full bg-white rounded-xl border border-slate-200 p-5 flex items-center gap-4 hover:border-slate-300 transition-colors group"
+      className="surface-card relative w-full overflow-hidden p-4 text-left flex items-center gap-4 hover:border-axiom-300 transition-colors group"
     >
-      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${color}`}>
-        <Icon size={18} className="text-white" />
+      <div className={`absolute left-0 top-0 h-full w-1 ${toneClasses.accent}`} />
+      <div className={`w-10 h-10 rounded-md flex items-center justify-center ${toneClasses.icon}`}>
+        <Icon size={18} />
       </div>
       <div className="flex-1">
-        <p className="text-2xl font-bold text-slate-900">{value}</p>
-        <p className="text-sm text-slate-500 group-hover:text-slate-700 transition-colors">{label}</p>
+        <p className="text-2xl font-semibold text-ink-900 tabular-nums">{value}</p>
+        <p className="text-sm text-ink-500 group-hover:text-ink-700 transition-colors">{label}</p>
       </div>
-      <ArrowRight size={16} className="text-slate-300 group-hover:text-slate-400 transition-colors opacity-0 group-hover:opacity-100" />
+      <ArrowRight size={16} className="text-slate-300 group-hover:text-gold-600 transition-colors opacity-0 group-hover:opacity-100" />
     </button>
   )
 }
 
 function SkeletonCard() {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-5 flex items-center gap-4">
-      <Skeleton className="w-10 h-10 rounded-lg" />
+    <div className="surface-card p-4 flex items-center gap-4">
+      <Skeleton className="w-10 h-10 rounded-md" />
       <div className="flex-1">
         <Skeleton className="h-7 w-16 mb-2" />
         <Skeleton className="h-4 w-24" />
@@ -63,11 +85,11 @@ function formatRelativeTime(dateStr: string): string {
 }
 
 const ACTION_COLORS: Record<string, string> = {
-  create: 'bg-green-100 text-green-700',
-  update: 'bg-blue-100 text-blue-700',
-  delete: 'bg-red-100 text-red-700',
-  assign: 'bg-purple-100 text-purple-700',
-  deploy: 'bg-orange-100 text-orange-700',
+  create: 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-600/20',
+  update: 'bg-sky-50 text-sky-800 ring-1 ring-sky-600/20',
+  delete: 'bg-red-50 text-red-800 ring-1 ring-red-600/20',
+  assign: 'bg-gold-50 text-gold-800 ring-1 ring-gold-600/25',
+  deploy: 'bg-axiom-50 text-axiom-800 ring-1 ring-axiom-600/20',
 }
 
 function getActionColor(action: string): string {
@@ -86,24 +108,29 @@ export function Dashboard() {
     queryFn: statsApi.get,
   })
   const { data: auditData, isLoading: auditLoading } = useQuery({
-    queryKey: ['audit', 0],
+    queryKey: ['audit', 0, 5],
     queryFn: () => auditApi.list(0, 5),
   })
 
   return (
-    <div className="px-8 py-8 max-w-6xl">
+    <div className="page-shell">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900">
-          Welcome back, {user?.username?.split(' ')[0]}
-        </h1>
-        <p className="text-sm text-slate-500 mt-2">
-          Meridian AI Gateway · Admin Console
-        </p>
+      <div className="mb-6 flex flex-col gap-3 border-b border-line pb-5 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="page-kicker mb-2">Axiom Admin</p>
+          <h1 className="text-2xl font-semibold text-ink-900">Governance Overview</h1>
+          <p className="muted-copy mt-1">
+            Signed in as {user?.username ?? 'administrator'}
+          </p>
+        </div>
+        <div className="inline-flex items-center gap-2 self-start rounded-md border border-line bg-white px-3 py-2 text-xs font-medium text-ink-700 sm:self-auto">
+          <span className="h-2 w-2 rounded-full bg-emerald-500" />
+          Meridian IAM
+        </div>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 gap-3 mb-6 sm:grid-cols-2 xl:grid-cols-4">
         {statsLoading ? (
           <>
             {[...Array(4)].map((_, i) => (
@@ -116,28 +143,28 @@ export function Dashboard() {
               label="Users"
               value={stats.totalUsers}
               icon={Users}
-              color="bg-brand-600"
+              tone="navy"
               onClick={() => navigate('/users')}
             />
             <StatCard
               label="Teams"
               value={stats.totalTeams}
               icon={UsersRound}
-              color="bg-violet-600"
+              tone="sky"
               onClick={() => navigate('/teams')}
             />
             <StatCard
               label="Roles"
               value={stats.totalRoles}
               icon={Shield}
-              color="bg-emerald-600"
+              tone="emerald"
               onClick={() => navigate('/roles')}
             />
             <StatCard
               label="Policies"
               value={stats.totalPolicies}
               icon={FileText}
-              color="bg-amber-600"
+              tone="gold"
               onClick={() => navigate('/policies')}
             />
           </>
@@ -145,10 +172,10 @@ export function Dashboard() {
       </div>
 
       {/* Recent Activity Card */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-200 flex items-center gap-2">
-          <Activity size={16} className="text-slate-400" />
-          <h2 className="text-sm font-semibold text-slate-700">Recent Activity</h2>
+      <div className="surface-panel">
+        <div className="px-5 py-4 border-b border-line flex items-center gap-2 bg-slate-50/70">
+          <Activity size={16} className="text-gold-600" />
+          <h2 className="section-heading">Recent Activity</h2>
         </div>
 
         {auditLoading ? (
@@ -166,22 +193,22 @@ export function Dashboard() {
           <>
             <div className="divide-y divide-slate-100">
               {auditData.content.map((entry) => (
-                <div key={entry.id} className="px-5 py-3.5 hover:bg-slate-50 transition-colors group">
+                <div key={entry.id} className="px-5 py-3.5 hover:bg-axiom-50/50 transition-colors group">
                   <div className="flex items-center gap-3 mb-1">
-                    <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-xs font-semibold text-slate-700 shrink-0">
+                    <div className="w-7 h-7 rounded-md bg-axiom-50 ring-1 ring-axiom-600/10 flex items-center justify-center text-xs font-semibold text-axiom-800 shrink-0">
                       {entry.actorId.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-slate-900">
+                      <p className="text-sm text-ink-900">
                         <span className="font-medium">{entry.actorId}</span>
                         {' '}
-                        <span className="text-slate-600">{entry.action}</span>
+                        <span className="text-ink-700">{entry.action}</span>
                         {' '}
-                        <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${getActionColor(entry.action)}`}>
+                        <span className={`inline-flex px-1.5 py-0.5 rounded-md text-xs font-medium ${getActionColor(entry.action)}`}>
                           {entry.resourceType}
                         </span>
                       </p>
-                      <p className="text-xs text-slate-500 mt-0.5">
+                      <p className="text-xs text-ink-500 mt-0.5">
                         {entry.resourceId} · {formatRelativeTime(entry.occurredAt)}
                       </p>
                     </div>
@@ -191,7 +218,7 @@ export function Dashboard() {
             </div>
             <button
               onClick={() => navigate('/audit')}
-              className="w-full px-5 py-3 text-sm font-medium text-brand-600 hover:bg-brand-50 border-t border-slate-200 transition-colors"
+              className="w-full px-5 py-3 text-sm font-medium text-axiom-800 hover:bg-axiom-50 border-t border-line transition-colors"
             >
               View all activity →
             </button>
@@ -199,7 +226,7 @@ export function Dashboard() {
         ) : (
           <div className="px-5 py-10">
             <EmptyState
-              icon={<Activity size={32} className="text-slate-300" />}
+              icon={<Activity size={32} />}
               title="No activity yet"
               description="Activity will appear here as changes are made"
             />

@@ -7,7 +7,7 @@
     "organization": "Meridian Demo Bank"
   },
   "domain": "asset-servicing",
-  "sub_domain": "cash-management",
+  "sub_domain": "corporate-actions",
   "max_response_tokens": 2000,
   "protocol": "mcp",
   "connection": {

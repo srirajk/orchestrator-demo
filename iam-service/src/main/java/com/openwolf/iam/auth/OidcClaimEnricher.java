@@ -79,10 +79,14 @@ public class OidcClaimEnricher {
 
         Map<String, Object> attrs = parseAttributes(principal.getAttributes());
         List<String> segments = getStringList(attrs, "segments");
+        List<String> adminDomains = getStringList(attrs, "admin_domains");
         String classification = (String) attrs.getOrDefault("classification", "internal");
+        int clearance = getInt(attrs, "clearance", 2);
 
         claims.put("roles", roles);
         claims.put("segments", segments);
+        claims.put("admin_domains", adminDomains);
+        claims.put("clearance", clearance);
         claims.put("classification", classification);
         claims.put("tenant_id", principal.getTenantId());
         claims.put("permissions", permissions);
@@ -152,5 +156,20 @@ public class OidcClaimEnricher {
             return list.stream().filter(Objects::nonNull).map(Object::toString).toList();
         }
         return Collections.emptyList();
+    }
+
+    private int getInt(Map<String, Object> attrs, String key, int defaultValue) {
+        Object val = attrs.get(key);
+        if (val instanceof Number n) {
+            return n.intValue();
+        }
+        if (val instanceof String s && !s.isBlank()) {
+            try {
+                return Integer.parseInt(s);
+            } catch (NumberFormatException ignored) {
+                return defaultValue;
+            }
+        }
+        return defaultValue;
     }
 }

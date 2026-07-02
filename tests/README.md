@@ -114,7 +114,6 @@ cd gateway && mvn test
 | `domain/auth/SecurityRejectionIT.java` | Security rejection paths (tampered/expired/invalid tokens). |
 | `domain/manifest/EffectiveManifestTest.java` | Effective-manifest resolution from registry. |
 | `domain/manifest/EffectiveManifestMergeTest.java` | Manifest merge/override semantics. |
-| `domain/session/ConversationSessionTest.java` | Conversation/session carry-forward. |
 | `synthesis/input/EntityBagTest.java` | Map-based entity context (input synthesis). |
 | `orchestration/harness/AgentHarnessResilienceIT.java` | Harness resilience — breaker trips, failed node yields partial result not a thrown request. |
 

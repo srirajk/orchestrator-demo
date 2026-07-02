@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://meridian.dev/schemas/agent-manifest.schema.json",
+  "$id": "https://conduit.dev/schemas/agent-manifest.schema.json",
   "title": "Meridian Agent Manifest (domain-team submission)",
   "description": "Canonical contract a domain team submits to register one agent. A2A-Agent-Card-aligned with gateway extensions (protocol, connection, constraints). Input/output schemas are DERIVED by the gateway via introspection and are NOT part of this submission. Validate submissions against this BEFORE introspection and storage.",
   "type": "object",
@@ -30,8 +30,8 @@
     },
     "domain": {
       "type": "string",
-      "description": "Coarse business bucket the resolver narrows by. Demo uses two; extend for scale.",
-      "enum": ["wealth-management", "asset-servicing"]
+      "minLength": 1,
+      "description": "World B: the business domain this agent belongs to. NOT enumerated here — a new domain onboards by adding its manifests; the gateway validates this against the loaded domain manifests at boot (DomainManifestStore), not against a hardcoded list."
     },
     "protocol": {
       "type": "string",
@@ -107,6 +107,16 @@
           }
         }
       }
+    },
+    "sub_domain": {
+      "type": "string",
+      "description": "World B: sub-domain this agent belongs to within its domain (e.g. private-banking); resolves to a loaded sub-domain manifest."
+    },
+    "max_response_tokens": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100000,
+      "description": "World B: gateway truncates this agent's response to this many tokens before synthesis."
     }
   },
   "allOf": [

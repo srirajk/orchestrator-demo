@@ -3,6 +3,10 @@
 > Chronological action log. Hooks and AI append to this file automatically.
 > Old sessions are consolidated by the daemon weekly.
 
+| 17:36 | Audited LibreChat OIDC token path and local image source | librechat/librechat.yaml, librechat/patches/openidStrategy.js, docker-compose.yml, gateway auth files | confirmed config-only token-forwarding path via `{{LIBRECHAT_OPENID_ACCESS_TOKEN}}` headers; no gateway code needed | ~9000 |
+| 17:45 | Implemented LibreChat/Axiom OIDC forwarding and checks | librechat/librechat.yaml, docker-compose.yml, iam-service auth/config/test, .env.example | targeted + full IAM tests pass; docker compose config valid; world-b-check CRITICAL 0 | ~3500 |
+| 06:31 | Implemented stateless gateway Phase 1+2 from ADR | gateway ChatService/IntentClassifier/AnswerSynthesizer, deleted domain/session, docs/tests wording | mvn gateway tests pass; smoke 18/18; Playwright 89/89 split across two runs; pytest coverage 8/8; world-b CRITICAL 0 | ~25000 |
+
 | 21:56 | Fixed 7 failing E2E Playwright tests (02-hero, 04-entitlements, 05-resilience, 10-coverage-flow) | ChatService.java, AnswerSynthesizer.java, e2e/tests/helpers.ts | 17/17 pass, 0 failures | ~8000 |
 
 | 11:19 | Wrote unit tests for domain manifest classes | gateway/src/test/java/ai/meridian/gateway/domain/manifest/EffectiveManifestMergeTest.java, domain/auth/RevocationCheckerTest.java, domain/session/ConversationSessionTest.java | created 3 test files, 15 tests total | ~800 tok |
@@ -1484,3 +1488,25 @@
 | 17:06 | Session end: 7 writes across 2 files (IntentClassifier.java, ChatService.java) | 2 reads | ~22357 tok |
 | 17:12 | Session end: 7 writes across 2 files (IntentClassifier.java, ChatService.java) | 2 reads | ~22357 tok |
 | 17:14 | Created ../../.claude/projects/-Users-srirajkadimisetty-projects-orchestrator-demo/memory/feedback_observability_standard.md | — | ~368 |
+| 17:34 | Created Conduit Workbench/Axiom control-plane implementation contract for parallel lanes | docs/CONDUIT-WORKBENCH-PLAN.md, .wolf/anatomy.md | plan added; anatomy updated | ~1900 |
+| 17:36 | Added merge protocol and reviewer stance for parallel lane integration | docs/CONDUIT-WORKBENCH-PLAN.md | review bar hardened | ~350 |
+| 17:33 | Read OpenWolf instructions, anatomy/cerebrum, verified worktree branch | .wolf/OPENWOLF.md, .wolf/anatomy.md, .wolf/cerebrum.md | branch codex-governed-memory, clean worktree; use non-login shell to avoid jenv sandbox noise | ~12400 |
+| 17:44 | Designed governed memory boundary and manifest contract updates | docs/domain-manifest-and-memory.md, docs/domain-onboarding-standard.md, registry/README.md | gateway limited to context-envelope IO and runtime events; memory service owns ledger/summaries | ~7200 |
+| 17:44 | Added registry schemas and updated domain memory policies | registry/*.schema.json, registry/domains/*.json, agent-manifest.schema.json | context-envelope.v1 and memory-ledger-event.v1 contracts added; root agent schema aligned with registry | ~6200 |
+| 17:44 | Added and ran registry schema tests | tests/schema/test_registry_contracts.py, registry/manifests/acme.servicing.nav.json | 8 passed; fixed NAV sub_domain drift to corporate-actions | ~5200 |
+| 17:44 | Updated OpenWolf learning logs | .wolf/cerebrum.md, .wolf/buglog.json, .wolf/anatomy.md | recorded governed-memory decision, pytest sandbox gotcha, NAV manifest bug, and new file anatomy | ~2600 |
+| 18:01 | Reviewer follow-up fixed onboarding example drift from time_period to period | docs/domain-onboarding-standard.md | aligns example clarification_schema with current sub-domain entity key | ~250 |
+| 17:33 | Loaded OpenWolf guidance, anatomy, and cerebrum; attempted DesignQC before edits | .wolf/OPENWOLF.md, .wolf/anatomy.md, .wolf/cerebrum.md, .wolf/buglog.json | admin-ui surface map established; DesignQC auto-start failed with npm code 127 and was logged | ~12800 |
+| 17:41 | Added Axiom navy/gold design tokens, shell/login/dashboard styling, design direction doc, and ran admin build | admin-ui, .wolf/anatomy.md, .wolf/buglog.json | npm ci restored toolchain; npm run build passed | ~14800 |
+| 17:44 | Session summary: elevated admin-ui visual system and captured DesignQC login screenshots | admin-ui, admin-ui/.wolf/designqc-captures, .wolf/cerebrum.md | build green; screenshots captured after escalated Vite/browser run; unauthenticated root redirects to login | ~9000 |
+| 18:01 | Reviewer follow-up removed production-hostile default credential hint from login | admin-ui/src/pages/Login.tsx | keeps credentials in runbooks/config rather than on the sign-in surface | ~300 |
+| 17:33 | Loaded OpenWolf session rules and confirmed worktree branch | .wolf/OPENWOLF.md, .wolf/anatomy.md, .wolf/cerebrum.md | codex-conduit-workbench lane confirmed | ~10370 |
+| 17:38 | Added Conduit Workbench UI slice and gateway proxy scaffolding | admin-ui/src/pages/Workbench.tsx, admin-ui/src/api/workbench.ts, admin-ui route/proxy files | ready for TypeScript build pass | ~9200 |
+| 17:40 | Installed admin-ui dependencies, verified build, and logged missing-tsc build failure | admin-ui, .wolf/buglog.json, .wolf/cerebrum.md | npm run build passed | ~2600 |
+| 17:45 | Refreshed OpenWolf context for workbench production refactor request | .wolf/OPENWOLF.md, .wolf/anatomy.md, .wolf/cerebrum.md | ready to split feature module | ~11800 |
+| 17:53 | Refactored workbench into feature module and updated route lazy loading | admin-ui/src/features/workbench/*, admin-ui/src/pages/Workbench.tsx, admin-ui/src/App.tsx | old root API/page implementation split | ~18800 |
+| 17:54 | Fixed Vite env typing, reran admin-ui build, and logged review/build fixes | admin-ui/src/vite-env.d.ts, .wolf/buglog.json, .wolf/cerebrum.md | npm run build passed with Workbench lazy chunk | ~3200 |
+| 18:01 | Reviewer follow-up removed hardcoded demo client prompt from Workbench composer | admin-ui/src/features/workbench/hooks/useWorkbenchChat.ts, ChatPanel.tsx | production control-plane UI now opens with a neutral gateway prompt | ~350 |
+| 18:14 | Integration critic pass centralized admin JWT localStorage access | admin-ui/src/auth/tokenStorage.ts, admin-ui/src/api/client.ts, admin-ui/src/hooks/useAuth.tsx, admin-ui/src/features/workbench/api.ts | fixed meridian_admin_token/conduit_admin_token mismatch and kept legacy fallback | ~700 |
+| 18:16 | Integration visual pass aligned Workbench header, panels, and composer with Axiom tokens | admin-ui/src/features/workbench/WorkbenchPage.tsx, components/Panel.tsx, components/ChatPanel.tsx | uses page-shell/surface-panel/navy-gold treatment after design-system merge | ~500 |
+| 03:59 | Fixed Axiom Workbench/persona UI review items and verified clean-stack suite | admin-ui, iam-service, gateway, tests/e2e | docker compose down -v/up --build; world-b CRITICAL 0; smoke 18/18; Playwright 91/91; gateway Maven passed; coverage pytest 8/8 | ~52000 |

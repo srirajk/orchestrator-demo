@@ -14,6 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 
 /**
  * In-memory pub/sub bus for glass-box trace events.
@@ -35,7 +36,9 @@ public class TraceEventPublisher {
      *  SSE comment keeps an idle connection alive so it doesn't miss the next request's burst. */
     private static final long HEARTBEAT_SECONDS = 15L;
 
-    private final ConcurrentHashMap<String, SseEmitter> subscribers = new ConcurrentHashMap<>();
+    private record Subscriber(SseEmitter emitter, Predicate<TraceEvent> filter) {}
+
+    private final ConcurrentHashMap<String, Subscriber> subscribers = new ConcurrentHashMap<>();
     private final ObjectMapper mapper;
     private final TraceStorageAdapter storage;
     private ScheduledExecutorService heartbeat;
@@ -64,9 +67,9 @@ public class TraceEventPublisher {
     /** Send an SSE comment (`:hb`) to every subscriber so idle connections stay live. */
     private void sendHeartbeat() {
         if (subscribers.isEmpty()) return;
-        subscribers.forEach((clientId, emitter) -> {
+        subscribers.forEach((clientId, subscriber) -> {
             try {
-                emitter.send(SseEmitter.event().comment("hb"));
+                subscriber.emitter().send(SseEmitter.event().comment("hb"));
             } catch (Exception e) {
                 subscribers.remove(clientId);
             }
@@ -78,8 +81,17 @@ public class TraceEventPublisher {
      * receive all subsequent events until disconnection or server restart.
      */
     public SseEmitter subscribe(String clientId) {
+        return subscribe(clientId, event -> true);
+    }
+
+    /**
+     * Subscribe a new glass-box client with a server-side event filter. Workbench clients
+     * pass their conversationId here so a broadcast trace stream cannot leak another
+     * conversation's frames into the rail.
+     */
+    public SseEmitter subscribe(String clientId, Predicate<TraceEvent> filter) {
         SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
-        subscribers.put(clientId, emitter);
+        subscribers.put(clientId, new Subscriber(emitter, filter));
         // Flush an immediate comment so the browser's EventSource fires `onopen` right away
         // (otherwise it sits in CONNECTING until the first real event and the client may
         // give up and reconnect, churning past the next request's events).
@@ -122,13 +134,14 @@ public class TraceEventPublisher {
             return;
         }
 
-        subscribers.forEach((clientId, emitter) -> {
+        subscribers.forEach((clientId, subscriber) -> {
+            if (!subscriber.filter().test(event)) return;
             try {
-                emitter.send(SseEmitter.event().data(json));
+                subscriber.emitter().send(SseEmitter.event().data(json));
             } catch (Exception e) {
                 log.debug("Glass-box client {} disconnected during publish — removing", clientId);
                 subscribers.remove(clientId);
-                emitter.completeWithError(e);
+                subscriber.emitter().completeWithError(e);
             }
         });
     }

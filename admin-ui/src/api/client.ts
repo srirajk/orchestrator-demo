@@ -1,21 +1,44 @@
+import { clearAdminToken, notifyAuthLogout, readAdminToken } from '../auth/tokenStorage'
+
 const BASE = '/api'
 
 function token(): string {
-  return localStorage.getItem('conduit_admin_token') || ''
+  return readAdminToken()
+}
+
+function broadcastLogout(): void {
+  clearAdminToken()
+  notifyAuthLogout()
+}
+
+function errorMessage(payload: unknown, fallback: string): string {
+  if (!payload || typeof payload !== 'object') return fallback
+  const err = payload as Record<string, unknown>
+  const detail = err.detail
+  if (typeof detail === 'string') return detail
+  if (detail && typeof detail === 'object') {
+    const message = (detail as Record<string, unknown>).message
+    if (typeof message === 'string') return message
+  }
+  if (typeof err.message === 'string') return err.message
+  if (typeof err.error === 'string') return err.error
+  return fallback
 }
 
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const authToken = token()
   const res = await fetch(`${BASE}${path}`, {
     method,
     headers: {
       'Content-Type': 'application/json',
-      ...(token() ? { Authorization: `Bearer ${token()}` } : {}),
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
     },
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   })
   if (!res.ok) {
+    if (res.status === 401) broadcastLogout()
     const err = await res.json().catch(() => ({ detail: res.statusText }))
-    throw new Error(err.detail?.message || err.detail || res.statusText)
+    throw new Error(errorMessage(err, res.statusText || `Request failed (${res.status})`))
   }
   if (res.status === 204) return undefined as T
   return res.json()
@@ -25,6 +48,8 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
 export const authApi = {
   login: (username: string, password: string) =>
     req<{ accessToken: string; tokenType: string; expiresIn: number; user: User }>('POST', '/auth/login', { username, password }),
+  impersonate: (userId: string) =>
+    req<{ accessToken: string; tokenType: string; expiresIn: number; user: User }>('POST', '/auth/impersonate', { userId }),
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -41,6 +66,20 @@ export interface User {
   adminDomains: string[]
   isActive?: boolean
   createdAt?: string
+}
+
+export interface CreateUserInput {
+  id: string
+  username: string
+  email: string
+  password: string
+  attributes: Record<string, unknown>
+}
+
+export interface UpdateUserInput {
+  email?: string
+  isActive?: boolean
+  attributes?: Record<string, unknown>
 }
 
 export interface AuditEntry {
@@ -79,6 +118,7 @@ export interface ClassificationTier {
 export interface Team {
   id: string
   name: string
+  domainId?: string
   description: string
   defaultRoles: string[]
   segments: string[]
@@ -136,11 +176,15 @@ export interface PolicyResult {
 
 // ── Users ─────────────────────────────────────────────────────────────────────
 export const usersApi = {
-  list: () => req<User[]>('GET', '/users'),
+  listPage: (page = 0, size = 100) => req<PageResponse<User>>('GET', `/users?page=${page}&size=${size}`),
+  list: async () => {
+    const page = await usersApi.listPage(0, 100)
+    return page.content
+  },
   get: (id: string) => req<User>('GET', `/users/${id}`),
-  create: (id: string, data: Omit<User, 'id' | 'adminDomains' | 'isActive' | 'createdAt'>) =>
-    req<User>('POST', `/users?user_id=${encodeURIComponent(id)}`, data),
-  update: (id: string, data: Omit<User, 'id' | 'adminDomains' | 'isActive' | 'createdAt'>) =>
+  create: (data: CreateUserInput) =>
+    req<User>('POST', '/users', data),
+  update: (id: string, data: UpdateUserInput) =>
     req<User>('PUT', `/users/${id}`, data),
   delete: (id: string) => req<void>('DELETE', `/users/${id}`),
   patchBook: (id: string, add: string[], remove: string[]) =>
@@ -162,9 +206,23 @@ export const teamsApi = {
   list: () => req<Team[]>('GET', '/teams'),
   get: (id: string) => req<Team>('GET', `/teams/${id}`),
   create: (data: Omit<Team, 'memberCount'>) =>
-    req<Team>('POST', '/teams', data),
+    req<Team>('POST', '/teams', {
+      name: data.name,
+      domainId: data.domainId || data.id || undefined,
+      description: data.description,
+      defaultRoles: data.defaultRoles,
+      segments: data.segments,
+      allowedDomains: data.allowedDomains,
+    }),
   update: (id: string, data: Omit<Team, 'id' | 'memberCount'>) =>
-    req<Team>('PUT', `/teams/${id}`, { id, ...data }),
+    req<Team>('PUT', `/teams/${id}`, {
+      name: data.name,
+      domainId: data.domainId || undefined,
+      description: data.description,
+      defaultRoles: data.defaultRoles,
+      segments: data.segments,
+      allowedDomains: data.allowedDomains,
+    }),
   delete: (id: string) => req<void>('DELETE', `/teams/${id}`),
   addMember: (teamId: string, userId: string) =>
     req<{ added: boolean }>('POST', `/teams/${teamId}/members`, { user_id: userId }),
@@ -176,11 +234,25 @@ export const teamsApi = {
 
 // ── Roles ─────────────────────────────────────────────────────────────────────
 export const rolesApi = {
-  list: () => req<Role[]>('GET', '/roles'),
+  list: async () => {
+    const roles = await req<Role[]>('GET', '/roles')
+    return roles.map((role) => ({
+      ...role,
+      clearance_required: role.clearance_required ?? 1,
+    }))
+  },
   get: (id: string) => req<Role>('GET', `/roles/${id}`),
-  create: (data: Role) => req<Role>('POST', '/roles', data),
+  create: (data: Role) => req<Role>('POST', '/roles', {
+    name: data.name,
+    description: data.description,
+    permissions: data.permissions,
+  }),
   update: (id: string, data: Omit<Role, 'id'>) =>
-    req<Role>('PUT', `/roles/${id}`, { id, ...data }),
+    req<Role>('PUT', `/roles/${id}`, {
+      name: data.name,
+      description: data.description,
+      permissions: data.permissions,
+    }),
   delete: (id: string) => req<void>('DELETE', `/roles/${id}`),
 }
 

@@ -39,6 +39,14 @@
 - `settings.json` (~441 tok)
 - `settings.local.json` (~36 tok)
 
+## .wolf/
+
+- `OPENWOLF.md` — OpenWolf operating protocol for navigation, memory, bug logging, and session-end updates. (~1675 tok)
+- `anatomy.md` — Auto-maintained project file catalog with descriptions and token estimates. (~6443 tok)
+- `buglog.json` — OpenWolf JSON bug log for errors, failures, root causes, and fixes. (~2124 tok)
+- `cerebrum.md` — Long-term project learnings, user preferences, do-not-repeat notes, and decision log. (~6443 tok)
+- `memory.md` — Chronological action log for session work and outcomes. (~2771 tok)
+
 ## .claude/rules/
 
 - `openwolf.md` (~313 tok)
@@ -208,6 +216,8 @@
 
 ## admin-ui/
 
+- `.env.example` — Documents optional Vite gateway proxy override and admin JWT storage keys. (~55 tok)
+- `DESIGN-SYSTEM.md` — Axiom Admin UI Design Direction (~251 tok)
 - `Dockerfile` — Docker container definition (~103 tok)
 - `index.html` — Meridian Admin (~236 tok)
 - `nginx.conf` (~148 tok)
@@ -223,13 +233,19 @@
 - `App.tsx` — Protected (~423 tok)
 - `index.css` — Styles: 5 rules (~228 tok)
 - `main.tsx` — queryClient (~141 tok)
+- `vite-env.d.ts` — Vite env typing for optional non-secret workbench gateway API base override (~65 tok)
 
 ## admin-ui/src/api/
 
 - `client.ts` — Exports authApi, User, AuditEntry, PageResponse + 16 more (~1988 tok)
 
+## admin-ui/src/auth/
+
+- `tokenStorage.ts` — Canonical admin JWT localStorage helper with legacy key fallback (~120 tok)
+
 ## admin-ui/src/components/
 
+- `ErrorBoundary.tsx` — Route-level React crash boundary with Axiom fallback and reload action. (~455 tok)
 - `Layout.tsx` — Layout (~85 tok)
 - `Sidebar.tsx` — nav (~774 tok)
 
@@ -247,6 +263,33 @@
 
 - `useAuth.tsx` — Ctx (~551 tok)
 
+## admin-ui/src/features/workbench/
+
+- `api.ts` — Typed gateway API boundary for trace health, domain/agent registry, auth-capable trace stream request metadata, and MVP non-streaming chat turns (~1070 tok)
+- `types.ts` — Workbench chat, trace, domain manifest, agent manifest, and UI tone types (~980 tok)
+- `WorkbenchPage.tsx` — Feature page composition for chat, trace, context ledger, coverage, and domain/agent health panels (~1230 tok)
+
+## admin-ui/src/features/workbench/components/
+
+- `ChatPanel.tsx` — Workbench chat composer/transcript panel labeled MVP non-streaming (~1450 tok)
+- `ContextLedger.tsx` — Request context ledger derived from trace events (~1080 tok)
+- `CoveragePanel.tsx` — Access check and manifest coverage status panel (~1260 tok)
+- `HealthPanel.tsx` — Domain/agent registry and indexed-status panel; liveness remains explicit placeholder (~1390 tok)
+- `Panel.tsx` — Shared workbench panel shell (~200 tok)
+- `StatusPill.tsx` — Shared green/slate status pill (~190 tok)
+- `TraceRail.tsx` — Live trace event rail renderer (~1120 tok)
+
+## admin-ui/src/features/workbench/hooks/
+
+- `useTraceStream.ts` — Fetch-based SSE reader with Authorization headers, parsing, reconnect, and request filtering (~1300 tok)
+- `useWorkbenchChat.ts` — Workbench conversation state and MVP non-streaming chat submission hook (~860 tok)
+
+## admin-ui/src/features/workbench/utils/
+
+- `format.ts` — Workbench value/time/duration formatting helpers (~230 tok)
+- `selectors.ts` — Domain, coverage, agent, and trace selector helpers (~430 tok)
+- `traceEvents.ts` — Trace event tone/title/detail presentation helpers (~780 tok)
+
 ## admin-ui/src/pages/
 
 - `AuditLog.tsx` — ACTION_COLORS — renders table (~3652 tok)
@@ -256,6 +299,7 @@
 - `Roles.tsx` — EMPTY — renders table, modal (~3469 tok)
 - `Teams.tsx` — EMPTY — renders modal (~3886 tok)
 - `Users.tsx` — EMPTY — renders table, modal (~5104 tok)
+- `Workbench.tsx` — Tiny route wrapper around features/workbench/WorkbenchPage (~30 tok)
 
 ## docs/
 
@@ -267,9 +311,10 @@
 - `authorization-model.md` — Enterprise AI Gateway — Authorization Model (~5478 tok)
 - `authz-architecture-brief.md` — Enterprise AI Gateway — Authorization & User Management Architectural Brief (~7031 tok)
 - `clearance-tiers-and-agent-metadata.md` — Clearance Tiers — Tenant Schema, Agent Metadata & Policy (~2142 tok)
+- `CONDUIT-WORKBENCH-PLAN.md` — Conduit Workbench + Axiom Control Plane Plan (~1861 tok)
 - `DIAGRAM-PROMPTS.md` — Conduit — Diagram Prompts & Generation Guide (~4216 tok)
-- `domain-manifest-and-memory.md` — Domain Manifest + Contextual Memory Architecture (~2480 tok)
-- `domain-onboarding-standard.md` — Domain Onboarding Standard (~4115 tok)
+- `domain-manifest-and-memory.md` — Governed Memory + Context Envelope Architecture (~1745 tok)
+- `domain-onboarding-standard.md` — Domain Onboarding Standard (~3140 tok)
 - `EVAL-EXTRACTION.md` — Eval — Extraction Record (lift into its own project) (~1425 tok)
 - `EVAL-FRAMEWORK.md` — Conduit Eval Framework — an agent-agnostic evaluation worker (~2269 tok)
 - `EVAL-PRODUCT-VISION.md` — Eval — Product Vision (framework + app) (~1004 tok)
@@ -742,6 +787,7 @@
 - `AssignRoleRequest.java` — Class: AssignRoleRequest (~49 tok)
 - `AuditLogResponse.java` — Class: AuditLogResponse (~99 tok)
 - `CreateGroupRequest.java` — Class: CreateGroupRequest (~96 tok)
+- `ImpersonateRequest.java` — Admin-only impersonation token request DTO accepting userId/user_id. (~55 tok)
 - `CreatePolicyRequest.java` — Class: CreatePolicyRequest (~74 tok)
 - `CreateRoleRequest.java` — Class: CreateRoleRequest (~71 tok)
 - `CreateUserRequest.java` — Class: CreateUserRequest (~129 tok)
@@ -817,6 +863,10 @@
 ## iam-service/src/test/java/com/openwolf/iam/
 
 - `IamApplicationTests.java` — Placeholder test class. (~197 tok)
+
+## iam-service/src/test/java/com/openwolf/iam/auth/
+
+- `JwtClaimsCustomizerTest.java` — Tests Axiom OIDC access-token gateway audience customization and ID-token identity-only behavior. (~779 tok)
 
 ## iam-service/src/test/resources/
 
@@ -1086,11 +1136,17 @@
 ## registry/
 
 - `agent-manifest.schema.json` (~1714 tok)
-- `README.md` — Project documentation (~1704 tok)
+- `context-envelope.schema.json` — Context envelope returned by the external memory service (~1900 tok)
+- `domain-manifest.schema.json` — Domain manifest contract with governed memory policy (~1200 tok)
+- `memory-ledger-event.schema.json` — Append-only gateway/memory event shell schema (~750 tok)
+- `README.md` — Registry onboarding and governed memory contract guide (~1160 tok)
+- `sub-domain-manifest.schema.json` — Sub-domain manifest contract for entity context and agents (~1050 tok)
 
 ## registry/domains/
 
-- `insurance.json` (~138 tok)
+- `asset-servicing.json` — Asset-servicing domain with memory-service summary policy (~160 tok)
+- `insurance.json` — Insurance domain with coverage URLs and memory-service summary policy (~210 tok)
+- `wealth-management.json` — Wealth domain with coverage URLs and memory-service summary policy (~210 tok)
 
 ## registry/domains/asset-servicing/
 
@@ -1161,6 +1217,11 @@
 - `__init__.py` (~0 tok)
 - `README.md` — Project documentation (~1979 tok)
 - `README.md` — Project documentation (~1980 tok)
+
+## tests/schema/
+
+- `requirements.txt` — Python dependencies for registry schema checks (~8 tok)
+- `test_registry_contracts.py` — Validates registry schemas, manifests, cross-references, context envelope and ledger event examples (~1100 tok)
 
 ## tests/e2e/
 

@@ -190,10 +190,11 @@ orchestrator-demo/
 external agent gateway inside it. Its shape mirrors the lifecycle: `domain/intent` (classify +
 extract), `domain/manifest` (the source of all domain knowledge), `domain/coverage`
 (book-of-business: discover/check/resolve), `domain/auth` (Cerbos + identity seam),
-`domain/session` (a conversation = a session, carried across turns), `orchestration/executor` (the
-flat-plan executor + Resilience4j harness), `adapter/http` + `adapter/mcp` (one `ProtocolAdapter`
-interface), `synthesis` (Extract→Resolve→Bind, then grounded answer), `infrastructure/telemetry`
-(OTel + glass-box publisher), `api/v1` (the OpenAI-compatible front door).
+`orchestration/executor` (the flat-plan executor + Resilience4j harness), `adapter/http` +
+`adapter/mcp` (one `ProtocolAdapter` interface), `synthesis` (Extract→Resolve→Bind, then grounded
+answer), `infrastructure/telemetry` (OTel + glass-box publisher), `api/v1` (the OpenAI-compatible
+front door). The gateway is stateless across chat turns: `conversationId` is trace context only,
+and the client-sent `messages[]` are the context contract.
 
 **`mock-agents/` — the specialist systems.** Stand-ins for a bank's domain teams; **not** part of
 the request brain:
@@ -283,7 +284,7 @@ bash scripts/world-b-check.sh   # must report CRITICAL: 0
 
 - **World B is real.** `world-b-check.sh` = CRITICAL 0. Three domains live (wealth + asset-servicing
   + insurance); insurance was added by manifest alone.
-- **The four demo beats work end-to-end**, plus multi-turn carry-forward.
+- **The four demo beats work end-to-end**, plus multi-turn client-sent context.
 - **Trust surfaces are live:** glass-box renders the full decision; Langfuse carries every turn
   (prompt + answer + agent spans) grouped by conversation; continuous eval posts real quality
   scores; SSO sign-in works (Axiom OIDC → LibreChat).

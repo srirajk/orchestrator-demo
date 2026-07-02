@@ -12,9 +12,9 @@ import {
  *
  * Covers:
  * - Login → first turn (FETCH_DATA intent) → follow-up turn (FOLLOW_UP intent)
- * - Session context preserved across turns (entity remembered without re-stating it)
- * - New conversation resets context (prior entity not carried forward)
- * - FOLLOW_UP via direct API with X-Conversation-Id header
+ * - Client-sent history preserves context across turns without re-stating the entity
+ * - New conversation resets context (prior entity not present in the sent history)
+ * - FOLLOW_UP via direct API with full message history
  */
 test.describe('Multi-turn conversation', () => {
 
@@ -61,7 +61,7 @@ test.describe('Multi-turn conversation', () => {
     const thirdReply = await sendMessage(page, 'And what is the risk score?');
     expect(thirdReply.length).toBeGreaterThan(20);
 
-    // Third reply must not say "which client" — context must persist across all three turns
+    // Third reply must not say "which client" — client-sent history must preserve context
     const lower = thirdReply.toLowerCase();
     expect(lower.includes('which client') || lower.includes('please specify')).toBe(false);
   });
@@ -78,7 +78,7 @@ test.describe('Multi-turn conversation', () => {
     await newConversation(page);
     const reply = await sendMessage(page, 'What was the last client we discussed?');
 
-    // In a fresh conversation the gateway has no session context about Whitman
+    // In a fresh conversation the gateway has no client-sent context about Whitman
     const lower = reply.toLowerCase();
     // Accept: "no prior conversation", "I don't have context", clarifying question, or chitchat
     // Reject: mentioning Whitman specific data from the *previous* conversation
@@ -86,9 +86,9 @@ test.describe('Multi-turn conversation', () => {
     expect(leakedWhitman).toBe(false);
   });
 
-  // ── Direct API path: X-Conversation-Id ties turns together ───────────────
+  // ── Direct API path: client-sent message history ties turns together ─────
 
-  test('API follow-up with same X-Conversation-Id maintains context', async ({ request }) => {
+  test('API follow-up with full message history maintains context', async ({ request }) => {
     const convId = `e2e-conv-${Date.now()}`;
     const headers = {
       'Content-Type':     'application/json',

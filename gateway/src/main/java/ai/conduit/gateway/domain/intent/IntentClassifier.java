@@ -76,10 +76,11 @@ public class IntentClassifier {
             if (et.extractAs() == null) continue;
             p.append(extractionRule(et)).append("\n");
         }
-        p.append("- Extract ONLY from the user's LATEST message. If it names a NEW entity, extract THAT one.\n")
-         .append("  NEVER carry over a name or id that appears only in an earlier turn or a prior assistant\n")
-         .append("  reply — even if the current topic seems related. If the latest message names no entity,\n")
-         .append("  return null (the system carries prior context forward itself; do not fill it from history).\n");
+        p.append("- The client-sent conversation is the only memory. Extract entities only from USER messages.\n")
+         .append("- Latest explicit user mention wins. If the latest user message names an entity, extract that one.\n")
+         .append("- If the latest user message names no entity but asks for fresh data, use the most recent prior\n")
+         .append("  user-authored entity mention in the sent conversation. Never use assistant text for extraction.\n")
+         .append("- If no user-authored entity mention exists in the sent conversation, return null.\n");
         p.append("- NEVER invent identifiers; copy verbatim from the user's words\n\n");
 
         // Generic guardrail — kept verbatim (domain-invariant).
@@ -90,9 +91,10 @@ public class IntentClassifier {
 
         p.append("Intent rules:\n");
         p.append("- If the user names an entity the system can fetch data about → FETCH_DATA\n");
+        p.append("- If the latest message asks for fresh data about an entity previously named by the user → FETCH_DATA\n");
         p.append("- If a prior assistant turn has data and the user says \"explain\", \"what does X mean\", ")
          .append("\"tell me more\", \"simplify\" → FOLLOW_UP\n");
-        p.append("- If a fetchable request is clear but no entity is named and none appears in prior turns → CLARIFY\n");
+        p.append("- If a fetchable request is clear but no entity appears in user-authored turns → CLARIFY\n");
         p.append("- Greetings, \"how are you\", \"thanks\" → CHITCHAT\n");
         return p.toString();
     }
@@ -206,16 +208,16 @@ public class IntentClassifier {
     }
 
     private IntentResult callLlm(List<Message> messages) throws Exception {
-        // Build conversation tail (last 6 messages) for context
+        // Build context from exactly the messages the client sent. The client owns
+        // transcript/window/summary policy; the gateway does not hard-truncate here.
         String conversationContext = buildContext(messages);
 
-        // The latest user message is the extraction target — spell it out so the model extracts
-        // the entity named THIS turn, not an id echoed from an earlier assistant reply. Prior
-        // context still informs classification (follow-up detection); it must NOT seed extraction.
+        // The latest user message is the classification target. Entity extraction follows the
+        // stateless latest-mention-wins rule over user-authored messages in the sent context.
         String latestUser = latestUserMessage(messages);
         if (!latestUser.isBlank()) {
             conversationContext = conversationContext
-                + "\n\n--- LATEST USER MESSAGE (classify THIS message; extract entities ONLY from this text) ---\n"
+                + "\n\n--- LATEST USER MESSAGE (classify THIS; if it names an entity, that mention wins) ---\n"
                 + latestUser;
         }
 
@@ -326,14 +328,12 @@ public class IntentClassifier {
                     if (val == null && et.defaultValue() != null && !et.defaultValue().isBlank()) {
                         val = et.defaultValue();
                     }
-                    // Deterministic anti-carryover guard (World-B: the LLM never produces an id).
-                    // If the value looks like a resolved id (matches the manifest's id_pattern) but
-                    // the user did NOT type it in their latest message, it was echoed from an earlier
-                    // turn — drop it so a stale entity can't silently survive a client pivot.
-                    if (val != null && et.isResolvable() && matchesIdPattern(et, val)
-                            && !latestUser.toLowerCase().contains(val.toLowerCase())) {
-                        log.debug("Dropping carried id '{}' for field '{}' — absent from latest user message '{}'",
-                                val, field, truncate(latestUser, 80));
+                    // Deterministic anti-carryover guard (World-B: the LLM never produces an id
+                    // or expands a name). Resolvable references must be present in USER-authored
+                    // messages in the client-sent context; assistant echoes are ignored.
+                    if (val != null && et.isResolvable() && !userMessagesContain(messages, val)) {
+                        log.debug("Dropping carried reference '{}' for field '{}' — absent from user-authored messages",
+                                val, field);
                         val = null;
                     }
                     if (val != null && !val.isBlank()) references.put(field, val);
@@ -352,24 +352,22 @@ public class IntentClassifier {
         return (v == null || v.isBlank() || "null".equalsIgnoreCase(v)) ? null : v;
     }
 
-    /** True if {@code val} contains a match for the entity's manifest-declared id_pattern. */
-    private static boolean matchesIdPattern(EntityType et, String val) {
-        String pattern = et.idPattern();
-        if (pattern == null || pattern.isBlank()) return false;
-        try {
-            return java.util.regex.Pattern.compile(pattern).matcher(val).find();
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
     private String buildContext(List<Message> messages) {
         if (messages == null || messages.isEmpty()) return "(empty conversation)";
-        int start = Math.max(0, messages.size() - 6);
-        return messages.subList(start, messages.size()).stream()
+        return messages.stream()
                 .filter(m -> m.content() != null && !m.content().isBlank())
-                .map(m -> m.role().toUpperCase() + ": " + truncate(m.content(), 400))
+                .map(m -> m.role().toUpperCase() + ": " + m.content())
                 .collect(Collectors.joining("\n"));
+    }
+
+    private static boolean userMessagesContain(List<Message> messages, String value) {
+        if (messages == null || value == null || value.isBlank()) return false;
+        String needle = value.toLowerCase();
+        return messages.stream()
+                .filter(m -> "user".equalsIgnoreCase(m.role()))
+                .map(Message::content)
+                .filter(c -> c != null && !c.isBlank())
+                .anyMatch(c -> c.toLowerCase().contains(needle));
     }
 
     /** The most recent user message text (the extraction target), or "" if none. */

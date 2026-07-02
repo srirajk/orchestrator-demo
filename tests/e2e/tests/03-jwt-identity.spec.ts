@@ -7,6 +7,12 @@ import { getJwt, GATEWAY_URL, USER_MGMT_URL, IAM_ADMIN_PASSWORD, IAM_USER_PASSWO
  */
 test.describe('JWT identity (Phase 8 M15)', () => {
 
+  function decodeJwtPayload(token: string): Record<string, unknown> {
+    const payload = token.split('.')[1];
+    if (!payload) throw new Error('JWT payload missing');
+    return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as Record<string, unknown>;
+  }
+
   // ── iam-service health ─────────────────────────────────────────────────────
 
   test('iam-service health reports UP', async ({ request }) => {
@@ -42,6 +48,31 @@ test.describe('JWT identity (Phase 8 M15)', () => {
     expect(book).toContain('REL-00099');
     // Okafor (REL-00188) must NOT be in her book
     expect(book).not.toContain('REL-00188');
+  });
+
+  test('POST /auth/impersonate returns a short-lived persona JWT for Workbench', async ({ request }) => {
+    const adminResp = await request.post(`${USER_MGMT_URL}/auth/token`, {
+      data: { username: 'admin', password: IAM_ADMIN_PASSWORD },
+    });
+    expect(adminResp.status()).toBe(200);
+    const adminToken: string = (await adminResp.json()).accessToken;
+
+    const resp = await request.post(`${USER_MGMT_URL}/auth/impersonate`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+      data: { userId: 'rm_jane' },
+    });
+    expect(resp.status()).toBe(200);
+    const body = await resp.json();
+    expect(body.tokenType).toBe('Bearer');
+    expect(body.expiresIn).toBeLessThanOrEqual(900);
+    expect(body.user?.id).toBe('rm_jane');
+
+    const claims = decodeJwtPayload(body.accessToken as string);
+    expect(claims.sub).toBe('rm_jane');
+    expect(claims.tenant_id).toBe('default');
+    expect(claims.aud).toContain('conduit-gateway');
+    expect(claims.segments).toContain('wealth');
+    expect(claims).not.toHaveProperty('book');
   });
 
   // ── gateway JWT enforcement ───────────────────────────────────────────────

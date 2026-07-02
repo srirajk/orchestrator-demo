@@ -17,8 +17,6 @@ import ai.conduit.gateway.domain.manifest.DomainManifest;
 import ai.conduit.gateway.domain.manifest.DomainManifestStore;
 import ai.conduit.gateway.domain.manifest.EffectiveManifest;
 import ai.conduit.gateway.domain.manifest.EntityType;
-import ai.conduit.gateway.domain.session.ConversationSession;
-import ai.conduit.gateway.domain.session.ConversationSessionStore;
 import ai.conduit.gateway.infrastructure.telemetry.TraceEvent;
 import ai.conduit.gateway.infrastructure.telemetry.TraceEventPublisher;
 import ai.conduit.gateway.infrastructure.telemetry.event.AgentCompleteData;
@@ -61,7 +59,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -71,21 +68,14 @@ public class ChatService {
 
     private static final Logger log = LoggerFactory.getLogger(ChatService.class);
     static final String MODEL_ID = "conduit-assistant";
-    private static final long RESULT_CACHE_TTL_MS = 5 * 60 * 1_000L;
 
     private static final List<String> TITLE_TRIGGERS = List.of(
             "generate a concise", "generate a short", "provide a title",
             "name this conversation", "title for this"
     );
 
-    private static final List<String> SUMMARIZATION_TRIGGERS = List.of(
-            "summarize the above", "create a summary", "summarize this conversation",
-            "provide a summary of the conversation", "tldr"
-    );
-
     private final ObjectMapper             mapper;
     private final IntentClassifier         intentClassifier;
-    private final ConversationSessionStore sessionStore;
     private final AgentResolver            resolver;
     private final InputSynthesizer         inputSynthesizer;
     private final FlatPlanExecutor         executor;
@@ -104,7 +94,6 @@ public class ChatService {
 
     public ChatService(ObjectMapper mapper,
                        IntentClassifier intentClassifier,
-                       ConversationSessionStore sessionStore,
                        AgentResolver resolver,
                        InputSynthesizer inputSynthesizer,
                        FlatPlanExecutor executor,
@@ -118,7 +107,6 @@ public class ChatService {
                        MeterRegistry meterRegistry) {
         this.mapper              = mapper;
         this.intentClassifier    = intentClassifier;
-        this.sessionStore        = sessionStore;
         this.resolver            = resolver;
         this.inputSynthesizer    = inputSynthesizer;
         this.executor            = executor;
@@ -142,14 +130,6 @@ public class ChatService {
                 .filter(m -> m.content() != null)
                 .map(m -> m.content().toLowerCase())
                 .anyMatch(c -> TITLE_TRIGGERS.stream().anyMatch(c::contains));
-    }
-
-    public boolean isSummarizationRequest(ChatRequest request) {
-        if (request.messages() == null) return false;
-        return request.messages().stream()
-                .filter(m -> "system".equals(m.role()) && m.content() != null)
-                .map(m -> m.content().toLowerCase())
-                .anyMatch(c -> SUMMARIZATION_TRIGGERS.stream().anyMatch(c::contains));
     }
 
     public void streamTitle(SseEmitter emitter) {
@@ -234,37 +214,27 @@ public class ChatService {
             IntentResult intentResult = intentClassifier.classify(request.messages());
             rootSpan.setAttribute("intent", intentResult.intent().name());
             incrementIntentCounter(intentResult.intent());
-            tracePublisher.publish(TraceEvent.of("intent_classified", requestId,
+            tracePublisher.publish(TraceEvent.of("intent_classified", requestId, conversationId,
                     new IntentClassifiedData(intentResult.intent().name(),
                             intentResult.confidence(), intentResult.reasoning())));
 
-            ConversationSession session = sessionStore.load(conversationId);
-            log.debug("Session: conversationId={} entities={} turns={}", conversationId,
-                    session.resolvedEntities(), session.turnCount());
-
-            // Gap 4: Intercept LibreChat's internal summarization call
-            if (isSummarizationRequest(request)) {
-                handleSummarization(emitter, session, requestId, requestStart, streamId);
-                return;
-            }
-
             switch (intentResult.intent()) {
                 case FETCH_DATA -> handleFetchData(request, emitter, latestPrompt,
-                        conversationId, session, userId, jwtPrincipal, requestId, requestStart, rootSpan,
+                        conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan,
                         intentResult.extractedEntities(), streamId);
                 case FOLLOW_UP  -> handleFollowUp(request, emitter, latestPrompt,
-                        conversationId, session, userId, jwtPrincipal, requestId, requestStart, rootSpan, streamId);
-                case CLARIFY    -> handleClarify(emitter, session, userId, jwtPrincipal, requestId, requestStart);
-                case CHITCHAT   -> handleChitchat(request, emitter, requestId, requestStart, streamId);
+                        conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan, streamId);
+                case CLARIFY    -> handleClarify(emitter, conversationId, userId, jwtPrincipal, requestId, requestStart, streamId);
+                case CHITCHAT   -> handleChitchat(request, emitter, conversationId, requestId, requestStart, streamId);
             }
 
         } catch (Exception e) {
             log.error("Chat pipeline failed requestId={}", requestId, e);
             rootSpan.setStatus(StatusCode.ERROR, e.getMessage());
             emitRequestOutcome("ERROR");
-            tracePublisher.publish(TraceEvent.of("request_complete", requestId,
+            tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                     new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
-            try { streamTextAndComplete(emitter, "An internal error occurred. Please try again."); }
+            try { streamTextAndComplete(emitter, "An internal error occurred. Please try again.", streamId); }
             catch (Exception ex) { try { emitter.completeWithError(ex); } catch (Exception ignored) {} }
         } finally {
             baggageScope.close();
@@ -274,13 +244,12 @@ public class ChatService {
 
     private void handleFetchData(ChatRequest request, SseEmitter emitter,
                                   String latestPrompt, String conversationId,
-                                  ConversationSession session, String userId,
+                                  String userId,
                                   Principal jwtPrincipal,
                                   String requestId, long requestStart, Span rootSpan,
                                   EntityBag preExtracted, String streamId) throws Exception {
         Span span = tracer.spanBuilder("chat.fetch_data").startSpan();
-        // coverageRelId is set by the coverage pipeline before synthesis;
-        // it takes priority over the synthesis-extracted relationship ID when saving the session.
+        // coverageRelId is set by the coverage pipeline before synthesis.
         String coverageRelId = null;
         // Deterministic CLARIFY (WORLD-B §4.2): which entity MUST resolve before fetch is a
         // manifest declaration (sub-domain required_context), NOT a Java rule. The coverage
@@ -293,10 +262,6 @@ public class ChatService {
         // entity (e.g. the insurance required entity for an insurance query) rather than the
         // union's first key. They are plain locals (captured by no lambda) so reassignment is safe.
         EntityType coverageEntity = coverageEntityType();
-        EntityType secondaryEntity = secondaryEntityType();
-        // Session-carried coverage id (resolved in a prior turn), keyed by manifest entity key.
-        String carriedCoverageId = coverageEntity != null
-                ? session.resolvedEntity(coverageEntity.key()) : null;
         try {
             ResolverResult resolved = resolver.resolve(latestPrompt);
 
@@ -308,14 +273,14 @@ public class ChatService {
                     .map(c -> new AgentsResolvedData.FilteredRef(
                             c.manifest().agentId(), "below-confidence-floor"))
                     .collect(Collectors.toList());
-            tracePublisher.publish(TraceEvent.of("agents_resolved", requestId,
+            tracePublisher.publish(TraceEvent.of("agents_resolved", requestId, conversationId,
                     new AgentsResolvedData(selectedRefs, skippedRefs)));
 
             if (resolved.fallback() || resolved.selected().isEmpty()) {
                 emitRequestOutcome("FAILED");
                 streamTextAndComplete(emitter, msg("needs_more_detail",
-                        "I wasn't sure which services to consult. Please add more detail about what you need."));
-                tracePublisher.publish(TraceEvent.of("request_complete", requestId,
+                        "I wasn't sure which services to consult. Please add more detail about what you need."), streamId);
+                tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                         new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
                 return;
             }
@@ -332,8 +297,8 @@ public class ChatService {
             List<AgentManifest> allowedManifests = entitlementService.filterAgents(principal, manifests);
             if (allowedManifests.isEmpty()) {
                 emitRequestOutcome("DENIED");
-                streamTextAndComplete(emitter, "You do not have access to any of the required services for this query.");
-                tracePublisher.publish(TraceEvent.of("request_complete", requestId,
+                streamTextAndComplete(emitter, "You do not have access to any of the required services for this query.", streamId);
+                tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                         new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
                 return;
             }
@@ -393,43 +358,24 @@ public class ChatService {
                 // RE-SCOPE the coverage/secondary entity to the ROUTED sub-domain. Up to here
                 // these held the cross-domain union's first key (wrong once >1 domain is loaded);
                 // now that `em` names the matched sub-domain we derive them from ITS
-                // required_context/entity_types, and re-read the session-carried id for the
-                // re-scoped key. Everything downstream (resolve/check/bind, entitlement, session
-                // save) uses these re-scoped values. Manifest-declared, domain-agnostic.
+                // required_context/entity_types. Everything downstream (resolve/check/bind,
+                // entitlement) uses these re-scoped values. Manifest-declared, domain-agnostic.
                 coverageEntity = coverageEntityType(em);
-                secondaryEntity = secondaryEntityType(em);
-                carriedCoverageId = coverageEntity != null
-                        ? session.resolvedEntity(coverageEntity.key()) : null;
-
                 DomainManifest.Coverage coverage = em.coverage();
                 String tenantId = jwtPrincipal != null ? jwtPrincipal.tenantId() : "default";
                 String principalId = principal.id();
 
                 if (coverage != null) {
                     try {
-                        // A client named in THIS turn takes precedence over any session-carried id.
-                        // Otherwise an explicit pivot ("show me the Okafor relationship") would be
-                        // silently answered against the previous client, skipping its re-resolution
-                        // and entitlement re-check. Only reuse the carried id when no new client is named.
-                        boolean namedThisTurn = coverageEntity != null && preExtracted != null
+                        // The classifier extracts from the client-sent conversation window:
+                        // latest user mention wins, otherwise the most recent prior user mention.
+                        // There is no server-side carry-forward path here.
+                        boolean hasConversationReference = coverageEntity != null && preExtracted != null
                                 && preExtracted.reference(coverageEntity.extractAs()) != null;
 
-                        if (carriedCoverageId != null && !namedThisTurn) {
-                            // No new client named — reuse the session's verified relationship, just re-check.
-                            CoverageCheckResult check = coverageClient.check(
-                                principalId, tenantId, carriedCoverageId, coverage);
-                            if (!check.allowed()) {
-                                emitRequestOutcome("DENIED");
-                                streamTextAndComplete(emitter, mapDenialReason(check.reason()));
-                                tracePublisher.publish(TraceEvent.of("request_complete", requestId,
-                                    new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
-                                return;
-                            }
-                            coverageRelId = carriedCoverageId;
-
-                        } else if (namedThisTurn) {
-                            // RM named a client this turn — resolve the text to a canonical relationship ID
-                            // (precedence over any carried id, so pivots re-resolve AND re-authorize).
+                        if (hasConversationReference) {
+                            // Resolve the client reference from the client-sent messages to a
+                            // canonical relationship ID. Pivots re-resolve and re-authorize.
                             CoverageResolveResult resolveResult = coverageClient.resolve(
                                 preExtracted.reference(coverageEntity.extractAs()),
                                 coverageEntity.resolveType(), principalId, coverage);
@@ -440,8 +386,8 @@ public class ChatService {
                                     principalId, tenantId, coverageRelId, coverage);
                                 if (!check.allowed()) {
                                     emitRequestOutcome("DENIED");
-                                    streamTextAndComplete(emitter, mapDenialReason(check.reason()));
-                                    tracePublisher.publish(TraceEvent.of("request_complete", requestId,
+                                    streamTextAndComplete(emitter, mapDenialReason(check.reason()), streamId);
+                                    tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                                         new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
                                     return;
                                 }
@@ -457,8 +403,8 @@ public class ChatService {
                                         .collect(Collectors.toList());
                                 String question = buildClarificationQuestion(em, filtered, discovered);
                                 emitRequestOutcome("CLARIFIED");
-                                streamTextAndComplete(emitter, question);
-                                tracePublisher.publish(TraceEvent.of("request_complete", requestId,
+                                streamTextAndComplete(emitter, question, streamId);
+                                tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                                     new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
                                 return;
 
@@ -467,57 +413,41 @@ public class ChatService {
                                 emitRequestOutcome("CLARIFIED");
                                 streamTextAndComplete(emitter, msg("reference_not_found",
                                     "I could not find a match for that reference. Please provide a specific identifier.")
-                                    .replace("{reference}", preExtracted.reference(coverageEntity.extractAs())));
-                                tracePublisher.publish(TraceEvent.of("request_complete", requestId,
+                                    .replace("{reference}", preExtracted.reference(coverageEntity.extractAs())), streamId);
+                                tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                                     new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
                                 return;
                             }
 
                         } else {
-                            // No reference at all — discover what this RM covers.
+                            // No user-authored reference in the sent conversation. Deterministic
+                            // CLARIFY: do not guess or auto-select a covered resource.
                             List<CoverageResource> discovered = coverageClient.discover(
                                 principalId, tenantId, coverage);
 
                             if (discovered.isEmpty()) {
                                 emitRequestOutcome("DENIED");
                                 streamTextAndComplete(emitter, msg("no_coverage",
-                                    "Your coverage set is empty."));
-                                tracePublisher.publish(TraceEvent.of("request_complete", requestId,
-                                    new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
-                                return;
-
-                            } else if (discovered.size() == 1) {
-                                coverageRelId = discovered.get(0).id();
-                                CoverageCheckResult check = coverageClient.check(
-                                    principalId, tenantId, coverageRelId, coverage);
-                                if (!check.allowed()) {
-                                    emitRequestOutcome("DENIED");
-                                    streamTextAndComplete(emitter, mapDenialReason(check.reason()));
-                                    tracePublisher.publish(TraceEvent.of("request_complete", requestId,
-                                        new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
-                                    return;
-                                }
-                                // Single relationship auto-selected — will be persisted in session via finalRelId.
-                                log.info("Coverage: auto-selected single relationship={} for principal={}",
-                                    coverageRelId, principalId);
-
-                            } else {
-                                // Multiple relationships — ask the RM to choose.
-                                String question = buildClarificationQuestion(em, List.of(), discovered);
-                                emitRequestOutcome("CLARIFIED");
-                                streamTextAndComplete(emitter, question);
-                                tracePublisher.publish(TraceEvent.of("request_complete", requestId,
+                                    "Your coverage set is empty."), streamId);
+                                tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                                     new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
                                 return;
                             }
+
+                            String question = buildClarificationQuestion(em, List.of(), discovered);
+                            emitRequestOutcome("CLARIFIED");
+                            streamTextAndComplete(emitter, question, streamId);
+                            tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
+                                new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                            return;
                         }
 
                     } catch (CoverageClient.CoverageUnavailableException e) {
                         log.error("Coverage service unavailable for principal={}: {}", principal.id(), e.getMessage());
                         emitRequestOutcome("FAILED");
                         streamTextAndComplete(emitter,
-                            "I am unable to process your request right now. Please try again shortly.");
-                        tracePublisher.publish(TraceEvent.of("request_complete", requestId,
+                            "I am unable to process your request right now. Please try again shortly.", streamId);
+                        tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                             new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
                         return;
                     }
@@ -526,7 +456,7 @@ public class ChatService {
             // ── END COVERAGE CHECK ──────────────────────────────────────────────────
 
             // Use pre-extracted entities from the combined intent+entity LLM call if available.
-            // Priority: coverage-resolved ID > session carry-forward > raw reference (needs EntityResolver).
+            // Priority: coverage-resolved ID > raw reference (needs EntityResolver).
             // When coverageRelId is set, the coverage pipeline already resolved the name to a canonical ID
             // (e.g. "Whitman Family Office" → "REL-00042"). Injecting the ID here makes EntityResolver
             // short-circuit via its REL-\d+ pattern match — no call to the external resolve endpoint needed.
@@ -539,43 +469,39 @@ public class ChatService {
                         // Inject the coverage-verified canonical ID as the entity reference so
                         // the resolver short-circuits via its id_pattern (no external lookup).
                         effectiveBag = preExtracted.withReference(covExtractAs, coverageRelId);
-                    } else if (preExtracted.reference(covExtractAs) == null
-                            && carriedCoverageId != null) {
-                        effectiveBag = preExtracted.withReference(covExtractAs, carriedCoverageId);
                     }
                 }
                 synthesis = inputSynthesizer.synthesize(effectiveBag, finalManifests);
             } else {
-                String entityPrompt = buildEntityPrompt(latestPrompt, session);
-                synthesis = inputSynthesizer.synthesize(entityPrompt, finalManifests);
+                synthesis = inputSynthesizer.synthesize(latestPrompt, finalManifests);
             }
 
             if (synthesis.needsClarification() && synthesis.inputs().isEmpty()) {
                 emitRequestOutcome("CLARIFIED");
-                streamTextAndComplete(emitter, synthesis.clarificationMessage()); return;
+                streamTextAndComplete(emitter, synthesis.clarificationMessage(), streamId); return;
             }
             if (synthesis.inputs().isEmpty()) {
                 emitRequestOutcome("FAILED");
                 streamTextAndComplete(emitter, msg("specify_entity",
-                        "Please specify the resource identifier.")); return;
+                        "Please specify the resource identifier."), streamId); return;
             }
 
             String resolvedRelId = extractResolvedId(synthesis, coverageEntity);
             if (resolvedRelId != null) {
                 EntitlementResult ent = entitlementService.checkRelationship(principal, resolvedRelId);
-                tracePublisher.publish(TraceEvent.of("entitlement_check", requestId,
+                tracePublisher.publish(TraceEvent.of("entitlement_check", requestId, conversationId,
                         new EntitlementCheckData(resolvedRelId, userId, ent.allowed(), ent.reason(), ent.source())));
                 if (!ent.allowed()) {
                     emitRequestOutcome("DENIED");
                     String denialMsg = "Access denied: you are not authorized to view relationship " +
                             resolvedRelId + ". This denial has been logged.";
                     try {
-                        streamTextAndComplete(emitter, denialMsg);
+                        streamTextAndComplete(emitter, denialMsg, streamId);
                     } catch (Exception denialEx) {
                         log.warn("Could not stream denial message (client disconnect?): {}", denialEx.getMessage());
                         try { emitter.complete(); } catch (Exception ce) { emitter.completeWithError(ce); }
                     }
-                    tracePublisher.publish(TraceEvent.of("request_complete", requestId,
+                    tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                             new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
                     return;
                 }
@@ -588,7 +514,7 @@ public class ChatService {
                         return new PlanNode(e.getKey(), m, e.getValue(), List.of());
                     }).collect(Collectors.toList());
 
-            nodes.forEach(n -> tracePublisher.publish(TraceEvent.of("agent_start", requestId,
+            nodes.forEach(n -> tracePublisher.publish(TraceEvent.of("agent_start", requestId, conversationId,
                     new AgentStartData(n.nodeId(), n.agent().protocol()))));
 
             long fanoutStart = System.currentTimeMillis();
@@ -604,32 +530,20 @@ public class ChatService {
             results.forEach(r -> {
                 String prev = r.isOk() && r.data() != null
                         ? r.data().toString().substring(0, Math.min(80, r.data().toString().length())) : r.status().name();
-                tracePublisher.publish(TraceEvent.of("agent_complete", requestId,
+                tracePublisher.publish(TraceEvent.of("agent_complete", requestId, conversationId,
                         new AgentCompleteData(r.agentId(), r.latencyMs(), r.isOk() ? "ok" : "failed", prev)));
             });
 
             long okCount = results.stream().filter(NodeResult::isOk).count();
             log.info("Fan-out complete {}/{} ok", okCount, results.size());
 
-            // Prefer the coverage-verified relationship ID over the synthesis-extracted one.
-            String finalRelId = coverageRelId != null ? coverageRelId : extractResolvedId(synthesis, coverageEntity);
-            Map<String, String> resolvedEntities = new java.util.HashMap<>();
-            if (coverageEntity != null && finalRelId != null) {
-                resolvedEntities.put(coverageEntity.key(), finalRelId);
-            }
-            if (secondaryEntity != null) {
-                String secId = extractResolvedId(synthesis, secondaryEntity);
-                if (secId != null) resolvedEntities.put(secondaryEntity.key(), secId);
-            }
-            sessionStore.save(session.withResults(resolvedEntities, results));
-
-            tracePublisher.publish(TraceEvent.of("synthesis_start", requestId,
+            tracePublisher.publish(TraceEvent.of("synthesis_start", requestId, conversationId,
                     new SynthesisStartData(results.size(), (int) okCount)));
 
             answerSynthesizer.synthesize(results, latestPrompt, request.messages(), emitter, streamId);
             emitRequestOutcome("ANSWERED");
 
-            tracePublisher.publish(TraceEvent.of("request_complete", requestId,
+            tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                     new RequestCompleteData(System.currentTimeMillis() - requestStart,
                             results.size(), (int) okCount)));
         } finally { span.end(); }
@@ -637,93 +551,36 @@ public class ChatService {
 
     private void handleFollowUp(ChatRequest request, SseEmitter emitter,
                                  String latestPrompt, String conversationId,
-                                 ConversationSession session, String userId,
+                                 String userId,
                                  Principal jwtPrincipal,
                                  String requestId, long requestStart, Span rootSpan,
                                  String streamId) throws Exception {
         Span span = tracer.spanBuilder("chat.follow_up").startSpan();
-        // Carry the conversation's domain onto the trace so cost-by-domain and per-domain
-        // metrics include follow-up turns too (FETCH_DATA tags this from the resolved
-        // manifests; follow-ups answer from session, so use the session's stored domain).
-        if (session.domain() != null && !session.domain().isBlank()) {
-            rootSpan.setAttribute("langfuse.metadata.domain", session.domain());
-            rootSpan.setAttribute("conduit.domain", session.domain());
-        }
         try {
-            if (session.hasFreshResults(RESULT_CACHE_TTL_MS)) {
-                List<NodeResult> cached = session.lastAgentResults();
-                int total = cached.size();
-                long ok = cached.stream().filter(NodeResult::isOk).count();
-                tracePublisher.publish(TraceEvent.of("synthesis_start", requestId,
-                        new SynthesisStartData(total, (int) ok)));
-                answerSynthesizer.synthesize(cached, latestPrompt, request.messages(), emitter, streamId);
-                emitRequestOutcome("ANSWERED");
-                tracePublisher.publish(TraceEvent.of("request_complete", requestId,
-                        new RequestCompleteData(System.currentTimeMillis() - requestStart, total, (int) ok)));
-            } else if (sessionCoverageEntity(session) != null) {
-                EntityType cov = carriedCoverageEntityType(session);
-                String enriched = latestPrompt + " [session_" + cov.key() + ": "
-                        + session.resolvedEntity(cov.key()) + "]";
-                handleFetchData(request, emitter, enriched, conversationId, session, userId, jwtPrincipal, requestId, requestStart, rootSpan, null, streamId);
-                return;
-            } else {
-                answerSynthesizer.synthesizeFromHistory(request.messages(), latestPrompt, emitter, streamId);
-                emitRequestOutcome("ANSWERED");
-                tracePublisher.publish(TraceEvent.of("request_complete", requestId,
-                        new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
-            }
+            answerSynthesizer.synthesizeFromHistory(request.messages(), latestPrompt, emitter, streamId);
+            emitRequestOutcome("ANSWERED");
+            tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
+                    new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
         } finally { span.end(); }
     }
 
-    private void handleClarify(SseEmitter emitter, ConversationSession session,
+    private void handleClarify(SseEmitter emitter, String conversationId,
                                 String userId, Principal jwtPrincipal,
-                                String requestId, long requestStart) throws Exception {
-        Principal principal = (jwtPrincipal != null) ? jwtPrincipal : principalStore.load(userId);
-
-        String message;
-        String covId = sessionCoverageEntity(session);
-        if (covId != null) {
-            message = msg("followup_clarification",
-                    "Could you clarify what you'd like to know about {entity}? Please add more detail.")
-                    .replace("{entity}", covId);
-        } else {
-            message = msg("missing_entity_question",
-                    "Which resource are you asking about? Please provide its identifier to continue.");
-        }
+                                String requestId, long requestStart, String streamId) throws Exception {
+        String message = msg("missing_entity_question",
+                "Which resource are you asking about? Please provide its identifier to continue.");
         emitRequestOutcome("CLARIFIED");
-        streamTextAndComplete(emitter, message);
-        tracePublisher.publish(TraceEvent.of("request_complete", requestId,
+        streamTextAndComplete(emitter, message, streamId);
+        tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                 new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
     }
 
     private void handleChitchat(ChatRequest request, SseEmitter emitter,
-                                 String requestId, long requestStart, String streamId) throws Exception {
+                                 String conversationId, String requestId, long requestStart, String streamId) throws Exception {
         answerSynthesizer.synthesizeFromHistory(request.messages(), extractLatestUserMessage(request), emitter, streamId);
         emitRequestOutcome("ANSWERED");
-        tracePublisher.publish(TraceEvent.of("request_complete", requestId,
+        tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                 new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
-    }
-
-    private void handleSummarization(SseEmitter emitter, ConversationSession session,
-                                      String requestId, long requestStart, String streamId) throws Exception {
-        StringBuilder summary = new StringBuilder();
-        summary.append("Conversation summary:\n");
-        String covId = sessionCoverageEntity(session);
-        if (covId != null) {
-            EntityType cov = carriedCoverageEntityType(session);
-            String label = (cov != null && cov.display() != null && !cov.display().isBlank())
-                    ? cov.display() : "Entity";
-            summary.append("- ").append(label).append(": ").append(covId);
-            if (session.clientName() != null) summary.append(" (").append(session.clientName()).append(")");
-            summary.append("\n");
-        }
-        if (session.domain() != null) summary.append("- Domain: ").append(session.domain()).append("\n");
-        if (session.timePeriod() != null) summary.append("- Period: ").append(session.timePeriod()).append("\n");
-        summary.append("- Turns completed: ").append(session.turnCount());
-        emitRequestOutcome("ANSWERED");
-        streamTextAndComplete(emitter, summary.toString());
-        tracePublisher.publish(TraceEvent.of("request_complete", requestId,
-            new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
     }
 
     // ── Coverage helper methods ────────────────────────────────────────────────
@@ -789,19 +646,6 @@ public class ChatService {
         return "";
     }
 
-    private String buildEntityPrompt(String latestPrompt, ConversationSession session) {
-        if (!session.hasResolvedEntities()) return latestPrompt;
-        StringBuilder sb = new StringBuilder(latestPrompt);
-        // Emit one [session_<entityKey>: <id>] hint per carried entity. The token name is the
-        // manifest entity key (data), so adding an entity type needs no gateway change.
-        session.resolvedEntities().forEach((k, v) -> {
-            if (k != null && v != null) {
-                sb.append(" [session_").append(k).append(": ").append(v).append("]");
-            }
-        });
-        return sb.toString();
-    }
-
     /**
      * The manifest-declared, resource-scoped (required) resolvable entity type — the one a
      * coverage/entitlement check gates on. Derived from the manifest, never hardcoded.
@@ -811,15 +655,6 @@ public class ChatService {
         return manifestStore.entityTypes().stream()
                 .filter(EntityType::isResolvable)
                 .filter(et -> requiredKeys.contains(et.key()))
-                .findFirst().orElse(null);
-    }
-
-    /** The first non-required resolvable entity type (e.g. a secondary lookup), or null. */
-    private EntityType secondaryEntityType() {
-        java.util.List<String> requiredKeys = manifestStore.requiredContextKeys();
-        return manifestStore.entityTypes().stream()
-                .filter(EntityType::isResolvable)
-                .filter(et -> !requiredKeys.contains(et.key()))
                 .findFirst().orElse(null);
     }
 
@@ -840,47 +675,6 @@ public class ChatService {
                 .filter(EntityType::isResolvable)
                 .filter(et -> requiredKeys != null && requiredKeys.contains(et.key()))
                 .findFirst().orElse(null);
-    }
-
-    /**
-     * The first non-required resolvable entity (a secondary lookup) within a SPECIFIC routed
-     * sub-domain, or null. Scoped to that sub-domain's {@code entity_types} so the secondary is
-     * the one declared by the routed sub-domain, not a sibling domain's. Manifest-declared.
-     */
-    private EntityType secondaryEntityType(EffectiveManifest em) {
-        if (em == null) return secondaryEntityType();
-        java.util.List<String> requiredKeys = em.requiredContext();
-        java.util.List<EntityType> scoped = manifestStore.entityTypesFor(em.subDomainId());
-        if (scoped.isEmpty()) return secondaryEntityType();
-        return scoped.stream()
-                .filter(EntityType::isResolvable)
-                .filter(et -> requiredKeys == null || !requiredKeys.contains(et.key()))
-                .findFirst().orElse(null);
-    }
-
-    /**
-     * The coverage EntityType whose resolved id the session is carrying from a prior turn — found
-     * by scanning the manifest's required-context resolvable entities for the one the session
-     * actually holds a value for. Domain-agnostic: the carried key itself identifies which
-     * sub-domain the prior turn resolved, so a multi-domain registry carries forward the correct
-     * entity (e.g. the wealth required entity for a wealth conversation, the insurance one for an
-     * insurance conversation) without scoping by a (frequently unset) session domain. Returns null
-     * when the session carries no required entity.
-     */
-    private EntityType carriedCoverageEntityType(ConversationSession session) {
-        if (session == null) return null;
-        java.util.List<String> requiredKeys = manifestStore.requiredContextKeys();
-        return manifestStore.entityTypes().stream()
-                .filter(EntityType::isResolvable)
-                .filter(et -> requiredKeys.contains(et.key()))
-                .filter(et -> session.resolvedEntity(et.key()) != null)
-                .findFirst().orElse(null);
-    }
-
-    /** The session-carried resolved id for the coverage entity, or null. */
-    private String sessionCoverageEntity(ConversationSession session) {
-        EntityType ce = carriedCoverageEntityType(session);
-        return ce != null ? session.resolvedEntity(ce.key()) : null;
     }
 
     /**
@@ -909,7 +703,13 @@ public class ChatService {
 
     /** Sends text tokens as SSE deltas and calls {@code emitter.complete()}. Terminates the stream. */
     private void streamTextAndComplete(SseEmitter emitter, String text) throws Exception {
-        String id = newId(); long ts = epochSeconds();
+        streamTextAndComplete(emitter, text, null);
+    }
+
+    /** Sends text tokens using the request's completion id when one is already allocated. */
+    private void streamTextAndComplete(SseEmitter emitter, String text, String streamId) throws Exception {
+        String id = (streamId != null && !streamId.isBlank()) ? streamId : newId();
+        long ts = epochSeconds();
         emitter.send(SseEmitter.event().data(roleDelta(id, ts)));
         for (String word : text.split("(?<=\\s)|(?=\\s)")) {
             emitter.send(SseEmitter.event().data(contentDelta(id, ts, word)));

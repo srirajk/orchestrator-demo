@@ -121,7 +121,7 @@ trace to a source system — none invented.)
   holdings, a portfolio value, settlement status, and cash — pulled from the agents, nothing invented.
 - **PASS:** grounded answer covering all four asks; **FAIL:** a hallucinated number, or "I can't".
 
-### 2.2 Follow-up — session memory
+### 2.2 Follow-up — client-sent context
 - **Send (same conversation):** *"which holding is largest, and how much cash is unsettled?"*
 - **Expected:** answers from prior context **without restating the client**.
 - **PASS:** correct follow-up answer that clearly reused the Whitman context.
