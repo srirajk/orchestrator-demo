@@ -7,7 +7,7 @@ import { registerOrLogin, sendMessage, newConversation, getJwt, GATEWAY_URL, OKA
  */
 test.describe('Entitlements (Phase 5 M8)', () => {
 
-  // ── UI path (LibreChat → gateway, identity = rm_jane via X-User-Id header) ─
+  // ── UI path (chat → gateway, identity = rm_jane via verified OIDC Bearer JWT) ─
 
   test('Okafor query — gateway denies rm_jane (verified via intercepted SSE)', async ({ page }) => {
     // Instead of relying on LibreChat to render the SSE response (which can stall on

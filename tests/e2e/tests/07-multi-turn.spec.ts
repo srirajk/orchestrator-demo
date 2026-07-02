@@ -4,6 +4,7 @@ import {
   sendMessage,
   newConversation,
   waitForReply,
+  getJwt,
   GATEWAY_URL,
 } from './helpers';
 
@@ -172,9 +173,12 @@ test.describe('Multi-turn conversation', () => {
 
   test('FETCH_DATA then FOLLOW_UP intent path via API', async ({ request }) => {
     const convId = `e2e-intent-${Date.now()}`;
+    // Identity is derived ONLY from the verified JWT now (the X-User-Id trusted-hop was removed).
+    const jwt = await getJwt('rm_jane');
     const baseHeaders = {
       'Content-Type':      'application/json',
       'X-Conversation-Id': convId,
+      'Authorization':     `Bearer ${jwt}`,
     };
 
     // Turn 1: explicit data fetch → FETCH_DATA intent
@@ -189,13 +193,13 @@ test.describe('Multi-turn conversation', () => {
     });
     expect(turn1.status()).toBe(200);
     const raw1 = await turn1.text();
-    // Must not be a "no access" denial (rm_jane via X-User-Id header)
+    // Must not be a "no access" denial (rm_jane authenticated via Bearer JWT)
     expect(raw1.toLowerCase()).not.toContain('do not have access to any');
 
     // Turn 2: a vague follow-up → FOLLOW_UP intent, still returns sensible answer
     const turn2 = await request.post(`${GATEWAY_URL}/v1/chat/completions`, {
       timeout: 60_000,
-      headers: { ...baseHeaders, 'X-User-Id': 'rm_jane' },
+      headers: baseHeaders,
       data: {
         model:    'conduit-assistant',
         messages: [

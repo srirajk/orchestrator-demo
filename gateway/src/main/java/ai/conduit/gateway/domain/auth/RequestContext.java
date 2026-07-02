@@ -8,9 +8,9 @@ package ai.conduit.gateway.domain.auth;
  * ai.conduit.gateway.infrastructure.telemetry.RequestCorrelationFilter}.
  *
  * When a valid RS256 JWT is present, the verified {@link Principal} is stored
- * here by {@code RequestCorrelationFilter} so that downstream services (e.g.
- * {@link PrincipalStore}) can return the JWT-derived identity instead of
- * performing a Redis lookup.
+ * here by {@code RequestCorrelationFilter} so that downstream services can use
+ * the JWT-derived identity. Identity is derived exclusively from the verified
+ * JWT — the legacy {@code X-User-Id}/Redis principal-lookup path was removed.
  */
 public final class RequestContext {
 

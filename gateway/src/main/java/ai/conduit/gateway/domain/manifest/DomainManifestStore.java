@@ -256,6 +256,23 @@ public class DomainManifestStore {
     }
 
     /**
+     * The same as {@link #message(String)} but SCOPED to the routed sub-domain first. Once more
+     * than one domain is loaded the unscoped search returns whichever sub-domain the HashMap
+     * iterates first — so an insurance denial could surface wealth copy. Callers that already know
+     * the routed sub-domain pass its id here so the copy belongs to the right domain; falls back to
+     * the cross-domain search when the sub-domain is unknown or lacks the key.
+     */
+    public String message(String key, String subDomainId) {
+        if (key == null) return null;
+        SubDomainManifest sd = (subDomainId != null) ? subDomains.get(subDomainId) : null;
+        if (sd != null) {
+            String v = sd.messages().get(key);
+            if (v != null) return v;
+        }
+        return message(key);
+    }
+
+    /**
      * The human-readable denial copy declared for a coverage denial reason code
      * (e.g. {@code not-covered}), searched across all sub-domains. Falls back to the
      * manifest-declared {@code default} entry, then null.
@@ -270,6 +287,24 @@ public class DomainManifestStore {
             if (def != null) return def;
         }
         return null;
+    }
+
+    /**
+     * The same as {@link #denialMessage(String)} but SCOPED to the routed sub-domain first
+     * (bug 238): resolves the reason code, then that sub-domain's {@code default}, before falling
+     * back to the cross-domain search. Without scoping, a HashMap iteration order can make an
+     * insurance policy denial emit wealth "client relationship" copy — because both sub-domains
+     * declare the same reason keys. The gateway holds no domain copy (WORLD-B §5); this only picks
+     * WHICH manifest's declared copy applies.
+     */
+    public String denialMessage(String reasonCode, String subDomainId) {
+        SubDomainManifest sd = (subDomainId != null) ? subDomains.get(subDomainId) : null;
+        if (sd != null) {
+            Map<String, String> dm = sd.denialMessages();
+            if (reasonCode != null && dm.get(reasonCode) != null) return dm.get(reasonCode);
+            if (dm.get("default") != null) return dm.get("default");
+        }
+        return denialMessage(reasonCode);
     }
 
     public Map<String, DomainManifest> allDomains() {

@@ -54,6 +54,22 @@ HOLDINGS: dict = {
         "currency": "USD",
         "as_of_date": "2026-06-22",
     },
+    "REL-00201": {
+        "relationship_id": "REL-00201",
+        "relationship_name": "Sterling Capital Partners",
+        "positions": [
+            {"ticker": "NVDA", "isin": "US67066G1040", "qty": 900,  "value": 621000},
+            {"ticker": "MSFT", "isin": "US5949181045", "qty": 400,  "value": 186000},
+            {"ticker": "T-BILL-2026", "isin": "US912796YS72", "qty": 1, "value": 300000},
+        ],
+        "allocation_by_class": [
+            {"asset_class": "Equity",       "pct": 73},
+            {"asset_class": "Fixed Income", "pct": 27},
+        ],
+        "total_value": 1107000,
+        "currency": "USD",
+        "as_of_date": "2026-06-22",
+    },
 }
 
 PERFORMANCE: dict = {
@@ -88,6 +104,17 @@ PERFORMANCE: dict = {
         "alpha": 8.7,
         "volatility_pct": 22.1,
         "sharpe_ratio": 0.85,
+        "as_of_date": "2026-06-22",
+    },
+    "REL-00201": {
+        "relationship_id": "REL-00201",
+        "period": "YTD",
+        "total_return_pct": 14.7,
+        "pnl": 141930,
+        "benchmark_return_pct": 10.2,
+        "alpha": 4.5,
+        "volatility_pct": 11.3,
+        "sharpe_ratio": 1.30,
         "as_of_date": "2026-06-22",
     },
 }
@@ -151,6 +178,22 @@ GOAL_PLANNING: dict = {
         "overall_on_track": True,
         "summary": "Growth target is on track.",
     },
+    "REL-00201": {
+        "relationship_id": "REL-00201",
+        "goals": [
+            {
+                "goal_id": "G-030",
+                "name": "Capital Growth",
+                "target_amount": 2000000,
+                "current_amount": 1107000,
+                "target_date": "2032-12-31",
+                "on_track": True,
+                "progress_pct": 55.4,
+            },
+        ],
+        "overall_on_track": True,
+        "summary": "Capital growth goal is on track.",
+    },
 }
 
 RISK_PROFILE: dict = {
@@ -196,5 +239,22 @@ RISK_PROFILE: dict = {
         ],
         "review_due_date": "2026-07-15",
         "last_reviewed": "2026-06-01",
+    },
+    "REL-00201": {
+        "relationship_id": "REL-00201",
+        "risk_tolerance": "Moderate",
+        "risk_score": 5,
+        "max_drawdown_tolerance_pct": 18,
+        "concentration_flags": [
+            {
+                "security": "NVDA",
+                "current_pct": 56.1,
+                "threshold_pct": 30.0,
+                "flagged": True,
+                "note": "NVDA single-name concentration exceeds 30% threshold",
+            }
+        ],
+        "review_due_date": "2026-10-31",
+        "last_reviewed": "2026-04-10",
     },
 }

@@ -42,7 +42,7 @@ import java.util.Map;
  * <ul>
  *   <li>POST/PUT/DELETE/GET /admin/agents/** → platform_admin OR domain_admin (+ fine domain check)</li>
  *   <li>GET /debug/**                        → platform_admin OR domain_admin</li>
- *   <li>POST /v1/chat/completions            → permitAll (identity from JWT sub or X-User-Id header)</li>
+ *   <li>POST /v1/chat/completions            → permitAll (identity from the verified JWT sub only; no JWT ⇒ anonymous)</li>
  *   <li>GET /trace/**, /v1/models, /actuator/** → permitAll</li>
  * </ul>
  *
@@ -81,7 +81,8 @@ public class SecurityConfig {
                 .requestMatchers("/v1/models", "/actuator/**").permitAll()
                 // Glass-box SSE — browser EventSource can't send a Bearer header
                 .requestMatchers("/trace/**").permitAll()
-                // Chat — trusted internal hop; LibreChat identifies via X-User-Id header
+                // Chat — permitAll so unauthenticated probes don't 401, but identity is taken
+                // ONLY from the verified JWT (see RequestCorrelationFilter); no JWT ⇒ anonymous.
                 .requestMatchers(HttpMethod.POST, "/v1/chat/completions").permitAll()
                 // Admin plane — requires domain_admin or platform_admin role
                 .requestMatchers("/admin/agents/**").hasAnyRole("domain_admin", "platform_admin")
@@ -93,7 +94,7 @@ public class SecurityConfig {
             .oauth2ResourceServer(oauth2 -> oauth2
                 // Ignore placeholder tokens (LibreChat apiKey="unused") and non-JWT strings.
                 // Real JWTs (three dot-delimited parts) are validated; everything else is null
-                // so the request proceeds as anonymous and identity falls back to X-User-Id.
+                // so the request proceeds as anonymous (no identity, no data access).
                 .bearerTokenResolver(request -> {
                     String header = request.getHeader("Authorization");
                     if (header == null || !header.startsWith("Bearer ")) return null;

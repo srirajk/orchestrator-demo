@@ -22,7 +22,7 @@ import java.util.UUID;
  * Sets MDC context keys on every inbound request so all log lines carry:
  *   requestId      — a fresh UUID per request (correlation across log lines for one call)
  *   conversationId — forwarded by LibreChat; ties gateway logs to the chat turn
- *   userId         — JWT sub (when present) or X-User-Id header fallback
+ *   userId         — verified JWT sub when present, else "anonymous"
  *
  * MDC is cleared after the request completes so there is no thread-local leakage
  * across requests — important with virtual threads (one vthread per request, but
@@ -41,9 +41,8 @@ public class RequestCorrelationFilter extends OncePerRequestFilter {
     private static final String MDC_CONVERSATION_ID  = "conversationId";
     private static final String MDC_USER_ID          = "userId";
 
-    // Headers forwarded by LibreChat (configurable in librechat.yaml)
+    // Conversation correlation header forwarded by the chat client (configurable in librechat.yaml)
     private static final String HEADER_CONVERSATION_ID = "X-Conversation-Id";
-    private static final String HEADER_USER_ID         = "X-User-Id";
 
     @Override
     protected void doFilterInternal(
@@ -54,8 +53,10 @@ public class RequestCorrelationFilter extends OncePerRequestFilter {
         String requestId      = UUID.randomUUID().toString();
         String conversationId = coalesce(request.getHeader(HEADER_CONVERSATION_ID), "");
 
-        // Phase 10: read authenticated principal from Spring Security (runs before this filter).
+        // Read the authenticated principal from Spring Security (runs before this filter).
         // BearerTokenAuthenticationFilter sets the JwtAuthenticationToken for valid Bearer JWTs.
+        // Identity comes ONLY from the verified JWT — the X-User-Id trusted-hop was removed
+        // (it allowed identity spoofing). No JWT ⇒ anonymous (no data access downstream).
         String userId;
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth instanceof JwtAuthenticationToken jwtAuth) {
@@ -63,7 +64,7 @@ public class RequestCorrelationFilter extends OncePerRequestFilter {
             userId = jwt.getSubject() != null ? jwt.getSubject() : "anonymous";
             RequestContext.setPrincipal(Principal.fromSpringJwt(jwt));
         } else {
-            userId = coalesce(request.getHeader(HEADER_USER_ID), "anonymous");
+            userId = "anonymous";
         }
 
         MDC.put(MDC_REQUEST_ID, requestId);

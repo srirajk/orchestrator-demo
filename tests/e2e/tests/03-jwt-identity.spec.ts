@@ -128,8 +128,11 @@ test.describe('JWT identity (Phase 8 M15)', () => {
     expect(resp.status()).toBe(401);
   });
 
-  test('gateway passes through requests with no Bearer token (trusted hop)', async ({ request }) => {
-    // LibreChat sends X-User-Id instead of Bearer — must not get 401
+  test('gateway accepts an unauthenticated request as anonymous (no X-User-Id trusted hop)', async ({ request }) => {
+    // The X-User-Id trusted-hop was removed (identity-spoofing hole). /v1/chat/completions is
+    // permitAll so an unauthenticated probe does not 401 — but with no verified JWT the caller is
+    // anonymous (empty coverage), so it can never reach privileged data. An X-User-Id header, if
+    // sent, is now ignored entirely.
     const resp = await request.post(`${GATEWAY_URL}/v1/chat/completions`, {
       headers: { 'X-User-Id': 'rm_jane' },
       data: {

@@ -10,27 +10,22 @@ import org.springframework.stereotype.Component;
 /**
  * Extracts the caller's user ID from the inbound HTTP request.
  *
- * <p>Phase 10: reads the authenticated principal from Spring Security's {@link SecurityContextHolder}
- * (populated by BearerTokenAuthenticationFilter before the controller runs). Falls back to the
- * {@code X-User-Id} header for trusted-internal-hop requests (LibreChat → gateway without a JWT).
+ * <p>Identity is derived <strong>exclusively</strong> from the verified RS256 JWT sub
+ * (populated by Spring Security's BearerTokenAuthenticationFilter before the controller runs).
+ * The legacy {@code X-User-Id} trusted-internal-hop was removed — it let any caller assert any
+ * identity without verification (a known auth hole). Now that the chat authenticates via Axiom
+ * OIDC end-to-end, an unauthenticated request resolves to {@code anonymous} (no data access).
  */
 @Component
 public class IdentityExtractor {
 
     public String extractUserId(HttpServletRequest request) {
-        // Phase 10: JWT-verified sub from Spring Security takes precedence
+        // JWT-verified sub from Spring Security is the ONLY source of identity.
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth instanceof JwtAuthenticationToken jwtAuth) {
             Jwt jwt = (Jwt) jwtAuth.getCredentials();
             String sub = jwt.getSubject();
             if (sub != null && !sub.isBlank()) return sub;
-        }
-
-        // Trusted internal hop (LibreChat → gateway with X-User-Id header).
-        // Only X-User-Id is honoured — X-Forwarded-User is never set by any component in this stack.
-        String userId = request.getHeader("X-User-Id");
-        if (userId != null && !userId.isBlank()) {
-            return userId.trim();
         }
         return "anonymous";
     }

@@ -12,7 +12,13 @@ LFK="pk-lf-meridian-public:sk-lf-meridian-secret"
 P=0; F=0
 pass(){ echo "  ✅ $1"; P=$((P+1)); }
 fail(){ echo "  ❌ $1"; F=$((F+1)); }
-ask(){ curl -s -X POST "$GW/v1/chat/completions" -H "Content-Type: application/json" -H "X-User-Id: $1" \
+# Mint a real Axiom (OIDC) JWT for a username — the X-User-Id trusted-hop was removed, so identity
+# is derived ONLY from the verified Bearer token.
+tok(){ curl -s -X POST $AX/auth/token -H 'Content-Type: application/json' \
+  -d "{\"username\":\"$1\",\"password\":\"Meridian@2024\"}" \
+  | python3 -c 'import sys,json;print(json.load(sys.stdin).get("accessToken",""))' 2>/dev/null; }
+# ask <username> <prompt> — mints a token for the persona and calls the gateway with a Bearer header.
+ask(){ local t; t=$(tok "$1"); curl -s -X POST "$GW/v1/chat/completions" -H "Content-Type: application/json" -H "Authorization: Bearer $t" \
   -d "{\"model\":\"conduit-assistant\",\"stream\":true,\"messages\":[{\"role\":\"user\",\"content\":\"$2\"}]}" 2>/dev/null \
   | python3 -c 'import sys,json;print("".join(json.loads(l[5:]).get("choices",[{}])[0].get("delta",{}).get("content","") for l in sys.stdin if l.startswith("data:") and l[5:].strip() not in ("","[DONE]")))' 2>/dev/null; }
 
@@ -29,7 +35,7 @@ TOK=$(curl -s -X POST $AX/auth/token -H 'Content-Type: application/json' -d '{"u
 [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST $GW/v1/chat/completions -H "Authorization: Bearer $TOK" -H 'Content-Type: application/json' -d '{"model":"conduit-assistant","stream":false,"messages":[{"role":"user","content":"hi"}]}')" = "200" ] && pass "gateway accepts Bearer-only (no Redis)" || fail "JWT path"
 
 echo "═══ C. SSE byte-exact (OpenAI spec) ═══"
-curl -sN -X POST $GW/v1/chat/completions -H "Content-Type: application/json" -H "X-User-Id: rm_jane" \
+curl -sN -X POST $GW/v1/chat/completions -H "Content-Type: application/json" -H "Authorization: Bearer $TOK" \
   -d '{"model":"conduit-assistant","stream":true,"messages":[{"role":"user","content":"hi"}]}' 2>/dev/null > /tmp/_smoke_sse.txt
 grep -qE '^data: \{' /tmp/_smoke_sse.txt && pass "data: {json} (space)" || fail "data: framing (no space)"
 grep -qE '^data: \[DONE\]$' /tmp/_smoke_sse.txt && pass "data: [DONE] (space)" || fail "[DONE] framing"
@@ -39,7 +45,9 @@ echo "═══ D. WORLD B SCENARIOS ═══"
 echo "$(ask rm_jane 'Give me a complete overview of the Whitman relationship: holdings, performance, settlement status, and cash position')" | grep -qiE "whitman|holding|portfolio|cash|settle|[0-9],[0-9]{3}" && pass "hero grounded" || fail "hero"
 echo "$(ask rm_jane 'Show me the Okafor relationship holdings')" | grep -qiE "denied|deny|not.*(cover|access|book)" && pass "denial (Okafor blocked for rm_jane)" || fail "denial"
 echo "$(ask rm_jane 'What is the latest on my client')" | grep -qiE "which|clarif|specify|by (id|name)|\?" && pass "clarify (no guess)" || fail "clarify"
-echo "$(ask uw_sam 'Give me the policy details and claim status for the Nakamura policy')" | grep -qiE "nakamura|policy|claim|coverage|premium" && pass "insurance grounded (uw_sam)" || fail "insurance"
+echo "$(ask uw_sam 'Give me the policy details for POL-77001')" | grep -qiE "continental|policy|premium|coverage|limit|[0-9],[0-9]{3}" && pass "insurance grounded (uw_sam POL-77001)" || fail "insurance grounded"
+echo "$(ask uw_sam 'Show me POL-88003')" | grep -qiE "polic(y|ies)" && pass "insurance denial says 'policy' (bug 238)" || fail "insurance denial copy"
+echo "$(ask rm_guest 'Show me the Whitman relationship holdings')" | grep -qiE "denied|deny|not.*(cover|access|book)|empty|no (client|coverage)" && pass "rm_guest denied (no coverage)" || fail "rm_guest denial"
 
 echo "═══ E. LANGFUSE (traces/tags/datasets) ═══"
 sleep 8
@@ -60,7 +68,9 @@ echo "═══ F. GRAFANA / WORLD-B / USERS ═══"
 n=$(curl -s -u admin:changeme "$GF/api/datasources/proxy/uid/prometheus/api/v1/query?query=conduit_agent_calls_total" | python3 -c 'import sys,json;print(len(json.load(sys.stdin)["data"]["result"]))' 2>/dev/null)
 [ "${n:-0}" -gt 0 ] && pass "grafana metric has data ($n series)" || fail "grafana metric"
 bash "$(dirname "$0")/world-b-check.sh" 2>/dev/null | grep -q "CRITICAL violations : 0" && pass "world-b CRITICAL 0" || fail "world-b"
-[ "$(docker exec conduit-redis redis-cli KEYS 'principal:*' 2>/dev/null | wc -l | tr -d ' ')" -ge 4 ] && pass "4 principals seeded" || fail "principals"
+# Axiom (OIDC) is the single identity source now — verify all four personas can mint a JWT.
+np=0; for u in rm_jane rm_carlos rm_guest uw_sam; do [ -n "$(tok $u)" ] && np=$((np+1)); done
+[ "$np" -eq 4 ] && pass "4 personas mint Axiom JWTs (rm_jane/rm_carlos/rm_guest/uw_sam)" || fail "personas login ($np/4)"
 
 echo ""
 echo "═══ eval scores (scorer runs on a cycle — up to ~5 min) ═══"

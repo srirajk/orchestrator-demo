@@ -5,7 +5,6 @@ import ai.conduit.gateway.api.v1.chat.dto.Message;
 import ai.conduit.gateway.domain.auth.EntitlementService;
 import ai.conduit.gateway.domain.auth.EntitlementService.EntitlementResult;
 import ai.conduit.gateway.domain.auth.Principal;
-import ai.conduit.gateway.domain.auth.PrincipalStore;
 import ai.conduit.gateway.domain.coverage.CoverageCheckResult;
 import ai.conduit.gateway.domain.coverage.CoverageClient;
 import ai.conduit.gateway.domain.coverage.CoverageResolveResult;
@@ -22,6 +21,7 @@ import ai.conduit.gateway.infrastructure.telemetry.TraceEventPublisher;
 import ai.conduit.gateway.infrastructure.telemetry.event.AgentCompleteData;
 import ai.conduit.gateway.infrastructure.telemetry.event.AgentStartData;
 import ai.conduit.gateway.infrastructure.telemetry.event.AgentsResolvedData;
+import ai.conduit.gateway.infrastructure.telemetry.event.CheckDeniedData;
 import ai.conduit.gateway.infrastructure.telemetry.event.EntitlementCheckData;
 import ai.conduit.gateway.infrastructure.telemetry.event.IntentClassifiedData;
 import ai.conduit.gateway.infrastructure.telemetry.event.RequestCompleteData;
@@ -80,7 +80,6 @@ public class ChatService {
     private final InputSynthesizer         inputSynthesizer;
     private final FlatPlanExecutor         executor;
     private final AnswerSynthesizer        answerSynthesizer;
-    private final PrincipalStore           principalStore;
     private final EntitlementService       entitlementService;
     private final TraceEventPublisher      tracePublisher;
     private final CoverageClient           coverageClient;
@@ -98,7 +97,6 @@ public class ChatService {
                        InputSynthesizer inputSynthesizer,
                        FlatPlanExecutor executor,
                        AnswerSynthesizer answerSynthesizer,
-                       PrincipalStore principalStore,
                        EntitlementService entitlementService,
                        TraceEventPublisher tracePublisher,
                        CoverageClient coverageClient,
@@ -111,7 +109,6 @@ public class ChatService {
         this.inputSynthesizer    = inputSynthesizer;
         this.executor            = executor;
         this.answerSynthesizer   = answerSynthesizer;
-        this.principalStore      = principalStore;
         this.entitlementService  = entitlementService;
         this.tracePublisher      = tracePublisher;
         this.coverageClient      = coverageClient;
@@ -285,10 +282,12 @@ public class ChatService {
                 return;
             }
 
-            // Use the JWT-verified principal if available; the JWT book claim is authoritative.
+            // Identity comes ONLY from the verified JWT. The legacy X-User-Id → Redis
+            // PrincipalStore fallback was removed (identity-spoofing hole); an unauthenticated
+            // caller is anonymous with no coverage, so every entity check denies.
             Principal principal = (jwtPrincipal != null)
                     ? jwtPrincipal
-                    : principalStore.load(userId);
+                    : Principal.anonymous();
 
             // Prune agents the principal is not permitted to invoke (domain + classification).
             // Must happen BEFORE input synthesis so we never synthesize inputs for denied agents.
@@ -297,6 +296,10 @@ public class ChatService {
             List<AgentManifest> allowedManifests = entitlementService.filterAgents(principal, manifests);
             if (allowedManifests.isEmpty()) {
                 emitRequestOutcome("DENIED");
+                // Glass-box: make the structural (Cerbos agent-invoke) deny explicit in the trace
+                // instead of jumping agents_resolved → request_complete. (bug 239)
+                tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
+                        new CheckDeniedData("structural", null, userId, "no-covered-agents", "cerbos")));
                 streamTextAndComplete(emitter, "You do not have access to any of the required services for this query.", streamId);
                 tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                         new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
@@ -386,7 +389,15 @@ public class ChatService {
                                     principalId, tenantId, coverageRelId, coverage);
                                 if (!check.allowed()) {
                                     emitRequestOutcome("DENIED");
-                                    streamTextAndComplete(emitter, mapDenialReason(check.reason()), streamId);
+                                    // Glass-box: explicit CHECK deny event (bug 239) so the trace shows the
+                                    // coverage decision rather than jumping straight to request_complete.
+                                    tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
+                                        new CheckDeniedData("coverage", coverageRelId, principalId,
+                                            check.reason(), "coverage")));
+                                    // Denial copy scoped to the routed sub-domain so an insurance denial
+                                    // emits "policy" copy, not the wealth "client relationship" default (bug 238).
+                                    streamTextAndComplete(emitter,
+                                        mapDenialReason(check.reason(), em.subDomainId()), streamId);
                                     tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                                         new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
                                     return;
@@ -412,7 +423,8 @@ public class ChatService {
                                 // Not found in coverage at all.
                                 emitRequestOutcome("CLARIFIED");
                                 streamTextAndComplete(emitter, msg("reference_not_found",
-                                    "I could not find a match for that reference. Please provide a specific identifier.")
+                                    "I could not find a match for that reference. Please provide a specific identifier.",
+                                    em.subDomainId())
                                     .replace("{reference}", preExtracted.reference(coverageEntity.extractAs())), streamId);
                                 tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                                     new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
@@ -427,8 +439,11 @@ public class ChatService {
 
                             if (discovered.isEmpty()) {
                                 emitRequestOutcome("DENIED");
+                                // Empty coverage book is a domain/coverage deny — surface it in the trace (bug 239).
+                                tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
+                                    new CheckDeniedData("coverage", null, principalId, "empty-coverage", "coverage")));
                                 streamTextAndComplete(emitter, msg("no_coverage",
-                                    "Your coverage set is empty."), streamId);
+                                    "Your coverage set is empty.", em.subDomainId()), streamId);
                                 tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                                     new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
                                 return;
@@ -493,6 +508,9 @@ public class ChatService {
                         new EntitlementCheckData(resolvedRelId, userId, ent.allowed(), ent.reason(), ent.source())));
                 if (!ent.allowed()) {
                     emitRequestOutcome("DENIED");
+                    // Explicit deny event for the glass-box trace (bug 239).
+                    tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
+                            new CheckDeniedData("entitlement", resolvedRelId, userId, ent.reason(), ent.source())));
                     String denialMsg = "Access denied: you are not authorized to view relationship " +
                             resolvedRelId + ". This denial has been logged.";
                     try {
@@ -589,17 +607,24 @@ public class ChatService {
      * Maps a machine-readable denial reason code from the coverage service to a
      * human-readable message suitable for streaming to the end user.
      */
-    private String mapDenialReason(String reason) {
+    private String mapDenialReason(String reason, String subDomainId) {
         // Reason codes (not-covered, coverage-transferred, relationship-closed) are the stable
         // contract; their user-facing TEXT is declared in the sub-domain manifest's
-        // denial_messages map. The gateway holds no domain copy (WORLD-B §5).
-        String text = manifestStore.denialMessage(reason);
+        // denial_messages map. The gateway holds no domain copy (WORLD-B §5). The lookup is scoped
+        // to the routed sub-domain so multi-domain registries emit the right domain's copy (bug 238).
+        String text = manifestStore.denialMessage(reason, subDomainId);
         return text != null ? text : "Access to the requested resource was denied.";
     }
 
     /** Returns a manifest-declared user-facing message, falling back to a domain-neutral default. */
     private String msg(String key, String fallback) {
         String m = manifestStore.message(key);
+        return (m != null && !m.isBlank()) ? m : fallback;
+    }
+
+    /** Sub-domain-scoped variant of {@link #msg(String, String)} — prefers the routed domain's copy. */
+    private String msg(String key, String fallback, String subDomainId) {
+        String m = manifestStore.message(key, subDomainId);
         return (m != null && !m.isBlank()) ? m : fallback;
     }
 

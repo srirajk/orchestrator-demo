@@ -15,6 +15,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
  *   <li>{@code intent_classified} — {@link ai.conduit.gateway.infrastructure.telemetry.event.IntentClassifiedData}</li>
  *   <li>{@code agents_resolved}   — {@link ai.conduit.gateway.infrastructure.telemetry.event.AgentsResolvedData}</li>
  *   <li>{@code entitlement_check} — {@link ai.conduit.gateway.infrastructure.telemetry.event.EntitlementCheckData}</li>
+ *   <li>{@code check_denied}      — {@link ai.conduit.gateway.infrastructure.telemetry.event.CheckDeniedData}</li>
  *   <li>{@code agent_start}       — {@link ai.conduit.gateway.infrastructure.telemetry.event.AgentStartData}</li>
  *   <li>{@code agent_complete}    — {@link ai.conduit.gateway.infrastructure.telemetry.event.AgentCompleteData}</li>
  *   <li>{@code synthesis_start}   — {@link ai.conduit.gateway.infrastructure.telemetry.event.SynthesisStartData}</li>
