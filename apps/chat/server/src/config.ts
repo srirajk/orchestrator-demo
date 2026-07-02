@@ -28,4 +28,6 @@ export const config = {
   minioBucket: process.env['MINIO_BUCKET'] ?? 'conduit-chat-files',
 
   nodeEnv: process.env['NODE_ENV'] ?? 'development',
+
+  webDist: process.env['WEB_DIST'] ?? '/app/web',
 } as const;

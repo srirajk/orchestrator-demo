@@ -6,6 +6,7 @@
  * OIDC auth routes are unauthenticated; everything else requires a session.
  */
 import express from 'express';
+import path from 'path';
 import { config } from './config';
 import { connectDb } from './db/connection';
 import { sessionMiddleware } from './auth/session';
@@ -36,6 +37,10 @@ async function bootstrap(): Promise<void> {
 
   // Health check (no auth)
   app.get('/health', (_req, res) => res.json({ ok: true }));
+
+  // ── Static web app (SPA) ──────────────────────────────────────────────────
+  app.use(express.static(config.webDist));
+  app.get('*', (_req, res) => res.sendFile(path.join(config.webDist, 'index.html')));
 
   // ── Start ─────────────────────────────────────────────────────────────────
   app.listen(config.port, () => {

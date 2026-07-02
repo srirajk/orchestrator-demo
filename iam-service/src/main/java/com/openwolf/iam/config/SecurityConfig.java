@@ -88,7 +88,7 @@ public class SecurityConfig {
     @Value("${iam.oauth2.conduit-chat.client-secret:conduit-chat-secret}")
     private String conduitChatClientSecret;
 
-    @Value("${iam.oauth2.conduit-chat.redirect-uri:http://localhost:8095/api/auth/callback}")
+    @Value("${iam.oauth2.conduit-chat.redirect-uri:http://localhost:8099/api/auth/callback}")
     private String conduitChatRedirectUri;
 
     @Value("${iam.oauth2.admin-ui.client-id:admin-ui-client}")
