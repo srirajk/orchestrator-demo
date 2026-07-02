@@ -2,7 +2,12 @@
 
 Everything needed to validate the system end-to-end with any persona. Pairs with `CODEX-HANDOFF.md` (what's proven vs. what to test) and `MORNING-REPORT.md` (status).
 
-> **Guardrails:** Do **not** touch the `backend-*` containers (separate `uac` project) or modify `iam-service` (Axiom). Compose project = `orchestrator-demo`.
+> **Guardrails:** Do **not** touch the `backend-*` containers (separate `uac` project). Compose project = `orchestrator-demo`.
+
+> **Post-fix reconciliation (commit `2c97c4c`) — read this:** the persona seed drift is fixed and Axiom OIDC is now the single source of truth (the `X-User-Id` trusted-hop was removed). All 4 personas log in with `Meridian@2024`. Two accuracy notes vs. the original matrix:
+> - **`rm_guest` is denied via the *coverage* layer (empty book), not a structural Cerbos/domain-membership check.** Correct outcome (denied, no leak); a true structural domain-gate is a documented follow-up (needs a Cerbos policy + `domains` claim). Do not file this as a bug — it's expected.
+> - **`uw_sam` → POL-88003 denial copy is** `"That policy is not in your book of business."` (insurance policy copy, not the wealth "client relationship" copy).
+> - After the iam rebuild, the signing key rotated — **do a fresh login** (any stale session token is expected to fail).
 
 ---
 
@@ -80,11 +85,11 @@ For each persona: log in at http://localhost:8099 (username / `Meridian@2024`), 
 8. A Whitman/Okafor query (not his book) → **🔒 denied**.
 
 ### rm_guest (no domain membership — structural denial)
-9. Any wealth query (even a valid client) → **🔒 denied at the structural/Cerbos layer** — proves domain membership is required, not just segment.
+9. Any wealth query (even a valid client) → **🔒 denied** — currently via the *coverage* layer (rm_guest has no covered entities), not a structural Cerbos denial. Denied, no leak. (True structural domain-gate = documented follow-up.)
 
 ### uw_sam (second domain — insurance)
 10. `What is the premium for POL-77001?` → **grounded** (his policy).
-11. `Show me POL-88003` → **🔒 denied** (uw_dana's).
+11. `Show me POL-88003` → **🔒 denied** — copy: `"That policy is not in your book of business."` (uw_dana's policy).
 12. Any wealth query → **🔒 denied** (no wealth segment) — proves cross-domain isolation.
 
 ### Determinism / no-fabrication
