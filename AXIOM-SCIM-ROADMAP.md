@@ -50,11 +50,25 @@ Same two-layer split: **standards-based identity/provisioning up top, fine-grain
 ## Part 4 — Why it stays World-B (gateway never changes)
 SCIM feeds Axiom → the token carries segments/domains → the gateway's structural check and the capabilities view **just consume it**. Add a domain, add a group, drop users in it → **zero gateway code**. Onboarding a business line and provisioning its users are both config/manifest, never code.
 
+## Part 5 — Federation / identity brokering (upstream SSO to the enterprise IdP)
+
+Axiom doesn't have to **be** the primary IdP — it can **broker** to the enterprise's existing one (Azure Entra/AD, Okta) via upstream OIDC/SAML. The user signs in with their **corporate** credentials against Entra; Axiom receives the claims, **maps on a stable identifier** (Entra `oid` or `employeeId` — NOT email/UPN, which drift), and issues **its own** OIDC token in the normalized claim shape Conduit already expects.
+
+**Why "nothing internal changes" is exactly right:** Conduit only ever sees *Axiom's* token. The whole downstream — gateway, Cerbos, coverage, capabilities — is **insulated from the identity source**. Swap Entra → Okta → local-password and Conduit neither knows nor cares. That insulation is the entire reason to put Axiom in the middle as a broker. Classic pattern (Keycloak/Auth0/Okta): federate up, normalize claims, issue your own token down.
+
+**SSO + SCIM are complementary, not either/or:**
+- **SSO / federation** = *authentication* — proves who you are, via Entra, at login.
+- **SCIM** = *provisioning* — your groups/domains pushed from Entra ahead of time, so Axiom already knows your entitlement context when you arrive.
+- Together: log in with corporate creds, land with the right segments/domains, zero manual mapping.
+
+**The one thing to nail:** map on a **stable subject** (`oid`/`employeeId`) as the Axiom principal key. Email/UPN drift; a stable id keeps a person's identity + entitlements consistent across renames/moves. Everything downstream keys off Axiom's `sub`, so the mapping happens once, at the broker.
+
 ## Suggested phasing
 1. **Capabilities view** (compose-only: token ∩ Cerbos ∩ coverage) — cheap, high UX value, no new store.
 2. **SCIM Users** (provision/de-provision lifecycle).
 3. **SCIM Groups → domain membership** (the "assign to domains" automation).
-4. **Retire the manual DB seed** once SCIM is authoritative.
+4. **Federation** — broker upstream SSO to Entra/Okta; map on the stable subject.
+5. **Retire the manual DB seed** once SCIM + federation are authoritative.
 
 ## Relationship to today's work
 The current fix — reconciling the seed (users → segments → domains) by hand — **is exactly what SCIM will later automate.** So it's not throwaway; it establishes the model SCIM feeds, and the capabilities view surfaces.
