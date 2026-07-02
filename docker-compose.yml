@@ -507,22 +507,37 @@ services:
       context: ./apps/chat
       dockerfile: Dockerfile
     container_name: conduit-chat
+    # host.docker.internal must resolve from inside the container (Docker Desktop provides
+    # it automatically; this mapping makes it explicit and works on Linux engines too). The
+    # OIDC issuer uses it so the SAME issuer URL is reachable by both the browser (authorize
+    # redirect) and this container (token/JWKS/userinfo).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8099:8095"
     environment:
       MONGODB_URI: mongodb://mongodb:27017/conduitchat
       GATEWAY_BASE: http://gateway:8080
-      OIDC_ISSUER: http://iam-service:8084
+      # Must be reachable by BOTH the browser and this container, and must match the issuer
+      # advertised by Axiom's discovery document. Do NOT use iam-service or localhost here.
+      OIDC_ISSUER: http://host.docker.internal:8084
       OIDC_CLIENT_ID: conduit-chat
       OIDC_CLIENT_SECRET: conduit-chat-secret
+      # Must match EXACTLY the redirect-uri Axiom already has registered (never change Axiom).
       OIDC_REDIRECT_URI: http://localhost:8099/api/auth/callback
-      SESSION_SECRET: conduit-chat-session-secret-change-in-production
+      # Session cookie must NOT be Secure over http (demo runs on http://localhost:8099).
+      COOKIE_SECURE: "false"
       CHAT_RECENT_MESSAGES: "8"
       CHAT_SUMMARY_AFTER: "12"
       CHAT_SUMMARY_MAX_TOKENS: "150"
+      # Facts-free rolling-summary LLM (optional). Leave blank → summary is a safe no-op.
+      SUMMARY_LLM_BASE_URL: ${SUMMARY_LLM_BASE_URL:-}
+      SUMMARY_LLM_API_KEY: ${SUMMARY_LLM_API_KEY:-}
+      SUMMARY_LLM_MODEL: ${SUMMARY_LLM_MODEL:-gpt-4o-mini}
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minio}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-miniosecret}
+      MINIO_BUCKET: conduit-chat-files
     depends_on:
       mongodb:
         condition: service_healthy

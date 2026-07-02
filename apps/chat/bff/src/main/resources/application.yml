@@ -1,0 +1,90 @@
+spring:
+  application:
+    name: conduit-chat-bff
+
+  # Blocking MVC + virtual threads is the idiom for this BFF.
+  threads:
+    virtual:
+      enabled: true
+
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://mongodb:27017/conduitchat}
+
+  session:
+    store-type: mongodb
+    timeout: 24h
+    mongodb:
+      collection-name: sessions
+
+  security:
+    oauth2:
+      client:
+        registration:
+          conduit-chat:
+            provider: conduit-chat
+            client-id: ${OIDC_CLIENT_ID:conduit-chat}
+            client-secret: ${OIDC_CLIENT_SECRET:conduit-chat-secret}
+            authorization-grant-type: authorization_code
+            client-authentication-method: client_secret_post
+            # Must match EXACTLY the redirect-uri registered in Axiom (iam-service) for this client.
+            # We adapt to Axiom; Axiom is never changed.
+            redirect-uri: ${OIDC_REDIRECT_URI:http://localhost:8099/api/auth/callback}
+            scope:
+              - openid
+              - profile
+              - email
+        provider:
+          conduit-chat:
+            # host.docker.internal:8084 is reachable by BOTH the browser (authorize redirect)
+            # and this container (token/JWKS/userinfo). The discovery document advertises this
+            # issuer, so issuer-uri MUST match it or Spring rejects the discovery.
+            issuer-uri: ${OIDC_ISSUER:http://host.docker.internal:8084}
+
+server:
+  port: ${PORT:8095}
+  servlet:
+    session:
+      cookie:
+        name: SESSION
+        http-only: true
+        # COOKIE GOTCHA: a Secure cookie is dropped by the browser over http.
+        # The demo runs on http://localhost:8099, so default OFF; set true only behind TLS.
+        secure: ${COOKIE_SECURE:false}
+        same-site: lax
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+conduit:
+  chat:
+    gateway:
+      base-url: ${GATEWAY_BASE:http://gateway:8080}
+      model: ${GATEWAY_MODEL:conduit-assistant}
+    context:
+      recent-messages: ${CHAT_RECENT_MESSAGES:8}
+      summary-after-messages: ${CHAT_SUMMARY_AFTER:12}
+      summary-max-tokens: ${CHAT_SUMMARY_MAX_TOKENS:150}
+    summary:
+      # Facts-free rolling topical summary. If base-url or api-key is blank the
+      # SummaryService is a safe no-op (keeps the existing summary).
+      base-url: ${SUMMARY_LLM_BASE_URL:}
+      api-key: ${SUMMARY_LLM_API_KEY:}
+      model: ${SUMMARY_LLM_MODEL:gpt-4o-mini}
+      temperature: ${SUMMARY_LLM_TEMPERATURE:0.0}
+    storage:
+      endpoint: ${MINIO_ENDPOINT:http://minio:9000}
+      access-key: ${MINIO_ACCESS_KEY:minioadmin}
+      secret-key: ${MINIO_SECRET_KEY:minioadmin}
+      bucket: ${MINIO_BUCKET:conduit-chat-files}
+
+logging:
+  level:
+    ai.conduit.chat: INFO
