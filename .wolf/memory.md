@@ -5,6 +5,7 @@
 
 | 17:36 | Audited LibreChat OIDC token path and local image source | librechat/librechat.yaml, librechat/patches/openidStrategy.js, docker-compose.yml, gateway auth files | confirmed config-only token-forwarding path via `{{LIBRECHAT_OPENID_ACCESS_TOKEN}}` headers; no gateway code needed | ~9000 |
 | 17:45 | Implemented LibreChat/Axiom OIDC forwarding and checks | librechat/librechat.yaml, docker-compose.yml, iam-service auth/config/test, .env.example | targeted + full IAM tests pass; docker compose config valid; world-b-check CRITICAL 0 | ~3500 |
+| 06:31 | Implemented stateless gateway Phase 1+2 from ADR | gateway ChatService/IntentClassifier/AnswerSynthesizer, deleted domain/session, docs/tests wording | mvn gateway tests pass; smoke 18/18; Playwright 89/89 split across two runs; pytest coverage 8/8; world-b CRITICAL 0 | ~25000 |
 
 | 21:56 | Fixed 7 failing E2E Playwright tests (02-hero, 04-entitlements, 05-resilience, 10-coverage-flow) | ChatService.java, AnswerSynthesizer.java, e2e/tests/helpers.ts | 17/17 pass, 0 failures | ~8000 |
 
@@ -1508,3 +1509,4 @@
 | 18:01 | Reviewer follow-up removed hardcoded demo client prompt from Workbench composer | admin-ui/src/features/workbench/hooks/useWorkbenchChat.ts, ChatPanel.tsx | production control-plane UI now opens with a neutral gateway prompt | ~350 |
 | 18:14 | Integration critic pass centralized admin JWT localStorage access | admin-ui/src/auth/tokenStorage.ts, admin-ui/src/api/client.ts, admin-ui/src/hooks/useAuth.tsx, admin-ui/src/features/workbench/api.ts | fixed meridian_admin_token/conduit_admin_token mismatch and kept legacy fallback | ~700 |
 | 18:16 | Integration visual pass aligned Workbench header, panels, and composer with Axiom tokens | admin-ui/src/features/workbench/WorkbenchPage.tsx, components/Panel.tsx, components/ChatPanel.tsx | uses page-shell/surface-panel/navy-gold treatment after design-system merge | ~500 |
+| 03:59 | Fixed Axiom Workbench/persona UI review items and verified clean-stack suite | admin-ui, iam-service, gateway, tests/e2e | docker compose down -v/up --build; world-b CRITICAL 0; smoke 18/18; Playwright 91/91; gateway Maven passed; coverage pytest 8/8 | ~52000 |

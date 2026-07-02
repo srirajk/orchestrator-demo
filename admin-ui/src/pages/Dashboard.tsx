@@ -108,7 +108,7 @@ export function Dashboard() {
     queryFn: statsApi.get,
   })
   const { data: auditData, isLoading: auditLoading } = useQuery({
-    queryKey: ['audit', 0],
+    queryKey: ['audit', 0, 5],
     queryFn: () => auditApi.list(0, 5),
   })
 

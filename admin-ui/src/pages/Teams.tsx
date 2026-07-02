@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2, Edit2, Users } from 'lucide-react'
 import { teamsApi, usersApi, type Team } from '../api/client'
 import { Button } from '../components/ui/Button'
-import { Input } from '../components/ui/Input'
+import { Input, Select } from '../components/ui/Input'
 import { Badge } from '../components/ui/Badge'
 import { Dialog } from '../components/ui/Dialog'
 import { Skeleton } from '../components/ui/Skeleton'
@@ -48,6 +48,7 @@ export function Teams() {
   const [form, setForm] = useState({ ...EMPTY })
   const [detail, setDetail] = useState<Team | null>(null)
   const [addMember, setAddMember] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<Team | null>(null)
 
   const { data: teams = [], isLoading } = useQuery({
     queryKey: ['teams'],
@@ -91,6 +92,7 @@ export function Teams() {
     mutationFn: (id: string) => teamsApi.delete(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['teams'] })
+      setDeleteTarget(null)
       toast('success', 'Team deleted')
     },
     onError: (e: Error) => toast('error', e.message),
@@ -114,6 +116,7 @@ export function Teams() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['team', detail?.id] })
       qc.invalidateQueries({ queryKey: ['teams'] })
+      toast('success', 'Member removed')
     },
     onError: (e: Error) => toast('error', e.message),
   })
@@ -126,7 +129,7 @@ export function Teams() {
   function openEdit(t: Team) {
     setEdit(t)
     setForm({
-      id: t.id,
+      id: t.domainId || '',
       name: t.name,
       description: t.description,
       defaultRoles: t.defaultRoles,
@@ -172,19 +175,21 @@ export function Teams() {
           {teams.map(t => (
             <div key={t.id} className="bg-white rounded-lg border border-slate-200 p-5 hover:border-slate-300 transition-colors group">
               <div className="flex items-start justify-between mb-3">
-                <div className="w-9 h-9 rounded-lg bg-violet-50 flex items-center justify-center">
-                  <Users size={16} className="text-violet-600" />
+                <div className="w-9 h-9 rounded-lg bg-axiom-50 flex items-center justify-center ring-1 ring-axiom-600/10">
+                  <Users size={16} className="text-axiom-700" />
                 </div>
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                   <button
                     onClick={() => openEdit(t)}
-                    className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
+                    aria-label={`Edit ${t.name}`}
+                    className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-300"
                   >
                     <Edit2 size={13} />
                   </button>
                   <button
-                    onClick={() => deleteMut.mutate(t.id)}
-                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                    onClick={() => setDeleteTarget(t)}
+                    aria-label={`Delete ${t.name}`}
+                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-300"
                   >
                     <Trash2 size={13} />
                   </button>
@@ -212,7 +217,7 @@ export function Teams() {
                 </span>
                 <button
                   onClick={() => setDetail(t)}
-                  className="text-xs text-brand-600 hover:underline font-medium"
+                  className="text-xs text-axiom-700 hover:underline font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-300 rounded"
                 >
                   Manage →
                 </button>
@@ -231,12 +236,11 @@ export function Teams() {
         <div className="space-y-4">
           {!editing && (
             <Input
-              label="Team ID"
+              label="Domain ID"
               placeholder="wealth-private-banking"
               value={form.id}
               onChange={e => setForm(f => ({ ...f, id: e.target.value }))}
-              hint="Lowercase, hyphens only"
-              required
+              hint="Optional domain association"
             />
           )}
           <Input
@@ -320,20 +324,22 @@ export function Teams() {
         {teamDetail && (
           <div className="space-y-4">
             <div className="flex gap-2">
-              <select
-                className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
-                value={addMember}
-                onChange={e => setAddMember(e.target.value)}
-              >
-                <option value="">Select a user to add…</option>
-                {users
-                  .filter(u => !teamDetail.members?.some(m => m.id === u.id))
-                  .map(u => (
-                    <option key={u.id} value={u.id}>
-                      {u.username} ({u.id})
-                    </option>
-                  ))}
-              </select>
+              <div className="flex-1">
+                <Select
+                  aria-label="User to add"
+                  value={addMember}
+                  onChange={e => setAddMember(e.target.value)}
+                >
+                  <option value="">Select a user to add…</option>
+                  {users
+                    .filter(u => !teamDetail.members?.some(m => m.id === u.id))
+                    .map(u => (
+                      <option key={u.id} value={u.id}>
+                        {u.username} ({u.id})
+                      </option>
+                    ))}
+                </Select>
+              </div>
               <Button
                 size="sm"
                 disabled={!addMember}
@@ -360,8 +366,8 @@ export function Teams() {
                 {teamDetail.members?.map(m => (
                   <div key={m.id} className="flex items-center justify-between py-2.5 group">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-full bg-violet-50 flex items-center justify-center">
-                        <span className="text-violet-700 text-xs font-semibold">
+                      <div className="w-7 h-7 rounded-full bg-axiom-50 flex items-center justify-center">
+                        <span className="text-axiom-700 text-xs font-semibold">
                           {m.name.charAt(0)}
                         </span>
                       </div>
@@ -377,7 +383,7 @@ export function Teams() {
                           userId: m.id,
                         })
                       }
-                      className="opacity-0 group-hover:opacity-100 text-xs text-red-500 hover:text-red-700 transition-opacity"
+                      className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 text-xs text-red-500 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-300 rounded"
                     >
                       Remove
                     </button>
@@ -387,6 +393,34 @@ export function Teams() {
             )}
           </div>
         )}
+      </Dialog>
+
+      <Dialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="Delete team"
+        description={deleteTarget ? `Remove ${deleteTarget.name}` : undefined}
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm leading-6 text-ink-600">
+            This removes the team grouping. User accounts remain active.
+          </p>
+          <div className="flex gap-2 border-t border-line pt-4">
+            <Button type="button" variant="secondary" className="flex-1" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              className="flex-1"
+              loading={deleteMut.isPending}
+              onClick={() => deleteTarget && deleteMut.mutate(deleteTarget.id)}
+            >
+              Delete
+            </Button>
+          </div>
+        </div>
       </Dialog>
     </div>
   )

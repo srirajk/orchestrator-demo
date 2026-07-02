@@ -1,14 +1,18 @@
 package com.openwolf.iam.controller;
 
 import com.openwolf.iam.dto.LoginResponse;
+import com.openwolf.iam.dto.ImpersonateRequest;
 import com.openwolf.iam.dto.TokenRequest;
 import com.openwolf.iam.dto.UserResponse;
 import com.openwolf.iam.entity.Principal;
 import com.openwolf.iam.entity.Role;
+import com.openwolf.iam.exception.EntityNotFoundException;
 import com.openwolf.iam.repository.PrincipalRepository;
+import com.openwolf.iam.service.AuditService;
 import com.openwolf.iam.service.UserService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,12 +20,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -51,7 +57,6 @@ import java.util.Set;
 public class AuthController {
 
     private static final Logger log = LoggerFactory.getLogger(AuthController.class);
-    private static final long TOKEN_TTL_SECONDS = 3600L;
 
     @Value("${spring.security.oauth2.authorizationserver.issuer:http://localhost:8084}")
     private String issuerUrl;
@@ -59,20 +64,29 @@ public class AuthController {
     @Value("${iam.oauth2.gateway.audience:conduit-gateway}")
     private String gatewayAudienceRaw;
 
+    @Value("${iam.auth.token-ttl-seconds:3600}")
+    private long tokenTtlSeconds;
+
+    @Value("${iam.auth.impersonation-ttl-seconds:900}")
+    private long impersonationTtlSeconds;
+
     private final AuthenticationManager authenticationManager;
     private final JwtEncoder jwtEncoder;
     private final PrincipalRepository principalRepository;
+    private final AuditService auditService;
     private final UserService userService;
     private final ObjectMapper objectMapper;
 
     public AuthController(AuthenticationManager authenticationManager,
                           JwtEncoder jwtEncoder,
                           PrincipalRepository principalRepository,
+                          AuditService auditService,
                           UserService userService,
                           ObjectMapper objectMapper) {
         this.authenticationManager = authenticationManager;
         this.jwtEncoder = jwtEncoder;
         this.principalRepository = principalRepository;
+        this.auditService = auditService;
         this.userService = userService;
         this.objectMapper = objectMapper;
     }
@@ -91,6 +105,33 @@ public class AuthController {
     @PostMapping("/auth/token")
     public ResponseEntity<LoginResponse> token(@Valid @RequestBody TokenRequest req) {
         return issueToken(req);
+    }
+
+    /**
+     * {@code POST /auth/impersonate} — admin-only, short-lived persona token exchange for
+     * Workbench demos. The returned token is a real Axiom JWT for the selected subject;
+     * the gateway must receive it as Bearer auth and must never rely on act-as headers.
+     */
+    @PostMapping("/auth/impersonate")
+    @PreAuthorize("hasRole('platform_admin')")
+    @Transactional
+    public ResponseEntity<LoginResponse> impersonate(
+            @Valid @RequestBody ImpersonateRequest req,
+            HttpServletRequest httpReq) {
+        Principal subject = principalRepository.findById(req.userId())
+                .or(() -> principalRepository.findByUsername(req.userId()))
+                .orElseThrow(() -> EntityNotFoundException.forId("User", req.userId()));
+
+        if (!subject.isActive()) {
+            throw new IllegalArgumentException("Cannot impersonate inactive user: " + subject.getId());
+        }
+
+        ResponseEntity<LoginResponse> response = issueTokenForPrincipal(subject, impersonationTtlSeconds, "impersonation");
+        auditService.log("default", auditService.currentActor(),
+                "IMPERSONATE_USER", "user", subject.getId(), null,
+                Map.of("subject", userService.toUserResponse(subject), "expiresIn", impersonationTtlSeconds),
+                httpReq);
+        return response;
     }
 
     /**
@@ -121,9 +162,13 @@ public class AuthController {
                 .or(() -> principalRepository.findByUsername(principalId))
                 .orElseThrow(() -> new RuntimeException("Authenticated principal not found in database: " + principalId));
 
+        return issueTokenForPrincipal(principal, tokenTtlSeconds, "login");
+    }
+
+    private ResponseEntity<LoginResponse> issueTokenForPrincipal(Principal principal, long ttlSeconds, String purpose) {
         // Build JWT claims
         Instant now = Instant.now();
-        Instant expiry = now.plusSeconds(TOKEN_TTL_SECONDS);
+        Instant expiry = now.plusSeconds(ttlSeconds);
 
         List<String> roles = principal.getRoles().stream()
                 .map(Role::getName)
@@ -141,6 +186,7 @@ public class AuthController {
 
         List<String> segments = extractSegments(principal.getAttributes());
         int clearance = extractClearance(principal.getAttributes());
+        String classification = extractString(principal.getAttributes(), "classification", "internal");
 
         UserResponse userResponse = userService.toUserResponse(principal);
         List<String> adminDomains = userResponse.adminDomains() != null ? userResponse.adminDomains() : List.of();
@@ -150,7 +196,7 @@ public class AuthController {
         JwsHeader jwsHeader = JwsHeader.with(SignatureAlgorithm.RS256).build();
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer(issuerUrl)
-                .subject(principalId)
+                .subject(principal.getId())
                 .issuedAt(now)
                 .expiresAt(expiry)
                 .audience(gatewayAudiences())
@@ -160,15 +206,16 @@ public class AuthController {
                 .claim("permissions", permissions)
                 .claim("segments", segments)
                 .claim("clearance", clearance)
+                .claim("classification", classification)
                 .claim("admin_domains", adminDomains)
                 .claim("tenant_id", "default")
                 .build();
 
         String tokenValue = jwtEncoder.encode(JwtEncoderParameters.from(jwsHeader, claims)).getTokenValue();
 
-        log.info("Issued JWT for user id={} username={}", principalId, principal.getUsername());
+        log.info("Issued {} JWT for user id={} username={}", purpose, principal.getId(), principal.getUsername());
 
-        return ResponseEntity.ok(new LoginResponse(tokenValue, "Bearer", TOKEN_TTL_SECONDS, userResponse));
+        return ResponseEntity.ok(new LoginResponse(tokenValue, "Bearer", ttlSeconds, userResponse));
     }
 
     private List<String> gatewayAudiences() {
@@ -176,6 +223,19 @@ public class AuthController {
                 .map(String::trim)
                 .filter(s -> !s.isBlank())
                 .toList();
+    }
+
+    private String extractString(String attributesJson, String key, String fallback) {
+        if (attributesJson == null || attributesJson.isBlank()) return fallback;
+        try {
+            Map<String, Object> attrs = objectMapper.readValue(
+                    attributesJson, new TypeReference<Map<String, Object>>() {});
+            Object val = attrs.get(key);
+            return val instanceof String s && !s.isBlank() ? s : fallback;
+        } catch (Exception ex) {
+            log.warn("Failed to extract {} from principal attributes: {}", key, ex.getMessage());
+            return fallback;
+        }
     }
 
     /**

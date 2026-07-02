@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './hooks/useAuth'
 import { ToastProvider } from './components/ui/Toast'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { Layout } from './components/Layout'
 import { Login } from './pages/Login'
 import { Dashboard } from './pages/Dashboard'
@@ -14,8 +15,8 @@ import { AuditLog } from './pages/AuditLog'
 const Workbench = lazy(() => import('./pages/Workbench').then((module) => ({ default: module.Workbench })))
 
 function Protected({ children }: { children: React.ReactNode }) {
-  const { token } = useAuth()
-  return token ? <>{children}</> : <Navigate to="/login" replace />
+  const { token, user } = useAuth()
+  return token && user ? <>{children}</> : <Navigate to="/login" replace />
 }
 
 function RouteFallback() {
@@ -27,6 +28,10 @@ function RouteFallback() {
   )
 }
 
+function PageBoundary({ children }: { children: React.ReactNode }) {
+  return <ErrorBoundary>{children}</ErrorBoundary>
+}
+
 function App() {
   return (
     <AuthProvider>
@@ -35,13 +40,13 @@ function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route element={<Protected><Layout /></Protected>}>
-              <Route index element={<Dashboard />} />
-              <Route path="users"    element={<Users />} />
-              <Route path="teams"    element={<Teams />} />
-              <Route path="roles"    element={<Roles />} />
-              <Route path="policies" element={<Policies />} />
-              <Route path="audit"    element={<AuditLog />} />
-              <Route path="workbench" element={<Suspense fallback={<RouteFallback />}><Workbench /></Suspense>} />
+              <Route index element={<PageBoundary><Dashboard /></PageBoundary>} />
+              <Route path="users"    element={<PageBoundary><Users /></PageBoundary>} />
+              <Route path="teams"    element={<PageBoundary><Teams /></PageBoundary>} />
+              <Route path="roles"    element={<PageBoundary><Roles /></PageBoundary>} />
+              <Route path="policies" element={<PageBoundary><Policies /></PageBoundary>} />
+              <Route path="audit"    element={<PageBoundary><AuditLog /></PageBoundary>} />
+              <Route path="workbench" element={<PageBoundary><Suspense fallback={<RouteFallback />}><Workbench /></Suspense></PageBoundary>} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

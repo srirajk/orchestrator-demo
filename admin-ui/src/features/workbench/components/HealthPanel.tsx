@@ -10,6 +10,8 @@ interface HealthPanelProps {
   domains: DomainEntry[]
   isLoadingAgents: boolean
   agentsError: Error | null
+  isLoadingDomains?: boolean
+  domainsError?: Error | null
 }
 
 export function HealthPanel({
@@ -17,6 +19,8 @@ export function HealthPanel({
   domains,
   isLoadingAgents,
   agentsError,
+  isLoadingDomains = false,
+  domainsError = null,
 }: HealthPanelProps) {
   const indexed = agents.filter((agent) => agent.indexed).length
   const protocols = new Set(agents.map((agent) => agent.protocol).filter(Boolean))
@@ -25,10 +29,21 @@ export function HealthPanel({
     <Panel title="Domain and Agent Health" icon={Server}>
       <div className="p-4">
         <div className="grid grid-cols-3 gap-3 mb-4">
-          <Metric label="Domains" value={domains.length} />
+          <Metric
+            label="Domains"
+            value={domains.length}
+            state={isLoadingDomains ? 'Loading' : domainsError ? 'Unavailable' : undefined}
+          />
           <Metric label="Agents" value={agents.length} />
           <Metric label="Protocols" value={protocols.size} />
         </div>
+
+        {domainsError && (
+          <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 flex items-center gap-2">
+            <AlertTriangle size={15} />
+            Domain registry unavailable
+          </div>
+        )}
 
         {agentsError && (
           <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 flex items-center gap-2">
@@ -85,11 +100,11 @@ export function HealthPanel({
   )
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
+function Metric({ label, value, state }: { label: string; value: number; state?: string }) {
   return (
     <div className="rounded-lg border border-slate-200 px-3 py-2 bg-slate-50">
       <p className="text-[11px] uppercase tracking-normal font-medium text-slate-400">{label}</p>
-      <p className="text-lg font-bold text-slate-900 mt-0.5">{value}</p>
+      <p className="text-lg font-bold text-slate-900 mt-0.5">{state || value}</p>
     </div>
   )
 }

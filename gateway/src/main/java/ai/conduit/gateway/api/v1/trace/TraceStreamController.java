@@ -33,12 +33,17 @@ public class TraceStreamController {
     }
 
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter stream(HttpServletResponse response) {
+    public SseEmitter stream(
+            @RequestParam(required = false) String conversationId,
+            HttpServletResponse response) {
         response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
         response.setHeader("X-Accel-Buffering", "no");   // disable nginx/proxy buffering
 
         String clientId = "gb-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
-        SseEmitter emitter = publisher.subscribe(clientId);
+        SseEmitter emitter = publisher.subscribe(clientId, event ->
+                conversationId == null
+                        || conversationId.isBlank()
+                        || conversationId.equals(event.conversationId()));
 
         emitter.onCompletion(() -> publisher.unsubscribe(clientId));
         emitter.onTimeout(()    -> publisher.unsubscribe(clientId));

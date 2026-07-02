@@ -102,9 +102,9 @@ test.describe('Coverage flow (Phase 11)', () => {
     expect(isDenied).toBe(true);
   });
 
-  // ── 4. Multi-turn: follow-up reuses session context ────────────────────────
+  // ── 4. Multi-turn: follow-up uses client-sent context ─────────────────────
 
-  test('second turn reuses session context (no re-clarification)', async ({ page }) => {
+  test('second turn uses client-sent context (no re-clarification)', async ({ page }) => {
     test.setTimeout(480_000);  // 8 min: login + 2 LLM turns under full-suite load
 
     await registerOrLogin(page);
@@ -123,7 +123,7 @@ test.describe('Coverage flow (Phase 11)', () => {
     expect(secondReply.length).toBeGreaterThan(20);
     const lower = secondReply.toLowerCase();
 
-    // The gateway must NOT ask "which client" — it should use session context
+    // The gateway must NOT ask "which client" — it should use the sent message history
     const asksWhichClient = lower.includes('which client') || lower.includes('please specify');
     expect(asksWhichClient).toBe(false);
   });

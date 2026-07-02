@@ -22,6 +22,7 @@ export function ContextLedger({
   const entitlement = latestOf(events, 'entitlement_check')
   const requestComplete = latestOf(events, 'request_complete')
   const agentsResolved = latestOf(events, 'agents_resolved')
+  const latestEvent = events.length > 0 ? events[events.length - 1] : undefined
 
   const selected = Array.isArray(agentsResolved?.data?.selected)
     ? agentsResolved.data.selected.length
@@ -55,7 +56,7 @@ export function ContextLedger({
         />
         <LedgerCell
           label="Request"
-          value={events[0]?.requestId ? events[0].requestId.slice(0, 12) : 'Pending'}
+          value={latestEvent?.requestId ? latestEvent.requestId.slice(0, 12) : 'Pending'}
         />
       </div>
     </Panel>

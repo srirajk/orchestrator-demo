@@ -216,6 +216,7 @@
 
 ## admin-ui/
 
+- `.env.example` — Documents optional Vite gateway proxy override and admin JWT storage keys. (~55 tok)
 - `DESIGN-SYSTEM.md` — Axiom Admin UI Design Direction (~251 tok)
 - `Dockerfile` — Docker container definition (~103 tok)
 - `index.html` — Meridian Admin (~236 tok)
@@ -244,6 +245,7 @@
 
 ## admin-ui/src/components/
 
+- `ErrorBoundary.tsx` — Route-level React crash boundary with Axiom fallback and reload action. (~455 tok)
 - `Layout.tsx` — Layout (~85 tok)
 - `Sidebar.tsx` — nav (~774 tok)
 
@@ -785,6 +787,7 @@
 - `AssignRoleRequest.java` — Class: AssignRoleRequest (~49 tok)
 - `AuditLogResponse.java` — Class: AuditLogResponse (~99 tok)
 - `CreateGroupRequest.java` — Class: CreateGroupRequest (~96 tok)
+- `ImpersonateRequest.java` — Admin-only impersonation token request DTO accepting userId/user_id. (~55 tok)
 - `CreatePolicyRequest.java` — Class: CreatePolicyRequest (~74 tok)
 - `CreateRoleRequest.java` — Class: CreateRoleRequest (~71 tok)
 - `CreateUserRequest.java` — Class: CreateUserRequest (~129 tok)

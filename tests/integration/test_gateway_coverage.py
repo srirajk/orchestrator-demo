@@ -254,12 +254,12 @@ def test_3_okafor_denied_for_rm_jane():
     )
 
 
-def test_4_multi_turn_carry_forward():
+def test_4_multi_turn_client_sent_context():
     """
     Two-turn conversation over the same conversation ID.
     Turn 1: establish Whitman context.
     Turn 2: follow-up question without re-stating the client.
-    Turn 2 must NOT ask 'which client' — session context must carry forward.
+    Turn 2 must NOT ask 'which client' because the client sends full message history.
     """
     jwt = get_jwt("rm_jane")
     conv_id = "test-mt-jane-001"
@@ -294,10 +294,10 @@ def test_4_multi_turn_carry_forward():
     assert len(turn2_text) > 20, f"Turn 2 response is too short: {repr(turn2_text)}"
 
     lower = turn2_text.lower()
-    # Session context must not trigger a fresh clarification re-asking which client
+    # Client-sent context must not trigger a fresh clarification re-asking which client
     asks_which_client = "which client" in lower or "please specify" in lower
     assert not asks_which_client, (
-        f"Turn 2 unexpectedly asked for client clarification (session carry-forward failed): "
+        f"Turn 2 unexpectedly asked for client clarification (client-sent context failed): "
         f"{repr(turn2_text)}"
     )
 

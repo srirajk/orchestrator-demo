@@ -135,6 +135,7 @@ function AuditRow({ entry, isExpanded, onToggle }: {
 }
 
 export function AuditLog() {
+  const pageSize = 10
   const { toast } = useToast()
   const [page, setPage] = useState(0)
   const [dateFrom, setDateFrom] = useState('')
@@ -142,13 +143,15 @@ export function AuditLog() {
   const [actor, setActor] = useState('')
   const [action, setAction] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
 
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ['audit', page],
-    queryFn: () => auditApi.list(page, 10),
+  const { data, isLoading, isError, error, refetch } = useQuery({
+    queryKey: ['audit', page, pageSize],
+    queryFn: () => auditApi.list(page, pageSize),
     retry: false,
   })
+  const queryError = isError
+    ? error instanceof Error ? error.message : 'Failed to load audit entries'
+    : null
 
   const handleExport = async () => {
     try {
@@ -171,11 +174,20 @@ export function AuditLog() {
   const filtered = useMemo(() => {
     if (!data?.content) return []
     return data.content.filter(e => {
+      const occurredAt = new Date(e.occurredAt).getTime()
+      if (dateFrom) {
+        const from = new Date(`${dateFrom}T00:00:00.000Z`).getTime()
+        if (occurredAt < from) return false
+      }
+      if (dateTo) {
+        const to = new Date(`${dateTo}T23:59:59.999Z`).getTime()
+        if (occurredAt > to) return false
+      }
       if (actor && !e.actorId.toLowerCase().includes(actor.toLowerCase())) return false
       if (action && !e.action.toLowerCase().includes(action.toLowerCase())) return false
       return true
     })
-  }, [data, actor, action])
+  }, [data, dateFrom, dateTo, actor, action])
 
   return (
     <div className="px-8 py-8">
@@ -200,16 +212,16 @@ export function AuditLog() {
       </div>
 
       {/* Error state */}
-      {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
+      {queryError && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3" role="alert">
           <AlertCircle size={18} className="text-red-600 shrink-0" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-red-900">{error}</p>
+            <p className="text-sm font-medium text-red-900">{queryError}</p>
           </div>
           <Button
             size="sm"
             variant="secondary"
-            onClick={() => { setError(null); refetch() }}
+            onClick={() => { void refetch() }}
           >
             <RefreshCw size={14} /> Retry
           </Button>
@@ -274,12 +286,45 @@ export function AuditLog() {
               </div>
             ))}
           </div>
-        ) : filtered.length === 0 ? (
+        ) : queryError ? (
           <EmptyState
-            icon={<Clock size={48} />}
-            title="No audit entries found"
-            description="Try adjusting your filters or wait for new activity"
+            icon={<AlertCircle size={48} />}
+            title="Audit log unavailable"
+            description="Retry the request after the service recovers"
           />
+        ) : filtered.length === 0 ? (
+          <>
+            <EmptyState
+              icon={<Clock size={48} />}
+              title="No audit entries found"
+              description="Try adjusting your filters or move between pages"
+            />
+            {data && (
+              <div className="px-5 py-4 border-t border-slate-200 flex items-center justify-between bg-slate-50">
+                <p className="text-sm text-slate-600">
+                  Page {page + 1} of {data.totalPages} · {data.totalElements} total entries
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={page === 0}
+                    onClick={() => setPage(Math.max(0, page - 1))}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={page >= data.totalPages - 1}
+                    onClick={() => setPage(Math.min(data.totalPages - 1, page + 1))}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         ) : (
           <>
             <table className="w-full text-sm">

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback } from 'react'
+import { createContext, useContext, useState, useCallback, useRef } from 'react'
 import { CheckCircle, XCircle, X } from 'lucide-react'
 import { clsx } from 'clsx'
 
@@ -11,10 +11,10 @@ const Ctx = createContext<ToastCtx>({ toast: () => {} })
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastMsg[]>([])
-  let seq = 0
+  const seq = useRef(0)
 
   const toast = useCallback((type: ToastType, message: string) => {
-    const id = ++seq
+    const id = ++seq.current
     setToasts(prev => [...prev, { id, type, message }])
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000)
   }, [])
@@ -22,7 +22,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <Ctx.Provider value={{ toast }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2">
+      <div
+        className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
         {toasts.map(t => (
           <div
             key={t.id}
@@ -35,7 +40,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               ? <CheckCircle size={16} className="text-green-500 mt-0.5 shrink-0" />
               : <XCircle size={16} className="text-red-500 mt-0.5 shrink-0" />}
             <span className="flex-1">{t.message}</span>
-            <button onClick={() => setToasts(p => p.filter(x => x.id !== t.id))}>
+            <button
+              type="button"
+              aria-label="Dismiss notification"
+              onClick={() => setToasts(p => p.filter(x => x.id !== t.id))}
+            >
               <X size={14} className="text-slate-400 hover:text-slate-600" />
             </button>
           </div>

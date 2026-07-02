@@ -64,8 +64,10 @@ export function Sidebar() {
             <p className="text-[11px] text-slate-400 truncate">{user?.id}</p>
           </div>
           <button
+            type="button"
             onClick={logout}
-            className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-md transition-colors"
+            aria-label="Sign out"
+            className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-300"
             title="Sign out"
           >
             <LogOut size={14} />

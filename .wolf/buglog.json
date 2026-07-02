@@ -3498,6 +3498,89 @@
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-07-01T22:14:00Z"
+    },
+    {
+      "id": "bug-217",
+      "timestamp": "2026-07-02T06:31:38Z",
+      "error_message": "Gateway used cross-turn ConversationSession memory despite exposing a stateless OpenAI-compatible API, manufacturing pivot/precedence/reset bugs.",
+      "file": "gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java, gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java, gateway/src/main/java/ai/conduit/gateway/domain/session/*",
+      "root_cause": "Resolved entities and last agent results were stored by conversationId in Redis, then reused on later turns. A stale carried entity could override a newly named entity or survive a client reset.",
+      "fix": "Made gateway a pure per-request function of messages[] + JWT: removed session store reads/writes, deleted ConversationSession/ConversationSessionStore, removed fixed history truncation, enforced latest user mention wins over user-authored messages, re-resolve/re-check coverage every turn, and clarify deterministically when no user-authored resource reference exists.",
+      "tags": [
+        "gateway",
+        "stateless",
+        "session",
+        "world-b",
+        "coverage",
+        "entitlement",
+        "openai-api"
+      ],
+      "related_bugs": [
+        "bug-205",
+        "bug-196"
+      ],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T06:31:38Z"
+    },
+    {
+      "id": "bug-218",
+      "timestamp": "2026-07-02T07:56:34Z",
+      "error_message": "Workbench sent the logged-in admin JWT to the gateway, so entitlement decisions reflected admin instead of the selected demo persona.",
+      "file": "admin-ui/src/features/workbench/WorkbenchPage.tsx, admin-ui/src/features/workbench/api.ts, iam-service/src/main/java/com/openwolf/iam/controller/AuthController.java",
+      "root_cause": "Workbench had no Axiom-minted persona token exchange and reused readAdminToken() for chat and trace requests.",
+      "fix": "Added platform-admin-gated /auth/impersonate with audited short-lived JWTs, wired Workbench persona selection from usersApi.list(), and send persona Bearer tokens to chat plus trace stream.",
+      "tags": ["admin-ui", "workbench", "auth", "impersonation", "jwt", "world-b"],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T07:56:34Z"
+    },
+    {
+      "id": "bug-219",
+      "timestamp": "2026-07-02T07:56:34Z",
+      "error_message": "Users page rendered blank because the UI consumed /users as User[] while IAM returns PageResponse<UserResponse>.",
+      "file": "admin-ui/src/api/client.ts, admin-ui/src/pages/Users.tsx",
+      "root_cause": "usersApi.list() returned the raw paginated response, so Users.tsx called array methods on an object and crashed the route without a boundary.",
+      "fix": "Mapped usersApi.list() to PageResponse.content, added route ErrorBoundary, visible users error state, and corrected create/update payloads to match IAM DTOs.",
+      "tags": ["admin-ui", "users", "pagination", "api-contract", "crash"],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T07:56:34Z"
+    },
+    {
+      "id": "bug-220",
+      "timestamp": "2026-07-02T07:56:34Z",
+      "error_message": "Trace rail could show events from other conversations and retained old events after New conversation.",
+      "file": "admin-ui/src/features/workbench/hooks/useTraceStream.ts, gateway/src/main/java/ai/conduit/gateway/infrastructure/telemetry/TraceEventPublisher.java, gateway/src/main/java/ai/conduit/gateway/api/v1/trace/TraceStreamController.java",
+      "root_cause": "Client whitelisted null conversationId events and the gateway trace stream broadcast every event to every subscriber; local event state was append-only across conversation resets.",
+      "fix": "Added optional server-side conversationId filtering for trace subscribers, made Workbench connect with the current conversationId, dropped non-matching events, and cleared events/request tracking when persona or conversation changes.",
+      "tags": ["admin-ui", "gateway", "trace", "sse", "isolation"],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T07:56:34Z"
+    },
+    {
+      "id": "bug-221",
+      "timestamp": "2026-07-02T07:56:34Z",
+      "error_message": "PolicyForge submitted role UUIDs as subject_roles instead of Cerbos role names.",
+      "file": "admin-ui/src/pages/Policies.tsx",
+      "root_cause": "The UI treated RoleResponse.id as the policy role identifier, but Cerbos policies and the policy generator expect role names.",
+      "fix": "Changed policy role selection to store role.name, surfaced policy data load errors, and kept the Axiom/gold visual treatment consistent.",
+      "tags": ["admin-ui", "policies", "cerbos", "policyforge"],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T07:56:34Z"
+    },
+    {
+      "id": "bug-222",
+      "timestamp": "2026-07-02T07:56:34Z",
+      "error_message": "Sandboxed smoke/Maven/Python test attempts produced localhost socket errors unrelated to product behavior.",
+      "file": "scripts/smoke.sh, gateway/pom.xml, tests/integration/test_gateway_coverage.py",
+      "root_cause": "macOS Codex sandbox denied localhost sockets for curl/Python/Redis-backed tests.",
+      "fix": "Stopped/reran the invalid smoke attempt and reran smoke, Maven gateway tests, Playwright, and pytest integration with approved unsandboxed execution.",
+      "tags": ["testing", "sandbox", "localhost", "verification"],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T07:56:34Z"
     }
   ]
 }

@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, Edit2, ChevronRight, User } from 'lucide-react'
+import { AlertCircle, Plus, RefreshCw, Trash2, Edit2, ChevronRight, User } from 'lucide-react'
 import { usersApi, rolesApi, tenantApi, type User as UserType } from '../api/client'
 import { Button } from '../components/ui/Button'
 import { Input, Select } from '../components/ui/Input'
@@ -10,11 +10,21 @@ import { Skeleton } from '../components/ui/Skeleton'
 import { EmptyState } from '../components/ui/EmptyState'
 import { useToast } from '../components/ui/Toast'
 
-const EMPTY: Omit<UserType, 'id' | 'adminDomains' | 'isActive' | 'createdAt'> = {
+interface UserForm {
+  username: string
+  email: string
+  password: string
+  roleIds: string[]
+  segments: string[]
+  classification: string
+  team: string
+}
+
+const EMPTY: UserForm = {
   username: '',
   email: '',
-  roles: [],
-  book: [],
+  password: '',
+  roleIds: [],
   segments: [],
   classification: 'internal',
   team: '',
@@ -61,8 +71,9 @@ export function Users() {
   const [form, setForm] = useState({ ...EMPTY })
   const [detail, setDetail] = useState<UserType | null>(null)
   const [search, setSearch] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<UserType | null>(null)
 
-  const { data: users = [], isLoading } = useQuery({
+  const { data: users = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['users'],
     queryFn: usersApi.list,
   })
@@ -75,8 +86,29 @@ export function Users() {
     queryFn: tenantApi.getClassificationSchema,
   })
 
+  const roleIdByName = useMemo(
+    () => new Map(roles.map((role) => [role.name, role.id])),
+    [roles],
+  )
+
   const createMut = useMutation({
-    mutationFn: () => usersApi.create(uid, form),
+    mutationFn: async () => {
+      if (!uid.trim()) throw new Error('User ID is required')
+      if (!form.password.trim()) throw new Error('Password is required')
+      const created = await usersApi.create({
+        id: uid.trim(),
+        username: form.username.trim(),
+        email: form.email.trim(),
+        password: form.password,
+        attributes: {
+          classification: form.classification,
+          segments: form.segments,
+          team: form.team,
+        },
+      })
+      await Promise.all(form.roleIds.map((roleId) => usersApi.assignRole(created.id, roleId)))
+      return created
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['users'] })
       close()
@@ -86,7 +118,33 @@ export function Users() {
   })
 
   const updateMut = useMutation({
-    mutationFn: () => usersApi.update(editing!.id, form),
+    mutationFn: async () => {
+      if (!editing) throw new Error('No user selected')
+      const beforeRoleIds = editing.roles
+        .map((name) => roleIdByName.get(name))
+        .filter((roleId): roleId is string => Boolean(roleId))
+      const desired = new Set(form.roleIds)
+      const before = new Set(beforeRoleIds)
+
+      const updated = await usersApi.update(editing.id, {
+        email: form.email.trim(),
+        attributes: {
+          classification: form.classification,
+          segments: form.segments,
+          team: form.team,
+        },
+      })
+
+      await Promise.all([
+        ...form.roleIds
+          .filter((roleId) => !before.has(roleId))
+          .map((roleId) => usersApi.assignRole(editing.id, roleId)),
+        ...beforeRoleIds
+          .filter((roleId) => !desired.has(roleId))
+          .map((roleId) => usersApi.removeRole(editing.id, roleId)),
+      ])
+      return updated
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['users'] })
       close()
@@ -99,6 +157,7 @@ export function Users() {
     mutationFn: (id: string) => usersApi.delete(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['users'] })
+      setDeleteTarget(null)
       toast('success', 'User deleted')
     },
     onError: (e: Error) => toast('error', e.message),
@@ -107,14 +166,20 @@ export function Users() {
   const assignRoleMut = useMutation({
     mutationFn: ({ userId, roleId }: { userId: string; roleId: string }) =>
       usersApi.assignRole(userId, roleId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['users'] })
+      toast('success', 'Role assigned')
+    },
     onError: (e: Error) => toast('error', e.message),
   })
 
   const removeRoleMut = useMutation({
     mutationFn: ({ userId, roleId }: { userId: string; roleId: string }) =>
       usersApi.removeRole(userId, roleId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['users'] })
+      toast('success', 'Role removed')
+    },
     onError: (e: Error) => toast('error', e.message),
   })
 
@@ -130,11 +195,13 @@ export function Users() {
     setForm({
       username: u.username,
       email: u.email,
-      roles: u.roles,
-      book: u.book,
+      password: '',
+      roleIds: u.roles
+        .map((name) => roleIdByName.get(name))
+        .filter((roleId): roleId is string => Boolean(roleId)),
       segments: u.segments,
       classification: u.classification,
-      team: u.team,
+      team: u.team || '',
     })
     setOpen(true)
   }
@@ -176,6 +243,19 @@ export function Users() {
           className="max-w-xs"
         />
       </div>
+
+      {isError && (
+        <div className="mb-4 flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-4" role="alert">
+          <AlertCircle size={18} className="shrink-0 text-red-700" />
+          <p className="flex-1 text-sm font-medium text-red-900">
+            {error instanceof Error ? error.message : 'Users could not be loaded'}
+          </p>
+          <Button size="sm" variant="secondary" onClick={() => { void refetch() }}>
+            <RefreshCw size={14} />
+            Retry
+          </Button>
+        </div>
+      )}
 
       {/* Table */}
       <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
@@ -233,8 +313,8 @@ export function Users() {
                 <tr key={u.id} className="hover:bg-slate-50 transition-colors group">
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-brand-50 flex items-center justify-center shrink-0">
-                        <span className="text-brand-700 text-sm font-semibold">
+                      <div className="w-8 h-8 rounded-full bg-axiom-50 flex items-center justify-center shrink-0 ring-1 ring-axiom-600/10">
+                        <span className="text-axiom-800 text-sm font-semibold">
                           {u.username.charAt(0)}
                         </span>
                       </div>
@@ -271,25 +351,28 @@ export function Users() {
                     </div>
                   </td>
                   <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                       <button
                         onClick={() => setDetail(u)}
-                        className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-md transition-colors"
+                        className="p-1.5 text-slate-400 hover:text-axiom-700 hover:bg-axiom-50 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-300"
                         title="View"
+                        aria-label={`View ${u.username}`}
                       >
                         <ChevronRight size={14} />
                       </button>
                       <button
                         onClick={() => openEdit(u)}
-                        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
+                        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-300"
                         title="Edit"
+                        aria-label={`Edit ${u.username}`}
                       >
                         <Edit2 size={14} />
                       </button>
                       <button
-                        onClick={() => deleteMut.mutate(u.id)}
-                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                        onClick={() => setDeleteTarget(u)}
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-300"
                         title="Delete"
+                        aria-label={`Delete ${u.username}`}
                       >
                         <Trash2 size={14} />
                       </button>
@@ -324,6 +407,7 @@ export function Users() {
             label="Username"
             value={form.username}
             onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
+            disabled={!!editing}
             required
           />
           <Input
@@ -332,6 +416,15 @@ export function Users() {
             value={form.email}
             onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
           />
+          {!editing && (
+            <Input
+              label="Password"
+              type="password"
+              value={form.password}
+              onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+              required
+            />
+          )}
           <Select
             label="Classification"
             value={form.classification}
@@ -379,16 +472,16 @@ export function Users() {
                 <label key={r.id} className="flex items-center gap-1.5 text-sm cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={form.roles.includes(r.id)}
+                    checked={form.roleIds.includes(r.id)}
                     onChange={e =>
                       setForm(f => ({
                         ...f,
-                        roles: e.target.checked
-                          ? [...f.roles, r.id]
-                          : f.roles.filter(x => x !== r.id),
+                        roleIds: e.target.checked
+                          ? [...f.roleIds, r.id]
+                          : f.roleIds.filter(x => x !== r.id),
                       }))
                     }
-                    className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                    className="rounded border-slate-300 text-axiom-700 focus:ring-gold-300"
                   />
                   <span className="text-slate-700">{r.name}</span>
                 </label>
@@ -435,7 +528,7 @@ export function Users() {
                       <button
                         key={r.id}
                         onClick={() => assignRoleMut.mutate({ userId: detailUser.id, roleId: r.id })}
-                        className="text-xs px-2 py-1 border border-dashed border-slate-300 rounded text-slate-500 hover:border-brand-400 hover:text-brand-600 transition-colors"
+                        className="text-xs px-2 py-1 border border-dashed border-slate-300 rounded text-slate-500 hover:border-axiom-400 hover:text-axiom-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-300"
                       >
                         + {r.id}
                       </button>
@@ -480,6 +573,34 @@ export function Users() {
             </div>
           </div>
         )}
+      </Dialog>
+
+      <Dialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="Delete user"
+        description={deleteTarget ? `Deactivate ${deleteTarget.username}` : undefined}
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm leading-6 text-ink-600">
+            This will deactivate the user and remove them from active admin workflows.
+          </p>
+          <div className="flex gap-2 border-t border-line pt-4">
+            <Button type="button" variant="secondary" className="flex-1" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              className="flex-1"
+              loading={deleteMut.isPending}
+              onClick={() => deleteTarget && deleteMut.mutate(deleteTarget.id)}
+            >
+              Delete
+            </Button>
+          </div>
+        </div>
       </Dialog>
     </div>
   )

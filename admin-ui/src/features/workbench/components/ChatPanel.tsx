@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useRef } from 'react'
-import { MessageSquare, Send } from 'lucide-react'
+import { MessageSquare, Plus, Send } from 'lucide-react'
 import { clsx } from 'clsx'
 import { Badge } from '../../../components/ui/Badge'
 import { Button } from '../../../components/ui/Button'
@@ -12,6 +12,8 @@ interface ChatPanelProps {
   isSending: boolean
   onDraftChange: (value: string) => void
   onSubmit: (event: FormEvent) => void
+  onReset?: () => void
+  disabled?: boolean
 }
 
 export function ChatPanel({
@@ -20,6 +22,8 @@ export function ChatPanel({
   isSending,
   onDraftChange,
   onSubmit,
+  onReset,
+  disabled = false,
 }: ChatPanelProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
@@ -28,7 +32,21 @@ export function ChatPanel({
   }, [messages, isSending])
 
   return (
-    <Panel title="Chat" icon={MessageSquare} action={<Badge color="yellow">MVP non-streaming</Badge>}>
+    <Panel
+      title="Chat"
+      icon={MessageSquare}
+      action={(
+        <div className="flex items-center gap-2">
+          <Badge color="yellow">MVP non-streaming</Badge>
+          {onReset && (
+            <Button type="button" size="sm" variant="ghost" onClick={onReset}>
+              <Plus size={14} />
+              New
+            </Button>
+          )}
+        </div>
+      )}
+    >
       <div ref={scrollRef} className="h-[410px] overflow-y-auto px-4 py-4 bg-slate-50/70">
         {messages.length === 0 ? (
           <div className="h-full flex items-center justify-center">
@@ -76,11 +94,19 @@ export function ChatPanel({
           <textarea
             value={draft}
             onChange={(event) => onDraftChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault()
+                event.currentTarget.form?.requestSubmit()
+              }
+            }}
             rows={3}
+            aria-label="Gateway question"
+            disabled={disabled}
             className="flex-1 resize-none rounded-md border border-line px-3 py-2 text-sm text-ink-900 placeholder:text-slate-400 shadow-sm focus:border-axiom-700 focus:outline-none focus:ring-2 focus:ring-gold-300"
             placeholder="Ask a gateway question"
           />
-          <Button type="submit" disabled={!draft.trim()} loading={isSending} className="h-10 px-3">
+          <Button type="submit" disabled={disabled || !draft.trim()} loading={isSending} className="h-10 px-3">
             <Send size={15} />
             Send
           </Button>
