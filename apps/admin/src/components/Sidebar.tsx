@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Users, Shield, UsersRound, FileText, LogOut, Clock, MessagesSquare } from 'lucide-react'
+import { LayoutDashboard, Users, Shield, UsersRound, FileText, LogOut, Clock } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useAuth } from '../hooks/useAuth'
 
@@ -10,7 +10,6 @@ const nav = [
   { to: '/roles',   label: 'Roles',     icon: Shield },
   { to: '/policies',label: 'Policies',  icon: FileText },
   { to: '/audit',   label: 'Audit Log', icon: Clock },
-  { to: '/workbench', label: 'Workbench', icon: MessagesSquare },
 ]
 
 export function Sidebar() {
