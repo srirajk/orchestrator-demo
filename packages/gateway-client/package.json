@@ -1,0 +1,28 @@
+{
+  "name": "@conduit/gateway-client",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Typed, framework-agnostic client for the Conduit gateway: OpenAI-compatible chat (stream + non-stream), trace stream, and admin manifest endpoints.",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.3"
+  }
+}
