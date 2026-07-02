@@ -25,6 +25,7 @@ We explicitly rejected embeddings/Redis-vector RAG for v1. For a **project-scope
 ```
 { fileId, userId, projectId, title, summary, topics[], storageKey, mime, size, createdAt }
 ```
+
 - On **upload**: store bytes in MinIO; generate a one-line **`summary`** ("what this doc is about") via the existing OpenAI summarizer → that's the wiki entry.
 
 ## Retrieval flow (catalog → LLM selects → fetch)

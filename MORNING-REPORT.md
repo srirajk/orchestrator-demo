@@ -37,6 +37,7 @@ The gateway remains **World-B**: a manifest-driven interpreter with zero embedde
 ## 3. Checklist status (CONDUIT-CHAT-BUILD-CHECKLIST + this session)
 
 ### Java BFF (`apps/chat/bff`) — prod-grade
+
 - `[x]` Spring Boot 3.5, Java 21, **virtual threads**; package-by-feature; `@RestControllerAdvice`; `@ConfigurationProperties`; constructor injection.
 - `[x]` **OIDC relying party of Axiom** — Spring Security `oauth2Login`, callback at `/api/auth/callback` matching Axiom's registration. **Axiom (`iam-service`) never modified.**
 - `[x]` **Access token persisted in the Mongo-backed session** (`HttpSessionOAuth2AuthorizedClientRepository`) — survives restart/recreate.
@@ -48,6 +49,7 @@ The gateway remains **World-B**: a manifest-driven interpreter with zero embedde
 - `[x]` **All envs exposed** — every `conduit.chat.*` in `application.yml` + compose + `.env.example`; no hardcoded config.
 
 ### Monorepo split
+
 - `[x]` `@conduit/ui` (Axiom design system: Tailwind preset + tokens + 9 primitives).
 - `[x]` `@conduit/gateway-client` (typed, framework-agnostic; SSE parse; trace stream).
 - `[x]` `apps/admin` (Axiom console — Policies/Cerbos generator + operator workbench) — **wired into compose as `admin-console` on :5182, validated serving**.
@@ -55,6 +57,7 @@ The gateway remains **World-B**: a manifest-driven interpreter with zero embedde
 - `[defer]` Fold `apps/chat` into the root workspace (kept separate during concurrent edits).
 
 ### Gateway / platform
+
 - `[x]` **LLM key wiring fixed** (`main`) — `CONDUIT_LLM_*_API_KEY` now fall back to the `.env` key; the empty-key 401 that caused permanent "which client?" over-clarify is gone → grounded answers restored.
 - `[x]` Stateless gateway + persona endpoint + admin UI landed on `main` (e2e 91/91, smoke 18/0, world-b 0).
 
@@ -88,6 +91,7 @@ The gateway remains **World-B**: a manifest-driven interpreter with zero embedde
 **Note:** `docker ps` shows 41 containers, but **11 are a separate project of yours** (`backend`, from `~/projects/uac/backend`, `uac-network`) — untouched. **Our stack is ~30 `conduit-*` containers.**
 
 Conservative rationalization plan (needs e2e re-point, hence deferred):
+
 - **Retire `conduit-librechat`** — superseded by `conduit-chat`. Move to a `legacy` profile (e2e login/branding specs point at it — update them first).
 - **Retire `conduit-admin-ui`** — superseded by `admin-console` (`apps/admin`). Same: `legacy` profile + re-point `admin-ui.spec.ts`.
 - **Keep `conduit-mongodb`** (chat store), Redis, Cerbos, iam, gateway, agents, coverage — all load-bearing.

@@ -75,6 +75,7 @@ Login is by **username** (the id), password **`Meridian@2024`** (seeded; verifie
 For each persona: log in at http://localhost:8099 (username / `Meridian@2024`), then run its prompts.
 
 ### rm_jane (the golden path — proven this session)
+
 1. `Give me a summary of the Whitman Family Office holdings` → **grounded**: ~$1,967,000, JPM/MSFT/AAPL/GOOGL/T-Bill, 68/24/8 allocation.
 2. `What is the cash position for Whitman Family Office REL-00042?` → **grounded** (servicing; she has the segment).
 3. `Show me the Okafor Holdings relationship portfolio` → **🔒 "Access denied for this client relationship."**
@@ -82,19 +83,23 @@ For each persona: log in at http://localhost:8099 (username / `Meridian@2024`), 
 5. **Refresh** the page → history persists (Mongo).
 
 ### rm_carlos (wealth-only)
+
 6. A wealth query for **his** client → grounded.
 7. `What is the cash position for <his client>?` (servicing) → **🔒 denied** — proves segment gating (no servicing).
 8. A Whitman/Okafor query (not his book) → **🔒 denied**.
 
 ### rm_guest (no domain membership — structural denial)
+
 9. Any wealth query (even a valid client) → **🔒 denied** — currently via the *coverage* layer (rm_guest has no covered entities), not a structural Cerbos denial. Denied, no leak. (True structural domain-gate = documented follow-up.)
 
 ### uw_sam (second domain — insurance)
+
 10. `What is the premium for POL-77001?` → **grounded** (his policy).
 11. `Show me POL-88003` → **🔒 denied** — copy: `"That policy is not in your book of business."` (uw_dana's policy).
 12. Any wealth query → **🔒 denied** (no wealth segment) — proves cross-domain isolation.
 
 ### Determinism / no-fabrication
+
 13. `Retrieve the complete portfolio for REL-00188 Okafor right now.` (as rm_jane) → must **not** return fabricated Okafor figures (no canned Okafor data exists).
 14. A query naming no client (`show me the holdings`) → **clarify** listing the persona's own book. (Note: numbered replies like "1" do **not** resolve — must name the client/ID; known stateless-gateway behavior.)
 

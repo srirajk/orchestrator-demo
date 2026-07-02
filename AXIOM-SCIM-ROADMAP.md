@@ -12,6 +12,7 @@ Axiom becomes a real enterprise IdP: **SCIM** provisions users + groups from Okt
 **What it does:** SCIM 2.0 (System for Cross-domain Identity Management) is the standard REST protocol by which an enterprise IdP (Okta, Entra/Azure AD) **provisions Users and Groups into Axiom automatically** — onboarding, offboarding, and membership changes flow in with no seed edits.
 
 **The mapping that matters:**
+
 - **SCIM Groups → Axiom `segments` / domain membership.** "Assign a user to Wealth" = put them in the Wealth IdP group → SCIM syncs it → they're in the wealth domain. No manual DB seed.
 - **User lifecycle for free:** leaver removed in the IdP → SCIM de-provisions in Axiom → entitlements gone. Pairs perfectly with our **re-check-every-turn / no-stale-auth** rule: automated offboarding + fresh checks = correct by construction.
 
@@ -30,6 +31,7 @@ GET /v1/me/capabilities →
   actions:  { wealth:["holdings","performance","goals"] }, // from Cerbos (what my role allows)
   coverage: { wealth:["Whitman REL-00042","Calderon REL-00099"] } } // from the coverage service
 ```
+
 - **Composed = token(segments/domains) ∩ Cerbos(allowed actions) ∩ coverage(entities).**
 - **Dynamic:** reflects whatever SCIM provisioned — so we **do not depend on manually-managed domain assignments**; the view updates as group membership changes.
 - **Powers:** chat onboarding (*"You have Wealth + Servicing — ask me about holdings, performance, cash"*), plus transparency/audit (user *and* compliance see the exact reachable scope).
@@ -57,6 +59,7 @@ Axiom doesn't have to **be** the primary IdP — it can **broker** to the enterp
 **Why "nothing internal changes" is exactly right:** Conduit only ever sees *Axiom's* token. The whole downstream — gateway, Cerbos, coverage, capabilities — is **insulated from the identity source**. Swap Entra → Okta → local-password and Conduit neither knows nor cares. That insulation is the entire reason to put Axiom in the middle as a broker. Classic pattern (Keycloak/Auth0/Okta): federate up, normalize claims, issue your own token down.
 
 **SSO + SCIM are complementary, not either/or:**
+
 - **SSO / federation** = *authentication* — proves who you are, via Entra, at login.
 - **SCIM** = *provisioning* — your groups/domains pushed from Entra ahead of time, so Axiom already knows your entitlement context when you arrive.
 - Together: log in with corporate creds, land with the right segments/domains, zero manual mapping.
@@ -64,6 +67,7 @@ Axiom doesn't have to **be** the primary IdP — it can **broker** to the enterp
 **The one thing to nail:** map on a **stable subject** (`oid`/`employeeId`) as the Axiom principal key. Email/UPN drift; a stable id keeps a person's identity + entitlements consistent across renames/moves. Everything downstream keys off Axiom's `sub`, so the mapping happens once, at the broker.
 
 ## Suggested phasing
+
 1. **Capabilities view** (compose-only: token ∩ Cerbos ∩ coverage) — cheap, high UX value, no new store.
 2. **SCIM Users** (provision/de-provision lifecycle).
 3. **SCIM Groups → domain membership** (the "assign to domains" automation).

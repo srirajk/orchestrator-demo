@@ -24,11 +24,13 @@ There are **two** ways a principal reaches the gateway, each with its own seed a
 ## The fix direction (decided): retire `X-User-Id`, Axiom OIDC = single source of truth
 
 Now that the chat does verified OIDC end-to-end, the `X-User-Id` trusted-hop is **redundant and is the known auth hole** (any caller could assert any user, no verification) — always slated for removal once the chat was rewritten. Removing it:
+
 - **Resolves the drift by construction** — one identity store (Axiom), one seed, one truth.
 - **Closes the security hole.**
 - Forces all personas + segments + books to be correct in Axiom (+ coverage), which is what the chat needs anyway.
 
 **Fix steps (ordered):**
+
 1. **Seed all 4 personas into Axiom (OIDC)** with correct passwords (`Meridian@2024`), roles, **segments** (rm_jane = wealth+**servicing**), and domain membership (rm_guest = none). Make Axiom the authoritative persona seed.
 2. **Sync the coverage services** (wealth/insurance-coverage) to the intended books (rm_carlos's RELs, uw_sam's POLs) so entitlement CHECK matches the tokens.
 3. **Remove the `X-User-Id` principal-resolution path** from the gateway; update smoke/e2e that rely on it to use OIDC/JWT.
@@ -52,6 +54,7 @@ Now that the chat does verified OIDC end-to-end, the `X-User-Id` trusted-hop is 
 ---
 
 ## Not-blocked / confirmed healthy
+
 - rm_jane grounded + denial (the golden demo path).
 - Stack, URLs, telemetry surfaces, Grafana dashboards, Prometheus metrics.
 - Chat restart-safe token, persistence.
