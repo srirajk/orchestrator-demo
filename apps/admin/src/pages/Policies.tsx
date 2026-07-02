@@ -36,7 +36,7 @@ export function Policies() {
   const resourcesQuery = useQuery({ queryKey: ['policy-resources'], queryFn: adminApi.policyResources })
   const segmentsQuery = useQuery({ queryKey: ['segments'], queryFn: adminApi.segments })
 
-  const policies = policiesQuery.data?.policies ?? []
+  const policies = policiesQuery.data ?? []
   const roles = rolesQuery.data ?? []
   const RESOURCES = resourcesQuery.data?.resources ?? ['agent', 'relationship', 'domain']
   const SEGMENTS = segmentsQuery.data?.segments ?? ['wealth', 'servicing']
@@ -123,24 +123,24 @@ export function Policies() {
             {policies.length === 0 ? (
               <div className="bg-white rounded-lg border border-slate-200 py-10 text-center text-sm text-slate-400">No policies found</div>
             ) : policies.map(p => (
-              <div key={p.filename} className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+              <div key={p.id} className="bg-white rounded-lg border border-slate-200 overflow-hidden">
                 <button
                   className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors text-left"
-                  onClick={() => setExpandedPolicy(expandedPolicy === p.filename ? null : p.filename)}
+                  onClick={() => setExpandedPolicy(expandedPolicy === p.id ? null : p.id)}
                 >
                   <div className="flex items-center gap-3">
                     <FileText size={15} className="text-slate-400 shrink-0" />
                     <div>
-                      <p className="text-sm font-medium text-slate-900">{p.filename}</p>
+                      <p className="text-sm font-medium text-slate-900">{p.name}</p>
                       <div className="flex gap-1.5 mt-0.5">
-                        <Badge color="slate">{p.policy_type}</Badge>
-                        {p.resource !== '—' && <Badge color="blue">{p.resource}</Badge>}
+                        <Badge color="slate">{p.resourceType}</Badge>
+                        {p.status && <Badge color="blue">{p.status}</Badge>}
                       </div>
                     </div>
                   </div>
-                  {expandedPolicy === p.filename ? <ChevronDown size={14} className="text-slate-400" /> : <ChevronRight size={14} className="text-slate-400" />}
+                  {expandedPolicy === p.id ? <ChevronDown size={14} className="text-slate-400" /> : <ChevronRight size={14} className="text-slate-400" />}
                 </button>
-                {expandedPolicy === p.filename && p.content && (
+                {expandedPolicy === p.id && p.content && (
                   <div className="border-t border-slate-100 px-4 py-3 bg-slate-50">
                     <pre className="text-xs text-slate-700 overflow-x-auto whitespace-pre-wrap font-mono">{p.content}</pre>
                   </div>

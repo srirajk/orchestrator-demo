@@ -143,12 +143,13 @@ export interface Role {
 }
 
 export interface Policy {
-  filename: string
-  policy_type: string
-  resource: string
-  size: number
+  id: string
+  name: string
+  resourceType: string
+  status?: string
   content?: string
-  error?: string
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface PolicyIntent {
@@ -283,7 +284,7 @@ export const tenantApi = {
 
 // ── Policies ──────────────────────────────────────────────────────────────────
 export const policiesApi = {
-  list: () => req<{ policies: Policy[] }>('GET', '/admin/policies'),
+  list: () => req<Policy[]>('GET', '/admin/policies'),
   generate: (intent: PolicyIntent) =>
     req<PolicyResult>('POST', '/admin/policies/generate', intent),
   validate: (yaml: string) =>
