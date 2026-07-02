@@ -102,9 +102,15 @@ public class ChatStreamService {
                 accumulate(lineBuffer.toString(StandardCharsets.UTF_8), assistant);
             }
         } catch (IOException ex) {
-            // Error reading from the gateway. The client may already have partial content;
-            // persist what we have below rather than losing the turn.
-            log.warn("[stream] error reading gateway stream: {}", ex.getMessage());
+            // A client abort interrupts the reading (virtual) thread mid-read — that's expected,
+            // not an error; log it quietly and restore the interrupt flag. A genuine gateway read
+            // failure still warns. Either way we persist whatever partial content we have below.
+            if (isInterruption(ex)) {
+                Thread.currentThread().interrupt();
+                log.debug("[stream] gateway read interrupted (client abort): {}", ex.getMessage());
+            } else {
+                log.warn("[stream] error reading gateway stream: {}", ex.getMessage());
+            }
         }
 
         persist(conversation, userId, assistant.toString(), userMessage);
