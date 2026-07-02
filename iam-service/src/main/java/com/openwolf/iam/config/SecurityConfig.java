@@ -82,6 +82,15 @@ public class SecurityConfig {
     @Value("${iam.oauth2.librechat.redirect-uri:http://localhost:3080/oauth/openid/callback}")
     private String librechatRedirectUri;
 
+    @Value("${iam.oauth2.conduit-chat.client-id:conduit-chat}")
+    private String conduitChatClientId;
+
+    @Value("${iam.oauth2.conduit-chat.client-secret:conduit-chat-secret}")
+    private String conduitChatClientSecret;
+
+    @Value("${iam.oauth2.conduit-chat.redirect-uri:http://localhost:8095/api/auth/callback}")
+    private String conduitChatRedirectUri;
+
     @Value("${iam.oauth2.admin-ui.client-id:admin-ui-client}")
     private String adminUiClientId;
 
@@ -270,7 +279,30 @@ public class SecurityConfig {
                         .build())
                 .build();
 
-        return new InMemoryRegisteredClientRepository(gatewayClient, adminUiClient, librechatClient);
+        // Conduit Chat — OIDC SSO for the end-user chat BFF (the user logs in AS THEMSELVES;
+        // the BFF forwards the user's token to the gateway → entitlements as the real principal).
+        RegisteredClient conduitChatClient = RegisteredClient.withId("conduit-chat-client-id")
+                .clientId(conduitChatClientId)
+                .clientSecret(passwordEncoder.encode(conduitChatClientSecret))
+                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+                .redirectUri(conduitChatRedirectUri)
+                .scope(OidcScopes.OPENID)
+                .scope(OidcScopes.PROFILE)
+                .scope(OidcScopes.EMAIL)
+                .tokenSettings(TokenSettings.builder()
+                        .accessTokenTimeToLive(Duration.ofHours(2))
+                        .refreshTokenTimeToLive(Duration.ofDays(1))
+                        .reuseRefreshTokens(false)
+                        .build())
+                .clientSettings(ClientSettings.builder()
+                        .requireAuthorizationConsent(false)
+                        .build())
+                .build();
+
+        return new InMemoryRegisteredClientRepository(gatewayClient, adminUiClient, librechatClient, conduitChatClient);
     }
 
     // =========================================================
