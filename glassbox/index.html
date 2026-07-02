@@ -231,6 +231,17 @@ function handleEvent(event) {
       if (!req.entitlements) req.entitlements = [];
       req.entitlements.push(data);
       break;
+    case 'check_denied':
+      // Explicit deny decision (structural / coverage / entitlement). Render it as a
+      // denied entitlement row so the gate shows the deny instead of silently skipping.
+      if (!req.entitlements) req.entitlements = [];
+      req.entitlements.push({
+        relationshipId: data.entityId || ('[' + (data.stage || 'check') + ']'),
+        allowed: false,
+        reason: (data.stage ? data.stage + ': ' : '') + (data.reason || 'denied'),
+        source: data.source,
+      });
+      break;
     case 'agent_start':
       if (req.agents && req.agents[data.agentId]) {
         req.agents[data.agentId].status = 'running';
