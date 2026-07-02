@@ -14,6 +14,7 @@ Everything needed to validate the system end-to-end with any persona. Pairs with
 ## A. URLs (verified live)
 
 ### Apps / UIs
+
 | Surface | URL | Notes |
 |---|---|---|
 | **Conduit Chat** (new, canonical) | http://localhost:8099 | Java BFF; log in via Axiom OIDC |
@@ -24,6 +25,7 @@ Everything needed to validate the system end-to-end with any persona. Pairs with
 | — legacy admin-ui (old admin) | http://localhost:5180 | superseded by :5182 |
 
 ### Telemetry / tracing
+
 | Surface | URL | Use |
 |---|---|---|
 | **Grafana** | http://localhost:3000 | metrics dashboards (7, below) |

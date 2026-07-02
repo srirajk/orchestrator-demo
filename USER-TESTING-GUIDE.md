@@ -5,6 +5,7 @@ A plain, click-by-click walkthrough. Do them in order, top to bottom. Each step 
 **Everyone's password:** `Meridian@2024`
 
 **The URLs you'll use:**
+
 | What | Open in browser |
 |---|---|
 | **Conduit Chat** | http://localhost:8099 |
