@@ -27,12 +27,13 @@ Four things here are genuinely differentiated — not demo polish, but architect
 3. **The glass box.** Every decision — intent, routing (selected *and rejected* agents),
    entitlement verdicts, per-agent latency, what's missing — renders live. This turns the
    compliance officer from the deal-blocker into the demo's best audience.
-4. **World B economics.** The gateway carries zero domain knowledge; a new business line is
-   onboarded with manifest JSON + a coverage-service URL, no gateway code. This is *proven in
-   the repo*: insurance was bolted onto a wealth-and-servicing gateway by manifest alone, with
-   a deterministic check (`world-b-check.sh` → CRITICAL 0) guarding the invariant. This is the
-   line that turns "nice demo" into "platform with a cost curve" — domain #2 costs config,
-   not a project.
+4. **Zero-code domain onboarding.** (Internally codenamed "World B" — keep that name out of
+   external materials; use the benefit as the name.) The gateway carries zero domain
+   knowledge; a new business line is onboarded with manifest JSON + a coverage-service URL,
+   no gateway code. This is *proven in the repo*: insurance was bolted onto a
+   wealth-and-servicing gateway by manifest alone, with a deterministic check
+   (`world-b-check.sh` → CRITICAL 0) guarding the invariant. This is the line that turns
+   "nice demo" into "platform with a cost curve" — domain #2 costs config, not a project.
 
 Supporting proof points worth quoting: partial-failure honesty (kill an agent mid-question,
 the answer still arrives and states what's missing), multi-turn context carry-forward, k6 at
@@ -69,8 +70,8 @@ the answer still arrives and states what's missing), multi-turn context carry-fo
 3. **How it works:** the six stages — Intent → Route → Entitle → Fan-out → Synthesize →
    Observe — each with its guardrail.
 4. **The trust surface:** the glass box, live, beside the chat.
-5. **The platform economics:** World B — insurance onboarded by manifest alone; zero gateway
-   code; deterministic proof.
+5. **The platform economics:** zero-code domain onboarding — insurance added by manifest
+   alone; no gateway code; deterministic proof.
 6. **The trajectory:** the maturity ladder, read → write, same front door, growing verbs.
 7. **Proof, not promises:** the four live demo beats (hero answer / kill an agent / denied
    entitlement / ambiguous → clarify).
@@ -116,12 +117,12 @@ PAGE STRUCTURE
 3. HOW IT WORKS — the six-stage pipeline as a horizontal flow, each stage paired with its
    guardrail (e.g. Fan-out: "a failed agent never cancels its siblings; the answer states
    what's missing").
-4. THE PLATFORM CLAIM ("World B") — the gateway carries zero domain knowledge. A new business
-   line is onboarded with manifest JSON + one coverage-service URL — no gateway code. Proof
-   line: "Insurance was added to a wealth-and-servicing gateway by manifest alone. A
-   deterministic check (CRITICAL: 0) guards the invariant on every change." Visualize as:
-   domain manifests plugging into an unchanged core. This is the cost-curve story: domain #2
-   costs config, not a project.
+4. THE PLATFORM CLAIM — ZERO-CODE DOMAIN ONBOARDING. The gateway carries zero domain
+   knowledge. A new business line is onboarded with configuration (domain manifests + one
+   coverage-service URL) — no gateway code. Proof line: "Insurance was added to a
+   wealth-and-servicing gateway by configuration alone. An automated check verifies zero
+   domain coupling on every change." Visualize as: domain manifests plugging into an
+   unchanged core. This is the cost-curve story: domain #2 costs config, not a project.
 5. MATURITY LADDER — Stage 1 (today, read-only): federated retrieval, "five portals → one
    question," near-zero operational risk. Stage 2 (the expansion, same substrate): write
    actions — resolve a settlement break, initiate a rebalance — each gated by human-in-the-
@@ -133,10 +134,14 @@ PAGE STRUCTURE
    • Kill an agent mid-question → the answer still arrives and honestly states what's missing.
    • Ask about a client outside your book → denied before any data is fetched.
    • Ask something ambiguous → a scoped clarifying question, never a guess.
-   Plus stat chips: "0% errors at 10 concurrent streams" · "3 domains live" · "CRITICAL: 0
-   domain coupling" · "grounding / honesty / relevance / safety scored on every turn."
-7. STACK CREDIBILITY FOOTER — quiet logos/labels: Java 21 virtual threads · Spring Boot ·
-   Redis vector routing · Cerbos policy engine · OpenTelemetry · Langfuse · MCP + OpenAPI.
+   Plus stat chips: "0% errors under concurrent load" · "3 business domains live" · "zero
+   domain coupling, verified on every change" · "every answer scored for grounding, honesty,
+   relevance, and safety."
+7. INTEGRATION & OPERATIONS FOOTER — quiet labels about standards and operability, not
+   implementation tech: "Open protocols: MCP + OpenAPI" · "Policy-as-code authorization" ·
+   "OpenTelemetry-native observability" · "OIDC identity, verified at every hop" · optional
+   single reassurance line for platform teams: "Runs as one JVM service — the stack your
+   bank already operates." No language/framework version numbers.
 8. CTA — "See the glass box live" (demo request).
 
 VISUAL DIRECTION
@@ -151,7 +156,8 @@ robot/sparkle AI clichés. Accessibility: WCAG AA contrast throughout.
 ## 5. Variants to ask Claude Design for after the first pass
 
 - A 10–12 slide **pitch deck** using the same narrative spine (slide 1 = hero split-screen,
-  slide for each fear, World B as the "why we win" slide, ladder as the "why now / roadmap").
+  slide for each fear, zero-code domain onboarding as the "why we win" slide, ladder as the
+  "why now / roadmap").
 - A one-page **compliance brief** aimed at the CISO: the six guardrails, the glass box, and
   the entitlement-before-fetch sequence diagram.
 - A **demo-day leave-behind**: the four beats as a card, QR to the runbook.

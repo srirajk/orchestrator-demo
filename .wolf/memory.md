@@ -1494,3 +1494,10 @@
 | 01:08 | Session end: 1 writes across 1 files (GTM-DESIGN-BRIEF.md) | 3 reads | ~8834 tok |
 | 01:08 | Session end: 1 writes across 1 files (GTM-DESIGN-BRIEF.md) | 3 reads | ~8834 tok |
 | 01:11 | Session end: 1 writes across 1 files (GTM-DESIGN-BRIEF.md) | 3 reads | ~8834 tok |
+| 01:11 | Session end: 1 writes across 1 files (GTM-DESIGN-BRIEF.md) | 3 reads | ~8834 tok |
+| 01:15 | Edited docs/GTM-DESIGN-BRIEF.md | 6→7 lines | ~161 |
+| 01:15 | Edited docs/GTM-DESIGN-BRIEF.md | 2→2 lines | ~37 |
+| 01:15 | Edited docs/GTM-DESIGN-BRIEF.md | 6→6 lines | ~139 |
+| 01:15 | Edited docs/GTM-DESIGN-BRIEF.md | 4→8 lines | ~170 |
+| 01:15 | Edited docs/GTM-DESIGN-BRIEF.md | 1→2 lines | ~31 |
+| 01:15 | De-jargonized GTM brief: World B -> zero-code domain onboarding in external copy; stack footer reframed to standards/operability, no language versions | docs/GTM-DESIGN-BRIEF.md | edited | ~300 |
