@@ -8,6 +8,15 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .demo{margin-top:20px;padding-top:16px;border-top:1px solid #e5e7eb;}
+    .demo-lbl{font-size:12px;color:#6b7280;margin-bottom:10px;}
+    .demo-lbl code{color:#0f172a;background:#f1f5f9;padding:1px 6px;border-radius:4px;font-size:12px;}
+    .demo-chips{display:flex;flex-wrap:wrap;gap:8px;}
+    .demo-chip{text-align:left;padding:7px 12px;border:1px solid #d1d5db;border-radius:8px;background:#fff;color:#1f2937;cursor:pointer;font:inherit;font-size:13px;font-weight:600;line-height:1.25;transition:border-color .15s,background .15s;}
+    .demo-chip:hover{border-color:#c9a227;background:#fffdf5;}
+    .demo-chip span{display:block;font-weight:400;font-size:11px;color:#6b7280;margin-top:2px;}
+  </style>
 </head>
 <body>
 <div class="page">
@@ -69,6 +78,21 @@
 
       <button type="submit" class="btn-sign-in">Sign in &rarr;</button>
     </form>
+
+    <!-- Demo accounts — click a chip to fill the username -->
+    <div class="demo">
+      <div class="demo-lbl">Demo accounts — all use password <code>Meridian@2024</code> (click to fill)</div>
+      <div class="demo-chips">
+        <button type="button" class="demo-chip" onclick="fillUser('rm_jane')">rm_jane<span>Wealth RM</span></button>
+        <button type="button" class="demo-chip" onclick="fillUser('rm_carlos')">rm_carlos<span>Wealth RM · 2nd book</span></button>
+        <button type="button" class="demo-chip" onclick="fillUser('rm_guest')">rm_guest<span>RM · no clients</span></button>
+        <button type="button" class="demo-chip" onclick="fillUser('uw_sam')">uw_sam<span>Insurance UW</span></button>
+        <button type="button" class="demo-chip" onclick="fillUser('admin')">admin<span>Platform admin</span></button>
+      </div>
+    </div>
+    <script>
+      function fillUser(u){var f=document.getElementById('username');f.value=u;var p=document.getElementById('password');if(p)p.focus();}
+    </script>
 
     <div class="divider"></div>
     <div class="meridian-byline">Meridian Private Banking &bull; Axiom Identity Platform</div>
