@@ -15,6 +15,7 @@
 - **Eval tools:** DeepEval for offline/release-gate evals. Langfuse for continuous/experimentation. No Phoenix (removed).
 - **Model selection for tasks:** Use `claude-haiku-4-5-20251001` for cheap/fast tasks (running tests, scripting, data processing, CLI invocations). Use Sonnet (default session model) for assessing screenshots, code review, design evaluation, and architectural decisions. Never use Opus for routine tasks.
 - **User wants to learn** both DeepEval and Langfuse — frame explanations so they understand the tool, not just copy-paste code.
+- **GTM / external-facing copy:** no internal codenames ("World B" → "zero-code domain onboarding", no "CRITICAL: 0" shorthand) and no implementation-language/framework name-dropping (Java/Spring versions). Sell standards (MCP, OpenAPI, OIDC, OTel, policy-as-code) and operability; at most one "runs as a single JVM service" reassurance line for bank platform teams.
 
 ## Key Learnings
 
