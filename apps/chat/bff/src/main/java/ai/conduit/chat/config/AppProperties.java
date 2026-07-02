@@ -35,28 +35,43 @@ public record AppProperties(
     ) {}
 
     /**
-     * The client owns memory. These thresholds decide what context is sent to the
-     * (stateless) gateway each turn.
+     * The client owns memory. These <b>token-budget</b> thresholds decide what context is
+     * sent to the (stateless) gateway each turn. Compaction is driven by estimated token
+     * size, not message count.
      *
-     * @param recentMessages       number of most-recent messages sent each turn.
-     * @param summaryAfterMessages once the transcript exceeds this, a rolling summary is used.
-     * @param summaryMaxTokens     soft cap on the facts-free summary length.
+     * @param maxTokens            token budget for the window sent to the gateway. Recent
+     *                             messages are included newest-first until the next would
+     *                             exceed this (the latest user message is always included).
+     * @param summaryTriggerTokens once the full transcript's estimated tokens exceed this,
+     *                             the facts-free rolling summary is (re)generated and, when
+     *                             present, prepended as a leading {@code system} message
+     *                             (counted against {@code maxTokens}).
+     * @param tokenEncoding        tiktoken encoding used for estimation (e.g.
+     *                             {@code cl100k_base}, {@code o200k_base}); falls back to a
+     *                             {@code chars/4} heuristic if unavailable.
      */
     public record Context(
-            @Min(1) int recentMessages,
-            @Min(1) int summaryAfterMessages,
-            @Min(1) int summaryMaxTokens
+            @Min(1) int maxTokens,
+            @Min(1) int summaryTriggerTokens,
+            @NotBlank String tokenEncoding
     ) {}
 
     /**
-     * Optional LLM used to (re)generate the facts-free topical summary. When
-     * {@code baseUrl} or {@code apiKey} is blank the summary service is a safe no-op.
+     * Optional LLM used to (re)generate the facts-free topical summary. Defaults to OpenAI.
+     * When {@code baseUrl} or {@code apiKey} is blank the summary service is a safe no-op.
+     *
+     * @param baseUrl     OpenAI-compatible base URL (default {@code https://api.openai.com/v1}).
+     * @param apiKey      API key; blank → summary is a no-op.
+     * @param model       completion model (default {@code gpt-4o-mini}).
+     * @param temperature sampling temperature.
+     * @param maxTokens   soft cap on the facts-free summary length.
      */
     public record Summary(
             String baseUrl,
             String apiKey,
             String model,
-            double temperature
+            double temperature,
+            @Min(1) int maxTokens
     ) {
         /** @return true when an LLM endpoint is fully configured. */
         public boolean isEnabled() {
@@ -67,15 +82,17 @@ public record AppProperties(
     }
 
     /**
-     * @param endpoint  S3/MinIO endpoint URL.
-     * @param accessKey access key.
-     * @param secretKey secret key.
-     * @param bucket    target bucket for uploads.
+     * @param endpoint    S3/MinIO endpoint URL.
+     * @param accessKey   access key.
+     * @param secretKey   secret key.
+     * @param bucket      target bucket for uploads.
+     * @param maxFileSize maximum accepted upload size in bytes.
      */
     public record Storage(
             String endpoint,
             String accessKey,
             String secretKey,
-            String bucket
+            String bucket,
+            @Min(1) long maxFileSize
     ) {}
 }

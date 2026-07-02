@@ -9,6 +9,8 @@ import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.client.web.HttpSessionOAuth2AuthorizedClientRepository;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 
@@ -34,6 +36,27 @@ import java.util.Map;
  */
 @Configuration
 public class SecurityConfig {
+
+    /**
+     * Persist the {@link org.springframework.security.oauth2.client.OAuth2AuthorizedClient}
+     * (and its {@code OAuth2AccessToken}) in the servlet HTTP session rather than an
+     * in-memory store. Because the session is backed by Spring Session on MongoDB, the
+     * authorized client survives container restart/recreate — the user's access token is
+     * no longer lost when we reconfigure via env and recreate the container.
+     *
+     * <p>Defining this bean overrides Spring Security's default
+     * {@code AuthenticatedPrincipalOAuth2AuthorizedClientRepository} (which delegates
+     * authenticated principals to the in-memory {@code OAuth2AuthorizedClientService});
+     * {@code oauth2Login} and the {@code OAuth2AuthorizedClientRepository} lookup both
+     * resolve this bean. Everything stored ({@code OAuth2AuthorizedClient},
+     * {@code ClientRegistration}, {@code OAuth2AccessToken}/{@code OAuth2RefreshToken}) is
+     * {@link java.io.Serializable}, so it round-trips through Spring Session's default JDK
+     * serialization to Mongo.
+     */
+    @Bean
+    OAuth2AuthorizedClientRepository authorizedClientRepository() {
+        return new HttpSessionOAuth2AuthorizedClientRepository();
+    }
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectMapper objectMapper) throws Exception {

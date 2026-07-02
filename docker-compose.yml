@@ -516,28 +516,43 @@ services:
     ports:
       - "8099:8095"
     environment:
-      MONGODB_URI: mongodb://mongodb:27017/conduitchat
-      GATEWAY_BASE: http://gateway:8080
+      # ── Core wiring ────────────────────────────────────────────────────────────
+      MONGODB_URI: ${CHAT_MONGODB_URI:-mongodb://mongodb:27017/conduitchat}
+      GATEWAY_BASE: ${CHAT_GATEWAY_BASE:-http://gateway:8080}
+      GATEWAY_MODEL: ${CHAT_GATEWAY_MODEL:-conduit-assistant}
+      # ── OIDC / Axiom ───────────────────────────────────────────────────────────
       # Must be reachable by BOTH the browser and this container, and must match the issuer
       # advertised by Axiom's discovery document. Do NOT use iam-service or localhost here.
-      OIDC_ISSUER: http://host.docker.internal:8084
-      OIDC_CLIENT_ID: conduit-chat
-      OIDC_CLIENT_SECRET: conduit-chat-secret
+      OIDC_ISSUER: ${CHAT_OIDC_ISSUER:-http://host.docker.internal:8084}
+      OIDC_CLIENT_ID: ${CHAT_OIDC_CLIENT_ID:-conduit-chat}
+      OIDC_CLIENT_SECRET: ${CHAT_OIDC_CLIENT_SECRET:-conduit-chat-secret}
       # Must match EXACTLY the redirect-uri Axiom already has registered (never change Axiom).
-      OIDC_REDIRECT_URI: http://localhost:8099/api/auth/callback
+      OIDC_REDIRECT_URI: ${CHAT_OIDC_REDIRECT_URI:-http://localhost:8099/api/auth/callback}
+      # ── Session cookie ─────────────────────────────────────────────────────────
       # Session cookie must NOT be Secure over http (demo runs on http://localhost:8099).
-      COOKIE_SECURE: "false"
-      CHAT_RECENT_MESSAGES: "8"
-      CHAT_SUMMARY_AFTER: "12"
-      CHAT_SUMMARY_MAX_TOKENS: "150"
-      # Facts-free rolling-summary LLM (optional). Leave blank → summary is a safe no-op.
-      SUMMARY_LLM_BASE_URL: ${SUMMARY_LLM_BASE_URL:-}
-      SUMMARY_LLM_API_KEY: ${SUMMARY_LLM_API_KEY:-}
-      SUMMARY_LLM_MODEL: ${SUMMARY_LLM_MODEL:-gpt-4o-mini}
-      MINIO_ENDPOINT: http://minio:9000
+      COOKIE_SECURE: ${CHAT_COOKIE_SECURE:-false}
+      COOKIE_SAME_SITE: ${CHAT_COOKIE_SAME_SITE:-lax}
+      SESSION_TIMEOUT: ${CHAT_SESSION_TIMEOUT:-24h}
+      # ── Memory: token-budget driven compaction (not message count) ─────────────
+      CHAT_CONTEXT_MAX_TOKENS: ${CHAT_CONTEXT_MAX_TOKENS:-3000}
+      CHAT_SUMMARY_TRIGGER_TOKENS: ${CHAT_SUMMARY_TRIGGER_TOKENS:-2000}
+      CHAT_TOKEN_ENCODING: ${CHAT_TOKEN_ENCODING:-cl100k_base}
+      # ── Facts-free rolling-summary LLM (OpenAI-compatible) ─────────────────────
+      # Defaults to the same OpenAI-compatible LLM key already in .env (the gateway
+      # synthesizer / Z.AI GLM) — nothing hardcoded, works out of the box. Set OPENAI_*
+      # explicitly to point summaries at real OpenAI instead.
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-${CONDUIT_LLM_SYNTHESIZER_BASE_URL:-https://api.z.ai/api/paas/v4}}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-${CONDUIT_LLM_SYNTHESIZER_API_KEY:-}}
+      CHAT_SUMMARY_MODEL: ${CHAT_SUMMARY_MODEL:-${CONDUIT_LLM_SYNTHESIZER_MODEL:-glm-4.5-flash}}
+      CHAT_SUMMARY_TEMPERATURE: ${CHAT_SUMMARY_TEMPERATURE:-0.2}
+      CHAT_SUMMARY_MAX_TOKENS: ${CHAT_SUMMARY_MAX_TOKENS:-150}
+      # ── Files / object store (MinIO) ───────────────────────────────────────────
+      MINIO_ENDPOINT: ${CHAT_MINIO_ENDPOINT:-http://minio:9000}
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minio}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-miniosecret}
-      MINIO_BUCKET: conduit-chat-files
+      MINIO_BUCKET: ${CHAT_MINIO_BUCKET:-conduit-chat-files}
+      CHAT_MAX_FILE_SIZE: ${CHAT_MAX_FILE_SIZE:-26214400}
+      LOG_LEVEL: ${CHAT_LOG_LEVEL:-INFO}
     depends_on:
       mongodb:
         condition: service_healthy

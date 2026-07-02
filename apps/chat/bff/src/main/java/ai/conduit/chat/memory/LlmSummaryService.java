@@ -60,7 +60,6 @@ public class LlmSummaryService implements SummaryService {
             Output ONLY the summary prose, no preamble.""";
 
     private final AppProperties.Summary config;
-    private final AppProperties.Context contextConfig;
     private final ExecutorService backgroundExecutor;
     private final MessageService messageService;
     private final ConversationRepository conversationRepository;
@@ -76,7 +75,6 @@ public class LlmSummaryService implements SummaryService {
                              ConversationRepository conversationRepository,
                              ObjectMapper objectMapper) {
         this.config = appProperties.summary();
-        this.contextConfig = appProperties.context();
         this.backgroundExecutor = backgroundExecutor;
         this.messageService = messageService;
         this.conversationRepository = conversationRepository;
@@ -138,7 +136,7 @@ public class LlmSummaryService implements SummaryService {
         Map<String, Object> body = Map.of(
                 "model", config.model(),
                 "temperature", config.temperature(),
-                "max_tokens", contextConfig.summaryMaxTokens(),
+                "max_tokens", config.maxTokens(),
                 "messages", List.of(
                         Map.of("role", "system", "content", FACTS_FREE_SYSTEM_PROMPT),
                         Map.of("role", "user", "content",

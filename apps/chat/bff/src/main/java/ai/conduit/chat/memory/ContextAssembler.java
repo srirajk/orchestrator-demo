@@ -7,19 +7,22 @@ import ai.conduit.chat.message.MessageService;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
  * Builds the per-turn context that the client (this BFF) sends to the stateless
  * gateway. The gateway holds no memory; the client owns it.
  *
- * <p>Contract (config-driven, no magic numbers):
+ * <p><b>Token-budget driven</b> (config, no magic numbers):
  * <ul>
- *   <li>Send the last {@code context.recentMessages} messages, chronologically.</li>
- *   <li>Once the transcript exceeds {@code context.summaryAfterMessages} and a
- *       facts-free summary exists, prepend it as a leading {@code system} message.</li>
- *   <li>If the threshold is exceeded but no summary exists yet, trigger fire-and-forget
- *       regeneration (it will be available on a later turn).</li>
+ *   <li>Include the most-recent messages newest-first until adding another would exceed
+ *       {@code context.max-tokens}; the latest user message is always included, even if it
+ *       alone exceeds the budget.</li>
+ *   <li>If the full transcript's estimated tokens exceed {@code context.summary-trigger-tokens},
+ *       prepend the facts-free rolling summary as a leading {@code system} message and count
+ *       it against the budget. If no summary exists yet, trigger fire-and-forget regeneration
+ *       for a future turn.</li>
  * </ul>
  */
 @Component
@@ -29,13 +32,16 @@ public class ContextAssembler {
 
     private final MessageService messageService;
     private final SummaryService summaryService;
+    private final TokenCounter tokenCounter;
     private final AppProperties.Context context;
 
     public ContextAssembler(MessageService messageService,
                             SummaryService summaryService,
+                            TokenCounter tokenCounter,
                             AppProperties appProperties) {
         this.messageService = messageService;
         this.summaryService = summaryService;
+        this.tokenCounter = tokenCounter;
         this.context = appProperties.context();
     }
 
@@ -45,25 +51,49 @@ public class ContextAssembler {
      */
     public List<ChatMessage> assemble(Conversation conversation, String userId) {
         String conversationId = conversation.getId();
-        long totalCount = messageService.count(conversationId);
 
-        List<Message> recent = messageService.recentChronological(conversationId, context.recentMessages());
-
-        List<ChatMessage> assembled = new ArrayList<>(recent.size() + 1);
-
-        boolean longEnoughForSummary = totalCount > context.summaryAfterMessages();
-        String summary = conversation.getSummary();
-
-        if (longEnoughForSummary && summary != null && !summary.isBlank()) {
-            assembled.add(new ChatMessage("system", SUMMARY_PREFIX + summary));
-        } else if (longEnoughForSummary) {
-            // No summary yet — kick off regeneration for a future turn (never blocks this one).
-            summaryService.requestRegeneration(conversation, userId);
+        // Full transcript, oldest-first. Its total token size drives the summary trigger.
+        List<Message> transcript = messageService.allInOrder(conversationId);
+        int transcriptTokens = 0;
+        for (Message m : transcript) {
+            transcriptTokens += tokenCounter.count(m.getContent());
         }
 
-        for (Message m : recent) {
-            assembled.add(new ChatMessage(m.getRole(), m.getContent()));
+        int budget = context.maxTokens();
+        int used = 0;
+
+        // Decide the leading summary system message (if the transcript is large enough).
+        ChatMessage summaryMessage = null;
+        if (transcriptTokens > context.summaryTriggerTokens()) {
+            String summary = conversation.getSummary();
+            if (summary != null && !summary.isBlank()) {
+                summaryMessage = new ChatMessage("system", SUMMARY_PREFIX + summary);
+                used += tokenCounter.count(summaryMessage.content());
+            } else {
+                // No summary yet — kick off regeneration for a future turn (never blocks this one).
+                summaryService.requestRegeneration(conversation, userId);
+            }
         }
+
+        // Fill the window newest-first until the next message would exceed the budget.
+        // The most-recent message (the latest user message) is always included.
+        List<ChatMessage> window = new ArrayList<>();
+        for (int i = transcript.size() - 1; i >= 0; i--) {
+            Message m = transcript.get(i);
+            int cost = tokenCounter.count(m.getContent());
+            if (!window.isEmpty() && used + cost > budget) {
+                break;
+            }
+            window.add(new ChatMessage(m.getRole(), m.getContent()));
+            used += cost;
+        }
+        Collections.reverse(window); // back to chronological order
+
+        List<ChatMessage> assembled = new ArrayList<>(window.size() + 1);
+        if (summaryMessage != null) {
+            assembled.add(summaryMessage);
+        }
+        assembled.addAll(window);
         return assembled;
     }
 }

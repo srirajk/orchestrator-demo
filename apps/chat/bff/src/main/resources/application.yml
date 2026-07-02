@@ -13,9 +13,15 @@ spring:
 
   session:
     store-type: mongodb
-    timeout: 24h
+    timeout: ${SESSION_TIMEOUT:24h}
     mongodb:
-      collection-name: sessions
+      collection-name: ${SESSION_COLLECTION:sessions}
+
+  servlet:
+    multipart:
+      # Upper transport bounds; the fine-grained limit is conduit.chat.storage.max-file-size.
+      max-file-size: ${CHAT_MAX_FILE_SIZE:26214400}
+      max-request-size: ${CHAT_MAX_REQUEST_SIZE:26214400}
 
   security:
     oauth2:
@@ -46,12 +52,12 @@ server:
   servlet:
     session:
       cookie:
-        name: SESSION
+        name: ${COOKIE_NAME:SESSION}
         http-only: true
         # COOKIE GOTCHA: a Secure cookie is dropped by the browser over http.
         # The demo runs on http://localhost:8099, so default OFF; set true only behind TLS.
         secure: ${COOKIE_SECURE:false}
-        same-site: lax
+        same-site: ${COOKIE_SAME_SITE:lax}
 
 management:
   endpoints:
@@ -69,22 +75,29 @@ conduit:
       base-url: ${GATEWAY_BASE:http://gateway:8080}
       model: ${GATEWAY_MODEL:conduit-assistant}
     context:
-      recent-messages: ${CHAT_RECENT_MESSAGES:8}
-      summary-after-messages: ${CHAT_SUMMARY_AFTER:12}
-      summary-max-tokens: ${CHAT_SUMMARY_MAX_TOKENS:150}
+      # Token-budget driven compaction (not message count).
+      # Window token budget sent to the gateway each turn.
+      max-tokens: ${CHAT_CONTEXT_MAX_TOKENS:3000}
+      # Once the full transcript exceeds this, (re)generate + attach the rolling summary.
+      summary-trigger-tokens: ${CHAT_SUMMARY_TRIGGER_TOKENS:2000}
+      # tiktoken encoding for estimation (cl100k_base | o200k_base); heuristic fallback otherwise.
+      token-encoding: ${CHAT_TOKEN_ENCODING:cl100k_base}
     summary:
-      # Facts-free rolling topical summary. If base-url or api-key is blank the
-      # SummaryService is a safe no-op (keeps the existing summary).
-      base-url: ${SUMMARY_LLM_BASE_URL:}
-      api-key: ${SUMMARY_LLM_API_KEY:}
-      model: ${SUMMARY_LLM_MODEL:gpt-4o-mini}
-      temperature: ${SUMMARY_LLM_TEMPERATURE:0.0}
+      # Facts-free rolling topical summary — OpenAI by default. If base-url or api-key is
+      # blank the SummaryService is a safe no-op (keeps the existing summary).
+      base-url: ${OPENAI_BASE_URL:${CHAT_SUMMARY_BASE_URL:https://api.openai.com/v1}}
+      api-key: ${OPENAI_API_KEY:${CHAT_SUMMARY_API_KEY:}}
+      model: ${CHAT_SUMMARY_MODEL:gpt-4o-mini}
+      temperature: ${CHAT_SUMMARY_TEMPERATURE:0.2}
+      max-tokens: ${CHAT_SUMMARY_MAX_TOKENS:150}
     storage:
       endpoint: ${MINIO_ENDPOINT:http://minio:9000}
       access-key: ${MINIO_ACCESS_KEY:minioadmin}
       secret-key: ${MINIO_SECRET_KEY:minioadmin}
       bucket: ${MINIO_BUCKET:conduit-chat-files}
+      # Max accepted upload size in bytes (default 25 MiB).
+      max-file-size: ${CHAT_MAX_FILE_SIZE:26214400}
 
 logging:
   level:
-    ai.conduit.chat: INFO
+    ai.conduit.chat: ${LOG_LEVEL:INFO}
