@@ -10,7 +10,7 @@ projectsRouter.use(requireAuth);
 projectsRouter.get('/', async (req: Request, res: Response) => {
   const projects = await Project.find({ userId: req.session.user!.id })
     .sort({ createdAt: -1 })
-    .lean();
+;
   res.json(projects);
 });
 
@@ -38,7 +38,7 @@ projectsRouter.get('/:id', async (req: Request, res: Response) => {
   const project = await Project.findOne({
     _id: req.params['id'],
     userId: req.session.user!.id,
-  }).lean();
+  });
   if (!project) {
     res.status(404).json({ error: 'Not found' });
     return;

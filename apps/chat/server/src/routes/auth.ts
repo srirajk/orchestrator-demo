@@ -36,7 +36,16 @@ authRouter.get('/login', async (req: Request, res: Response) => {
       code_challenge_method: 'S256',
     });
 
-    res.redirect(url);
+    // Persist PKCE verifier + state to the (async Mongo-backed) session BEFORE redirecting,
+    // so they're durably stored by the time the OIDC callback comes back.
+    req.session.save((saveErr) => {
+      if (saveErr) {
+        console.error('[auth/login] session save failed:', saveErr);
+        res.status(500).json({ error: 'session error' });
+        return;
+      }
+      res.redirect(url);
+    });
   } catch (err) {
     console.error('[auth/login] OIDC discovery failed:', err);
     res.status(502).json({ error: 'OIDC provider unavailable' });

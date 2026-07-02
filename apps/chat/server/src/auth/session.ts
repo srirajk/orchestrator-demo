@@ -17,7 +17,9 @@ export const sessionMiddleware = session({
   }),
   cookie: {
     httpOnly: true,
-    secure: config.nodeEnv === 'production',
+    // Secure cookies are dropped over http. The demo runs on http://localhost, so default OFF
+    // and gate on an explicit env — set COOKIE_SECURE=true only when served behind https/TLS.
+    secure: process.env['COOKIE_SECURE'] === 'true',
     sameSite: 'lax',
     maxAge: 24 * 60 * 60 * 1000, // 1 day in ms
   },

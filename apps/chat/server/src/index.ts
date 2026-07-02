@@ -16,7 +16,7 @@ import { conversationsRouter } from './routes/conversations';
 import { projectsRouter } from './routes/projects';
 import { filesRouter } from './routes/files';
 
-// Pull in the session type augmentation
+// Pull in the session SessionData augmentation (real .ts module → emits .js → safe at runtime).
 import './types/session';
 
 async function bootstrap(): Promise<void> {

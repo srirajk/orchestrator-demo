@@ -19,4 +19,6 @@ const messageSchema = new Schema<IMessage>(
   { timestamps: { createdAt: true, updatedAt: false } },
 );
 
+messageSchema.set("toJSON", { virtuals: true, versionKey: false, transform: (_doc, ret) => { delete (ret as { _id?: unknown })._id; } });
+
 export const Message = model<IMessage>('Message', messageSchema);

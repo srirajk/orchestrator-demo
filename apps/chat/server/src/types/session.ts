@@ -1,5 +1,10 @@
 /**
  * Augment express-session's SessionData with our application-specific fields.
+ *
+ * This is a real `.ts` module (NOT a `.d.ts`) on purpose: it emits a `.js`, so the runtime
+ * `import './types/session'` in index.ts resolves cleanly (importing a `.d.ts` at runtime crashes
+ * Node — no `.js` is emitted). The top-level `import 'express-session'` + `export {}` keep this a
+ * module so the `declare module` block *augments* express-session rather than shadowing it.
  */
 import 'express-session';
 
@@ -19,3 +24,5 @@ declare module 'express-session' {
     state?: string;
   }
 }
+
+export {};

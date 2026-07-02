@@ -50,8 +50,7 @@ async function generateSummary(_conversationId: string, _userId: string): Promis
 conversationsRouter.get('/', async (req: Request, res: Response) => {
   const conversations = await Conversation.find({ userId: req.session.user!.id, archived: { $ne: true } })
     .sort({ updatedAt: -1 })
-    .select('_id title projectId updatedAt')
-    .lean();
+    .select('_id title projectId updatedAt');
   res.json(conversations);
 });
 
@@ -76,7 +75,7 @@ conversationsRouter.get('/:id', async (req: Request, res: Response) => {
   const conversation = await Conversation.findOne({
     _id: id,
     userId: req.session.user!.id,
-  }).lean();
+  });
 
   if (!conversation) {
     res.status(404).json({ error: 'Not found' });
@@ -85,7 +84,7 @@ conversationsRouter.get('/:id', async (req: Request, res: Response) => {
 
   const messages = await Message.find({ conversationId: id })
     .sort({ createdAt: 1 })
-    .lean();
+;
 
   res.json({ conversation, messages });
 });
@@ -163,7 +162,7 @@ conversationsRouter.post('/:id/messages', async (req: Request, res: Response) =>
   }
 
   // Verify ownership
-  const conversation = await Conversation.findOne({ _id: id, userId }).lean();
+  const conversation = await Conversation.findOne({ _id: id, userId });
   if (!conversation) {
     res.status(404).json({ error: 'Not found' });
     return;
@@ -183,7 +182,7 @@ conversationsRouter.post('/:id/messages', async (req: Request, res: Response) =>
   const recentMessages = await Message.find({ conversationId: id })
     .sort({ createdAt: -1 })
     .limit(config.chatRecentMessages)
-    .lean();
+;
   recentMessages.reverse();
 
   const contextMessages: Array<{ role: string; content: string }> = [];

@@ -22,4 +22,11 @@ const conversationSchema = new Schema<IConversation>(
   { timestamps: true },
 );
 
+// Expose `id` (string) instead of Mongo `_id`/`__v` in JSON responses — the web client reads `id`.
+conversationSchema.set('toJSON', {
+  virtuals: true,
+  versionKey: false,
+  transform: (_doc, ret) => { delete (ret as { _id?: unknown })._id; },
+});
+
 export const Conversation = model<IConversation>('Conversation', conversationSchema);

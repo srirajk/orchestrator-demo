@@ -18,4 +18,6 @@ const projectSchema = new Schema<IProject>(
   { timestamps: true },
 );
 
+projectSchema.set("toJSON", { virtuals: true, versionKey: false, transform: (_doc, ret) => { delete (ret as { _id?: unknown })._id; } });
+
 export const Project = model<IProject>('Project', projectSchema);
