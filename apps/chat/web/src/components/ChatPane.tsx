@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo } from 'react'
+import { useState, useRef, useCallback, useMemo, useEffect } from 'react'
 import { ShieldX } from 'lucide-react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
@@ -8,6 +8,7 @@ import { TraceRail } from './TraceRail'
 import { useConversationDetail, useCreateConversation } from '../hooks/useConversations'
 import { useTraceStream, selectDenial } from '../hooks/useTraceStream'
 import { apiStream } from '../api/client'
+import { iterateSseData } from '../lib/gatewayTrace'
 import type { Message } from '../api/types'
 
 export function ChatPane() {
@@ -25,16 +26,51 @@ export function ChatPane() {
   const [railCollapsed, setRailCollapsed] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
 
+  // Track the server message count at send time so we know when the server has confirmed
+  // the exchange and local optimistic messages can be safely cleared.
+  const sendBaseCountRef = useRef(0)
+
+  // Always-current server message count readable without closure staleness.
+  const serverMessages = data?.messages ?? []
+  const serverMsgCountRef = useRef(serverMessages.length)
+  serverMsgCountRef.current = serverMessages.length
+
   // Glass-box: subscribe to this conversation's live authorization/pipeline trace.
   const { events: traceEvents, status: traceStatus } = useTraceStream(isNew ? undefined : id)
   const denial = useMemo(() => selectDenial(traceEvents), [traceEvents])
 
   const createConversation = useCreateConversation()
 
-  // Merge server messages with local optimistic messages
-  const serverMessages = data?.messages ?? []
-  // When we have server data, prefer it; local messages are only used while pending
-  const messages = serverMessages.length > 0 ? serverMessages : localMessages
+  // Reset local state and kill the active stream whenever the conversation changes or on unmount.
+  // Prevents cross-conversation bleed: optimistic messages / streaming content from conversation A
+  // must never appear in conversation B (Fix: bugs 1 + 2).
+  useEffect(() => {
+    setLocalMessages([])
+    setStreamingContent(null)
+    setIsStreaming(false)
+    return () => {
+      abortRef.current?.abort()
+    }
+  }, [id])
+
+  // Once the server message count exceeds what it was at send time and we are no longer
+  // streaming, the server has confirmed the exchange — clear local optimistic messages so they
+  // don't appear as duplicates alongside the real server messages (Fix: bug 1).
+  useEffect(() => {
+    if (!isStreaming && serverMessages.length > sendBaseCountRef.current) {
+      setLocalMessages([])
+      sendBaseCountRef.current = serverMessages.length
+    }
+  }, [serverMessages.length, isStreaming])
+
+  // Merge server messages with local optimistic messages, de-duplicating by id.
+  // Local ids are "local-*" so they never collide with server UUIDs. This ensures the
+  // optimistic user message is always visible while the assistant reply streams in, even
+  // when the conversation already has prior server messages (length-based either/or was the bug).
+  const messages = useMemo(() => {
+    const serverIds = new Set(serverMessages.map((m) => m.id))
+    return [...serverMessages, ...localMessages.filter((m) => !serverIds.has(m.id))]
+  }, [serverMessages, localMessages])
 
   const handleSend = useCallback(
     async (content: string) => {
@@ -53,6 +89,10 @@ export function ChatPane() {
           return
         }
       }
+
+      // Snapshot server message count before adding optimistic messages so we can detect
+      // when the server has caught up (Fix: bug 1 — use ref so no stale-closure risk).
+      sendBaseCountRef.current = serverMsgCountRef.current
 
       // Optimistically append user message
       const userMsg: Message = {
@@ -81,51 +121,39 @@ export function ChatPane() {
           throw new Error('Response body is null')
         }
 
-        const reader = resp.body.getReader()
-        const decoder = new TextDecoder()
         let accumulated = ''
-        let buffer = ''
 
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          // Keep the last partial line in buffer
-          buffer = lines.pop() ?? ''
-
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue
-            const data = line.slice(6).trim()
-            if (data === '[DONE]') {
-              // Finalize
-              const assistantMsg: Message = {
-                id: `local-assistant-${Date.now()}`,
-                role: 'assistant',
-                content: accumulated,
-                createdAt: new Date().toISOString(),
-              }
-              setLocalMessages((prev) => [...prev, assistantMsg])
-              setStreamingContent(null)
-              setIsStreaming(false)
-              // Invalidate to pull real messages from server
-              void qc.invalidateQueries({ queryKey: ['conversation', convId] })
-              void qc.invalidateQueries({ queryKey: ['conversations'] })
-              return
+        // Use iterateSseData (from gatewayTrace) — it handles the decoder flush and the
+        // trailing buffer after the stream ends, so the final token and [DONE] sentinel are
+        // never silently dropped (Fix: bug 4 — trailing SSE buffer).
+        for await (const data of iterateSseData(resp.body)) {
+          if (data === '[DONE]') {
+            // Finalize
+            const assistantMsg: Message = {
+              id: `local-assistant-${Date.now()}`,
+              role: 'assistant',
+              content: accumulated,
+              createdAt: new Date().toISOString(),
             }
-            try {
-              const parsed = JSON.parse(data) as {
-                choices?: Array<{ delta?: { content?: string } }>
-              }
-              const delta = parsed.choices?.[0]?.delta?.content ?? ''
-              if (delta) {
-                accumulated += delta
-                setStreamingContent(accumulated)
-              }
-            } catch {
-              // Ignore malformed lines
+            setLocalMessages((prev) => [...prev, assistantMsg])
+            setStreamingContent(null)
+            setIsStreaming(false)
+            // Invalidate to pull real messages from server
+            void qc.invalidateQueries({ queryKey: ['conversation', convId] })
+            void qc.invalidateQueries({ queryKey: ['conversations'] })
+            return
+          }
+          try {
+            const parsed = JSON.parse(data) as {
+              choices?: Array<{ delta?: { content?: string } }>
             }
+            const delta = parsed.choices?.[0]?.delta?.content ?? ''
+            if (delta) {
+              accumulated += delta
+              setStreamingContent(accumulated)
+            }
+          } catch {
+            // Ignore malformed lines
           }
         }
 
@@ -139,8 +167,8 @@ export function ChatPane() {
         setLocalMessages((prev) => [...prev, assistantMsg])
       } catch (err) {
         if ((err as Error).name === 'AbortError') {
-          // Stopped by user — keep whatever was accumulated
-          console.info('Stream aborted by user')
+          // Stopped by user or id change — keep whatever was accumulated
+          console.info('Stream aborted')
         } else {
           console.error('Stream error', err)
         }
