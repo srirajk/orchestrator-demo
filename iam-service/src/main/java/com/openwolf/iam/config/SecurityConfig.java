@@ -299,6 +299,9 @@ public class SecurityConfig {
 
         // Conduit Chat — OIDC SSO for the end-user chat BFF (the user logs in AS THEMSELVES;
         // the BFF forwards the user's token to the gateway → entitlements as the real principal).
+        // offline_access is included so Axiom issues a refresh_token alongside the access token,
+        // enabling the BFF's OAuth2AuthorizedClientManager refresh_token provider to silently
+        // renew credentials without a full re-login.
         RegisteredClient conduitChatClient = RegisteredClient.withId("conduit-chat-client-id")
                 .clientId(conduitChatClientId)
                 .clientSecret(passwordEncoder.encode(conduitChatClientSecret))
@@ -310,6 +313,7 @@ public class SecurityConfig {
                 .scope(OidcScopes.OPENID)
                 .scope(OidcScopes.PROFILE)
                 .scope(OidcScopes.EMAIL)
+                .scope("offline_access")
                 .tokenSettings(TokenSettings.builder()
                         .accessTokenTimeToLive(Duration.ofHours(2))
                         .refreshTokenTimeToLive(Duration.ofDays(1))

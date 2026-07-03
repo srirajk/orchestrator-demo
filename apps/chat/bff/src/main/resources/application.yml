@@ -43,6 +43,7 @@ spring:
               - openid
               - profile
               - email
+              - offline_access
         provider:
           conduit-chat:
             # host.docker.internal:8084 is reachable by BOTH the browser (authorize redirect)
