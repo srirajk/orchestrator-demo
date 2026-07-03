@@ -1,7 +1,17 @@
+function currentSpaPath(): string {
+  return `${window.location.pathname}${window.location.search}${window.location.hash}` || '/'
+}
+
+export function redirectToLogin(): never {
+  const returnTo = encodeURIComponent(currentSpaPath())
+  window.location.assign(`/api/auth/login?returnTo=${returnTo}`)
+  return new Promise<never>(() => {}) as never
+}
+
 /**
  * Generic fetch wrapper.
  * - Always includes credentials: 'include'
- * - On any 401 response: redirects to /api/auth/login
+ * - On any 401 response: redirects to /api/auth/login and preserves the current SPA route.
  */
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const resp = await fetch(path, {
@@ -14,9 +24,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   })
 
   if (resp.status === 401) {
-    window.location.href = '/api/auth/login'
-    // Return a never-resolving promise so callers don't see a value
-    return new Promise(() => {})
+    return redirectToLogin()
   }
 
   if (!resp.ok) {
@@ -48,8 +56,7 @@ export async function apiStream(path: string, init?: RequestInit): Promise<Respo
   })
 
   if (resp.status === 401) {
-    window.location.href = '/api/auth/login'
-    return new Promise(() => {})
+    return redirectToLogin()
   }
 
   if (!resp.ok) {

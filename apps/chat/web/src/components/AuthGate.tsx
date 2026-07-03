@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
+import { redirectToLogin } from '../api/client'
 import type { User } from '../api/types'
 
 const UserContext = createContext<User | null>(null)
@@ -21,7 +22,7 @@ export function AuthGate({ children }: Props) {
   // render-phase side-effects and potential redirect loops with apiFetch's own 401 handling.
   useEffect(() => {
     if (!isLoading && (error || !user)) {
-      window.location.href = '/api/auth/login'
+      redirectToLogin()
     }
   }, [isLoading, error, user])
 

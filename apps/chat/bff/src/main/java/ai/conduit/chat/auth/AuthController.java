@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
@@ -38,10 +39,30 @@ public class AuthController {
     private static final String AUTHORIZATION_REQUEST_URI = "/oauth2/authorization/conduit-chat";
     private static final String LOGIN_URI = "/api/auth/login";
     private static final String SESSION_COOKIE_NAME = "SESSION";
+    public static final String LOGIN_RETURN_TO_SESSION_ATTRIBUTE = "conduit.chat.loginReturnTo";
 
     @GetMapping("/login")
-    public void login(HttpServletResponse response) throws IOException {
+    public void login(@RequestParam(name = "returnTo", required = false) String returnTo,
+                      HttpServletRequest request,
+                      HttpServletResponse response) throws IOException {
+        if (isSafeSpaPath(returnTo)) {
+            request.getSession(true).setAttribute(LOGIN_RETURN_TO_SESSION_ATTRIBUTE, returnTo);
+        } else {
+            HttpSession session = request.getSession(false);
+            if (session != null) {
+                session.removeAttribute(LOGIN_RETURN_TO_SESSION_ATTRIBUTE);
+            }
+        }
         response.sendRedirect(AUTHORIZATION_REQUEST_URI);
+    }
+
+    public static boolean isSafeSpaPath(String path) {
+        return path != null
+                && path.startsWith("/")
+                && !path.startsWith("//")
+                && !path.startsWith("/api/")
+                && !path.startsWith("/oauth2/")
+                && !path.startsWith("/login/");
     }
 
     /**

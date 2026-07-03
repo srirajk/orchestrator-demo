@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { redirectToLogin } from '../api/client'
 import { iterateSseData } from '../lib/gatewayTrace'
 import type { TraceEvent } from '../lib/gatewayTrace'
 
@@ -54,6 +55,10 @@ export function useTraceStream(conversationId: string | undefined): UseTraceStre
             headers: { Accept: 'text/event-stream' },
             signal: ac.signal,
           })
+
+          if (resp.status === 401) {
+            return redirectToLogin()
+          }
 
           if (!resp.ok || !resp.body) {
             setStatus('error')

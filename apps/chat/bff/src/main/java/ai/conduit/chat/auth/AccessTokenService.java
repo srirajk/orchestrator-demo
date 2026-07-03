@@ -3,16 +3,22 @@ package ai.conduit.chat.auth;
 import ai.conduit.chat.web.UnauthorizedException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
 import org.springframework.security.oauth2.client.OAuth2AuthorizeRequest;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
 import org.springframework.security.oauth2.core.OAuth2AuthorizationException;
 import org.springframework.stereotype.Service;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Retrieves the signed-in user's OIDC <b>access token</b> to forward to the Conduit
@@ -38,9 +44,13 @@ public class AccessTokenService {
     private static final String REGISTRATION_ID = "conduit-chat";
 
     private final OAuth2AuthorizedClientManager authorizedClientManager;
+    private final OAuth2AuthorizedClientRepository authorizedClientRepository;
+    private final ConcurrentMap<String, ReentrantLock> sessionRefreshLocks = new ConcurrentHashMap<>();
 
-    public AccessTokenService(OAuth2AuthorizedClientManager authorizedClientManager) {
+    public AccessTokenService(OAuth2AuthorizedClientManager authorizedClientManager,
+                              OAuth2AuthorizedClientRepository authorizedClientRepository) {
         this.authorizedClientManager = authorizedClientManager;
+        this.authorizedClientRepository = authorizedClientRepository;
     }
 
     /**
@@ -57,6 +67,10 @@ public class AccessTokenService {
         ServletRequestAttributes attributes = currentAttributes();
         HttpServletRequest request = attributes.getRequest();
         HttpServletResponse response = attributes.getResponse();
+        HttpSession session = request.getSession(false);
+        if (session == null) {
+            throw new UnauthorizedException("No HTTP session available for access-token lookup");
+        }
 
         // Resolve (and, if expired, refresh) through the manager. Passing the servlet request +
         // response lets the manager persist a refreshed authorized client back to the session store.
@@ -72,10 +86,17 @@ public class AccessTokenService {
                 .build();
 
         OAuth2AuthorizedClient client;
+        ReentrantLock lock = sessionRefreshLocks.computeIfAbsent(session.getId(), ignored -> new ReentrantLock());
+        lock.lock();
         try {
             client = authorizedClientManager.authorize(authorizeRequest);
         } catch (OAuth2AuthorizationException ex) {
+            if (response != null) {
+                authorizedClientRepository.removeAuthorizedClient(REGISTRATION_ID, authentication, request, response);
+            }
             throw new UnauthorizedException("OIDC session expired; re-authentication required", ex);
+        } finally {
+            lock.unlock();
         }
         if (client == null || client.getAccessToken() == null) {
             throw new UnauthorizedException("No OIDC access token available; re-authentication required");

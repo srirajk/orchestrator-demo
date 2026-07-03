@@ -1,6 +1,8 @@
 package ai.conduit.chat.config;
 
+import ai.conduit.chat.auth.AuthController;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpSession;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -115,8 +117,19 @@ public class SecurityConfig {
                 .oauth2Login(oauth -> oauth
                         // Process Axiom's callback at the path Axiom has registered.
                         .redirectionEndpoint(redir -> redir.baseUri("/api/auth/callback"))
-                        // After a successful login, land the browser back on the SPA.
-                        .defaultSuccessUrl("/", true)
+                        // After a successful login, return to the SPA route that requested auth.
+                        .successHandler((request, response, authentication) -> {
+                            String target = "/";
+                            HttpSession session = request.getSession(false);
+                            if (session != null) {
+                                Object saved = session.getAttribute(AuthController.LOGIN_RETURN_TO_SESSION_ATTRIBUTE);
+                                session.removeAttribute(AuthController.LOGIN_RETURN_TO_SESSION_ATTRIBUTE);
+                                if (saved instanceof String path && AuthController.isSafeSpaPath(path)) {
+                                    target = path;
+                                }
+                            }
+                            response.sendRedirect(target);
+                        })
                         .failureUrl("/?login_error")
                 )
                 // Spring's default logout is replaced by AuthController#logout (JSON response).
