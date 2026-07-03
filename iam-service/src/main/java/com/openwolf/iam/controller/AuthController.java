@@ -40,9 +40,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -184,9 +184,11 @@ public class AuthController {
         List<String> permissions = new ArrayList<>(permSet);
         Collections.sort(permissions);
 
-        List<String> segments = extractSegments(principal.getAttributes());
-        int clearance = extractClearance(principal.getAttributes());
         String classification = extractString(principal.getAttributes(), "classification", "internal");
+        // segments is a per-segment classification MAP {segment -> tier}. Numeric clearance is
+        // dropped — the per-segment tier is the ceiling. Legacy array attrs auto-migrate to
+        // {segment -> global classification} so an un-reseeded principal keeps its ceiling.
+        Map<String, String> segments = extractSegmentMap(principal.getAttributes(), classification);
 
         UserResponse userResponse = userService.toUserResponse(principal);
         List<String> adminDomains = userResponse.adminDomains() != null ? userResponse.adminDomains() : List.of();
@@ -205,7 +207,6 @@ public class AuthController {
                 .claim("roles", roles)
                 .claim("permissions", permissions)
                 .claim("segments", segments)
-                .claim("clearance", clearance)
                 .claim("classification", classification)
                 .claim("admin_domains", adminDomains)
                 .claim("tenant_id", "default")
@@ -239,45 +240,33 @@ public class AuthController {
     }
 
     /**
-     * Extracts the {@code clearance} integer from the principal's JSON attributes string.
-     * Returns 1 (lowest) as a safe default if the attribute is absent or parsing fails.
+     * Builds the per-segment classification map claim {@code {segment -> tier}} from the
+     * principal's JSON attributes. Preferred: {@code segments} stored as a JSON object.
+     * Legacy tolerance: a JSON array maps each segment to {@code fallbackTier} (the global
+     * classification), so an un-reseeded principal keeps an equivalent ceiling rather than
+     * losing access. Returns an empty map if absent or parsing fails.
      */
-    private int extractClearance(String attributesJson) {
-        if (attributesJson == null || attributesJson.isBlank()) return 1;
-        try {
-            Map<String, Object> attrs = objectMapper.readValue(
-                    attributesJson, new TypeReference<Map<String, Object>>() {});
-            Object val = attrs.get("clearance");
-            if (val instanceof Number n) return n.intValue();
-            return 1;
-        } catch (Exception ex) {
-            log.warn("Failed to extract clearance from principal attributes: {}", ex.getMessage());
-            return 1;
-        }
-    }
-
-    /**
-     * Extracts the {@code segments} list from the principal's JSON attributes string.
-     * Returns an empty list if the attribute is absent or parsing fails.
-     */
-    @SuppressWarnings("unchecked")
-    private List<String> extractSegments(String attributesJson) {
-        if (attributesJson == null || attributesJson.isBlank()) return List.of();
+    private Map<String, String> extractSegmentMap(String attributesJson, String fallbackTier) {
+        Map<String, String> out = new LinkedHashMap<>();
+        if (attributesJson == null || attributesJson.isBlank()) return out;
         try {
             Map<String, Object> attrs = objectMapper.readValue(
                     attributesJson, new TypeReference<Map<String, Object>>() {});
             Object val = attrs.get("segments");
-            if (val instanceof List<?> list) {
-                return list.stream()
-                        .filter(Objects::nonNull)
-                        .map(Object::toString)
-                        .toList();
+            if (val instanceof Map<?, ?> m) {
+                m.forEach((k, v) -> {
+                    if (k != null && v != null) out.put(k.toString(), v.toString());
+                });
+            } else if (val instanceof List<?> list) {
+                String tier = (fallbackTier == null || fallbackTier.isBlank()) ? "internal" : fallbackTier;
+                for (Object s : list) {
+                    if (s != null) out.put(s.toString(), tier);
+                }
             }
-            return List.of();
         } catch (Exception ex) {
             log.warn("Failed to extract segments from principal attributes: {}", ex.getMessage());
-            return List.of();
         }
+        return out;
     }
 
     /**

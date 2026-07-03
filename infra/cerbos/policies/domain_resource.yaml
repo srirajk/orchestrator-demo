@@ -25,10 +25,11 @@ resourcePolicy:
         match:
           expr: P.attr.admin_domains.exists(d, d == R.id)
 
-    # ── relationship_manager: can view domains they belong to (read-only) ────────
+    # ── chat_user: can view domains they belong to (read-only) ───────────────────
+    #    relationship_manager kept as an alias during the chat_user migration.
     - actions: ["view"]
       effect: EFFECT_ALLOW
-      roles: ["relationship_manager"]
+      roles: ["chat_user", "relationship_manager"]
       condition:
         match:
           expr: P.attr.domains.exists(d, d == R.id)
