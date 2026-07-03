@@ -4,6 +4,8 @@ import ai.conduit.chat.config.AppProperties;
 import ai.conduit.chat.conversation.Conversation;
 import ai.conduit.chat.message.Message;
 import ai.conduit.chat.message.MessageService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -27,6 +29,8 @@ import java.util.List;
  */
 @Component
 public class ContextAssembler {
+
+    private static final Logger log = LoggerFactory.getLogger(ContextAssembler.class);
 
     static final String SUMMARY_PREFIX = "Summary of earlier conversation:\n";
 
@@ -94,6 +98,25 @@ public class ContextAssembler {
             assembled.add(summaryMessage);
         }
         assembled.addAll(window);
+
+        // Observability: show exactly what compacted context leaves the BFF for this turn —
+        // the leading facts-free summary (if any) + the recent window, trimmed to the token
+        // budget. DEBUG-only; thresholds come from config, not literals here.
+        if (log.isDebugEnabled()) {
+            StringBuilder sb = new StringBuilder();
+            for (ChatMessage cm : assembled) {
+                String c = cm.content();
+                String preview = c.length() > 140 ? c.substring(0, 140) + "…" : c;
+                sb.append("\n    [").append(cm.role()).append(", ~")
+                        .append(tokenCounter.count(c)).append(" tok] ")
+                        .append(preview.replace('\n', ' '));
+            }
+            log.debug("[context] convo={} transcript={} msgs/{} tok | budget={} tok trigger={} tok "
+                            + "-> assembled {} msgs (summaryAttached={}, windowMsgs={}):{}",
+                    conversationId, transcript.size(), transcriptTokens,
+                    budget, context.summaryTriggerTokens(),
+                    assembled.size(), summaryMessage != null, window.size(), sb);
+        }
         return assembled;
     }
 }
