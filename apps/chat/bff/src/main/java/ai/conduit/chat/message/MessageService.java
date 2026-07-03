@@ -22,6 +22,17 @@ public class MessageService {
         return repository.save(new Message(conversationId, userId, role, content));
     }
 
+    /**
+     * Deletes a single message by id. Used to roll back a just-persisted user message when the
+     * gateway rejects the turn before streaming, so a failed send leaves no orphan (and a retry
+     * does not duplicate it).
+     */
+    public void delete(Message message) {
+        if (message != null && message.getId() != null) {
+            repository.deleteById(message.getId());
+        }
+    }
+
     public List<Message> allInOrder(String conversationId) {
         return repository.findByConversationIdOrderByCreatedAtAsc(conversationId);
     }

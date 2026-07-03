@@ -9,6 +9,11 @@ import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientProvider;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientProviderBuilder;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizedClientManager;
 import org.springframework.security.oauth2.client.web.HttpSessionOAuth2AuthorizedClientRepository;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
 import org.springframework.security.web.SecurityFilterChain;
@@ -56,6 +61,34 @@ public class SecurityConfig {
     @Bean
     OAuth2AuthorizedClientRepository authorizedClientRepository() {
         return new HttpSessionOAuth2AuthorizedClientRepository();
+    }
+
+    /**
+     * Request-scoped authorized-client manager with a {@code refresh_token} provider.
+     *
+     * <p>Access tokens from Axiom are short-lived (≈2h). Without this, an expired token was
+     * forwarded to the gateway → 401 → forced full re-login. The manager transparently refreshes
+     * an expired access token using the stored refresh token and writes the refreshed client back
+     * to the session-backed {@link OAuth2AuthorizedClientRepository}. {@code AccessTokenService}
+     * resolves the token through this manager.
+     *
+     * <p>Note: this only takes effect when Axiom actually issues a refresh token for the
+     * {@code conduit-chat} client (typically gated on the {@code offline_access} scope being
+     * registered/granted). When no refresh token is present the manager returns the existing
+     * client unchanged — behaviour is no worse than before.
+     */
+    @Bean
+    OAuth2AuthorizedClientManager authorizedClientManager(
+            ClientRegistrationRepository clientRegistrationRepository,
+            OAuth2AuthorizedClientRepository authorizedClientRepository) {
+        OAuth2AuthorizedClientProvider provider = OAuth2AuthorizedClientProviderBuilder.builder()
+                .authorizationCode()
+                .refreshToken()
+                .build();
+        DefaultOAuth2AuthorizedClientManager manager = new DefaultOAuth2AuthorizedClientManager(
+                clientRegistrationRepository, authorizedClientRepository);
+        manager.setAuthorizedClientProvider(provider);
+        return manager;
     }
 
     @Bean

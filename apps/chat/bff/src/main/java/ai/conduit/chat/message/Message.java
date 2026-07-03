@@ -2,6 +2,7 @@ package ai.conduit.chat.message;
 
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -10,14 +11,20 @@ import java.time.Instant;
 /**
  * A single chat message belonging to a conversation. {@code role} is
  * {@code "user"} or {@code "assistant"}. Serializes {@code id} (not {@code _id}).
+ *
+ * <p>The compound {@code (conversationId, createdAt)} index backs the per-turn transcript
+ * load ({@code findByConversationIdOrderByCreatedAtAsc}) and the recent-window query, so the
+ * transcript is served pre-sorted from the index instead of collection-scanned and re-sorted
+ * every turn. It also covers the {@code conversationId}-prefixed count/delete queries, so a
+ * separate single-field {@code conversationId} index is redundant.
  */
 @Document(collection = "messages")
+@CompoundIndex(name = "conversation_created_idx", def = "{'conversationId': 1, 'createdAt': 1}")
 public class Message {
 
     @Id
     private String id;
 
-    @Indexed
     private String conversationId;
 
     @Indexed

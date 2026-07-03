@@ -58,6 +58,20 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse("Storage error", "File storage is unavailable"));
     }
 
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<ErrorResponse> handleUnauthorized(UnauthorizedException ex, HttpServletResponse response) {
+        if (response.isCommitted()) {
+            // Stream already committed — cannot switch to a 401 body now. Swallow.
+            log.debug("[auth] unauthorized after response committed: {}", ex.getMessage());
+            return null;
+        }
+        // Not a server fault: the caller's session/token is gone. 401 so the SPA re-logins,
+        // distinct from a 502 gateway-reachability failure. Debug-level; not error spam.
+        log.debug("[auth] unauthorized: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(new ErrorResponse("Unauthorized", ex.getMessage()));
+    }
+
     @ExceptionHandler(GatewayException.class)
     public ResponseEntity<ErrorResponse> handleGateway(GatewayException ex, HttpServletResponse response) {
         if (response.isCommitted()) {
