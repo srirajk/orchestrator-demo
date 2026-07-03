@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { NavLink, useNavigate, useParams } from 'react-router-dom'
-import { MessageSquare, Plus, Folder, Trash2, Pencil, Check, X, LogOut } from 'lucide-react'
+import { MessageSquare, Plus, Folder, Trash2, Pencil, Archive, Search, LogOut, X } from 'lucide-react'
 import clsx from 'clsx'
 import { useConversations, useDeleteConversation, useUpdateConversation } from '../hooks/useConversations'
 import { useProjects } from '../hooks/useProjects'
@@ -12,11 +12,13 @@ function ConversationItem({
   active,
   onDelete,
   onRename,
+  onArchive,
 }: {
   conv: Conversation
   active: boolean
   onDelete: (id: string) => void
   onRename: (id: string, title: string) => void
+  onArchive: (id: string) => void
 }) {
   const [hovered, setHovered] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -74,6 +76,13 @@ function ConversationItem({
             <Pencil size={12} />
           </button>
           <button
+            onClick={(e) => { e.preventDefault(); onArchive(conv.id) }}
+            className="p-0.5 rounded text-slate-400 hover:text-white"
+            title="Archive"
+          >
+            <Archive size={12} />
+          </button>
+          <button
             onClick={(e) => { e.preventDefault(); onDelete(conv.id) }}
             className="p-0.5 rounded text-slate-400 hover:text-red-400"
             title="Delete"
@@ -91,10 +100,36 @@ export function Sidebar() {
   const navigate = useNavigate()
   const user = useUser()
 
-  const { data: conversations = [] } = useConversations()
+  const [search, setSearch] = useState('')
+  const searchRef = useRef<HTMLInputElement>(null)
+
+  const { data: conversations = [], isLoading } = useConversations()
   const { data: projects = [] } = useProjects()
   const deleteMutation = useDeleteConversation()
-  const renameMutation = useUpdateConversation()
+  const updateMutation = useUpdateConversation()
+
+  // Keyboard shortcuts
+  const handleNewChat = useCallback(() => {
+    navigate('/c/new')
+  }, [navigate])
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const mod = e.metaKey || e.ctrlKey
+      // Cmd/Ctrl+N → new chat (when not typing in a text input)
+      if (mod && e.key === 'n' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
+        e.preventDefault()
+        handleNewChat()
+      }
+      // / → focus search (when not typing)
+      if (e.key === '/' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
+        e.preventDefault()
+        searchRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [handleNewChat])
 
   function handleDelete(id: string) {
     deleteMutation.mutate(id, {
@@ -105,15 +140,31 @@ export function Sidebar() {
   }
 
   function handleRename(id: string, title: string) {
-    renameMutation.mutate({ id, title })
+    updateMutation.mutate({ id, title })
   }
 
+  function handleArchive(id: string) {
+    updateMutation.mutate({ id, archived: true }, {
+      onSuccess: () => {
+        if (activeId === id) navigate('/c/new')
+      },
+    })
+  }
+
+  // Filter conversations by search query (title match, case-insensitive)
+  const query = search.trim().toLowerCase()
+  const filtered = query
+    ? conversations.filter((c) => (c.title || '').toLowerCase().includes(query))
+    : conversations
+
   // Group conversations by project
-  const ungrouped = conversations.filter((c) => !c.projectId)
-  const grouped = projects.map((p) => ({
-    project: p,
-    convs: conversations.filter((c) => c.projectId === p.id),
-  })).filter((g) => g.convs.length > 0)
+  const ungrouped = filtered.filter((c) => !c.projectId)
+  const grouped = projects
+    .map((p) => ({
+      project: p,
+      convs: filtered.filter((c) => c.projectId === p.id),
+    }))
+    .filter((g) => g.convs.length > 0)
 
   return (
     <div className="flex flex-col h-full bg-axiom-950 w-64 shrink-0">
@@ -129,27 +180,61 @@ export function Sidebar() {
       {/* New Chat */}
       <div className="px-3 pt-4 pb-2">
         <button
-          onClick={() => navigate('/c/new')}
+          onClick={handleNewChat}
           className="flex w-full items-center gap-2 px-3 py-2 rounded-md bg-gold-400 text-axiom-950 text-sm font-semibold hover:bg-gold-300 transition-colors"
+          title="New chat (⌘N)"
         >
           <Plus size={16} />
           New Chat
         </button>
       </div>
 
+      {/* Search */}
+      <div className="px-3 pb-2">
+        <div className="relative flex items-center">
+          <Search size={13} className="absolute left-2.5 text-slate-500 pointer-events-none" />
+          <input
+            ref={searchRef}
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search  (/)"
+            className="w-full pl-8 pr-7 py-1.5 bg-axiom-800 text-slate-200 text-xs rounded-md placeholder:text-slate-500 outline-none focus:ring-1 focus:ring-gold-500 transition-colors"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-2 text-slate-500 hover:text-slate-300"
+              tabIndex={-1}
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Conversation list */}
       <div className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
-        {ungrouped.map((conv) => (
+        {isLoading && (
+          <div className="space-y-1 px-1">
+            {[1, 2, 3].map((n) => (
+              <div key={n} className="h-8 rounded-md bg-axiom-800/60 animate-pulse" />
+            ))}
+          </div>
+        )}
+
+        {!isLoading && ungrouped.map((conv) => (
           <ConversationItem
             key={conv.id}
             conv={conv}
             active={activeId === conv.id}
             onDelete={handleDelete}
             onRename={handleRename}
+            onArchive={handleArchive}
           />
         ))}
 
-        {grouped.map(({ project, convs }) => (
+        {!isLoading && grouped.map(({ project, convs }) => (
           <div key={project.id} className="mt-4">
             <div className="flex items-center gap-2 px-3 py-1 mb-1">
               <Folder size={12} style={{ color: project.color }} className="shrink-0" />
@@ -164,17 +249,20 @@ export function Sidebar() {
                 active={activeId === conv.id}
                 onDelete={handleDelete}
                 onRename={handleRename}
+                onArchive={handleArchive}
               />
             ))}
           </div>
         ))}
 
-        {conversations.length === 0 && (
-          <p className="text-xs text-slate-500 px-3 py-2">No conversations yet</p>
+        {!isLoading && filtered.length === 0 && (
+          <p className="text-xs text-slate-500 px-3 py-2">
+            {query ? 'No conversations match your search.' : 'No conversations yet.'}
+          </p>
         )}
       </div>
 
-      {/* User chip */}
+      {/* User chip + logout */}
       <div className="border-t border-white/10 px-4 py-3 flex items-center gap-3">
         <div className="h-8 w-8 rounded-full bg-axiom-700 flex items-center justify-center text-white text-xs font-semibold shrink-0">
           {user.username.slice(0, 2).toUpperCase()}
@@ -183,6 +271,13 @@ export function Sidebar() {
           <p className="text-sm font-medium text-white truncate">{user.username}</p>
           <p className="text-xs text-slate-400 truncate">{user.email}</p>
         </div>
+        <a
+          href="/api/auth/logout"
+          className="shrink-0 p-1.5 rounded text-slate-500 hover:text-white transition-colors"
+          title="Sign out"
+        >
+          <LogOut size={14} />
+        </a>
       </div>
     </div>
   )
