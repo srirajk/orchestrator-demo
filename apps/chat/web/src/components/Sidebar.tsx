@@ -23,10 +23,18 @@ function ConversationItem({
   const [hovered, setHovered] = useState(false)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(conv.title)
+  // Guard against the duplicate PATCH that fires when Enter commits the rename and then
+  // blur fires on the same input as it is removed from the DOM (Fix: bug 6).
+  const committedRef = useRef(false)
 
   function commitRename() {
+    if (committedRef.current) {
+      setEditing(false)
+      return
+    }
     const trimmed = draft.trim()
     if (trimmed && trimmed !== conv.title) {
+      committedRef.current = true
       onRename(conv.id, trimmed)
     }
     setEditing(false)
@@ -69,7 +77,7 @@ function ConversationItem({
       {(hovered || active) && !editing && (
         <div className="flex items-center gap-1 shrink-0">
           <button
-            onClick={(e) => { e.preventDefault(); setDraft(conv.title); setEditing(true) }}
+            onClick={(e) => { e.preventDefault(); committedRef.current = false; setDraft(conv.title); setEditing(true) }}
             className="p-0.5 rounded text-slate-400 hover:text-white"
             title="Rename"
           >
@@ -103,7 +111,10 @@ export function Sidebar() {
   const [search, setSearch] = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
 
-  const { data: conversations = [], isLoading } = useConversations()
+  const { data: allConversations = [], isLoading } = useConversations()
+  // Filter archived client-side in case the backend list endpoint includes them
+  // (Fix: bug 7 — archived conversations must not appear in the sidebar).
+  const conversations = allConversations.filter((c) => !c.archived)
   const { data: projects = [] } = useProjects()
   const deleteMutation = useDeleteConversation()
   const updateMutation = useUpdateConversation()

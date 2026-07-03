@@ -10,6 +10,7 @@ export interface Conversation {
   title: string
   projectId?: string
   updatedAt: string
+  archived?: boolean
 }
 
 export interface Message {
