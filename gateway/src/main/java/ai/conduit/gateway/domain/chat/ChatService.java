@@ -402,9 +402,12 @@ public class ChatService {
                         if (hasConversationReference) {
                             // Resolve the client reference from the client-sent messages to a
                             // canonical relationship ID. Pivots re-resolve and re-authorize.
+                            // RESOLVE is principal-agnostic (World-B invariant 5): scope by tenant,
+                            // not by the caller's book. The book gate is the CHECK call below plus
+                            // the candidates ∩ discover intersection in the ambiguous branch.
                             CoverageResolveResult resolveResult = coverageClient.resolve(
                                 preExtracted.reference(coverageEntity.extractAs()),
-                                coverageEntity.resolveType(), principalId, coverage);
+                                coverageEntity.resolveType(), tenantId, coverage);
 
                             if (resolveResult.resolved()) {
                                 coverageRelId = resolveResult.id();
