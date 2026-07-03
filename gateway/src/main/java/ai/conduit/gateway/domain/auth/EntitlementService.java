@@ -130,6 +130,85 @@ public class EntitlementService {
     }
 
     /**
+     * Produces the ordered, per-agent breakdown of the structural authorization gates for the
+     * glass box: {@code audience → segment → classification}. This EXPLAINS the decision the
+     * Cerbos PDP enforces (AUTHZ-SPEC §1) so the trace shows each gate's pass/deny + a plain-english
+     * reason instead of one opaque allow/deny.
+     *
+     * <p><strong>The verdicts come from Cerbos, not from re-deciding here.</strong> The gateway
+     * carries zero domain knowledge (World B): the domain→segment mapping and the classification
+     * ladder live in the Cerbos policy. Two batched PDP verdicts label each agent:
+     * <ul>
+     *   <li>{@code invoke_membership} — segment membership only (ignores tier)</li>
+     *   <li>{@code invoke}            — the full, enforced structural decision</li>
+     * </ul>
+     * from which the gate that decided is inferred:
+     * <ol>
+     *   <li><b>audience</b> — {@code enterprise} agents (manifest-declared) are open to all; no
+     *       segment/classification gate applies.</li>
+     *   <li><b>segment</b> — {@code invoke_membership} deny ⇒ the agent's domain maps to no segment
+     *       the principal holds.</li>
+     *   <li><b>classification</b> — member but {@code invoke} deny ⇒ the principal's tier in that
+     *       segment is below the agent's declared {@code data_classification}.</li>
+     * </ol>
+     *
+     * <p>Reason copy is built from data the manifest/principal declare (the agent's domain and
+     * required classification, the tiers the principal holds) — never a hardcoded domain literal or
+     * the domain→segment mapping, so this stays World-B clean. The coverage gate is entity-scoped
+     * and lives in the request pipeline; it is not evaluated here.
+     */
+    public List<GateResult> explainStructuralGates(Principal principal, List<AgentManifest> manifests) {
+        if (manifests == null || manifests.isEmpty()) return List.of();
+
+        Map<String, Boolean> member = cerbos.checkAgentMembership(principal, manifests);
+        CerbosEntitlementAdapter.BatchResult invoke = cerbos.checkAgents(principal, manifests);
+
+        List<GateResult> out = new java.util.ArrayList<>();
+        for (AgentManifest m : manifests) {
+            String agent    = m.agentId();
+            String domain   = m.domain();
+            String audience = m.audience() != null ? m.audience() : "segment";
+            String required = (m.constraints() != null && m.constraints().dataClassification() != null)
+                    ? m.constraints().dataClassification() : "confidential";
+
+            if ("enterprise".equals(audience)) {
+                out.add(new GateResult("audience", true,
+                        "enterprise agent — available to all users", agent));
+                continue;
+            }
+
+            boolean isMember  = member.getOrDefault(agent, false);
+            boolean canInvoke = invoke.isAllowed(agent);
+
+            if (!isMember) {
+                out.add(new GateResult("segment", false, "not in segment for " + domain, agent));
+                continue;
+            }
+            out.add(new GateResult("segment", true, "in segment for " + domain, agent));
+
+            if (!canInvoke) {
+                out.add(new GateResult("classification", false,
+                        domain + " requires " + required + "; you hold " + heldTiers(principal), agent));
+            } else {
+                out.add(new GateResult("classification", true,
+                        "clearance meets " + required, agent));
+            }
+        }
+        return out;
+    }
+
+    /** Renders the principal's per-segment tiers for a legible classification reason, e.g. "wealth=confidential". */
+    private static String heldTiers(Principal principal) {
+        if (principal.segments() == null || principal.segments().isEmpty()) return "no segment clearances";
+        return principal.segments().entrySet().stream()
+                .map(e -> e.getKey() + "=" + e.getValue())
+                .collect(Collectors.joining(", "));
+    }
+
+    /** One gate's verdict for one agent, for the glass-box authorization trace. */
+    public record GateResult(String gate, boolean allow, String reason, String agent) {}
+
+    /**
      * Whether an agent is entity-scoped and therefore subject to the coverage (book-of-business)
      * gate. Only {@code segment}-audience agents carry an entity; {@code enterprise} agents are
      * open knowledge services (e.g. HR policy Q&A) with no per-user entity to check, so the

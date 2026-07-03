@@ -23,6 +23,7 @@ import ai.conduit.gateway.infrastructure.telemetry.event.AgentStartData;
 import ai.conduit.gateway.infrastructure.telemetry.event.AgentsResolvedData;
 import ai.conduit.gateway.infrastructure.telemetry.event.CheckDeniedData;
 import ai.conduit.gateway.infrastructure.telemetry.event.EntitlementCheckData;
+import ai.conduit.gateway.infrastructure.telemetry.event.GateData;
 import ai.conduit.gateway.infrastructure.telemetry.event.IntentClassifiedData;
 import ai.conduit.gateway.infrastructure.telemetry.event.RequestCompleteData;
 import ai.conduit.gateway.infrastructure.telemetry.event.RequestStartData;
@@ -293,6 +294,18 @@ public class ChatService {
             // Must happen BEFORE input synthesis so we never synthesize inputs for denied agents.
             List<AgentManifest> manifests = resolved.selected().stream()
                     .map(c -> c.manifest()).collect(Collectors.toList());
+
+            // ── STRUCTURAL GATE TRACE (audience → segment → classification) ──────────
+            // Emit one ordered `gate` frame per gate/agent so the glass box renders the
+            // authorization decision as a legible step-by-step trace with each gate's
+            // pass/deny + plain-english reason. This EXPLAINS the Cerbos verdict enforced
+            // just below by filterAgents. Reasons are built from manifest/principal data
+            // (segment, tier, classification) — no hardcoded domain literal (World B).
+            entitlementService.explainStructuralGates(principal, manifests)
+                    .forEach(g -> tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
+                            new GateData(g.gate(), g.allow() ? GateData.EFFECT_ALLOW : GateData.EFFECT_DENY,
+                                    g.reason(), g.agent()))));
+
             List<AgentManifest> allowedManifests = entitlementService.filterAgents(principal, manifests);
             if (allowedManifests.isEmpty()) {
                 emitRequestOutcome("DENIED");
@@ -391,6 +404,12 @@ public class ChatService {
                                     principalId, tenantId, coverageRelId, coverage);
                                 if (!check.allowed()) {
                                     emitRequestOutcome("DENIED");
+                                    // Structured coverage gate frame for the glass box: which entity,
+                                    // whose book. Reason is data (entity id + principal id), World-B clean.
+                                    tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
+                                        GateData.deny(GateData.GATE_COVERAGE,
+                                            coverageRelId + " not in " + principalId + "'s book",
+                                            resourceScopedAgent.agentId())));
                                     // Glass-box: explicit CHECK deny event (bug 239) so the trace shows the
                                     // coverage decision rather than jumping straight to request_complete.
                                     tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
@@ -404,6 +423,12 @@ public class ChatService {
                                         new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
                                     return;
                                 }
+                                // Coverage cleared — emit the passing gate frame so the trace shows a
+                                // green coverage row, not a silent skip to synthesis.
+                                tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
+                                    GateData.allow(GateData.GATE_COVERAGE,
+                                        coverageRelId + " in " + principalId + "'s book",
+                                        resourceScopedAgent.agentId())));
 
                             } else if (resolveResult.isAmbiguous()) {
                                 // Multiple matches — discover what's in RM's coverage and intersect.
@@ -441,6 +466,10 @@ public class ChatService {
 
                             if (discovered.isEmpty()) {
                                 emitRequestOutcome("DENIED");
+                                // Structured coverage gate frame — the principal's book is empty.
+                                tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
+                                    GateData.deny(GateData.GATE_COVERAGE,
+                                        principalId + "'s book is empty", resourceScopedAgent.agentId())));
                                 // Empty coverage book is a domain/coverage deny — surface it in the trace (bug 239).
                                 tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
                                     new CheckDeniedData("coverage", null, principalId, "empty-coverage", "coverage")));
