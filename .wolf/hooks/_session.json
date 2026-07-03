@@ -1,73 +1,12 @@
 {
-  "session_id": "session-2026-07-02-0105",
-  "started": "2026-07-02T01:05:37.974Z",
-  "files_read": {
-    "/home/user/orchestrator-demo/docs/PROJECT-OVERVIEW.md": {
-      "count": 1,
-      "tokens": 165,
-      "first_read": "2026-07-02T01:06:03.160Z"
-    },
-    "/home/user/orchestrator-demo/docs/platform-vision-and-maturity-path.md": {
-      "count": 1,
-      "tokens": 1324,
-      "first_read": "2026-07-02T01:06:03.221Z"
-    },
-    "/home/user/orchestrator-demo/README.md": {
-      "count": 1,
-      "tokens": 4394,
-      "first_read": "2026-07-02T01:06:13.315Z"
-    }
-  },
-  "files_written": [
-    {
-      "file": "/home/user/orchestrator-demo/docs/GTM-DESIGN-BRIEF.md",
-      "action": "create",
-      "tokens": 2951,
-      "at": "2026-07-02T01:07:30.057Z"
-    },
-    {
-      "file": "/home/user/orchestrator-demo/docs/GTM-DESIGN-BRIEF.md",
-      "action": "edit",
-      "tokens": 173,
-      "at": "2026-07-02T01:15:05.208Z"
-    },
-    {
-      "file": "/home/user/orchestrator-demo/docs/GTM-DESIGN-BRIEF.md",
-      "action": "edit",
-      "tokens": 39,
-      "at": "2026-07-02T01:15:10.743Z"
-    },
-    {
-      "file": "/home/user/orchestrator-demo/docs/GTM-DESIGN-BRIEF.md",
-      "action": "edit",
-      "tokens": 148,
-      "at": "2026-07-02T01:15:18.724Z"
-    },
-    {
-      "file": "/home/user/orchestrator-demo/docs/GTM-DESIGN-BRIEF.md",
-      "action": "edit",
-      "tokens": 182,
-      "at": "2026-07-02T01:15:28.176Z"
-    },
-    {
-      "file": "/home/user/orchestrator-demo/docs/GTM-DESIGN-BRIEF.md",
-      "action": "edit",
-      "tokens": 33,
-      "at": "2026-07-02T01:15:43.611Z"
-    },
-    {
-      "file": "/home/user/orchestrator-demo/docs/GTM-DESIGN-BRIEF.md",
-      "action": "create",
-      "tokens": 4766,
-      "at": "2026-07-02T01:20:55.894Z"
-    }
-  ],
-  "edit_counts": {
-    "docs/GTM-DESIGN-BRIEF.md": 7
-  },
-  "anatomy_hits": 3,
+  "session_id": "session-2026-07-03-1727",
+  "started": "2026-07-03T17:27:08.036Z",
+  "files_read": {},
+  "files_written": [],
+  "edit_counts": {},
+  "anatomy_hits": 0,
   "anatomy_misses": 0,
   "repeated_reads_warned": 0,
   "cerebrum_warnings": 0,
-  "stop_count": 5
+  "stop_count": 0
 }
