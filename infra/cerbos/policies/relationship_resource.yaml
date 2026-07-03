@@ -18,7 +18,6 @@ resourcePolicy:
     - actions: ["read"]
       effect: EFFECT_ALLOW
       roles: ["platform_admin"]
-
-    - actions: ["read"]
-      effect: EFFECT_ALLOW
-      roles: ["admin"]
+    # NOTE: a bare "admin" role rule was removed here — no principal/IAM seed ever
+    # grants "admin"; the real platform super-role is platform_admin (above). Keeping
+    # a rule for a role that is defined/seeded nowhere is dead grant surface.
