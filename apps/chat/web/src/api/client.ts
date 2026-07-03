@@ -24,7 +24,12 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     throw new Error(`API error ${resp.status}: ${text}`)
   }
 
-  return resp.json() as Promise<T>
+  // 204 No Content (and any response with an empty body) must not be passed to resp.json()
+  // or the browser throws "Unexpected end of JSON input". DELETE/archive PATCH return 204.
+  if (resp.status === 204) return undefined as T
+  const text = await resp.text()
+  if (!text) return undefined as T
+  return JSON.parse(text) as T
 }
 
 /**
