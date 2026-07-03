@@ -209,7 +209,7 @@ public class AuthController {
                 .claim("segments", segments)
                 .claim("classification", classification)
                 .claim("admin_domains", adminDomains)
-                .claim("tenant_id", "default")
+                .claim("tenant_id", principal.getTenantId() != null ? principal.getTenantId() : "default")
                 .build();
 
         String tokenValue = jwtEncoder.encode(JwtEncoderParameters.from(jwsHeader, claims)).getTokenValue();
