@@ -541,6 +541,86 @@
       "resource": { "kind": "relationship", "id": "REL-99999", "attr": {} },
       "action": "read",
       "expected": "DENY"
+    },
+    {
+      "id": "ABAC-001",
+      "description": "analyst_amy (wealth@confidential) invokes internal-classified wealth knowledge agent — classification gate allows (confidential >= internal)",
+      "tags": ["agent", "abac", "chat_user", "classification", "allow"],
+      "principal": {
+        "id": "analyst_amy",
+        "roles": ["chat_user"],
+        "attr": { "tenant_id": "default", "segments": { "wealth": "confidential" } }
+      },
+      "resource": {
+        "kind": "agent", "id": "wealth-market-research",
+        "attr": { "domain": "wealth-management", "audience": "segment", "access_mode": "read", "data_classification": "internal" }
+      },
+      "action": "invoke",
+      "expected": "ALLOW"
+    },
+    {
+      "id": "ABAC-002",
+      "description": "analyst_amy (wealth@confidential) cannot invoke confidential-pii wealth agent — per-segment classification gate denies (confidential < confidential-pii)",
+      "tags": ["agent", "abac", "chat_user", "classification", "deny", "critical"],
+      "principal": {
+        "id": "analyst_amy",
+        "roles": ["chat_user"],
+        "attr": { "tenant_id": "default", "segments": { "wealth": "confidential" } }
+      },
+      "resource": {
+        "kind": "agent", "id": "wealth-holdings",
+        "attr": { "domain": "wealth-management", "audience": "segment", "access_mode": "read", "data_classification": "confidential-pii" }
+      },
+      "action": "invoke",
+      "expected": "DENY"
+    },
+    {
+      "id": "ABAC-003",
+      "description": "rm_jane (wealth@pii, servicing@confidential) cannot invoke an insurance-segment agent — segment gate denies (no insurance segment)",
+      "tags": ["agent", "abac", "chat_user", "segment", "deny", "critical"],
+      "principal": {
+        "id": "rm_jane",
+        "roles": ["chat_user"],
+        "attr": { "tenant_id": "default", "segments": { "wealth": "confidential-pii", "servicing": "confidential" } }
+      },
+      "resource": {
+        "kind": "agent", "id": "insurance-policy",
+        "attr": { "domain": "insurance", "audience": "segment", "access_mode": "read", "data_classification": "internal" }
+      },
+      "action": "invoke",
+      "expected": "DENY"
+    },
+    {
+      "id": "ABAC-004",
+      "description": "uw_sam (insurance@pii) invokes an enterprise HR knowledge agent — audience=enterprise skips the segment gate, open to all authenticated users",
+      "tags": ["agent", "abac", "chat_user", "enterprise", "allow"],
+      "principal": {
+        "id": "uw_sam",
+        "roles": ["chat_user"],
+        "attr": { "tenant_id": "default", "segments": { "insurance": "confidential-pii" } }
+      },
+      "resource": {
+        "kind": "agent", "id": "hr-policy-qa",
+        "attr": { "domain": "hr", "audience": "enterprise", "access_mode": "read", "data_classification": "internal" }
+      },
+      "action": "invoke",
+      "expected": "ALLOW"
+    },
+    {
+      "id": "ABAC-005",
+      "description": "rm_jane (wealth@pii) invokes confidential-pii wealth agent — segment + classification baseline pass (pii >= pii)",
+      "tags": ["agent", "abac", "chat_user", "classification", "segment", "allow"],
+      "principal": {
+        "id": "rm_jane",
+        "roles": ["chat_user"],
+        "attr": { "tenant_id": "default", "segments": { "wealth": "confidential-pii", "servicing": "confidential" } }
+      },
+      "resource": {
+        "kind": "agent", "id": "wealth-holdings",
+        "attr": { "domain": "wealth-management", "audience": "segment", "access_mode": "read", "data_classification": "confidential-pii" }
+      },
+      "action": "invoke",
+      "expected": "ALLOW"
     }
   ]
 }
