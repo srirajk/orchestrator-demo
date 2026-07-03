@@ -10,6 +10,7 @@ import ai.conduit.chat.message.MessageService;
 import ai.conduit.chat.web.GatewayException;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -78,11 +79,21 @@ public class ChatController {
         List<ChatMessage> context = contextAssembler.assemble(conversation, userId);
 
         // 3. Open the gateway stream and fail fast on a non-2xx status (before streaming).
+        //    Because we detect this BEFORE writing any bytes, the response is not yet a committed
+        //    text/event-stream: we return a normal (empty-body) response carrying the gateway's
+        //    status so the client never sees a hung stream. A 401 (e.g. the signing key rotated
+        //    and the forwarded token no longer verifies) is surfaced as a real 401 so the SPA's
+        //    apiStream 401-handler redirects to /api/auth/login instead of hanging on an empty SSE.
         GatewayStream stream = gatewayClient.openChatStream(accessToken, id, context);
         if (!stream.successful()) {
             int status = stream.status();
             stream.close();
-            throw new GatewayException("Gateway returned " + status);
+            HttpStatus resolved = HttpStatus.resolve(status);
+            if (resolved == null) {
+                // Unknown/invalid status from the gateway → treat as a bad gateway (502).
+                throw new GatewayException("Gateway returned " + status);
+            }
+            return ResponseEntity.status(resolved).build();
         }
 
         // 4. Stream through to the client while accumulating + persisting the reply.
