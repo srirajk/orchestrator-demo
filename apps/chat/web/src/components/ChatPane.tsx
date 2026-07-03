@@ -25,6 +25,7 @@ export function ChatPane() {
   const [isStreaming, setIsStreaming] = useState(false)
   const [railCollapsed, setRailCollapsed] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
+  const preserveNextIdRef = useRef<string | null>(null)
 
   // Track the server message count at send time so we know when the server has confirmed
   // the exchange and local optimistic messages can be safely cleared.
@@ -41,16 +42,25 @@ export function ChatPane() {
 
   const createConversation = useCreateConversation()
 
-  // Reset local state and kill the active stream whenever the conversation changes or on unmount.
-  // Prevents cross-conversation bleed: optimistic messages / streaming content from conversation A
-  // must never appear in conversation B (Fix: bugs 1 + 2).
   useEffect(() => {
-    setLocalMessages([])
-    setStreamingContent(null)
-    setIsStreaming(false)
     return () => {
       abortRef.current?.abort()
     }
+  }, [])
+
+  // Reset local state and kill the active stream when the user switches conversations.
+  // The one exception is the internal /c/new -> /c/{createdId} transition during send:
+  // that route change belongs to the same in-flight turn, so preserving local state keeps
+  // the optimistic user bubble and assistant stream visible until the server copy arrives.
+  useEffect(() => {
+    if (id && preserveNextIdRef.current === id) {
+      preserveNextIdRef.current = null
+      return
+    }
+    abortRef.current?.abort()
+    setLocalMessages([])
+    setStreamingContent(null)
+    setIsStreaming(false)
   }, [id])
 
   // Once the server message count exceeds what it was at send time and we are no longer
@@ -83,6 +93,7 @@ export function ChatPane() {
             title: content.slice(0, 60),
           })
           convId = conv.id
+          preserveNextIdRef.current = conv.id
           navigate(`/c/${convId}`, { replace: true })
         } catch (err) {
           console.error('Failed to create conversation', err)

@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
-import { Copy, Check } from 'lucide-react'
+import { Copy, Check, LoaderCircle } from 'lucide-react'
 import clsx from 'clsx'
 import type { Message as MessageType } from '../api/types'
 
@@ -39,6 +39,7 @@ interface Props {
 
 export function Message({ message, isStreaming }: Props) {
   const isUser = message.role === 'user'
+  const showStreamingSpinner = isStreaming && message.content.length === 0
 
   const formattedTime = new Date(message.createdAt).toLocaleTimeString([], {
     hour: '2-digit',
@@ -69,6 +70,14 @@ export function Message({ message, isStreaming }: Props) {
         >
           {isUser ? (
             <p className="whitespace-pre-wrap">{message.content}</p>
+          ) : showStreamingSpinner ? (
+            <span
+              className="inline-flex h-5 min-w-5 items-center justify-center text-axiom-500"
+              role="status"
+              aria-label="Loading response"
+            >
+              <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
+            </span>
           ) : (
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
@@ -137,7 +146,7 @@ export function Message({ message, isStreaming }: Props) {
               {message.content}
             </ReactMarkdown>
           )}
-          {isStreaming && (
+          {isStreaming && !showStreamingSpinner && (
             <span className="inline-block w-1.5 h-4 ml-0.5 bg-axiom-500 rounded-sm animate-pulse align-middle" />
           )}
         </div>
