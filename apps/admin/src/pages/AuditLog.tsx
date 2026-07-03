@@ -273,7 +273,7 @@ export function AuditLog() {
             <option value="deploy">Deploy</option>
           </Select>
         </div>
-        <div className="flex gap-2 mt-4">
+        <div className="flex items-center justify-between mt-4">
           <Button
             size="sm"
             variant="secondary"
@@ -281,6 +281,7 @@ export function AuditLog() {
           >
             Clear filters
           </Button>
+          <p className="text-xs text-slate-400">Filters apply to the current page only — the backend does not support server-side filtering.</p>
         </div>
       </div>
 
