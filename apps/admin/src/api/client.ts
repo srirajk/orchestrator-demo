@@ -59,7 +59,12 @@ export interface User {
   email: string
   roles: string[]
   book: string[]
-  segments: string[]
+  /**
+   * ABAC per-segment clearance MAP: `{ segment -> data tier }` (AUTHZ-SPEC §1). Each key is a
+   * business segment the user belongs to; each value is the data-classification ceiling they
+   * hold in that segment. This is exactly the shape baked into the JWT `segments` claim.
+   */
+  segments: Record<string, string>
   clearance?: number
   classification: string
   team?: string
@@ -192,7 +197,7 @@ export const usersApi = {
   patchBook: (id: string, add: string[], remove: string[]) =>
     req<User>('PATCH', `/users/${id}/book`, { add, remove }),
   assignRole: (userId: string, roleId: string) =>
-    req<{ roles: string[] }>('POST', `/users/${userId}/roles`, { role_id: roleId }),
+    req<{ roles: string[] }>('POST', `/users/${userId}/roles`, { roleId }),
   removeRole: (userId: string, roleId: string) =>
     req<void>('DELETE', `/users/${userId}/roles/${roleId}`),
   getTeams: (userId: string) =>
