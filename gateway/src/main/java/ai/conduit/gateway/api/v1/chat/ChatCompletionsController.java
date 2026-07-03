@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import jakarta.annotation.PreDestroy;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
@@ -25,6 +26,8 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 @RestController
@@ -37,11 +40,23 @@ public class ChatCompletionsController {
     private final IdentityExtractor identityExtractor;
     private final ObjectMapper mapper;
 
+    // Application-scoped virtual-thread executor for offloading the chat pipeline.
+    // CLAUDE.md §3 mandates virtual threads ON — offloading via CompletableFuture without
+    // an explicit executor would run on ForkJoinPool.commonPool() (a small fixed pool of
+    // platform threads), starving under concurrent long-lived agent calls. Each pipeline
+    // run gets its own cheap virtual thread instead.
+    private final ExecutorService pipelineExecutor = Executors.newVirtualThreadPerTaskExecutor();
+
     public ChatCompletionsController(ChatService chatService, IdentityExtractor identityExtractor,
                                      ObjectMapper mapper) {
         this.chatService = chatService;
         this.identityExtractor = identityExtractor;
         this.mapper = mapper;
+    }
+
+    @PreDestroy
+    void shutdown() {
+        pipelineExecutor.shutdown();
     }
 
     @PostMapping(value = "/chat/completions")
@@ -79,10 +94,10 @@ public class ChatCompletionsController {
         SseEmitter emitter = new SseEmitter(120_000L);
         if (chatService.isTitleRequest(request)) {
             log.debug("Detected auto-title request — short-circuiting");
-            CompletableFuture.runAsync(() -> chatService.streamTitle(emitter));
+            CompletableFuture.runAsync(() -> chatService.streamTitle(emitter), pipelineExecutor);
         } else {
             CompletableFuture.runAsync(() ->
-                    chatService.handleChat(request, emitter, userId, principal, conversationId));
+                    chatService.handleChat(request, emitter, userId, principal, conversationId), pipelineExecutor);
         }
         return emitter;
     }
@@ -96,10 +111,10 @@ public class ChatCompletionsController {
                                                 Principal principal, String conversationId) {
         BufferingSseEmitter buf = new BufferingSseEmitter();
         if (chatService.isTitleRequest(request)) {
-            CompletableFuture.runAsync(() -> chatService.streamTitle(buf));
+            CompletableFuture.runAsync(() -> chatService.streamTitle(buf), pipelineExecutor);
         } else {
             CompletableFuture.runAsync(() ->
-                    chatService.handleChat(request, buf, userId, principal, conversationId));
+                    chatService.handleChat(request, buf, userId, principal, conversationId), pipelineExecutor);
         }
         boolean finished = buf.await(150_000L);
         if (!finished) log.warn("Non-streaming request did not complete within 150s — returning partial");

@@ -102,34 +102,50 @@ public class ContextAssembler {
         }
 
         int budget = context.maxTokens();
-        int used = 0;
 
-        // Decide the leading summary system message (if the transcript is large enough).
-        ChatMessage summaryMessage = null;
+        // --- GENERATION trigger (independent of attachment) ---
+        // Once the transcript is large enough, (re)generate the facts-free rolling summary if we
+        // have none yet, OR if the transcript has grown materially past the watermark captured at
+        // the last generation. Fire-and-forget: never blocks this turn.
+        String summary = conversation.getSummary();
+        boolean haveSummary = summary != null && !summary.isBlank();
         if (transcriptTokens > context.summaryTriggerTokens()) {
-            String summary = conversation.getSummary();
-            if (summary != null && !summary.isBlank()) {
-                summaryMessage = new ChatMessage("system", SUMMARY_PREFIX + summary);
-                used += tokenCounter.count(summaryMessage.content());
-            } else {
-                // No summary yet — kick off regeneration for a future turn (never blocks this one).
+            boolean stale = transcript.size()
+                    >= conversation.getSummaryWatermark() + context.summaryRefreshMessages();
+            if (!haveSummary || stale) {
                 summaryService.requestRegeneration(conversation, userId);
             }
         }
 
-        // Fill the window newest-first until the next message would exceed the budget.
-        // The most-recent message (the latest user message) is always included.
-        List<ChatMessage> window = new ArrayList<>();
-        for (int i = transcript.size() - 1; i >= 0; i--) {
-            Message m = transcript.get(i);
-            int cost = tokenCounter.count(m.getContent());
-            if (!window.isEmpty() && used + cost > budget) {
-                break;
-            }
-            window.add(new ChatMessage(m.getRole(), m.getContent()));
-            used += cost;
+        // The summary is only worth attaching if the transcript is large enough AND we actually
+        // have one. Whether it gets attached is decided below, gated on real trimming.
+        ChatMessage candidateSummary =
+                (haveSummary && transcriptTokens > context.summaryTriggerTokens())
+                        ? new ChatMessage("system", SUMMARY_PREFIX + summary)
+                        : null;
+
+        // First pass: fill newest-first WITHOUT reserving summary space, to learn whether the
+        // full transcript fits in the window. The most-recent message is always included.
+        FillResult full = fill(transcript, budget, 0);
+        boolean trimmed = full.window().size() < transcript.size();
+
+        // --- ATTACHMENT: attach the summary ONLY when messages were actually dropped ---
+        // For transcripts that fit entirely in the window, the summary is pure overhead (context
+        // would exceed the full transcript for no gain), so we skip it. When we do attach, reserve
+        // its tokens and re-fill so the summary is counted against the budget.
+        ChatMessage summaryMessage = null;
+        List<ChatMessage> window;
+        int used;
+        if (trimmed && candidateSummary != null) {
+            summaryMessage = candidateSummary;
+            int summaryCost = tokenCounter.count(summaryMessage.content());
+            FillResult withSummary = fill(transcript, budget, summaryCost);
+            window = withSummary.window();
+            used = summaryCost + withSummary.windowTokens();
+        } else {
+            window = full.window();
+            used = full.windowTokens();
         }
-        Collections.reverse(window); // back to chronological order
 
         List<ChatMessage> assembled = new ArrayList<>(window.size() + 1);
         if (summaryMessage != null) {
@@ -167,5 +183,31 @@ public class ContextAssembler {
                     assembled.size(), summaryMessage != null, window.size(), sb);
         }
         return assembled;
+    }
+
+    /**
+     * Fills the recent window newest-first (then reverses to chronological order), stopping before
+     * the first message whose token cost would push {@code reserved + windowTokens} over
+     * {@code budget}. The most-recent message is always included even if it alone exceeds the
+     * budget. {@code reserved} models tokens already spoken for (e.g. a leading summary message).
+     */
+    private FillResult fill(List<Message> transcript, int budget, int reserved) {
+        List<ChatMessage> window = new ArrayList<>();
+        int windowTokens = 0;
+        for (int i = transcript.size() - 1; i >= 0; i--) {
+            Message m = transcript.get(i);
+            int cost = tokenCounter.count(m.getContent());
+            if (!window.isEmpty() && reserved + windowTokens + cost > budget) {
+                break;
+            }
+            window.add(new ChatMessage(m.getRole(), m.getContent()));
+            windowTokens += cost;
+        }
+        Collections.reverse(window); // back to chronological order
+        return new FillResult(window, windowTokens);
+    }
+
+    /** Result of a window fill: the chronological window and the tokens its messages consume. */
+    private record FillResult(List<ChatMessage> window, int windowTokens) {
     }
 }
