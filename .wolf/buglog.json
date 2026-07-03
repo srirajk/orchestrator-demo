@@ -3737,5 +3737,29 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-07-03"
+  },
+  {
+    "id": "bug-013",
+    "timestamp": "2026-07-03T11:45:00.000Z",
+    "error_message": "Users screen role assignment silently failed / default chat_user role not applied on create (POST /users/{id}/roles -> 400)",
+    "file": "apps/admin/src/api/client.ts",
+    "root_cause": "client.ts usersApi.assignRole sent {role_id} but AssignRoleRequest DTO expects {roleId}; iam has NO global snake_case Jackson strategy (responses are camelCase e.g. isActive/adminDomains), so role_id never bound and validation returned 400.",
+    "fix": "Changed the POST body to { roleId }. Verified 200 + role now present in UserResponse and in the minted token's roles claim.",
+    "tags": ["iam", "admin-console", "role-assignment", "jackson", "400", "camelCase"],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-03"
+  },
+  {
+    "id": "bug-014",
+    "timestamp": "2026-07-03T11:20:00.000Z",
+    "error_message": "GET /users/{id} returned segments: [] for personas after ABAC V5 migration (edit mode could not repopulate rows)",
+    "file": "iam-service/src/main/java/com/openwolf/iam/service/UserService.java",
+    "root_cause": "toUserResponse read the segments attribute via getStringList (List<String>), but V5 stored segments as a per-segment MAP {segment->tier}; a JSON object is not a List so it yielded empty.",
+    "fix": "UserResponse.segments -> Map<String,String>; added getSegmentMap() (map preferred, legacy list tolerated by mapping each segment to the flat classification tier). Update path now merges attributes so identity metadata (display_name/title/department) is not wiped.",
+    "tags": ["iam", "abac", "segments-map", "UserResponse", "jsonb"],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-03"
   }
 ]

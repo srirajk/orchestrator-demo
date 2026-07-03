@@ -1519,3 +1519,13 @@
 - PART 2 GUARDRAILS: injection in agent DATA ignored (no "HACKED"); no computed/invented totals; rm_jane->Okafor "Access denied" no PII; segment/classification denies clean; grounded allows (Whitman, market_research, HR enterprise for all personas); unresolved ref -> clarify, no fabricated ID. Synthesis prompt already hardened (INSTRUCTION HIERARCHY) — no change needed.
 - PART 3 EVAL: +5 ABAC golden cases (5/5 pass live Cerbos). Fixed eval_deepeval.py auth (mint tokens via /auth/login) — gate was 401ing after X-User-Id removal. DeepEval gate PASS 94.1% F1. Langfuse datasets seeded (connectivity ok); conduit-eval-continuous posting scores. Commit 25eec97.
 - WORLD-B: CRITICAL 0 before and after (gateway untouched).
+
+## Validation wave — Conduit final e2e + observability + golden cleanup (feat/conduit-chat)
+- e2e ABAC matrix 12/12 green through gateway chat path (scripts/e2e-matrix.sh added). smoke-ui 16/0, world-b CRITICAL 0.
+- Glass-box gate labels via gateway SSE /trace/stream: coverage (not-in-book), structural/classification (no-covered-agents), segment.
+- Observability: 7 Grafana dashboards — Gateway/Live Demo(22)/Business(13)/gateway-perf all populate at runtime; agent-health populates with $agentId=$__all (error panels empty = zero failures). Only genuine gap: Resource Usage CPU/Mem — cadvisor emits only `id` (cgroup) label, no `name` on Docker Desktop/macOS (platform limitation, works on Linux).
+- Prometheus: intent, http server/client histograms, authz(332), request_outcome, resilience4j_circuitbreaker all have samples. resilience4j_timelimiter binder NOT registered (timeout surfaced via conduit_agent_calls_total{status=TIMEOUT} + conduit_bulkhead_*).
+- Tempo: full chat.handle span tree with new agents as spans (acme.wealth.market_research, acme.hr.policy_qa); gate CHECK = 3x http post cerbos:3592/api/check/resources spans. Langfuse: 50 traces + 30 scores (grounding/relevance/safety/partial_honesty) flowing.
+- Cleanup: migrated 7 stale cerbos golden cases (AGT-001/003/005/008 agent → per-segment map+access_mode; REL-002/006 + SEC-005 book → structural ALLOW, coverage-delegated). Cerbos golden 40/40. Cerbos HTTP port = 3594.
+
+| 11:50 | Step 10: per-segment "Segments & clearance" row editor on Users screen + iam wiring (UserResponse map, merge-on-update, V6 classification ladder incl confidential-pii, segments+insurance) | apps/admin/src/pages/Users.tsx, api/client.ts, hooks/useAuth.tsx, iam-service dto/UserResponse.java, service/UserService.java, controller/PolicyController.java, resources/db/migration/V6__abac_classification_ladder.sql | rm_test created w/ {wealth:confidential-pii,servicing:confidential}; token segments claim exact; 4 personas unchanged; admin tsc+vite green; world-b CRITICAL 0 | ~48k |

@@ -298,7 +298,7 @@
 - `Policies.tsx` — RESOURCES (~3774 tok)
 - `Roles.tsx` — EMPTY — renders table, modal (~3469 tok)
 - `Teams.tsx` — EMPTY — renders modal (~3886 tok)
-- `Users.tsx` — EMPTY — renders table, modal (~5104 tok)
+- `Users.tsx` — Users screen; per-segment "Segments & clearance" row editor (segment+tier rows, dup/required validation, live segments+classification-schema options), table shows per-segment chips, default chat_user role (~7200 tok)
 - `Workbench.tsx` — Tiny route wrapper around features/workbench/WorkbenchPage (~30 tok)
 
 ## docs/
@@ -851,6 +851,9 @@
 - `V1__init.sql` — ============================================================ (~2518 tok)
 - `V2__seed_demo_data.sql` — ============================================================================ (~4218 tok)
 - `V3__seed_e2e_users.sql` — ============================================================================ (~458 tok)
+- `V4__reconcile_personas.sql` — reconciles personas (rm_guest, uw_sam insurance) (~500 tok)
+- `V5__abac_segments_map_and_chat_user.sql` — flat segments array -> per-segment MAP; drop clearance; chat_user role; analyst_amy (~900 tok)
+- `V6__abac_classification_ladder.sql` — tenant classification_schema -> ABAC ladder internal<confidential<confidential-pii (drops phantom restricted/public); live source for Users tier dropdown (~180 tok)
 
 ## iam-service/src/main/resources/static/css/
 
