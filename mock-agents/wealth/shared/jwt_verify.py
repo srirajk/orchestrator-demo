@@ -26,8 +26,22 @@ _jwks_cache: dict = {}
 _CACHE_TTL = 300  # 5 minutes
 
 
+class JWKSUnreachable(Exception):
+    """Raised when the JWKS endpoint could not be fetched (network/HTTP error).
+
+    Distinct from 'JWKS fetched successfully but the requested kid is absent':
+    the former is an infrastructure fault (dev fallback may apply), the latter is a
+    token signed by an unknown/untrusted key and MUST be rejected (fail closed).
+    """
+
+
 def _fetch_public_key(kid: str):
-    """Fetch and cache the RSA public key for the given kid from JWKS."""
+    """Return the RSA public key for the given kid from JWKS.
+
+    Returns the key on success, or None if the JWKS was fetched but does not
+    contain this kid (unknown key → caller must reject).
+    Raises JWKSUnreachable if the JWKS endpoint itself could not be reached.
+    """
     now = time.monotonic()
     if _jwks_cache.get("_fetched_at", 0) + _CACHE_TTL > now and kid in _jwks_cache:
         return _jwks_cache[kid]
@@ -38,7 +52,7 @@ def _fetch_public_key(kid: str):
         jwks = resp.json()
     except Exception as exc:
         log.warning("Failed to fetch JWKS from %s: %s", JWKS_URL, exc)
-        return None
+        raise JWKSUnreachable(str(exc)) from exc
 
     _jwks_cache.clear()
     _jwks_cache["_fetched_at"] = now
@@ -47,6 +61,8 @@ def _fetch_public_key(kid: str):
         if k:
             _jwks_cache[k] = RSAAlgorithm.from_jwk(key)
 
+    # JWKS fetched OK. If the kid is present, return it; otherwise None signals
+    # "known-good JWKS, unknown kid" → the caller fails closed.
     return _jwks_cache.get(kid)
 
 
@@ -86,10 +102,20 @@ def verify_bearer_token(authorization: str | None) -> tuple[bool, str | None, di
     if alg.lower() == "none" or not alg.startswith("RS"):
         return False, f"Algorithm '{alg}' not permitted — RS256 required", None
 
-    public_key = _fetch_public_key(kid)
+    try:
+        public_key = _fetch_public_key(kid)
+    except JWKSUnreachable:
+        # Infrastructure fault: JWKS endpoint unreachable. Dev fallback — allow so the
+        # local stack keeps working when iam-service is down. (The gateway is still the
+        # real trust boundary; this hop is defence-in-depth.)
+        log.warning("JWKS unreachable — allowing kid=%s (dev fallback)", kid)
+        return True, None, None
+
     if public_key is None:
-        log.warning("No public key found for kid=%s — allowing (JWKS unavailable)", kid)
-        return True, None, None  # Fail open when JWKS unreachable (dev fallback)
+        # JWKS fetched successfully but has no key for this kid → the token was signed
+        # by an unknown/untrusted key. Fail CLOSED (reject), never fall through to allow.
+        log.warning("Unknown kid=%s — JWKS reachable but key absent; rejecting", kid)
+        return False, f"Unknown signing key (kid={kid})", None
 
     try:
         claims = pyjwt.decode(
