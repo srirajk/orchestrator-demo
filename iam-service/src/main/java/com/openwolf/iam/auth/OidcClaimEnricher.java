@@ -80,7 +80,8 @@ public class OidcClaimEnricher {
 
         Map<String, Object> attrs = parseAttributes(principal.getAttributes());
         List<String> adminDomains = getStringList(attrs, "admin_domains");
-        String classification = (String) attrs.getOrDefault("classification", "internal");
+        Object classificationRaw = attrs.get("classification");
+        String classification = (classificationRaw instanceof String s && !s.isBlank()) ? s : "internal";
         // segments is now a per-segment classification MAP {segment -> tier}. The numeric
         // `clearance` claim is dropped entirely — the per-segment tier is the ceiling.
         Map<String, String> segments = getSegmentMap(attrs, classification);
