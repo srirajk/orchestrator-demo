@@ -726,14 +726,14 @@ export function Users() {
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1">
                   {roles
-                    .filter((r) => !detailUser.roles.includes(r.id))
+                    .filter((r) => !detailUser.roles.includes(r.name))
                     .map((r) => (
                       <button
                         key={r.id}
                         onClick={() => assignRoleMut.mutate({ userId: detailUser.id, roleId: r.id })}
                         className="text-xs px-2 py-1 border border-dashed border-slate-300 rounded text-slate-500 hover:border-axiom-400 hover:text-axiom-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-300"
                       >
-                        + {r.id}
+                        + {r.name}
                       </button>
                     ))}
                 </div>
