@@ -345,6 +345,8 @@ public class ChatService {
             // If found, run DISCOVER/RESOLVE/CHECK before synthesis so we never
             // waste agent calls on a relationship the RM doesn't cover.
             AgentManifest resourceScopedAgent = finalManifests.stream()
+                // Enterprise/knowledge agents carry no per-user entity — skip the coverage gate.
+                .filter(entitlementService::requiresCoverage)
                 .filter(m -> {
                     EffectiveManifest em = manifestStore.getEffective(
                         m.agentId(), m.domain(), m.subDomain());

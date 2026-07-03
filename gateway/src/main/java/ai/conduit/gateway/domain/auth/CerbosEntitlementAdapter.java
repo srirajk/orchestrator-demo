@@ -100,7 +100,8 @@ public class CerbosEntitlementAdapter {
      * <p>Each agent is presented as a resource with attributes:
      * <ul>
      *   <li>{@code domain} — the agent's business domain (e.g. "wealth-management")</li>
-     *   <li>{@code is_mutating} — whether the agent writes data</li>
+     *   <li>{@code audience} — "segment" | "enterprise"</li>
+     *   <li>{@code access_mode} — "read" | "write"</li>
      *   <li>{@code data_classification} — e.g. "confidential-pii", "confidential"</li>
      * </ul>
      *
@@ -162,7 +163,7 @@ public class CerbosEntitlementAdapter {
         return mapper.writeValueAsString(root);
     }
 
-    /** Agent-specific builder — sends domain, is_mutating, data_classification per agent. */
+    /** Agent-specific builder — sends domain, audience, access_mode, data_classification per agent. */
     private String buildAgentRequest(Principal principal, List<AgentManifest> manifests) throws Exception {
         ObjectNode root = mapper.createObjectNode();
         addPrincipal(root, principal);
@@ -177,7 +178,9 @@ public class CerbosEntitlementAdapter {
             resource.put("id",            m.agentId());
             ObjectNode attr = resource.putObject("attr");
             attr.put("domain",              m.domain() != null ? m.domain() : "");
-            attr.put("is_mutating",         m.constraints() != null && m.constraints().isMutating());
+            attr.put("audience",            m.audience() != null ? m.audience() : "segment");
+            attr.put("access_mode",         m.constraints() != null && m.constraints().accessMode() != null
+                    ? m.constraints().accessMode() : "read");
             attr.put("data_classification", m.constraints() != null
                     ? m.constraints().dataClassification() : "confidential");
         }
@@ -197,10 +200,9 @@ public class CerbosEntitlementAdapter {
 
         // Structural attributes only — no book claim.
         // Book-of-business is enforced by the domain coverage service (DISCOVER/CHECK), not Cerbos.
-        attr.put("clearance", principal.clearance());
-
-        ArrayNode segments = attr.putArray("segments");
-        principal.segments().forEach(segments::add);
+        // segments is a per-segment classification map: segment -> tier held in that segment.
+        ObjectNode segments = attr.putObject("segments");
+        principal.segments().forEach(segments::put);
 
         ArrayNode domains = attr.putArray("domains");
         principal.domains().forEach(domains::add);

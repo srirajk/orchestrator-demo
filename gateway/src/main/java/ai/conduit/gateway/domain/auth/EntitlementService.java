@@ -129,6 +129,19 @@ public class EntitlementService {
         return allowed;
     }
 
+    /**
+     * Whether an agent is entity-scoped and therefore subject to the coverage (book-of-business)
+     * gate. Only {@code segment}-audience agents carry an entity; {@code enterprise} agents are
+     * open knowledge services (e.g. HR policy Q&A) with no per-user entity to check, so the
+     * DISCOVER/RESOLVE/CHECK coverage pipeline is skipped for them.
+     *
+     * <p>Audience is manifest-declared — no domain knowledge in the gateway (World B).
+     */
+    public boolean requiresCoverage(AgentManifest manifest) {
+        if (manifest == null) return true;
+        return !"enterprise".equals(manifest.audience());
+    }
+
     /** Immutable result of an entitlement check — published as a trace event. */
     public record EntitlementResult(
             boolean allowed,

@@ -228,11 +228,10 @@ public class SecurityConfig {
 
         copyListClaim(claims, claimsMap, "roles");
         copyListClaim(claims, claimsMap, "book");
-        copyListClaim(claims, claimsMap, "segments");
+        // segments is a per-segment classification map (object), not a list — copy verbatim.
+        copyObjectClaim(claims, claimsMap, "segments");
         copyListClaim(claims, claimsMap, "domains");
         copyListClaim(claims, claimsMap, "admin_domains");
-        Object clearance = claims.getClaim("clearance");
-        if (clearance != null) claimsMap.put("clearance", clearance);
         Object name = claims.getClaim("name");
         if (name != null) claimsMap.put("name", name);
 
@@ -246,6 +245,12 @@ public class SecurityConfig {
     private void copyListClaim(JWTClaimsSet claims, Map<String, Object> out, String key) {
         Object v = claims.getClaim(key);
         if (v instanceof List<?> list) out.put(key, new ArrayList<>((List<String>) list));
+    }
+
+    /** Copies an object/map claim (e.g. the per-segment classification map) verbatim. */
+    private void copyObjectClaim(JWTClaimsSet claims, Map<String, Object> out, String key) {
+        Object v = claims.getClaim(key);
+        if (v instanceof Map<?, ?> map) out.put(key, new HashMap<>(map));
     }
 
     /**
