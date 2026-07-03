@@ -78,6 +78,13 @@ conduit:
       base-url: ${CONDUIT_LLM_INTENT_CLASSIFIER_BASE_URL:https://api.z.ai/api/paas/v4}
       api-key: ${CONDUIT_LLM_INTENT_CLASSIFIER_API_KEY:${ZAI_API_KEY:}}
       model: ${CONDUIT_LLM_INTENT_CLASSIFIER_MODEL:glm-4.5-flash}
+      # Intent classification runs synchronously before the first SSE byte, so it gets its own
+      # bounded latency budget (~20s worst case) — independent of the (streamed) synthesizer's
+      # conduit.llm.* budget, which could otherwise burn ~81s (3 retries × 25s + backoff).
+      max-retries: ${CONDUIT_LLM_INTENT_CLASSIFIER_MAX_RETRIES:2}
+      retry-initial-delay-ms: ${CONDUIT_LLM_INTENT_CLASSIFIER_RETRY_INITIAL_DELAY_MS:200}
+      retry-backoff-multiplier: ${CONDUIT_LLM_INTENT_CLASSIFIER_RETRY_BACKOFF_MULTIPLIER:2}
+      request-timeout-seconds: ${CONDUIT_LLM_INTENT_CLASSIFIER_REQUEST_TIMEOUT_SECONDS:10}
     # ── Entity Extractor (pull relationship/fund/ticker from user prompt) ─────
     entity-extractor:
       base-url: ${CONDUIT_LLM_ENTITY_EXTRACTOR_BASE_URL:https://api.z.ai/api/paas/v4}

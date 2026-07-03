@@ -169,10 +169,15 @@ public class IntentClassifier {
             @Value("${conduit.llm.intent-classifier.api-key:}") String apiKey,
             @Value("${conduit.llm.intent-classifier.model:glm-4.5-flash}") String model,
             @Value("${conduit.assistant.domain-context:an enterprise data assistant for relationship managers}") String domainContext,
-            @Value("${conduit.llm.max-retries:3}") int maxRetries,
-            @Value("${conduit.llm.retry-initial-delay-ms:2000}") int retryInitialDelayMs,
-            @Value("${conduit.llm.retry-backoff-multiplier:2}") int retryBackoffMultiplier,
-            @Value("${conduit.llm.request-timeout-seconds:25}") int requestTimeoutSeconds) {
+            // Intent classification runs SYNCHRONOUSLY before any SSE byte, so it gets its OWN
+            // budget, independent of the conduit.llm.* budget used by the (slower, streamed)
+            // synthesizer. The shared 3-retry × 25s + backoff budget could burn ~81s here; this
+            // bounds the worst case to ~20s (10s × 1 retry) while leaving enough headroom that a
+            // healthy ~2-4s call never falls back to the entity-less FETCH_DATA default.
+            @Value("${conduit.llm.intent-classifier.max-retries:2}") int maxRetries,
+            @Value("${conduit.llm.intent-classifier.retry-initial-delay-ms:200}") int retryInitialDelayMs,
+            @Value("${conduit.llm.intent-classifier.retry-backoff-multiplier:2}") int retryBackoffMultiplier,
+            @Value("${conduit.llm.intent-classifier.request-timeout-seconds:10}") int requestTimeoutSeconds) {
         this.mapper = mapper;
         this.manifestStore = manifestStore;
         this.domainContext = domainContext;
@@ -332,7 +337,10 @@ public class IntentClassifier {
                     if (arr.isArray()) {
                         for (JsonNode t : arr) {
                             String val = t.asText(null);
-                            if (val != null && !val.isBlank()) vals.add(val.toUpperCase());
+                            // Copy verbatim — do NOT uppercase. Scalars are already kept verbatim;
+                            // force-uppercasing list values corrupts case-sensitive references
+                            // (e.g. tickers/IDs) and contradicts the "copy verbatim" contract.
+                            if (val != null && !val.isBlank()) vals.add(val);
                         }
                     }
                     lists.put(field, vals);
