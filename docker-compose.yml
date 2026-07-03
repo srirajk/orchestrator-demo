@@ -63,6 +63,7 @@ services:
     container_name: conduit-prometheus
     volumes:
       - ./infra/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/alerting-rules.yml:/etc/prometheus/alerting-rules.yml:ro
     ports:
       - "9090:9090"
     restart: unless-stopped
