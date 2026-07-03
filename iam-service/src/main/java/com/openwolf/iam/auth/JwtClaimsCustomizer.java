@@ -15,7 +15,8 @@ import java.util.List;
 
 /**
  * Enriches OIDC access tokens with mandated claims ({@code tenant_id}, {@code roles},
- * {@code permissions}, {@code segments}, {@code classification}).
+ * {@code permissions}, {@code segments} — a per-segment classification MAP —,
+ * {@code classification}). The legacy numeric {@code clearance} claim is no longer emitted.
  *
  * <p>The actual claim-building lives in {@link OidcClaimEnricher}, a separate
  * {@code @Transactional} bean — this customizer runs as a lambda during token encoding with

@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -78,15 +79,15 @@ public class OidcClaimEnricher {
         Collections.sort(permissions);
 
         Map<String, Object> attrs = parseAttributes(principal.getAttributes());
-        List<String> segments = getStringList(attrs, "segments");
         List<String> adminDomains = getStringList(attrs, "admin_domains");
         String classification = (String) attrs.getOrDefault("classification", "internal");
-        int clearance = getInt(attrs, "clearance", 2);
+        // segments is now a per-segment classification MAP {segment -> tier}. The numeric
+        // `clearance` claim is dropped entirely — the per-segment tier is the ceiling.
+        Map<String, String> segments = getSegmentMap(attrs, classification);
 
         claims.put("roles", roles);
         claims.put("segments", segments);
         claims.put("admin_domains", adminDomains);
-        claims.put("clearance", clearance);
         claims.put("classification", classification);
         claims.put("tenant_id", principal.getTenantId());
         claims.put("permissions", permissions);
@@ -158,18 +159,28 @@ public class OidcClaimEnricher {
         return Collections.emptyList();
     }
 
-    private int getInt(Map<String, Object> attrs, String key, int defaultValue) {
-        Object val = attrs.get(key);
-        if (val instanceof Number n) {
-            return n.intValue();
-        }
-        if (val instanceof String s && !s.isBlank()) {
-            try {
-                return Integer.parseInt(s);
-            } catch (NumberFormatException ignored) {
-                return defaultValue;
+    /**
+     * Builds the per-segment classification map claim {@code {segment -> tier}}.
+     *
+     * <p>Preferred source: the {@code segments} attribute stored as a JSON object (the new
+     * shape). Legacy tolerance: if {@code segments} is still a JSON array (old flat list),
+     * each segment is mapped to the principal's global {@code classification} tier — this
+     * auto-migrates un-reseeded principals to an equivalent per-segment ceiling instead of
+     * losing their access, without inventing tiers.
+     */
+    private Map<String, String> getSegmentMap(Map<String, Object> attrs, String fallbackTier) {
+        Object raw = attrs.get("segments");
+        Map<String, String> out = new LinkedHashMap<>();
+        if (raw instanceof Map<?, ?> m) {
+            m.forEach((k, v) -> {
+                if (k != null && v != null) out.put(k.toString(), v.toString());
+            });
+        } else if (raw instanceof List<?> list) {
+            String tier = (fallbackTier == null || fallbackTier.isBlank()) ? "internal" : fallbackTier;
+            for (Object s : list) {
+                if (s != null) out.put(s.toString(), tier);
             }
         }
-        return defaultValue;
+        return out;
     }
 }
