@@ -7,6 +7,9 @@ import ai.conduit.chat.message.Message;
 import ai.conduit.chat.message.MessageService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -69,11 +72,18 @@ public class LlmSummaryService implements SummaryService {
     /** Prevents stacking multiple concurrent regenerations for the same conversation. */
     private final Set<String> inFlight = ConcurrentHashMap.newKeySet();
 
+    // --- Metrics ---
+    /** Latency of the LLM summarisation call (fire-and-forget background, but still timed). */
+    private final Timer summaryTimer;
+    /** Count of failed summarisation attempts (LLM non-2xx or exception). */
+    private final Counter summaryErrors;
+
     public LlmSummaryService(AppProperties appProperties,
                              ExecutorService backgroundExecutor,
                              MessageService messageService,
                              ConversationRepository conversationRepository,
-                             ObjectMapper objectMapper) {
+                             ObjectMapper objectMapper,
+                             MeterRegistry meterRegistry) {
         this.config = appProperties.summary();
         this.backgroundExecutor = backgroundExecutor;
         this.messageService = messageService;
@@ -82,6 +92,14 @@ public class LlmSummaryService implements SummaryService {
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(5))
                 .build();
+
+        this.summaryTimer = Timer.builder("chat_summary_generation_seconds")
+                .description("Latency of the LLM facts-free rolling summary call.")
+                .publishPercentiles(0.5, 0.9, 0.95, 0.99)
+                .register(meterRegistry);
+        this.summaryErrors = Counter.builder("chat_summary_generation_errors_total")
+                .description("Number of failed LLM summary generation attempts (non-2xx or exception).")
+                .register(meterRegistry);
     }
 
     @Override
@@ -112,8 +130,17 @@ public class LlmSummaryService implements SummaryService {
             return;
         }
         String rendered = renderTranscript(transcript);
-        String summary = callLlm(rendered);
+        // Time the LLM call and count failures. Fire-and-forget: errors are caught by the caller.
+        String summary;
+        try {
+            summary = summaryTimer.recordCallable(() -> callLlm(rendered));
+        } catch (Exception ex) {
+            summaryErrors.increment();
+            throw ex;
+        }
         if (summary == null || summary.isBlank()) {
+            // callLlm returned null (non-2xx or empty body) — count as an error.
+            summaryErrors.increment();
             return; // safe fallback: leave existing summary untouched
         }
         // Re-load under ownership to avoid clobbering a concurrently-updated document.

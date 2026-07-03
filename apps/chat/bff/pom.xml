@@ -67,6 +67,12 @@
             <version>${jtokkit.version}</version>
         </dependency>
 
+        <!-- Prometheus metrics export via /actuator/prometheus -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
         <!-- Config metadata for @ConfigurationProperties -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

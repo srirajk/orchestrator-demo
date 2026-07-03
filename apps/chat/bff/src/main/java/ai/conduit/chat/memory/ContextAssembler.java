@@ -4,6 +4,9 @@ import ai.conduit.chat.config.AppProperties;
 import ai.conduit.chat.conversation.Conversation;
 import ai.conduit.chat.message.Message;
 import ai.conduit.chat.message.MessageService;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -39,14 +42,49 @@ public class ContextAssembler {
     private final TokenCounter tokenCounter;
     private final AppProperties.Context context;
 
+    // --- Metrics ---
+    /** Summary attached (true) / not attached (false) per turn. Guardrail: if true == 0, compaction is silent-broken. */
+    private final Counter summaryAttachedTrue;
+    private final Counter summaryAttachedFalse;
+    /** Distribution of context window size (messages) sent to the gateway per turn. */
+    private final DistributionSummary contextMessages;
+    /** Token distributions: assembled context vs full untrimmed transcript (tokens saved = full - context). */
+    private final DistributionSummary contextTokens;
+    private final DistributionSummary fullTokens;
+
     public ContextAssembler(MessageService messageService,
                             SummaryService summaryService,
                             TokenCounter tokenCounter,
-                            AppProperties appProperties) {
+                            AppProperties appProperties,
+                            MeterRegistry meterRegistry) {
         this.messageService = messageService;
         this.summaryService = summaryService;
         this.tokenCounter = tokenCounter;
         this.context = appProperties.context();
+
+        this.summaryAttachedTrue = Counter.builder("chat_compaction_summary_attached_total")
+                .description("Turns where the rolling summary was attached to context. " +
+                        "If attached=true stays 0, compaction is silently broken.")
+                .tag("attached", "true")
+                .register(meterRegistry);
+        this.summaryAttachedFalse = Counter.builder("chat_compaction_summary_attached_total")
+                .description("Turns where no rolling summary was attached to context.")
+                .tag("attached", "false")
+                .register(meterRegistry);
+        this.contextMessages = DistributionSummary.builder("chat_compaction_context_messages")
+                .description("Number of messages in the assembled context per turn.")
+                .baseUnit("messages")
+                .register(meterRegistry);
+        this.contextTokens = DistributionSummary.builder("chat_compaction_tokens")
+                .description("Estimated tokens in the assembled context window sent to the gateway.")
+                .tag("kind", "context")
+                .baseUnit("tokens")
+                .register(meterRegistry);
+        this.fullTokens = DistributionSummary.builder("chat_compaction_tokens")
+                .description("Estimated tokens in the full untruncated transcript (before compaction).")
+                .tag("kind", "full")
+                .baseUnit("tokens")
+                .register(meterRegistry);
     }
 
     /**
@@ -98,6 +136,17 @@ public class ContextAssembler {
             assembled.add(summaryMessage);
         }
         assembled.addAll(window);
+
+        // --- Metrics ---
+        // Guardrail: summary_attached{attached="true"} staying at 0 is the canary for silent compaction breakage.
+        if (summaryMessage != null) {
+            summaryAttachedTrue.increment();
+        } else {
+            summaryAttachedFalse.increment();
+        }
+        contextMessages.record(assembled.size());
+        contextTokens.record(used);
+        fullTokens.record(transcriptTokens);
 
         // Observability: show exactly what compacted context leaves the BFF for this turn —
         // the leading facts-free summary (if any) + the recent window, trimmed to the token
