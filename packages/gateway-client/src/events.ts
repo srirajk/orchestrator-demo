@@ -8,6 +8,7 @@ import { formatDuration, getNumber, getString } from './format'
  */
 
 export function eventTone(type: string): EventTone {
+  if (type === 'gate') return 'indigo'
   if (type.includes('complete')) return 'green'
   if (type.includes('entitlement')) return 'indigo'
   if (type.includes('agent')) return 'blue'
@@ -29,6 +30,8 @@ export function eventTitle(event: TraceEvent): string {
       const filtered = Array.isArray(data.filtered) ? data.filtered.length : 0
       return `${selected} agent${selected === 1 ? '' : 's'} selected, ${filtered} filtered`
     }
+    case 'gate':
+      return `${getString(data.gate, 'gate')} ${data.effect === 'deny' ? 'denied' : 'allowed'}`
     case 'entitlement_check':
       return `${data.allowed ? 'Access allowed' : 'Access denied'} for ${getString(data.relationshipId, 'resource')}`
     case 'agent_start':
@@ -53,6 +56,8 @@ export function eventDetail(event: TraceEvent): string {
       const confidence = getNumber(data.confidence)
       return confidence === null ? getString(data.reasoning, '') : `${Math.round(confidence * 100)}% confidence`
     }
+    case 'gate':
+      return getString(data.reason, '')
     case 'entitlement_check':
       return getString(data.reason, getString(data.source, 'policy check'))
     case 'agent_complete':

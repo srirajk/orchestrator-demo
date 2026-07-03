@@ -52,6 +52,10 @@ export interface TraceFilteredRef {
   reason?: string
 }
 
+/** A single authorization gate's verdict (trace event type `gate`). */
+export type GateName = 'audience' | 'segment' | 'classification' | 'coverage'
+export type GateEffect = 'allow' | 'deny'
+
 export interface TraceEventData extends Record<string, unknown> {
   userId?: string
   prompt?: string
@@ -72,6 +76,10 @@ export interface TraceEventData extends Record<string, unknown> {
   agentCount?: number
   successCount?: number
   totalMs?: number
+  // `gate` frame fields — one authorization gate's structured pass/deny + reason.
+  gate?: GateName
+  effect?: GateEffect
+  agent?: string
 }
 
 export interface TraceEvent {
