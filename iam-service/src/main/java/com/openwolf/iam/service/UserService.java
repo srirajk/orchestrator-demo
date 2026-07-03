@@ -31,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -126,7 +127,7 @@ public class UserService {
 
         if (req.email() != null) p.setEmail(req.email());
         if (req.isActive() != null) p.setActive(req.isActive());
-        if (req.attributes() != null) p.setAttributes(serializeAttributes(req.attributes()));
+        if (req.attributes() != null) p.setAttributes(mergeAttributes(p.getAttributes(), req.attributes()));
 
         principalRepository.save(p);
         UserResponse after = toUserResponse(p);
@@ -329,8 +330,8 @@ public class UserService {
                 .toList();
 
         Map<String, Object> attrs = parseAttributes(p.getAttributes());
-        List<String> segments = getStringList(attrs, "segments");
         String classification = (String) attrs.getOrDefault("classification", "internal");
+        Map<String, String> segments = getSegmentMap(attrs, classification);
         List<String> adminDomains = getStringList(attrs, "admin_domains");
 
         return new UserResponse(
@@ -367,6 +368,45 @@ public class UserService {
                     .toList();
         }
         return Collections.emptyList();
+    }
+
+    /**
+     * Reads the {@code segments} attribute as the ABAC per-segment clearance MAP
+     * {@code {segment -> tier}} (the current shape). Legacy tolerance: if an un-migrated
+     * principal still stores {@code segments} as a flat JSON array, each segment is mapped to
+     * the principal's global {@code classification} tier so the admin console renders the same
+     * per-segment ceiling the token enricher derives — no access is silently dropped and no
+     * tier is invented. Insertion order is preserved for stable rendering.
+     */
+    private Map<String, String> getSegmentMap(Map<String, Object> attrs, String fallbackTier) {
+        Object raw = attrs.get("segments");
+        Map<String, String> out = new LinkedHashMap<>();
+        if (raw instanceof Map<?, ?> map) {
+            map.forEach((k, v) -> {
+                if (k != null && v != null) out.put(k.toString(), v.toString());
+            });
+        } else if (raw instanceof List<?> list) {
+            String tier = (fallbackTier == null || fallbackTier.isBlank()) ? "internal" : fallbackTier;
+            for (Object s : list) {
+                if (s != null) out.put(s.toString(), tier);
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Shallow-merges {@code incoming} over the principal's existing attribute bag at the
+     * top-level-key granularity. This is what makes an admin edit non-destructive: the console
+     * only sends the keys it manages ({@code segments}, {@code classification}, {@code team}),
+     * so identity metadata it never renders ({@code display_name}, {@code title},
+     * {@code department}, {@code admin_domains}) survives the update. Any key present in
+     * {@code incoming} fully replaces its stored value (so a whole {@code segments} map — with a
+     * segment row removed — is replaced atomically, not deep-merged).
+     */
+    private String mergeAttributes(String existingJson, Map<String, Object> incoming) {
+        Map<String, Object> merged = new LinkedHashMap<>(parseAttributes(existingJson));
+        merged.putAll(incoming);
+        return serializeAttributes(merged);
     }
 
     private String serializeAttributes(Map<String, Object> attributes) {

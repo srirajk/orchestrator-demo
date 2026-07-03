@@ -122,7 +122,7 @@ public class PolicyController {
     @GetMapping("/admin/segments")
     public ResponseEntity<Map<String, List<String>>> listSegments() {
         return ResponseEntity.ok(Map.of(
-                "segments", List.of("wealth", "servicing", "platform")
+                "segments", List.of("wealth", "servicing", "insurance", "platform")
         ));
     }
 }
