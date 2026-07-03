@@ -5,7 +5,7 @@
   "description": "Canonical contract a domain team submits to register one agent. A2A-Agent-Card-aligned with gateway extensions (protocol, connection, constraints). Input/output schemas are DERIVED by the gateway via introspection and are NOT part of this submission. Validate submissions against this BEFORE introspection and storage.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["agent_id", "name", "description", "version", "provider", "domain", "protocol", "connection", "capabilities", "skills", "constraints"],
+  "required": ["agent_id", "name", "description", "version", "provider", "domain", "audience", "protocol", "connection", "capabilities", "skills", "constraints"],
   "properties": {
     "agent_id": {
       "type": "string",
@@ -32,6 +32,11 @@
       "type": "string",
       "minLength": 1,
       "description": "World B: the business domain this agent belongs to. NOT enumerated here — a new domain onboards by adding its manifests; the gateway validates this against the loaded domain manifests at boot (DomainManifestStore), not against a hardcoded list."
+    },
+    "audience": {
+      "type": "string",
+      "enum": ["segment", "enterprise"],
+      "description": "Who may reach this agent. 'segment' = gated by business-segment membership + per-segment classification. 'enterprise' = open to all authenticated users (segment gate skipped) — e.g. HR policy Q&A."
     },
     "protocol": {
       "type": "string",
@@ -86,11 +91,12 @@
       "type": "object",
       "additionalProperties": false,
       "description": "Scope-of-authority and operational limits.",
-      "required": ["is_mutating", "data_classification", "sla_timeout_ms"],
+      "required": ["access_mode", "data_classification", "sla_timeout_ms"],
       "properties": {
-        "is_mutating": {
-          "type": "boolean",
-          "description": "Phase 1 agents MUST be false; the resolver/entitlement layer enforces read-only."
+        "access_mode": {
+          "type": "string",
+          "enum": ["read", "write"],
+          "description": "Phase 1 agents MUST be \"read\"; the resolver/entitlement layer enforces read-only. Replaces the former boolean is_mutating."
         },
         "data_classification": {
           "type": "string",

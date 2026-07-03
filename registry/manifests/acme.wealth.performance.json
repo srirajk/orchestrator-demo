@@ -7,6 +7,7 @@
     "organization": "Meridian Demo Bank"
   },
   "domain": "wealth-management",
+  "audience": "segment",
   "sub_domain": "private-banking",
   "max_response_tokens": 2000,
   "protocol": "http",
@@ -45,7 +46,7 @@
     }
   ],
   "constraints": {
-    "is_mutating": false,
+    "access_mode": "read",
     "data_classification": "confidential-pii",
     "sla_timeout_ms": 30000
   }
