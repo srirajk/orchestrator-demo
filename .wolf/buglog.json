@@ -3682,5 +3682,60 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-07-02"
+  },
+  {
+    "id": "bug-226",
+    "timestamp": "2026-07-03",
+    "error_message": "docker build iam-service failed: JwtClaimsCustomizerTest constructor cannot be applied to given types",
+    "file": "iam-service/src/test/java/com/openwolf/iam/auth/JwtClaimsCustomizerTest.java",
+    "root_cause": "`mvn package -DskipTests` still COMPILES test sources; changing JwtClaimsCustomizer's constructor broke the test. Local `mvn compile` passed (main only) so it was missed until the Docker build.",
+    "fix": "Updated the test to the new constructor (added AuditService + chatClientId args) and added a chat_access emit test. Always run `mvn test-compile` (not just compile) after changing a public constructor/signature.",
+    "tags": [
+      "maven",
+      "skipTests",
+      "test-compile",
+      "iam-service",
+      "docker-build"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-03"
+  },
+  {
+    "id": "bug-227",
+    "timestamp": "2026-07-03",
+    "error_message": "Rebuilt admin-console image not picked up; UI served stale bundle (no Client column)",
+    "file": "docker-compose.yml (admin-console service)",
+    "root_cause": "`docker compose build admin-console` without `-p orchestrator-demo` tagged the image under project `orchestrator-chat` (dir name). The service has no explicit `image:`, so build+recreate under different projects used different image tags. iam-service was unaffected because it pins `image: conduit/iam-service:latest`.",
+    "fix": "Always build with the running project: `docker compose -p orchestrator-demo build <svc>` then `up -d --no-deps --force-recreate <svc>`. Also: iam restart regenerates the RS256 signing key on boot, invalidating previously issued tokens.",
+    "tags": [
+      "docker-compose",
+      "project-name",
+      "image-tag",
+      "admin-console",
+      "stale-build"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-03"
+  },
+  {
+    "id": "bug-228",
+    "timestamp": "2026-07-03",
+    "error_message": "DeepEval release gate FAIL: routing F1=0.0%, every /debug/resolve returned HTTP 401",
+    "file": "eval/eval_deepeval.py",
+    "root_cause": "Phase-11 JWT hardening removed the X-User-Id trusted hop (identity now only from verified JWT sub) and made /debug/** require platform_admin/domain_admin. The harness sent X-User-Id and no bearer token, so all resolves 401'd.",
+    "fix": "Mint gateway-valid RS256 tokens via Axiom /auth/login (admin for /debug/resolve, per-user for /v1/chat). Gate then PASSES at 94.1%. eval-routing.py/worker.py already mint tokens; eval_deepeval.py had been missed.",
+    "tags": [
+      "deepeval",
+      "eval-gate",
+      "jwt",
+      "auth",
+      "X-User-Id",
+      "401"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-03"
   }
 ]

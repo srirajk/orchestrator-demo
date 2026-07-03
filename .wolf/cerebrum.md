@@ -266,3 +266,9 @@ JWT/Axiom is the real public API path (gateway extracts principal from JWT claim
 - `GET /users` returns `PageResponse<UserResponse>`, not `User[]`. UI list helpers unwrap `.content`; create/update match `CreateUserRequest`/`UpdateUserRequest`; role assignment is separate `/users/{id}/roles` using role UUIDs.
 - `/trace/stream` is broadcast unless filtered. Workbench connects with its conversation ID; gateway server-filters when present; the client still drops non-matching events and clears trace state on persona/conversation reset.
 - PolicyForge subject role rules should use Cerbos role names, not role UUIDs. Do not lose the old Axiom Cerbos policy generator path when modernizing the UI.
+
+## Key Learnings (Safety/Governance wave)
+- The stack runs under docker compose project **orchestrator-demo**. ALWAYS `docker compose -p orchestrator-demo build|up` — building without `-p` tags images under project `orchestrator-chat` and services without an explicit `image:` (e.g. admin-console) silently keep the old image on recreate. iam-service is safe because it pins `image: conduit/iam-service:latest`.
+- `mvn package -DskipTests` still COMPILES test sources — a changed public constructor breaks the Docker build even though `mvn compile` (main only) passes locally. Run `mvn test-compile`.
+- The gateway derives identity ONLY from the verified JWT `sub` (X-User-Id hop removed). `/debug/**` and `/admin/**` need platform_admin/domain_admin. Mint gateway-valid tokens via Axiom `POST /auth/login` (aud=conduit-gateway). iam-service regenerates its RS256 key on every boot, invalidating old tokens.
+- The DeepEval release gate = scripts/eval-gate.sh -> eval/eval_deepeval.py; exit code driven ONLY by routing F1 (golden-prompts.json) vs threshold (0.75). Cerbos ABAC allow/deny lives in eval/cerbos_golden_dataset.json, run separately by cerbos_policy_eval.py.
