@@ -4,13 +4,16 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.Map;
 
 /**
@@ -19,7 +22,10 @@ import java.util.Map;
  * <ul>
  *   <li>{@code GET /api/auth/login} initiates the OIDC PKCE flow by forwarding to
  *       Spring's authorization endpoint. The SPA navigates here on any 401.</li>
- *   <li>{@code POST /api/auth/logout} invalidates the session and clears the cookie.</li>
+ *   <li>{@code GET|POST /api/auth/logout} always invalidates the session and clears the
+ *       cookie, then (GET) redirects to the login flow for a clean re-login, or (POST)
+ *       returns {@code {"loggedOut":true}} for the SPA. It never 500s, even if the
+ *       session/token is already absent or invalid.</li>
  * </ul>
  *
  * The OIDC callback itself ({@code /api/auth/callback}) is handled by Spring
@@ -30,6 +36,7 @@ import java.util.Map;
 public class AuthController {
 
     private static final String AUTHORIZATION_REQUEST_URI = "/oauth2/authorization/conduit-chat";
+    private static final String LOGIN_URI = "/api/auth/login";
     private static final String SESSION_COOKIE_NAME = "SESSION";
 
     @GetMapping("/login")
@@ -37,11 +44,24 @@ public class AuthController {
         response.sendRedirect(AUTHORIZATION_REQUEST_URI);
     }
 
-    @PostMapping("/logout")
-    public Map<String, Boolean> logout(HttpServletRequest request, HttpServletResponse response) {
+    /**
+     * Logout accepts both GET (the sidebar sign-out link) and POST (SPA fetch). It always
+     * succeeds: the session is invalidated best-effort and the session cookie is cleared even
+     * when there is no session or the token is already invalid — so a stale/expired session can
+     * always be cleanly logged out without a 500.
+     *
+     * <p>GET → 302 redirect to {@code /api/auth/login} (clean re-login). POST → JSON
+     * {@code {"loggedOut":true}} for the SPA.
+     */
+    @RequestMapping(value = "/logout", method = {RequestMethod.GET, RequestMethod.POST})
+    public ResponseEntity<Map<String, Boolean>> logout(HttpServletRequest request, HttpServletResponse response) {
         HttpSession session = request.getSession(false);
         if (session != null) {
-            session.invalidate();
+            try {
+                session.invalidate();
+            } catch (IllegalStateException alreadyInvalidated) {
+                // Session was already invalidated concurrently — nothing to do.
+            }
         }
         SecurityContextHolder.clearContext();
 
@@ -51,6 +71,9 @@ public class AuthController {
         cookie.setMaxAge(0);
         response.addCookie(cookie);
 
-        return Map.of("ok", true);
+        if (RequestMethod.GET.name().equalsIgnoreCase(request.getMethod())) {
+            return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(LOGIN_URI)).build();
+        }
+        return ResponseEntity.ok(Map.of("loggedOut", true));
     }
 }
