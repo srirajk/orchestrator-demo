@@ -60,6 +60,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -222,7 +223,14 @@ public class ChatService {
                         intentResult.extractedEntities(), streamId);
                 case FOLLOW_UP  -> handleFollowUp(request, emitter, latestPrompt,
                         conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan, streamId);
-                case CLARIFY    -> handleClarify(emitter, conversationId, userId, jwtPrincipal, requestId, requestStart, streamId);
+                // CLARIFY is routed through the SAME deterministic coverage path as FETCH_DATA
+                // (hard-rule e): the LLM never decides clarification. The coverage
+                // discover/intersect/`required ∩ resolved = ∅` check inside handleFetchData
+                // produces the proper numbered clarification from the RM's book — not a bare,
+                // LLM-judged manifest message.
+                case CLARIFY    -> handleFetchData(request, emitter, latestPrompt,
+                        conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan,
+                        intentResult.extractedEntities(), streamId);
                 case CHITCHAT   -> handleChitchat(request, emitter, conversationId, requestId, requestStart, streamId);
             }
 
@@ -613,17 +621,6 @@ public class ChatService {
         } finally { span.end(); }
     }
 
-    private void handleClarify(SseEmitter emitter, String conversationId,
-                                String userId, Principal jwtPrincipal,
-                                String requestId, long requestStart, String streamId) throws Exception {
-        String message = msg("missing_entity_question",
-                "Which resource are you asking about? Please provide its identifier to continue.");
-        emitRequestOutcome("CLARIFIED");
-        streamTextAndComplete(emitter, message, streamId);
-        tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
-                new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
-    }
-
     private void handleChitchat(ChatRequest request, SseEmitter emitter,
                                  String conversationId, String requestId, long requestStart, String streamId) throws Exception {
         answerSynthesizer.synthesizeFromHistory(request.messages(), extractLatestUserMessage(request), emitter, streamId);
@@ -664,11 +661,12 @@ public class ChatService {
      * client relationships to choose from.
      *
      * @param em         the effective manifest (provides the question template from clarification schema)
-     * @param candidates resolve candidates already known (may be empty — falls back to discovered)
+     * @param candidates disambiguation candidates already narrowed to the RM's book (may be empty
+     *                   — falls back to the full discovered list)
      * @param discovered full discovered list for this RM
      */
     private String buildClarificationQuestion(EffectiveManifest em,
-                                               List<? extends Object> candidates,
+                                               List<CoverageResolveResult.ResolveCandidate> candidates,
                                                List<CoverageResource> discovered) {
         ai.conduit.gateway.domain.manifest.ClarificationSchema cs =
                 em.clarificationFor(em.primaryRequiredKey());
@@ -676,10 +674,20 @@ public class ChatService {
             ? cs.question()
             : msg("missing_entity_question", "Which resource are you asking about?");
 
-        // Use discovered list when candidates is empty or no match narrowing was done.
-        List<CoverageResource> options = discovered.isEmpty()
-            ? discovered
-            : (candidates.isEmpty() ? discovered : discovered); // always show full discovered list
+        // When disambiguation candidates exist (already intersected with the RM's book),
+        // narrow the options to just those — do NOT dump the full book. Fall back to the
+        // full discovered list only when there are no candidates to narrow with.
+        List<CoverageResource> options;
+        if (candidates != null && !candidates.isEmpty()) {
+            Set<String> candidateIds = candidates.stream()
+                .map(CoverageResolveResult.ResolveCandidate::id)
+                .collect(Collectors.toSet());
+            options = discovered.stream()
+                .filter(r -> candidateIds.contains(r.id()))
+                .collect(Collectors.toList());
+        } else {
+            options = discovered;
+        }
 
         StringBuilder sb = new StringBuilder(questionText).append("\n");
         int i = 1;
