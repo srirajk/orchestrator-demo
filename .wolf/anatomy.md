@@ -1307,3 +1307,16 @@
 ## apps/admin/ (Axiom Admin Console — split from admin-ui)
 
 - `apps/admin/**` — standalone copy of admin-ui (name: axiom-admin); Dashboard/Users/Teams/Roles/Policies(Cerbos)/Audit + operator Workbench; builds via `npm run build`; keeps local ui/gateway copies (does not yet consume @conduit packages)
+
+## Glass-box authorization gate trace (2026-07-03)
+- `gateway/.../telemetry/event/GateData.java` — Trace payload for one authz gate decision: {gate, effect, reason, agent}; audience|segment|classification|coverage. (~350 tok)
+- `gateway/.../domain/auth/EntitlementService.java` — +explainStructuralGates(): per-agent gate breakdown sourced from Cerbos (invoke + invoke_membership), World-B clean.
+- `gateway/.../domain/auth/CerbosEntitlementAdapter.java` — +checkAgentMembership(): membership-only `invoke_membership` probe; buildAgentRequest parametrized by action.
+- `gateway/.../domain/chat/ChatService.java` — publishes ordered `gate` frames (structural + coverage allow/deny) in handleFetchData.
+- `infra/cerbos/policies/agent_resource.yaml` — +`invoke_membership` action (segment membership without the classification-rank gate) for the glass-box trace.
+- `apps/chat/bff/.../chat/TraceController.java` — GET /api/conversations/{id}/trace/stream; ownership-checked SSE proxy of the gateway trace stream.
+- `apps/chat/bff/.../chat/GatewayClient.java` — +openTraceStream(conversationId).
+- `apps/chat/web/src/lib/gatewayTrace.ts` — vendored mirror of @conduit/gateway-client SSE parse + trace types (Docker build-context safe). (~600 tok)
+- `apps/chat/web/src/hooks/useTraceStream.ts` — conversation-scoped trace SSE hook + selectDenial(). (~900 tok)
+- `apps/chat/web/src/components/TraceRail.tsx` — collapsible Decision-trace rail: intent→resolve→gate rows (✓/✗ + reason)→answer. (~1400 tok)
+- `apps/chat/web/src/components/ChatPane.tsx` — wires the rail + "Access denied → gate: reason" banner.
