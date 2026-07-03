@@ -33,6 +33,14 @@ resourcePolicy:
         (R.attr.data_classification == "confidential" ? 2 :
         (R.attr.data_classification == "internal" ? 1 : 0))
 
+      # Resource-side fail-closed guard. A missing / typo'd / "public" (or any other
+      # unrecognised) data_classification ranks 0, and `wealthRank >= 0` is ALWAYS true —
+      # so without this guard an unclassified agent would be reachable by every segment
+      # member (fail-OPEN). The principal side already fails closed (rank 0 = not a member);
+      # this makes the resource side symmetric: an unrecognised classification is DENIED.
+      resourceClassRecognized: >
+        R.attr.data_classification in ["internal", "confidential", "confidential-pii"]
+
       # Per-segment tier the principal holds, ranked on the same ladder. 0 = not a member of
       # that segment (or an unrecognised tier) -> the classification gate can never clear.
       wealthRank: >
@@ -113,9 +121,9 @@ resourcePolicy:
               - expr: V.accessIsRead
               - expr: >
                   V.audienceEnterprise ||
-                  (R.attr.domain == "wealth-management" && V.wealthRank    > 0 && V.wealthRank    >= V.resourceRank) ||
-                  (R.attr.domain == "asset-servicing"   && V.servicingRank > 0 && V.servicingRank >= V.resourceRank) ||
-                  (R.attr.domain == "insurance"         && V.insuranceRank > 0 && V.insuranceRank >= V.resourceRank)
+                  (V.resourceClassRecognized && R.attr.domain == "wealth-management" && V.wealthRank    > 0 && V.wealthRank    >= V.resourceRank) ||
+                  (V.resourceClassRecognized && R.attr.domain == "asset-servicing"   && V.servicingRank > 0 && V.servicingRank >= V.resourceRank) ||
+                  (V.resourceClassRecognized && R.attr.domain == "insurance"         && V.insuranceRank > 0 && V.insuranceRank >= V.resourceRank)
 
     # ── chat_user: membership-only probe (glass-box explanation, NOT enforcement) ──
     #    Same domain->segment mapping as `invoke` but WITHOUT the classification-rank
