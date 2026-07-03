@@ -12,11 +12,11 @@ Legend: **P0** = required for a working persistent chat · **P1** = expected · 
 
 ## A. Scaffolding & structure
 - [ ] **P0** `apps/chat/web` — Vite + React + TS + Tailwind, importing the Axiom design tokens/ui kit.
-- [ ] **P0** `apps/chat/server` — BFF (Node + Express + TS).
-- [ ] **P0** MongoDB connection in the BFF (reuse existing `mongodb` service — user directed Mongo).
-- [ ] **P0** MinIO client in the BFF for files (reuse existing `minio` service).
-- [ ] **P0** Dockerfile(s) + one `apps/chat` service wired into the **single** canonical compose.
-- [ ] **P0** Dev proxy: web → BFF; BFF → gateway (`/v1/chat/completions`, `/trace/stream`) + IAM.
+- [x] **P0** `apps/chat/bff` — BFF (Java, Spring Boot, virtual threads).
+- [x] **P0** MongoDB connection in the BFF (reuse existing `mongodb` service — user directed Mongo).
+- [x] **P0** MinIO client in the BFF for files (reuse existing `minio` service).
+- [x] **P0** Dockerfile(s) + one `apps/chat` service wired into the **single** canonical compose.
+- [x] **P0** Dev proxy: web → BFF; BFF → gateway (`/v1/chat/completions`, `/trace/stream`) + IAM.
 
 ## B. Auth — real user login (retires P0/persona by construction)
 - [ ] **P0** Axiom OIDC login (redirect → callback → session cookie).
@@ -26,28 +26,32 @@ Legend: **P0** = required for a working persistent chat · **P1** = expected · 
 - [ ] **P1** 401/expiry → re-login; refresh handling.
 
 ## C. Data model (MongoDB, per-user isolation)
-- [ ] **P0** `Conversation` {id, userId, title, projectId?, summary, createdAt, updatedAt}.
-- [ ] **P0** `Message` {id, conversationId, userId, role, content, files?, createdAt}.
-- [ ] **P1** `Project` {id, userId, name, color}.
-- [ ] **P1** `Attachment` {id, userId, conversationId, name, mime, size, storageKey}.
-- [ ] **P0** Every query scoped to `userId` (isolation).
+**Backend persistence built in the Java BFF; remaining work is the web conversation-management UI.**
+
+- [x] **P0** `Conversation` {id, userId, title, projectId?, summary, createdAt, updatedAt}.
+- [x] **P0** `Message` {id, conversationId, userId, role, content, files?, createdAt}.
+- [~] **P1** `Project` {id, userId, name, color}.
+- [~] **P1** `Attachment` {id, userId, conversationId, name, mime, size, storageKey}.
+- [x] **P0** Every query scoped to `userId` (isolation).
 
 ## D. Conversations — persistence (THE core)
-- [ ] **P0** List conversations (sidebar, per user, newest first).
-- [ ] **P0** New conversation.
-- [ ] **P0** Open/switch → load messages from Mongo.
-- [ ] **P0** **Survives refresh + across devices** (server-side, not localStorage).
-- [ ] **P0** Auto-title from first turn.
-- [ ] **P1** Rename / delete / archive.
-- [ ] **P1** Search conversations.
+**Backend persistence built in the Java BFF; remaining work is the web conversation-management UI.**
+
+- [x] **P0** List conversations (per user, newest first; load from Mongo).
+- [x] **P0** New conversation.
+- [x] **P0** Open/switch → load messages from Mongo.
+- [x] **P0** **Survives refresh + across devices** (server-side, not localStorage).
+- [x] **P0** Auto-title from first turn.
+- [~] **P1** Rename / delete / archive.
+- [~] **P1** Search conversations.
 
 ## E. Messaging — the chat
-- [ ] **P0** Send: BFF persists user msg → assembles context → calls gateway `stream:true` → **streams** to client → persists assistant msg.
-- [ ] **P0** Streaming UI (token-by-token; consume byte-exact SSE, done on `data: [DONE]`).
-- [ ] **P0** Markdown + syntax-highlighted code + copy.
-- [ ] **P1** Stop generation (AbortController).
-- [ ] **P1** Regenerate / edit-and-rerun.
-- [ ] **P1** Message feedback → Langfuse score.
+- [x] **P0** Send: BFF persists user msg → assembles context → calls gateway `stream:true` → **streams** to client → persists assistant msg.
+- [~] **P0** Streaming UI (token-by-token; consume byte-exact SSE, done on `data: [DONE]`).
+- [~] **P0** Markdown + syntax-highlighted code + copy.
+- [~] **P1** Stop generation (AbortController).
+- [~] **P1** Regenerate / edit-and-rerun.
+- [~] **P1** Message feedback → Langfuse score.
 
 ## F. Memory / compaction (client-owned, per ADR-STATELESS-GATEWAY.md)
 - [ ] **P0** BFF assembles context = last `recentMessages` (config, default 8) from Mongo.
@@ -68,7 +72,7 @@ Legend: **P0** = required for a working persistent chat · **P1** = expected · 
 - [ ] **P2** Slash commands; @-mention agent/domain; voice.
 
 ## J. Glass-box (Conduit differentiator)
-- [ ] **P1** Trace rail (reuse workbench components), conversationId-scoped; collapsible.
+- [ ] **P1** Trace rail (reuse `packages/gateway-client` SSE/types + shared `packages/ui`), conversationId-scoped; collapsible.
 - [ ] **P1** Explicit "Access denied" UX on entitlement denial.
 
 ## K. UX / resilience
