@@ -3745,7 +3745,14 @@
     "file": "apps/admin/src/api/client.ts",
     "root_cause": "client.ts usersApi.assignRole sent {role_id} but AssignRoleRequest DTO expects {roleId}; iam has NO global snake_case Jackson strategy (responses are camelCase e.g. isActive/adminDomains), so role_id never bound and validation returned 400.",
     "fix": "Changed the POST body to { roleId }. Verified 200 + role now present in UserResponse and in the minted token's roles claim.",
-    "tags": ["iam", "admin-console", "role-assignment", "jackson", "400", "camelCase"],
+    "tags": [
+      "iam",
+      "admin-console",
+      "role-assignment",
+      "jackson",
+      "400",
+      "camelCase"
+    ],
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-07-03"
@@ -3757,9 +3764,36 @@
     "file": "iam-service/src/main/java/com/openwolf/iam/service/UserService.java",
     "root_cause": "toUserResponse read the segments attribute via getStringList (List<String>), but V5 stored segments as a per-segment MAP {segment->tier}; a JSON object is not a List so it yielded empty.",
     "fix": "UserResponse.segments -> Map<String,String>; added getSegmentMap() (map preferred, legacy list tolerated by mapping each segment to the flat classification tier). Update path now merges attributes so identity metadata (display_name/title/department) is not wiped.",
-    "tags": ["iam", "abac", "segments-map", "UserResponse", "jsonb"],
+    "tags": [
+      "iam",
+      "abac",
+      "segments-map",
+      "UserResponse",
+      "jsonb"
+    ],
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-07-03"
+  },
+  {
+    "id": "bug-231",
+    "timestamp": "2026-07-03T12:12:18.223180Z",
+    "error_message": "Chat BFF rolling summary never persists (Conversation.summary always null in Mongo); context compaction never attaches a summary (summaryAttached=false every turn), so early turns that fall out of the recent window are forgotten and callback-memory fails.",
+    "file": "apps/chat/bff/src/main/java/ai/conduit/chat/conversation/ConversationService.java",
+    "root_cause": "Lost update. ChatStreamService.savePersistently() runs on a background thread after streaming and calls ConversationService.touchAndMaybeTitle(conversation,...), which did a full-document conversationRepository.save(conversation). That 'conversation' was loaded at the START of the turn (before the fire-and-forget LlmSummaryService wrote the summary), so its in-memory summary was stale (null). The full-document save overwrote the summary the summarizer had just persisted \u2014 every turn \u2014 silently defeating compaction.",
+    "fix": "Made touchAndMaybeTitle do a field-scoped MongoTemplate.updateFirst($set title+updatedAt) scoped by _id+userId, never writing the summary field. The title/updatedAt writer and the summary writer can no longer race on the summary field. Also added a DEBUG [context] observability log in ContextAssembler showing the assembled summary+recent-window per turn.",
+    "tags": [
+      "chat-bff",
+      "memory",
+      "compaction",
+      "lost-update",
+      "mongodb",
+      "summary",
+      "concurrency",
+      "virtual-threads"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-03T12:12:18.223180Z"
   }
 ]
