@@ -7,6 +7,7 @@ public record AuditLogResponse(
         UUID id,
         String tenantId,
         String actorId,
+        String clientId,
         String action,
         String resourceType,
         String resourceId,

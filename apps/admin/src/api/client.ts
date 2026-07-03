@@ -86,6 +86,7 @@ export interface AuditEntry {
   id: string
   tenantId: string
   actorId: string
+  clientId?: string
   action: string
   resourceType: string
   resourceId: string

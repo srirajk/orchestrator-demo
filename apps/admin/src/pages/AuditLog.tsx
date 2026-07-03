@@ -14,6 +14,7 @@ const ACTION_COLORS: Record<string, string> = {
   delete: 'bg-red-100 text-red-800 border-red-300',
   assign: 'bg-purple-100 text-purple-800 border-purple-300',
   deploy: 'bg-orange-100 text-orange-800 border-orange-300',
+  access: 'bg-teal-100 text-teal-800 border-teal-300',
 }
 
 function getActionColor(action: string): string {
@@ -97,6 +98,15 @@ function AuditRow({ entry, isExpanded, onToggle }: {
           </span>
         </td>
         <td className="px-5 py-3.5">
+          {entry.clientId && entry.clientId !== 'system' ? (
+            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">
+              {entry.clientId}
+            </span>
+          ) : (
+            <span className="text-xs text-slate-400">—</span>
+          )}
+        </td>
+        <td className="px-5 py-3.5">
           <span className="inline-flex px-2 py-1 rounded text-xs font-medium bg-slate-100 text-slate-700">
             {entry.resourceType}
           </span>
@@ -108,7 +118,7 @@ function AuditRow({ entry, isExpanded, onToggle }: {
 
       {isExpanded && (
         <tr className="bg-slate-50 border-b border-slate-100">
-          <td colSpan={5} className="px-5 py-4">
+          <td colSpan={6} className="px-5 py-4">
             <div className="grid grid-cols-2 gap-6">
               <div>
                 <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Before State</p>
@@ -255,6 +265,7 @@ export function AuditLog() {
             onChange={e => setAction(e.target.value)}
           >
             <option value="">All actions</option>
+            <option value="chat_access">Chat access</option>
             <option value="create">Create</option>
             <option value="update">Update</option>
             <option value="delete">Delete</option>
@@ -338,6 +349,9 @@ export function AuditLog() {
                   </th>
                   <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide" style={{ width: '120px' }}>
                     Action
+                  </th>
+                  <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide" style={{ width: '130px' }}>
+                    Client
                   </th>
                   <th className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide" style={{ width: '100px' }}>
                     Resource Type
