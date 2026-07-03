@@ -1,4 +1,4 @@
-import React, { createContext, useContext } from 'react'
+import React, { createContext, useContext, useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import type { User } from '../api/types'
 
@@ -17,6 +17,14 @@ interface Props {
 export function AuthGate({ children }: Props) {
   const { user, isLoading, error } = useAuth()
 
+  // Redirect to login in an effect rather than during render to avoid double-redirect /
+  // render-phase side-effects and potential redirect loops with apiFetch's own 401 handling.
+  useEffect(() => {
+    if (!isLoading && (error || !user)) {
+      window.location.href = '/api/auth/login'
+    }
+  }, [isLoading, error, user])
+
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-axiom-900">
@@ -30,8 +38,12 @@ export function AuthGate({ children }: Props) {
   }
 
   if (error || !user) {
-    window.location.href = '/api/auth/login'
-    return null
+    // Effect above will redirect; show a neutral state while that happens
+    return (
+      <div className="flex h-screen items-center justify-center bg-axiom-900">
+        <p className="text-sm text-axiom-300">Redirecting to login…</p>
+      </div>
+    )
   }
 
   return <UserContext.Provider value={user}>{children}</UserContext.Provider>
