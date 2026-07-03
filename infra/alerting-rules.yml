@@ -12,15 +12,12 @@ groups:
 
       # GUARDRAIL ALERT — fires when compaction is active but NO summary is ever attached.
       # This is the exact condition that would have caught the lost-update bug silently.
+      # Uses sum() to drop the 'attached' label so the two series are comparable.
       - alert: CompactionSummaryNeverAttached
         expr: |
-          (
-            increase(chat_compaction_summary_attached_total{attached="false"}[30m]) > 0
-          )
-          unless
-          (
-            increase(chat_compaction_summary_attached_total{attached="true"}[30m]) > 0
-          )
+          sum(increase(chat_compaction_summary_attached_total{attached="false"}[30m])) > 0
+          and
+          sum(increase(chat_compaction_summary_attached_total{attached="true"}[30m])) == 0
         for: 5m
         labels:
           severity: warning
