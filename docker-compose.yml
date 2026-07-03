@@ -506,6 +506,11 @@ services:
       IAM_LIBRECHAT_REDIRECT_URI: ${IAM_LIBRECHAT_REDIRECT_URI:-http://localhost:3080/oauth/openid/callback}
       # Audience stamped on Axiom access tokens that are forwarded to the gateway.
       IAM_GATEWAY_AUDIENCE: ${IAM_GATEWAY_AUDIENCE:-conduit-gateway}
+      # Persist the RSA signing key (+ its stable kid) to a named volume so a restart does not
+      # regenerate it and invalidate every live session. See SecurityConfig#loadOrGenerateRsaKey.
+      IAM_SIGNING_KEY_PATH: /app/keys/signing-key.json
+    volumes:
+      - iam-signing-key:/app/keys
     depends_on:
       postgres:
         condition: service_healthy
@@ -929,3 +934,5 @@ volumes:
   minio-data:
   postgres_data:
   loki-data:
+  # Persists the iam-service RSA signing key so its kid is stable across restarts.
+  iam-signing-key:

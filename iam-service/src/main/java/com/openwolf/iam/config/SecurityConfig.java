@@ -45,6 +45,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPrivateKey;
@@ -72,6 +74,12 @@ public class SecurityConfig {
 
     @Value("${spring.security.oauth2.authorizationserver.issuer:http://localhost:8084}")
     private String issuerUrl;
+
+    // Persistent location of the RSA signing key (full JWK JSON, incl. private params + stable kid).
+    // The key is loaded if present, else generated once and written here. Persisting it means the
+    // signing key + its kid survive restarts, so live sessions are not invalidated on every restart.
+    @Value("${iam.signing-key-path:/app/keys/signing-key.json}")
+    private String signingKeyPath;
 
     // Browser origins allowed to call this IAM cross-origin (Axiom's own admin/chat UIs).
     // Comma-separated, env-overridable. Adding an origin here is CORS allowlist config only,
@@ -310,14 +318,40 @@ public class SecurityConfig {
     }
 
     // =========================================================
-    // JWK Source — RSA 2048, generated fresh on startup
+    // JWK Source — RSA 2048, persisted (load-or-generate) so kid is stable across restarts
     // =========================================================
 
     @Bean
     public JWKSource<SecurityContext> jwkSource() {
-        RSAKey rsaKey = generateRsaKey();
+        RSAKey rsaKey = loadOrGenerateRsaKey();
         JWKSet jwkSet = new JWKSet(rsaKey);
         return new ImmutableJWKSet<>(jwkSet);
+    }
+
+    /**
+     * Load the RSA signing key (with its stable kid) from {@code signingKeyPath} if it exists;
+     * otherwise generate a new key once and write it there. This keeps the same key + kid across
+     * restarts, so previously-issued tokens remain verifiable and live sessions survive a restart.
+     */
+    private RSAKey loadOrGenerateRsaKey() {
+        Path path = Path.of(signingKeyPath);
+        if (Files.exists(path)) {
+            try {
+                return RSAKey.parse(Files.readString(path));
+            } catch (Exception ex) {
+                throw new IllegalStateException("Failed to load RSA signing key from " + path, ex);
+            }
+        }
+        RSAKey generated = generateRsaKey();
+        try {
+            if (path.getParent() != null) {
+                Files.createDirectories(path.getParent());
+            }
+            Files.writeString(path, generated.toJSONString());
+        } catch (Exception ex) {
+            throw new IllegalStateException("Failed to persist RSA signing key to " + path, ex);
+        }
+        return generated;
     }
 
     private RSAKey generateRsaKey() {
