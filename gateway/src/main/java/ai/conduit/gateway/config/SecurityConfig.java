@@ -232,6 +232,13 @@ public class SecurityConfig {
         copyObjectClaim(claims, claimsMap, "segments");
         copyListClaim(claims, claimsMap, "domains");
         copyListClaim(claims, claimsMap, "admin_domains");
+        // tenant_id scopes coverage (RESOLVE/DISCOVER/CHECK) — dropping it made Principal fall
+        // back to "default", silently mis-scoping every coverage call. Copy it (and any
+        // top-level classification claim) through verbatim.
+        Object tenantId = claims.getClaim("tenant_id");
+        if (tenantId != null) claimsMap.put("tenant_id", tenantId);
+        Object classification = claims.getClaim("classification");
+        if (classification != null) claimsMap.put("classification", classification);
         Object name = claims.getClaim("name");
         if (name != null) claimsMap.put("name", name);
 
