@@ -44,7 +44,8 @@ public class JwksClient {
     @PostConstruct
     public void warmUp() {
         try {
-            refreshKeys();
+            refreshLock.lock();
+            try { fetchKeys(); } finally { refreshLock.unlock(); }
             log.info("JwksClient: pre-loaded {} key(s) at startup", keyCache.size());
         } catch (Exception e) {
             log.warn("JwksClient: startup pre-load failed (will retry on first request): {}", e.getMessage());
@@ -56,15 +57,29 @@ public class JwksClient {
      * Refreshes the cache if stale or if the kid is unknown.
      */
     public RSAPublicKey getPublicKey(String kid) {
-        if (keyCache.containsKey(kid) && Instant.now().isBefore(cacheExpiry)) {
-            return keyCache.get(kid);
+        RSAPublicKey cached = keyCache.get(kid);
+        if (cached != null && Instant.now().isBefore(cacheExpiry)) {
+            return cached;
         }
-        refreshKeys();
+        // Stale cache or unknown kid (e.g. mid key-rotation). BLOCK on the refresh lock rather
+        // than tryLock-and-bail: bailing returned a spurious null → a 401 while another thread
+        // was still fetching the rotated key. Re-check under the lock so concurrent callers
+        // coalesce onto a single network refresh instead of stampeding.
+        refreshLock.lock();
+        try {
+            cached = keyCache.get(kid);
+            if (cached != null && Instant.now().isBefore(cacheExpiry)) {
+                return cached;  // a concurrent refresh already satisfied this kid
+            }
+            fetchKeys();
+        } finally {
+            refreshLock.unlock();
+        }
         return keyCache.get(kid);
     }
 
-    private void refreshKeys() {
-        if (!refreshLock.tryLock()) return;
+    /** Fetches the JWKS and replaces the cache. Must be called while holding {@link #refreshLock}. */
+    private void fetchKeys() {
         try {
             log.debug("JwksClient: refreshing keys from {}", jwksUrl);
             HttpRequest req = HttpRequest.newBuilder()
@@ -83,8 +98,6 @@ public class JwksClient {
             cacheExpiry = Instant.now().plus(CACHE_TTL);
         } catch (Exception e) {
             log.error("JwksClient: JWKS refresh failed — {}", e.getMessage());
-        } finally {
-            refreshLock.unlock();
         }
     }
 }
