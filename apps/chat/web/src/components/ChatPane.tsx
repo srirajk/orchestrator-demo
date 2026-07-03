@@ -11,6 +11,50 @@ import { apiStream } from '../api/client'
 import { iterateSseData } from '../lib/gatewayTrace'
 import type { Message } from '../api/types'
 
+const PENDING_SEND_KEY = 'conduit.chat.pendingSend'
+const PENDING_SEND_MAX_AGE_MS = 10 * 60 * 1000
+
+interface PendingSend {
+  conversationId: string | null
+  content: string
+  createdAt: number
+}
+
+function savePendingSend(conversationId: string | null, content: string) {
+  const pending: PendingSend = { conversationId, content, createdAt: Date.now() }
+  window.sessionStorage.setItem(PENDING_SEND_KEY, JSON.stringify(pending))
+}
+
+function clearPendingSend(conversationId: string | null, content: string) {
+  const pending = readPendingSend()
+  if (pending?.conversationId === conversationId && pending.content === content) {
+    window.sessionStorage.removeItem(PENDING_SEND_KEY)
+  }
+}
+
+function readPendingSend(): PendingSend | null {
+  const raw = window.sessionStorage.getItem(PENDING_SEND_KEY)
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as PendingSend
+    if (!parsed.content || Date.now() - parsed.createdAt > PENDING_SEND_MAX_AGE_MS) {
+      window.sessionStorage.removeItem(PENDING_SEND_KEY)
+      return null
+    }
+    return parsed
+  } catch {
+    window.sessionStorage.removeItem(PENDING_SEND_KEY)
+    return null
+  }
+}
+
+function takePendingSend(conversationId: string | null): string | null {
+  const pending = readPendingSend()
+  if (pending?.conversationId !== conversationId) return null
+  window.sessionStorage.removeItem(PENDING_SEND_KEY)
+  return pending.content
+}
+
 export function ChatPane() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -24,6 +68,7 @@ export function ChatPane() {
   const [streamingContent, setStreamingContent] = useState<string | null>(null)
   const [isStreaming, setIsStreaming] = useState(false)
   const [railCollapsed, setRailCollapsed] = useState(false)
+  const [restoredDraft, setRestoredDraft] = useState<{ id: number; content: string } | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const preserveNextIdRef = useRef<string | null>(null)
 
@@ -41,6 +86,13 @@ export function ChatPane() {
   const denial = useMemo(() => selectDenial(traceEvents), [traceEvents])
 
   const createConversation = useCreateConversation()
+
+  useEffect(() => {
+    const content = takePendingSend(isNew ? null : (id ?? null))
+    if (content) {
+      setRestoredDraft({ id: Date.now(), content })
+    }
+  }, [id, isNew])
 
   useEffect(() => {
     return () => {
@@ -85,6 +137,7 @@ export function ChatPane() {
   const handleSend = useCallback(
     async (content: string) => {
       let convId = isNew ? null : (id ?? null)
+      savePendingSend(convId, content)
 
       // Create conversation if new
       if (!convId) {
@@ -93,6 +146,7 @@ export function ChatPane() {
             title: content.slice(0, 60),
           })
           convId = conv.id
+          savePendingSend(convId, content)
           preserveNextIdRef.current = conv.id
           navigate(`/c/${convId}`, { replace: true })
         } catch (err) {
@@ -127,6 +181,7 @@ export function ChatPane() {
           headers: { 'Content-Type': 'application/json' },
           signal: abortRef.current.signal,
         })
+        clearPendingSend(convId, content)
 
         if (!resp.body) {
           throw new Error('Response body is null')
@@ -233,6 +288,7 @@ export function ChatPane() {
           onSend={handleSend}
           isStreaming={isStreaming}
           onStop={handleStop}
+          restoredDraft={restoredDraft}
         />
       </div>
 

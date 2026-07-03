@@ -7,11 +7,18 @@ interface Props {
   isStreaming: boolean
   onStop: () => void
   disabled?: boolean
+  restoredDraft?: { id: number; content: string } | null
 }
 
-export function Composer({ onSend, isStreaming, onStop, disabled }: Props) {
+export function Composer({ onSend, isStreaming, onStop, disabled, restoredDraft }: Props) {
   const [value, setValue] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (restoredDraft) {
+      setValue(restoredDraft.content)
+    }
+  }, [restoredDraft])
 
   // Auto-grow
   useEffect(() => {
