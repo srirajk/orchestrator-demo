@@ -43,10 +43,14 @@ import org.springframework.security.web.authentication.LoginUrlAuthenticationEnt
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPrivateKey;
@@ -71,6 +75,8 @@ import java.util.UUID;
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
+
+    private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
 
     @Value("${spring.security.oauth2.authorizationserver.issuer:http://localhost:8084}")
     private String issuerUrl;
@@ -348,6 +354,15 @@ public class SecurityConfig {
                 Files.createDirectories(path.getParent());
             }
             Files.writeString(path, generated.toJSONString());
+            // Restrict to owner-read/write only (0600) — the file contains the RSA private key.
+            // Best-effort: UnsupportedOperationException is thrown on non-POSIX filesystems
+            // (e.g. Windows, certain container overlays) and is silently ignored.
+            try {
+                Files.setPosixFilePermissions(path,
+                        PosixFilePermissions.fromString("rw-------"));
+            } catch (UnsupportedOperationException ignored) {
+                log.warn("Could not restrict signing-key file permissions to 0600 (non-POSIX filesystem): {}", path);
+            }
         } catch (Exception ex) {
             throw new IllegalStateException("Failed to persist RSA signing key to " + path, ex);
         }
