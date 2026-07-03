@@ -1,9 +1,12 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useMemo } from 'react'
+import { ShieldX } from 'lucide-react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { MessageList } from './MessageList'
 import { Composer } from './Composer'
+import { TraceRail } from './TraceRail'
 import { useConversationDetail, useCreateConversation } from '../hooks/useConversations'
+import { useTraceStream, selectDenial } from '../hooks/useTraceStream'
 import { apiStream } from '../api/client'
 import type { Message } from '../api/types'
 
@@ -19,7 +22,12 @@ export function ChatPane() {
   const [localMessages, setLocalMessages] = useState<Message[]>([])
   const [streamingContent, setStreamingContent] = useState<string | null>(null)
   const [isStreaming, setIsStreaming] = useState(false)
+  const [railCollapsed, setRailCollapsed] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
+
+  // Glass-box: subscribe to this conversation's live authorization/pipeline trace.
+  const { events: traceEvents, status: traceStatus } = useTraceStream(isNew ? undefined : id)
+  const denial = useMemo(() => selectDenial(traceEvents), [traceEvents])
 
   const createConversation = useCreateConversation()
 
@@ -153,24 +161,48 @@ export function ChatPane() {
   const conversationTitle = data?.conversation.title ?? (isNew ? 'New Chat' : 'Loading…')
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Header */}
-      <div className="border-b border-line bg-panel px-6 py-3 flex items-center gap-3">
-        <h1 className="section-heading truncate">{conversationTitle}</h1>
+    <div className="flex h-full overflow-hidden">
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+        {/* Header */}
+        <div className="border-b border-line bg-panel px-6 py-3 flex items-center gap-3">
+          <h1 className="section-heading truncate">{conversationTitle}</h1>
+        </div>
+
+        {/* Explicit access-denied banner — the entitlement/denial trust story. */}
+        {denial && (
+          <div
+            role="alert"
+            className="mx-4 mt-3 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          >
+            <ShieldX size={18} className="mt-0.5 shrink-0 text-red-600" />
+            <p>
+              <span className="font-semibold">Access denied → {denial.gate}</span>
+              {denial.reason ? <span>: {denial.reason}</span> : null}
+            </p>
+          </div>
+        )}
+
+        {/* Messages */}
+        <MessageList
+          messages={messages}
+          streamingContent={streamingContent}
+          isLoading={!isNew && isLoading}
+        />
+
+        {/* Composer */}
+        <Composer
+          onSend={handleSend}
+          isStreaming={isStreaming}
+          onStop={handleStop}
+        />
       </div>
 
-      {/* Messages */}
-      <MessageList
-        messages={messages}
-        streamingContent={streamingContent}
-        isLoading={!isNew && isLoading}
-      />
-
-      {/* Composer */}
-      <Composer
-        onSend={handleSend}
-        isStreaming={isStreaming}
-        onStop={handleStop}
+      {/* Glass-box decision trace rail (collapsible) */}
+      <TraceRail
+        events={traceEvents}
+        status={traceStatus}
+        collapsed={railCollapsed}
+        onToggle={() => setRailCollapsed((c) => !c)}
       />
     </div>
   )
