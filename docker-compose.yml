@@ -515,6 +515,8 @@ services:
       IAM_LIBRECHAT_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-meridian-client-secret-dev}
       IAM_LIBRECHAT_REDIRECT_URI: ${IAM_LIBRECHAT_REDIRECT_URI:-http://localhost:3080/oauth/openid/callback}
       IAM_CONDUIT_CHAT_POST_LOGOUT_REDIRECT_URI: ${IAM_CONDUIT_CHAT_POST_LOGOUT_REDIRECT_URI:-http://localhost:8099/}
+      IAM_CONDUIT_INSIGHTS_REDIRECT_URI: ${IAM_CONDUIT_INSIGHTS_REDIRECT_URI:-http://localhost:5175/callback}
+      IAM_CONDUIT_INSIGHTS_POST_LOGOUT_REDIRECT_URI: ${IAM_CONDUIT_INSIGHTS_POST_LOGOUT_REDIRECT_URI:-http://localhost:5175/}
       # Audience stamped on Axiom access tokens that are forwarded to the gateway.
       IAM_GATEWAY_AUDIENCE: ${IAM_GATEWAY_AUDIENCE:-conduit-gateway}
       # Persist the RSA signing key (+ its stable kid) to a named volume so a restart does not
@@ -624,6 +626,27 @@ services:
       timeout: 5s
       retries: 10
       start_period: 20s
+    restart: unless-stopped
+
+  # ── Conduit Insights — public PKCE SPA + same-origin nginx proxy ─────────────
+  conduit-insights:
+    build:
+      context: ./apps/insights/web
+      dockerfile: Dockerfile
+    container_name: conduit-insights
+    ports:
+      - "5175:80"
+    depends_on:
+      gateway:
+        condition: service_healthy
+      iam-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
 
   # ── Glass-box live decision trace panel ───────────────────────────────────────
