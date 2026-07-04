@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useEffect } from 'react'
+import React, { createContext, useContext, useEffect, useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
-import { redirectToLogin } from '../api/client'
+import { AUTH_REQUIRED_EVENT } from '../api/client'
 import type { User } from '../api/types'
+import { LoginLanding } from './LoginLanding'
 
 const UserContext = createContext<User | null>(null)
 
@@ -17,14 +18,17 @@ interface Props {
 
 export function AuthGate({ children }: Props) {
   const { user, isLoading, error } = useAuth()
+  const [authRequired, setAuthRequired] = useState(false)
 
-  // Redirect to login in an effect rather than during render to avoid double-redirect /
-  // render-phase side-effects and potential redirect loops with apiFetch's own 401 handling.
   useEffect(() => {
-    if (!isLoading && (error || !user)) {
-      redirectToLogin()
-    }
-  }, [isLoading, error, user])
+    const handleAuthRequired = () => setAuthRequired(true)
+    window.addEventListener(AUTH_REQUIRED_EVENT, handleAuthRequired)
+    return () => window.removeEventListener(AUTH_REQUIRED_EVENT, handleAuthRequired)
+  }, [])
+
+  useEffect(() => {
+    if (user) setAuthRequired(false)
+  }, [user])
 
   if (isLoading) {
     return (
@@ -38,13 +42,8 @@ export function AuthGate({ children }: Props) {
     )
   }
 
-  if (error || !user) {
-    // Effect above will redirect; show a neutral state while that happens
-    return (
-      <div className="flex h-screen items-center justify-center bg-axiom-900">
-        <p className="text-sm text-axiom-300">Redirecting to login…</p>
-      </div>
-    )
+  if (authRequired || error || !user) {
+    return <LoginLanding />
   }
 
   return <UserContext.Provider value={user}>{children}</UserContext.Provider>
