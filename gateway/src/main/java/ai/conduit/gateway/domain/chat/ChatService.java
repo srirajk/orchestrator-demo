@@ -152,6 +152,7 @@ public class ChatService {
     public void handleChat(ChatRequest request, SseEmitter emitter, String userId,
                            Principal jwtPrincipal, String headerConvId) {
         long   requestStart = System.currentTimeMillis();
+        emitAdoption(jwtPrincipal);   // adoption-by-role (cardinality-safe: role, not user)
         Span   rootSpan     = tracer.spanBuilder("chat.handle").startSpan();
         // Use the OTel trace_id as the single correlation ID across logs, glass-box, and traces.
         String requestId    = rootSpan.getSpanContext().isValid()
@@ -820,6 +821,20 @@ public class ChatService {
         Counter.builder("conduit.request.outcome")
                 .description("Request resolution outcome")
                 .tag("outcome", outcome)
+                .register(meterRegistry)
+                .increment();
+    }
+
+    /**
+     * Adoption counter tagged by ROLE (not per-user — user-level cardinality would explode the
+     * metric). One increment per chat request; feeds the Insights "adoption by role" panel.
+     */
+    private void emitAdoption(Principal principal) {
+        String role = (principal != null && principal.roles() != null && !principal.roles().isEmpty())
+                ? principal.roles().get(0) : "anonymous";
+        Counter.builder("conduit.adoption")
+                .description("Chat requests by principal role")
+                .tag("role", role)
                 .register(meterRegistry)
                 .increment();
     }

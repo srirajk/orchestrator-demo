@@ -1,0 +1,29 @@
+apiVersion: api.cerbos.dev/v1
+# ── Conduit Insights admin gate ──────────────────────────────────────────────
+# Governs the native analytics API (GET /v1/insights/*). ADDITIVE: a brand-new
+# resource kind ("insights"); it changes no existing agent/relationship/iam decision.
+#
+# The gateway's InsightsAuthorizer issues a CheckResources call:
+#   principal: the caller (roles from the verified JWT)
+#   resource : kind=insights, id=insights, action=read
+#
+# Allow only administrators. A chat_user carries none of these roles, so the implicit
+# default-deny returns EFFECT_DENY → the gateway responds 403. The role→allow mapping
+# lives HERE in policy, not in gateway Java.
+resourcePolicy:
+  version: "default"
+  resource: insights
+
+  rules:
+    # Platform administrators: full access (superuser across the platform).
+    - actions: ["read"]
+      effect: EFFECT_ALLOW
+      roles: ["platform_admin"]
+
+    # Dedicated Insights administrators (conduit_admin) — the least-privilege role that
+    # grants analytics access without any other platform_admin capability.
+    - actions: ["read"]
+      effect: EFFECT_ALLOW
+      roles: ["conduit_admin"]
+
+    # No explicit deny needed — Cerbos denies by default (a chat_user hits the implicit deny).

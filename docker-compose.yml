@@ -178,6 +178,11 @@ services:
       # NOT baked into the image. Onboard a domain by dropping JSON here + restart.
       CONDUIT_REGISTRY_LOCATION: file:/registry/
       CONDUIT_ASSISTANT_DOMAIN_CONTEXT: ${CONDUIT_ASSISTANT_DOMAIN_CONTEXT:-an enterprise assistant for banking staff — covering client financial data, market research, and internal HR policies}
+      # ── Conduit Insights: metric sources (in-network URLs; keys from env) ──────
+      CONDUIT_INSIGHTS_PROMETHEUS_URL: http://prometheus:9090
+      CONDUIT_INSIGHTS_LANGFUSE_URL: http://langfuse:3000
+      CONDUIT_INSIGHTS_LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PROJECT_PUBLIC_KEY:-pk-lf-meridian-public}
+      CONDUIT_INSIGHTS_LANGFUSE_SECRET_KEY: ${LANGFUSE_PROJECT_SECRET_KEY:-sk-lf-meridian-secret}
     volumes:
       - ./registry:/registry:ro
     depends_on:

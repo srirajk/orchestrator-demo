@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
@@ -58,6 +60,7 @@ public class AnswerSynthesizer {
     private final boolean showReasoning;
     private final HttpClient httpClient;
     private final Tracer tracer;
+    private final MeterRegistry meterRegistry;
     private final int maxRetries;
     private final int retryInitialDelayMs;
     private final int retryBackoffMultiplier;
@@ -76,6 +79,7 @@ public class AnswerSynthesizer {
     public AnswerSynthesizer(
             ObjectMapper mapper,
             Tracer tracer,
+            MeterRegistry meterRegistry,
             @Value("${conduit.llm.synthesizer.base-url:https://api.z.ai/api/paas/v4}") String baseUrl,
             @Value("${conduit.llm.synthesizer.api-key:}") String apiKey,
             @Value("${conduit.llm.synthesizer.model:glm-4.6}") String model,
@@ -92,6 +96,7 @@ public class AnswerSynthesizer {
             @Value("${conduit.llm.synthesizer.stream-idle-timeout-seconds:30}") int streamIdleTimeoutSeconds) {
         this.mapper = mapper;
         this.tracer = tracer;
+        this.meterRegistry = meterRegistry;
         this.baseUrl = baseUrl;
         this.apiKey = apiKey;
         this.model = model;
@@ -367,6 +372,10 @@ public class AnswerSynthesizer {
             boolean emitReasoning,
             long[] tokenCounts) throws Exception {
 
+        // TTFT clock: wall time from issuing the generation request to the first answer token.
+        final long ttftStart = System.currentTimeMillis();
+        boolean ttftRecorded = false;
+
         // Inject stream_options to get a final usage chunk — needed for token count telemetry.
         String bodyWithUsage = requestBody;
         try {
@@ -459,6 +468,15 @@ public class AnswerSynthesizer {
 
                 // ── Answer content ─────────────────────────────────────────────
                 if (chunk.content != null && !chunk.content.isEmpty()) {
+                    if (!ttftRecorded) {
+                        // Record TTFT once, on the first answer token (Insights "TTFT p95" panel).
+                        Timer.builder("conduit.ttft")
+                                .description("Time to first answer token from the synthesizer")
+                                .publishPercentileHistogram()
+                                .register(meterRegistry)
+                                .record(System.currentTimeMillis() - ttftStart, java.util.concurrent.TimeUnit.MILLISECONDS);
+                        ttftRecorded = true;
+                    }
                     if (firstContent && reasoningEmitted) {
                         // Close the thinking block and add a separator before the answer
                         emitter.send(SseEmitter.event().data(
