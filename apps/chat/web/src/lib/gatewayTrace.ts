@@ -1,11 +1,10 @@
 /**
- * Gateway trace contract for the chat SPA — a self-contained mirror of the reused surface of
- * `@conduit/gateway-client` (its dependency-free SSE parser + glass-box trace types).
+ * Gateway trace contract for the chat SPA — the self-contained, canonical definition of the
+ * dependency-free SSE parser + glass-box trace types the gateway emits.
  *
- * Why vendored: the `conduit-chat` Docker image builds `apps/chat/web` with build context
- * `./apps/chat`, so the monorepo `packages/` dir is outside the image context and cannot be
- * imported by path. This module keeps the SAME wire contract the gateway emits (kept byte-for-byte
- * in sync with `packages/gateway-client/src/{sse,types}.ts`) so the rail consumes it identically.
+ * Self-contained by design: the `conduit-chat` Docker image builds `apps/chat/web` with build
+ * context `./apps/chat`, so nothing outside that dir can be imported by path. This module keeps
+ * the SAME wire contract the gateway emits so the rail consumes it identically.
  */
 
 // ── Trace wire types (mirror of gateway-client/src/types.ts) ─────────────────

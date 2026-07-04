@@ -14,8 +14,8 @@ export interface UseTraceStream {
 
 /**
  * Subscribes to the BFF-proxied glass-box trace stream for one conversation and yields the
- * pipeline frames of the current turn. Reuses `@conduit/gateway-client`'s dependency-free SSE
- * parser (`iterateSseData`) and `TraceEvent` type — the same contract the gateway emits.
+ * pipeline frames of the current turn. Uses the dependency-free SSE parser (`iterateSseData`)
+ * and `TraceEvent` type from `../lib/gatewayTrace` — the same contract the gateway emits.
  *
  * <p>Uses `fetch` + a manual reader (not native `EventSource`) so it inherits the SPA session
  * cookie via `credentials: 'include'`. Frames accumulate until a new `request_start` frame, at
