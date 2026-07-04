@@ -2,15 +2,12 @@
   "name": "conduit-monorepo",
   "version": "1.0.0",
   "private": true,
-  "description": "Conduit / Axiom monorepo — shared UI + gateway client packages and the Axiom Admin console.",
+  "description": "Conduit / Axiom monorepo — the Axiom Admin console.",
   "workspaces": [
-    "packages/*",
     "apps/admin"
   ],
   "scripts": {
-    "build:packages": "npm run build --workspace @conduit/gateway-client && npm run build --workspace @conduit/ui",
-    "typecheck:packages": "npm run typecheck --workspace @conduit/gateway-client && npm run typecheck --workspace @conduit/ui",
     "build:admin": "npm run build --workspace axiom-admin",
-    "build": "npm run build:packages && npm run build:admin"
+    "build": "npm run build:admin"
   }
 }

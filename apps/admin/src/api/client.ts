@@ -59,7 +59,12 @@ export interface User {
   email: string
   roles: string[]
   book: string[]
-  segments: string[]
+  /**
+   * ABAC per-segment clearance MAP: `{ segment -> data tier }` (AUTHZ-SPEC §1). Each key is a
+   * business segment the user belongs to; each value is the data-classification ceiling they
+   * hold in that segment. This is exactly the shape baked into the JWT `segments` claim.
+   */
+  segments: Record<string, string>
   clearance?: number
   classification: string
   team?: string
@@ -86,6 +91,7 @@ export interface AuditEntry {
   id: string
   tenantId: string
   actorId: string
+  clientId?: string
   action: string
   resourceType: string
   resourceId: string
@@ -139,7 +145,6 @@ export interface Role {
   name: string
   description: string
   permissions: string[]
-  clearance_required: number
 }
 
 export interface Policy {
@@ -191,15 +196,9 @@ export const usersApi = {
   patchBook: (id: string, add: string[], remove: string[]) =>
     req<User>('PATCH', `/users/${id}/book`, { add, remove }),
   assignRole: (userId: string, roleId: string) =>
-    req<{ roles: string[] }>('POST', `/users/${userId}/roles`, { role_id: roleId }),
+    req<{ roles: string[] }>('POST', `/users/${userId}/roles`, { roleId }),
   removeRole: (userId: string, roleId: string) =>
     req<void>('DELETE', `/users/${userId}/roles/${roleId}`),
-  getTeams: (userId: string) =>
-    req<{ teams: Team[] }>('GET', `/users/${userId}/teams`),
-  getBook: (userId: string) =>
-    req<{ relationships: string[] }>('GET', `/users/${userId}/book`),
-  checkRelAccess: (userId: string, relId: string) =>
-    req<{ allowed: boolean }>('GET', `/users/${userId}/relationships/${relId}/access`),
 }
 
 // ── Teams ─────────────────────────────────────────────────────────────────────
@@ -226,7 +225,7 @@ export const teamsApi = {
     }),
   delete: (id: string) => req<void>('DELETE', `/teams/${id}`),
   addMember: (teamId: string, userId: string) =>
-    req<{ added: boolean }>('POST', `/teams/${teamId}/members`, { user_id: userId }),
+    req<{ added: boolean }>('POST', `/teams/${teamId}/members`, { userId }),
   removeMember: (teamId: string, userId: string) =>
     req<void>('DELETE', `/teams/${teamId}/members/${userId}`),
   listMembers: (teamId: string) =>
@@ -235,13 +234,7 @@ export const teamsApi = {
 
 // ── Roles ─────────────────────────────────────────────────────────────────────
 export const rolesApi = {
-  list: async () => {
-    const roles = await req<Role[]>('GET', '/roles')
-    return roles.map((role) => ({
-      ...role,
-      clearance_required: role.clearance_required ?? 1,
-    }))
-  },
+  list: () => req<Role[]>('GET', '/roles'),
   get: (id: string) => req<Role>('GET', `/roles/${id}`),
   create: (data: Role) => req<Role>('POST', '/roles', {
     name: data.name,

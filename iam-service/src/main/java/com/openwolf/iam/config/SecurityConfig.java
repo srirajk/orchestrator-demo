@@ -43,8 +43,14 @@ import org.springframework.security.web.authentication.LoginUrlAuthenticationEnt
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPrivateKey;
@@ -70,8 +76,16 @@ import java.util.UUID;
 @EnableMethodSecurity
 public class SecurityConfig {
 
+    private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
+
     @Value("${spring.security.oauth2.authorizationserver.issuer:http://localhost:8084}")
     private String issuerUrl;
+
+    // Persistent location of the RSA signing key (full JWK JSON, incl. private params + stable kid).
+    // The key is loaded if present, else generated once and written here. Persisting it means the
+    // signing key + its kid survive restarts, so live sessions are not invalidated on every restart.
+    @Value("${iam.signing-key-path:/app/keys/signing-key.json}")
+    private String signingKeyPath;
 
     // Browser origins allowed to call this IAM cross-origin (Axiom's own admin/chat UIs).
     // Comma-separated, env-overridable. Adding an origin here is CORS allowlist config only,
@@ -97,6 +111,9 @@ public class SecurityConfig {
 
     @Value("${iam.oauth2.conduit-chat.redirect-uri:http://localhost:8099/api/auth/callback}")
     private String conduitChatRedirectUri;
+
+    @Value("${iam.oauth2.conduit-chat.post-logout-redirect-uri:http://localhost:8099/api/auth/login}")
+    private String conduitChatPostLogoutRedirectUri;
 
     @Value("${iam.oauth2.admin-ui.client-id:admin-ui-client}")
     private String adminUiClientId;
@@ -285,6 +302,9 @@ public class SecurityConfig {
 
         // Conduit Chat — OIDC SSO for the end-user chat BFF (the user logs in AS THEMSELVES;
         // the BFF forwards the user's token to the gateway → entitlements as the real principal).
+        // offline_access is included so Axiom issues a refresh_token alongside the access token,
+        // enabling the BFF's OAuth2AuthorizedClientManager refresh_token provider to silently
+        // renew credentials without a full re-login.
         RegisteredClient conduitChatClient = RegisteredClient.withId("conduit-chat-client-id")
                 .clientId(conduitChatClientId)
                 .clientSecret(passwordEncoder.encode(conduitChatClientSecret))
@@ -293,9 +313,11 @@ public class SecurityConfig {
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
                 .redirectUri(conduitChatRedirectUri)
+                .postLogoutRedirectUri(conduitChatPostLogoutRedirectUri)
                 .scope(OidcScopes.OPENID)
                 .scope(OidcScopes.PROFILE)
                 .scope(OidcScopes.EMAIL)
+                .scope("offline_access")
                 .tokenSettings(TokenSettings.builder()
                         .accessTokenTimeToLive(Duration.ofHours(2))
                         .refreshTokenTimeToLive(Duration.ofDays(1))
@@ -310,14 +332,49 @@ public class SecurityConfig {
     }
 
     // =========================================================
-    // JWK Source — RSA 2048, generated fresh on startup
+    // JWK Source — RSA 2048, persisted (load-or-generate) so kid is stable across restarts
     // =========================================================
 
     @Bean
     public JWKSource<SecurityContext> jwkSource() {
-        RSAKey rsaKey = generateRsaKey();
+        RSAKey rsaKey = loadOrGenerateRsaKey();
         JWKSet jwkSet = new JWKSet(rsaKey);
         return new ImmutableJWKSet<>(jwkSet);
+    }
+
+    /**
+     * Load the RSA signing key (with its stable kid) from {@code signingKeyPath} if it exists;
+     * otherwise generate a new key once and write it there. This keeps the same key + kid across
+     * restarts, so previously-issued tokens remain verifiable and live sessions survive a restart.
+     */
+    private RSAKey loadOrGenerateRsaKey() {
+        Path path = Path.of(signingKeyPath);
+        if (Files.exists(path)) {
+            try {
+                return RSAKey.parse(Files.readString(path));
+            } catch (Exception ex) {
+                throw new IllegalStateException("Failed to load RSA signing key from " + path, ex);
+            }
+        }
+        RSAKey generated = generateRsaKey();
+        try {
+            if (path.getParent() != null) {
+                Files.createDirectories(path.getParent());
+            }
+            Files.writeString(path, generated.toJSONString());
+            // Restrict to owner-read/write only (0600) — the file contains the RSA private key.
+            // Best-effort: UnsupportedOperationException is thrown on non-POSIX filesystems
+            // (e.g. Windows, certain container overlays) and is silently ignored.
+            try {
+                Files.setPosixFilePermissions(path,
+                        PosixFilePermissions.fromString("rw-------"));
+            } catch (UnsupportedOperationException ignored) {
+                log.warn("Could not restrict signing-key file permissions to 0600 (non-POSIX filesystem): {}", path);
+            }
+        } catch (Exception ex) {
+            throw new IllegalStateException("Failed to persist RSA signing key to " + path, ex);
+        }
+        return generated;
     }
 
     private RSAKey generateRsaKey() {

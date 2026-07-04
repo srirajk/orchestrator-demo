@@ -69,6 +69,36 @@ public class GatewayClient {
         }
     }
 
+    /**
+     * Opens the gateway's glass-box trace SSE stream ({@code GET /trace/stream}), scoped to a
+     * single conversation so the rail only sees this conversation's authorization/pipeline frames.
+     *
+     * <p>The gateway's {@code /trace/**} is public (a browser {@code EventSource} cannot carry a
+     * Bearer header), so no token is forwarded — the BFF gates access to this proxy via its own
+     * session ({@code /api/**} is authenticated) instead.
+     *
+     * @throws GatewayException if the gateway is unreachable.
+     */
+    public GatewayStream openTraceStream(String conversationId) {
+        String uri = config.baseUrl() + "/trace/stream"
+                + "?conversationId=" + java.net.URLEncoder.encode(
+                        conversationId == null ? "" : conversationId, java.nio.charset.StandardCharsets.UTF_8);
+        HttpRequest request = HttpRequest.newBuilder(URI.create(uri))
+                .header("Accept", "text/event-stream")
+                .GET()
+                .build();
+        try {
+            HttpResponse<java.io.InputStream> response =
+                    httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            return new GatewayStream(response.statusCode(), response.body());
+        } catch (java.io.IOException ex) {
+            throw new GatewayException("Gateway trace stream unreachable", ex);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new GatewayException("Gateway trace stream interrupted", ex);
+        }
+    }
+
     private String serialize(List<ChatMessage> messages) {
         List<Map<String, String>> wire = messages.stream()
                 .map(m -> Map.of("role", m.role(), "content", m.content()))

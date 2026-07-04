@@ -11,10 +11,10 @@
 
 **Audience — persona-agnostic (important):** this chat is for **any entitled user, not just
 relationship managers** — RMs, underwriters, analysts, ops, compliance, execs, and any future role.
-What each person can see and do is decided **entirely by their JWT claims (roles/book/segments/
-clearance) + the manifest-declared domains** — never by hardcoded, RM- or wealth-specific
-assumptions in the UI (the same World-B rule the gateway follows: zero embedded domain knowledge).
-No domain/persona names, entity-type literals, or "which client?"-style copy baked into the client;
+What each person can see and do is decided **entirely by their JWT claims (roles as `chat_user` + segments
+as `{segment: data_classification}` map + coverage) + the manifest-declared domains** — never by hardcoded,
+RM- or wealth-specific assumptions in the UI (the same World-B rule the gateway follows: zero embedded domain
+knowledge). No domain/persona names, entity-type literals, or "which client?"-style copy baked into the client;
 it's all driven by the effective manifest + the user's entitlements. Any persona in this doc
 (`rm_jane`, `uw_sam`, …) is just an illustration.
 
@@ -113,21 +113,25 @@ admin token), **entitlements gate everything**, and **agent outputs are the only
 
 ## 8. Identity, entitlements, audit  *(non-negotiable — from the ADR)*
 - **P0 Axiom OIDC/SSO login — the user logs in AS THEMSELVES** (rm_jane), and the **user's JWT**
-  (with `book`/`segments`/`clearance`/`roles`) is the Bearer to `/gateway-api`. This is what makes
+  (with `roles` as `chat_user` + `segments` as `{segment: data_classification}` map + `coverage`) is the Bearer to `/gateway-api`. This is what makes
   the entitlement/denial story correct **by construction** — and it **retires the P0 persona/
   impersonation problem** entirely (no admin token, no `/auth/impersonate` for the end-user path).
 - **P0 401/expiry handling** — refresh or route to login on expiry; no silent stale sessions.
 - **P1 Per-user history isolation** — a user only ever sees their own conversations/files.
 - **P1 Usage/quota** surfacing if the gateway meters.
 
-## 9. Gateway integration contract (reuse `packages/gateway-client`)
+## 9. Gateway integration contract (reuse `packages/gateway-client` for SSE/trace types)
 - **Streaming:** `POST /v1/chat/completions` `stream:true` → SSE (byte-exact); consume via
   fetch-stream (so `Authorization` header works), key done on `data: [DONE]`.
 - **Non-streaming fallback:** `stream:false` → single `chat.completion` JSON.
 - **Multi-turn:** send `X-Conversation-Id`; it must round-trip into trace frames (NEW-1).
 - **Trace:** `GET /trace/stream` (SSE) scoped to the conversation.
 - **Registry:** `/admin/domains`, `/admin/agents` for scope/citation display; `/trace/health`.
-- Reuse the hardened hooks (`useTraceStream`, `useWorkbenchChat`) + fixes from `CODEX-WORKLIST.md`.
+- Reuse `packages/gateway-client` for SSE parsing + trace types only. The Java BFF talks directly
+  to the gateway; the web reuses gateway-client for the glass-box trace rail (SSE deltas + type defs).
+
+**Note:** LibreChat is now redundant — Conduit Chat replaces it end-to-end (persistent, OIDC-backed,
+glass-box). LibreChat is a retirement candidate once chat reaches feature parity.
 
 ---
 

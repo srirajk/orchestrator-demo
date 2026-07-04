@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Users, UsersRound, Shield, FileText, Activity, ArrowRight } from 'lucide-react'
+import { Users, UsersRound, Shield, FileText, Activity, ArrowRight, AlertCircle, RefreshCw } from 'lucide-react'
 import { statsApi, auditApi } from '../api/client'
 import { useAuth } from '../hooks/useAuth'
 import { Skeleton } from '../components/ui/Skeleton'
@@ -103,9 +103,10 @@ function getActionColor(action: string): string {
 export function Dashboard() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats, isLoading: statsLoading, isError: statsIsError, error: statsError, refetch: refetchStats } = useQuery({
     queryKey: ['stats'],
     queryFn: statsApi.get,
+    retry: false,
   })
   const { data: auditData, isLoading: auditLoading } = useQuery({
     queryKey: ['audit', 0, 5],
@@ -137,6 +138,19 @@ export function Dashboard() {
               <SkeletonCard key={i} />
             ))}
           </>
+        ) : statsIsError ? (
+          <div className="col-span-full flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg" role="alert">
+            <AlertCircle size={18} className="text-red-600 shrink-0" />
+            <p className="text-sm text-red-800 flex-1">
+              {statsError instanceof Error ? statsError.message : 'Failed to load statistics'}
+            </p>
+            <button
+              onClick={() => { void refetchStats() }}
+              className="flex items-center gap-1.5 text-xs font-medium text-red-700 hover:text-red-900 transition-colors"
+            >
+              <RefreshCw size={13} /> Retry
+            </button>
+          </div>
         ) : stats ? (
           <>
             <StatCard

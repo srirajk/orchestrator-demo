@@ -7,6 +7,7 @@
     "organization": "Meridian Demo Bank"
   },
   "domain": "insurance",
+  "audience": "segment",
   "sub_domain": "claims-servicing",
   "max_response_tokens": 2000,
   "protocol": "http",
@@ -22,7 +23,7 @@
     {
       "id": "get_policy_details",
       "name": "get_policy_details",
-      "description": "Retrieve policy details — line of business, premium, coverage limit, deductible, status, and effective date — for a commercial insurance policy.",
+      "description": "Retrieve policy details \u2014 line of business, premium, coverage limit, deductible, status, and effective date \u2014 for a commercial insurance policy.",
       "tags": [
         "policy",
         "policy-details",
@@ -47,7 +48,7 @@
     }
   ],
   "constraints": {
-    "is_mutating": false,
+    "access_mode": "read",
     "data_classification": "confidential-pii",
     "sla_timeout_ms": 30000
   }

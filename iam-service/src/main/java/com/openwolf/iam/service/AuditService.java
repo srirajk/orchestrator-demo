@@ -74,6 +74,38 @@ public class AuditService {
     }
 
     /**
+     * Records a non-mutating ACCESS audit event — e.g. a user entering a client
+     * application on successful OIDC authentication ("who entered"). This is additive
+     * audit <em>around</em> authentication: it records the fact of a successful login,
+     * it never participates in or alters the authentication decision.
+     * <p>
+     * The {@code clientId} tags which application was entered (e.g. {@code conduit-chat}
+     * vs the admin console) so chat-access is distinct in the audit log. Never throws —
+     * an audit-write failure must never break login.
+     *
+     * @param actorId      the authenticated user id ("who")
+     * @param clientId     the OIDC client the user authenticated into ("where")
+     * @param action       the access event name (e.g. {@code chat_access})
+     * @param resourceType the audited resource kind
+     * @param resourceId   the audited resource identifier
+     * @param sourceIp     best-effort source IP, may be null
+     */
+    public void logAccess(String actorId, String clientId, String action,
+                          String resourceType, String resourceId, String sourceIp) {
+        try {
+            AuditLog entry = new AuditLog(
+                    TENANT_ID, actorId, clientId, action,
+                    resourceType, resourceId, null, null, sourceIp, null);
+            auditLogRepository.save(entry);
+            log.info("Audit access event: actor={} action={} client={}", actorId, action, clientId);
+        } catch (Exception ex) {
+            // Never break the request — log and continue
+            log.error("Failed to write access audit log for actor={} action={} client={}: {}",
+                    actorId, action, clientId, ex.getMessage(), ex);
+        }
+    }
+
+    /**
      * Resolves the current actor's user ID from the Spring Security context.
      * Returns "system" if no authenticated principal is present.
      */

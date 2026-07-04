@@ -15,7 +15,6 @@ const EMPTY: Role = {
   name: '',
   description: '',
   permissions: [],
-  clearance_required: 1,
 }
 
 function SkeletonRow() {
@@ -32,7 +31,6 @@ function SkeletonRow() {
       </td>
       <td className="px-5 py-3.5"><Skeleton className="h-4 w-48" /></td>
       <td className="px-5 py-3.5"><Skeleton className="h-4 w-32" /></td>
-      <td className="px-5 py-3.5"><Skeleton className="h-4 w-16" /></td>
       <td className="px-5 py-3.5"><Skeleton className="h-4 w-12" /></td>
     </tr>
   )
@@ -126,7 +124,7 @@ export function Roles() {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                {['Role', 'Description', 'Permissions', 'Min. Clearance', ''].map(h => (
+                {['Role', 'Description', 'Permissions', ''].map(h => (
                   <th
                     key={h}
                     className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide"
@@ -153,7 +151,7 @@ export function Roles() {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                {['Role', 'Description', 'Permissions', 'Min. Clearance', ''].map(h => (
+                {['Role', 'Description', 'Permissions', ''].map(h => (
                   <th
                     key={h}
                     className="text-left px-5 py-3 text-xs font-medium text-slate-500 uppercase tracking-wide"
@@ -195,19 +193,6 @@ export function Roles() {
                     </div>
                   </td>
                   <td className="px-5 py-3.5">
-                    <Badge
-                      color={
-                        r.clearance_required >= 4
-                          ? 'purple'
-                          : r.clearance_required >= 3
-                            ? 'blue'
-                            : 'slate'
-                      }
-                    >
-                      L{r.clearance_required}
-                    </Badge>
-                  </td>
-                  <td className="px-5 py-3.5">
                     <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                       <button
                         onClick={() => openEdit(r)}
@@ -246,29 +231,6 @@ export function Roles() {
             value={form.description}
             onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
           />
-          <div>
-            <label className="text-sm font-medium text-slate-700 block mb-1">
-              Minimum clearance required
-            </label>
-            <input
-              type="range"
-              min={1}
-              max={5}
-              value={form.clearance_required}
-              onChange={e => setForm(f => ({ ...f, clearance_required: Number(e.target.value) }))}
-              className="w-full accent-axiom-700"
-            />
-            <div className="flex justify-between text-xs text-slate-500 mt-1">
-              {[1, 2, 3, 4, 5].map(n => (
-                <span
-                  key={n}
-                  className={form.clearance_required === n ? 'font-bold text-axiom-700' : ''}
-                >
-                  {n}
-                </span>
-              ))}
-            </div>
-          </div>
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-slate-700">Permissions</label>
             <div className="flex gap-2">

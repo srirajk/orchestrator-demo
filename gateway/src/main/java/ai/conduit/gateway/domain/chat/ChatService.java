@@ -23,6 +23,7 @@ import ai.conduit.gateway.infrastructure.telemetry.event.AgentStartData;
 import ai.conduit.gateway.infrastructure.telemetry.event.AgentsResolvedData;
 import ai.conduit.gateway.infrastructure.telemetry.event.CheckDeniedData;
 import ai.conduit.gateway.infrastructure.telemetry.event.EntitlementCheckData;
+import ai.conduit.gateway.infrastructure.telemetry.event.GateData;
 import ai.conduit.gateway.infrastructure.telemetry.event.IntentClassifiedData;
 import ai.conduit.gateway.infrastructure.telemetry.event.RequestCompleteData;
 import ai.conduit.gateway.infrastructure.telemetry.event.RequestStartData;
@@ -59,6 +60,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -221,7 +223,14 @@ public class ChatService {
                         intentResult.extractedEntities(), streamId);
                 case FOLLOW_UP  -> handleFollowUp(request, emitter, latestPrompt,
                         conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan, streamId);
-                case CLARIFY    -> handleClarify(emitter, conversationId, userId, jwtPrincipal, requestId, requestStart, streamId);
+                // CLARIFY is routed through the SAME deterministic coverage path as FETCH_DATA
+                // (hard-rule e): the LLM never decides clarification. The coverage
+                // discover/intersect/`required ∩ resolved = ∅` check inside handleFetchData
+                // produces the proper numbered clarification from the RM's book — not a bare,
+                // LLM-judged manifest message.
+                case CLARIFY    -> handleFetchData(request, emitter, latestPrompt,
+                        conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan,
+                        intentResult.extractedEntities(), streamId);
                 case CHITCHAT   -> handleChitchat(request, emitter, conversationId, requestId, requestStart, streamId);
             }
 
@@ -293,6 +302,18 @@ public class ChatService {
             // Must happen BEFORE input synthesis so we never synthesize inputs for denied agents.
             List<AgentManifest> manifests = resolved.selected().stream()
                     .map(c -> c.manifest()).collect(Collectors.toList());
+
+            // ── STRUCTURAL GATE TRACE (audience → segment → classification) ──────────
+            // Emit one ordered `gate` frame per gate/agent so the glass box renders the
+            // authorization decision as a legible step-by-step trace with each gate's
+            // pass/deny + plain-english reason. This EXPLAINS the Cerbos verdict enforced
+            // just below by filterAgents. Reasons are built from manifest/principal data
+            // (segment, tier, classification) — no hardcoded domain literal (World B).
+            entitlementService.explainStructuralGates(principal, manifests)
+                    .forEach(g -> tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
+                            new GateData(g.gate(), g.allow() ? GateData.EFFECT_ALLOW : GateData.EFFECT_DENY,
+                                    g.reason(), g.agent()))));
+
             List<AgentManifest> allowedManifests = entitlementService.filterAgents(principal, manifests);
             if (allowedManifests.isEmpty()) {
                 emitRequestOutcome("DENIED");
@@ -345,6 +366,8 @@ public class ChatService {
             // If found, run DISCOVER/RESOLVE/CHECK before synthesis so we never
             // waste agent calls on a relationship the RM doesn't cover.
             AgentManifest resourceScopedAgent = finalManifests.stream()
+                // Enterprise/knowledge agents carry no per-user entity — skip the coverage gate.
+                .filter(entitlementService::requiresCoverage)
                 .filter(m -> {
                     EffectiveManifest em = manifestStore.getEffective(
                         m.agentId(), m.domain(), m.subDomain());
@@ -379,9 +402,12 @@ public class ChatService {
                         if (hasConversationReference) {
                             // Resolve the client reference from the client-sent messages to a
                             // canonical relationship ID. Pivots re-resolve and re-authorize.
+                            // RESOLVE is principal-agnostic (World-B invariant 5): scope by tenant,
+                            // not by the caller's book. The book gate is the CHECK call below plus
+                            // the candidates ∩ discover intersection in the ambiguous branch.
                             CoverageResolveResult resolveResult = coverageClient.resolve(
                                 preExtracted.reference(coverageEntity.extractAs()),
-                                coverageEntity.resolveType(), principalId, coverage);
+                                coverageEntity.resolveType(), tenantId, coverage);
 
                             if (resolveResult.resolved()) {
                                 coverageRelId = resolveResult.id();
@@ -389,6 +415,12 @@ public class ChatService {
                                     principalId, tenantId, coverageRelId, coverage);
                                 if (!check.allowed()) {
                                     emitRequestOutcome("DENIED");
+                                    // Structured coverage gate frame for the glass box: which entity,
+                                    // whose book. Reason is data (entity id + principal id), World-B clean.
+                                    tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
+                                        GateData.deny(GateData.GATE_COVERAGE,
+                                            coverageRelId + " not in " + principalId + "'s book",
+                                            resourceScopedAgent.agentId())));
                                     // Glass-box: explicit CHECK deny event (bug 239) so the trace shows the
                                     // coverage decision rather than jumping straight to request_complete.
                                     tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
@@ -402,6 +434,12 @@ public class ChatService {
                                         new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
                                     return;
                                 }
+                                // Coverage cleared — emit the passing gate frame so the trace shows a
+                                // green coverage row, not a silent skip to synthesis.
+                                tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
+                                    GateData.allow(GateData.GATE_COVERAGE,
+                                        coverageRelId + " in " + principalId + "'s book",
+                                        resourceScopedAgent.agentId())));
 
                             } else if (resolveResult.isAmbiguous()) {
                                 // Multiple matches — discover what's in RM's coverage and intersect.
@@ -439,6 +477,10 @@ public class ChatService {
 
                             if (discovered.isEmpty()) {
                                 emitRequestOutcome("DENIED");
+                                // Structured coverage gate frame — the principal's book is empty.
+                                tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
+                                    GateData.deny(GateData.GATE_COVERAGE,
+                                        principalId + "'s book is empty", resourceScopedAgent.agentId())));
                                 // Empty coverage book is a domain/coverage deny — surface it in the trace (bug 239).
                                 tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
                                     new CheckDeniedData("coverage", null, principalId, "empty-coverage", "coverage")));
@@ -582,17 +624,6 @@ public class ChatService {
         } finally { span.end(); }
     }
 
-    private void handleClarify(SseEmitter emitter, String conversationId,
-                                String userId, Principal jwtPrincipal,
-                                String requestId, long requestStart, String streamId) throws Exception {
-        String message = msg("missing_entity_question",
-                "Which resource are you asking about? Please provide its identifier to continue.");
-        emitRequestOutcome("CLARIFIED");
-        streamTextAndComplete(emitter, message, streamId);
-        tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
-                new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
-    }
-
     private void handleChitchat(ChatRequest request, SseEmitter emitter,
                                  String conversationId, String requestId, long requestStart, String streamId) throws Exception {
         answerSynthesizer.synthesizeFromHistory(request.messages(), extractLatestUserMessage(request), emitter, streamId);
@@ -633,11 +664,12 @@ public class ChatService {
      * client relationships to choose from.
      *
      * @param em         the effective manifest (provides the question template from clarification schema)
-     * @param candidates resolve candidates already known (may be empty — falls back to discovered)
+     * @param candidates disambiguation candidates already narrowed to the RM's book (may be empty
+     *                   — falls back to the full discovered list)
      * @param discovered full discovered list for this RM
      */
     private String buildClarificationQuestion(EffectiveManifest em,
-                                               List<? extends Object> candidates,
+                                               List<CoverageResolveResult.ResolveCandidate> candidates,
                                                List<CoverageResource> discovered) {
         ai.conduit.gateway.domain.manifest.ClarificationSchema cs =
                 em.clarificationFor(em.primaryRequiredKey());
@@ -645,10 +677,20 @@ public class ChatService {
             ? cs.question()
             : msg("missing_entity_question", "Which resource are you asking about?");
 
-        // Use discovered list when candidates is empty or no match narrowing was done.
-        List<CoverageResource> options = discovered.isEmpty()
-            ? discovered
-            : (candidates.isEmpty() ? discovered : discovered); // always show full discovered list
+        // When disambiguation candidates exist (already intersected with the RM's book),
+        // narrow the options to just those — do NOT dump the full book. Fall back to the
+        // full discovered list only when there are no candidates to narrow with.
+        List<CoverageResource> options;
+        if (candidates != null && !candidates.isEmpty()) {
+            Set<String> candidateIds = candidates.stream()
+                .map(CoverageResolveResult.ResolveCandidate::id)
+                .collect(Collectors.toSet());
+            options = discovered.stream()
+                .filter(r -> candidateIds.contains(r.id()))
+                .collect(Collectors.toList());
+        } else {
+            options = discovered;
+        }
 
         StringBuilder sb = new StringBuilder(questionText).append("\n");
         int i = 1;

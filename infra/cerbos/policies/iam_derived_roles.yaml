@@ -25,7 +25,10 @@ derivedRoles:
               - expr: "P.attr.tenant_id == R.attr.tenant_id"
               - expr: "R.attr.domain_id != '' && P.attr.admin_domains.exists(d, d == R.attr.domain_id)"
 
-    # ── own_resource: principal is the owner of the resource ──
+    # ── own_resource: principal is the owner of the resource, in the same tenant ──
+    # Tenant equality is required in addition to the owner match: without it, a
+    # principal could read a same-id owner record that happens to live in another
+    # tenant. Owner match AND tenant match together scope this to the real self.
     - name: own_resource
       parentRoles: ["*"]
       condition:
@@ -33,6 +36,8 @@ derivedRoles:
           all:
             of:
               - expr: "R.attr.owner_id != '' && P.id == R.attr.owner_id"
+              - expr: "P.attr.tenant_id != '' && R.attr.tenant_id != ''"
+              - expr: "P.attr.tenant_id == R.attr.tenant_id"
 
     # ── policy_drafter: policy authorship capability within tenant ──
     - name: policy_drafter

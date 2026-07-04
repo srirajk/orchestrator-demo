@@ -46,7 +46,7 @@ public class CustomUserDetailsService implements UserDetailsService {
 
         List<SimpleGrantedAuthority> authorities = principal.getRoles().stream()
                 .map(Role::getName)
-                .map(role -> new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()))
+                .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
                 .toList();
 
         return User.builder()

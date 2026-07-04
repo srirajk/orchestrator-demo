@@ -5,144 +5,144 @@
   "cases": [
     {
       "id": "AGT-001",
-      "description": "RM invokes internal-classified wealth agent — baseline happy path",
-      "tags": ["agent", "rm", "classification", "allow"],
+      "description": "chat_user in wealth (internal tier) invokes internal-classified wealth agent — baseline happy path; classification gate allows (internal >= internal)",
+      "tags": ["agent", "abac", "chat_user", "classification", "allow"],
       "principal": {
         "id": "rm_jane",
-        "roles": ["relationship_manager"],
-        "attr": { "tenant_id": "default", "segments": ["wealth"], "clearance": "1", "book": ["REL-00042"] }
+        "roles": ["chat_user"],
+        "attr": { "tenant_id": "default", "segments": { "wealth": "internal" } }
       },
       "resource": {
         "kind": "agent", "id": "wealth-holdings",
-        "attr": { "domain": "wealth-management", "is_mutating": false, "data_classification": "internal" }
+        "attr": { "domain": "wealth-management", "audience": "segment", "access_mode": "read", "data_classification": "internal" }
       },
       "action": "invoke",
       "expected": "ALLOW"
     },
     {
       "id": "AGT-002",
-      "description": "RM (clearance 1) cannot invoke confidential-classified agent",
-      "tags": ["agent", "rm", "classification", "deny"],
+      "description": "chat_user holding only the internal tier in wealth cannot invoke a confidential-classified wealth agent — classification gate denies (internal < confidential)",
+      "tags": ["agent", "abac", "chat_user", "classification", "deny"],
       "principal": {
         "id": "rm_junior",
-        "roles": ["relationship_manager"],
-        "attr": { "tenant_id": "default", "segments": ["wealth"], "clearance": "1", "book": [] }
+        "roles": ["chat_user"],
+        "attr": { "tenant_id": "default", "segments": { "wealth": "internal" } }
       },
       "resource": {
         "kind": "agent", "id": "wealth-performance",
-        "attr": { "domain": "wealth-management", "is_mutating": false, "data_classification": "confidential" }
+        "attr": { "domain": "wealth-management", "audience": "segment", "access_mode": "read", "data_classification": "confidential" }
       },
       "action": "invoke",
       "expected": "DENY"
     },
     {
       "id": "AGT-003",
-      "description": "Senior RM (clearance 2) invokes confidential-classified agent",
-      "tags": ["agent", "rm", "classification", "allow"],
+      "description": "Senior chat_user in wealth (confidential tier) invokes confidential-classified agent — classification gate allows (confidential >= confidential)",
+      "tags": ["agent", "abac", "chat_user", "classification", "allow"],
       "principal": {
         "id": "rm_senior",
-        "roles": ["relationship_manager"],
-        "attr": { "tenant_id": "default", "segments": ["wealth"], "clearance": "2", "book": [] }
+        "roles": ["chat_user"],
+        "attr": { "tenant_id": "default", "segments": { "wealth": "confidential" } }
       },
       "resource": {
         "kind": "agent", "id": "wealth-performance",
-        "attr": { "domain": "wealth-management", "is_mutating": false, "data_classification": "confidential" }
+        "attr": { "domain": "wealth-management", "audience": "segment", "access_mode": "read", "data_classification": "confidential" }
       },
       "action": "invoke",
       "expected": "ALLOW"
     },
     {
       "id": "AGT-004",
-      "description": "Senior RM (clearance 2) cannot invoke confidential-pii agent",
-      "tags": ["agent", "rm", "classification", "deny"],
+      "description": "chat_user holding the confidential tier in wealth cannot invoke a confidential-pii agent — per-segment classification gate denies (confidential < confidential-pii)",
+      "tags": ["agent", "abac", "chat_user", "classification", "deny"],
       "principal": {
         "id": "rm_senior",
-        "roles": ["relationship_manager"],
-        "attr": { "tenant_id": "default", "segments": ["wealth"], "clearance": "2", "book": [] }
+        "roles": ["chat_user"],
+        "attr": { "tenant_id": "default", "segments": { "wealth": "confidential" } }
       },
       "resource": {
         "kind": "agent", "id": "wealth-pii-agent",
-        "attr": { "domain": "wealth-management", "is_mutating": false, "data_classification": "confidential-pii" }
+        "attr": { "domain": "wealth-management", "audience": "segment", "access_mode": "read", "data_classification": "confidential-pii" }
       },
       "action": "invoke",
       "expected": "DENY"
     },
     {
       "id": "AGT-005",
-      "description": "Very senior RM (clearance 3) invokes confidential-pii agent",
-      "tags": ["agent", "rm", "classification", "allow"],
+      "description": "Very senior chat_user in wealth (confidential-pii tier) invokes confidential-pii agent — classification gate allows (pii >= pii)",
+      "tags": ["agent", "abac", "chat_user", "classification", "allow"],
       "principal": {
         "id": "rm_vp",
-        "roles": ["relationship_manager"],
-        "attr": { "tenant_id": "default", "segments": ["wealth"], "clearance": "3", "book": [] }
+        "roles": ["chat_user"],
+        "attr": { "tenant_id": "default", "segments": { "wealth": "confidential-pii" } }
       },
       "resource": {
         "kind": "agent", "id": "wealth-pii-agent",
-        "attr": { "domain": "wealth-management", "is_mutating": false, "data_classification": "confidential-pii" }
+        "attr": { "domain": "wealth-management", "audience": "segment", "access_mode": "read", "data_classification": "confidential-pii" }
       },
       "action": "invoke",
       "expected": "ALLOW"
     },
     {
       "id": "AGT-006",
-      "description": "RM cannot invoke mutating agent regardless of clearance",
-      "tags": ["agent", "rm", "mutating", "deny"],
+      "description": "chat_user with the highest wealth tier still cannot invoke a write-mode (mutating) agent — Phase 1 is read-only; access_mode=write fails the accessIsRead gate regardless of tier",
+      "tags": ["agent", "abac", "chat_user", "mutating", "access-mode", "deny"],
       "principal": {
         "id": "rm_vp",
-        "roles": ["relationship_manager"],
-        "attr": { "tenant_id": "default", "segments": ["wealth"], "clearance": "5", "book": [] }
+        "roles": ["chat_user"],
+        "attr": { "tenant_id": "default", "segments": { "wealth": "confidential-pii" } }
       },
       "resource": {
         "kind": "agent", "id": "wealth-trade-exec",
-        "attr": { "domain": "wealth-management", "is_mutating": true, "data_classification": "internal" }
+        "attr": { "domain": "wealth-management", "audience": "segment", "access_mode": "write", "data_classification": "internal" }
       },
       "action": "invoke",
       "expected": "DENY"
     },
     {
       "id": "AGT-007",
-      "description": "RM in wealth segment cannot invoke servicing agent — wrong segment",
-      "tags": ["agent", "rm", "segment", "deny"],
+      "description": "chat_user holding only a wealth segment cannot invoke an asset-servicing agent — segment gate denies (no servicing membership, servicingRank=0)",
+      "tags": ["agent", "abac", "chat_user", "segment", "deny"],
       "principal": {
         "id": "rm_jane",
-        "roles": ["relationship_manager"],
-        "attr": { "tenant_id": "default", "segments": ["wealth"], "clearance": "3", "book": [] }
+        "roles": ["chat_user"],
+        "attr": { "tenant_id": "default", "segments": { "wealth": "confidential-pii" } }
       },
       "resource": {
         "kind": "agent", "id": "custody-agent",
-        "attr": { "domain": "asset-servicing", "is_mutating": false, "data_classification": "internal" }
+        "attr": { "domain": "asset-servicing", "audience": "segment", "access_mode": "read", "data_classification": "internal" }
       },
       "action": "invoke",
       "expected": "DENY"
     },
     {
       "id": "AGT-008",
-      "description": "RM in servicing segment invokes asset-servicing agent",
-      "tags": ["agent", "rm", "segment", "allow"],
+      "description": "chat_user in servicing (internal tier) invokes asset-servicing agent — segment membership + classification gate allows",
+      "tags": ["agent", "abac", "chat_user", "segment", "allow"],
       "principal": {
         "id": "ops_rm",
-        "roles": ["relationship_manager"],
-        "attr": { "tenant_id": "default", "segments": ["servicing"], "clearance": "1", "book": [] }
+        "roles": ["chat_user"],
+        "attr": { "tenant_id": "default", "segments": { "servicing": "internal" } }
       },
       "resource": {
         "kind": "agent", "id": "custody-agent",
-        "attr": { "domain": "asset-servicing", "is_mutating": false, "data_classification": "internal" }
+        "attr": { "domain": "asset-servicing", "audience": "segment", "access_mode": "read", "data_classification": "internal" }
       },
       "action": "invoke",
       "expected": "ALLOW"
     },
     {
       "id": "AGT-009",
-      "description": "platform_admin can invoke any agent including restricted and mutating",
+      "description": "platform_admin can invoke any agent including write-mode and confidential-pii — the platform_admin role rule has no condition and bypasses segment/classification/access-mode gates entirely",
       "tags": ["agent", "platform_admin", "bypass", "allow"],
       "principal": {
         "id": "admin",
         "roles": ["platform_admin"],
-        "attr": { "tenant_id": "default", "segments": [], "clearance": "0", "book": [] }
+        "attr": { "tenant_id": "default", "segments": {} }
       },
       "resource": {
-        "kind": "agent", "id": "restricted-agent",
-        "attr": { "domain": "wealth-management", "is_mutating": true, "data_classification": "restricted" }
+        "kind": "agent", "id": "wealth-trade-exec",
+        "attr": { "domain": "wealth-management", "audience": "segment", "access_mode": "write", "data_classification": "confidential-pii" }
       },
       "action": "invoke",
       "expected": "ALLOW"
@@ -210,16 +210,16 @@
     },
     {
       "id": "REL-002",
-      "description": "rm_jane cannot read Okafor (REL-00188) — not in her book — key demo scenario",
-      "tags": ["relationship", "rm", "book", "deny", "demo-scenario"],
+      "description": "rm_jane reading Okafor (REL-00188): Cerbos grants STRUCTURAL read to chat_user — the not-in-book DENY (key demo scenario) is enforced downstream by the wealth coverage service, not by Cerbos (verified e2e). This case asserts Cerbos does the structural allow; book enforcement is coverage-delegated.",
+      "tags": ["relationship", "chat_user", "structural", "coverage-delegated", "allow", "demo-scenario"],
       "principal": {
         "id": "rm_jane",
-        "roles": ["relationship_manager"],
-        "attr": { "tenant_id": "default", "book": ["REL-00042", "REL-00099"], "segments": ["wealth"], "clearance": "2" }
+        "roles": ["chat_user"],
+        "attr": { "tenant_id": "default", "book": ["REL-00042", "REL-00099"], "segments": { "wealth": "confidential-pii", "servicing": "confidential" } }
       },
       "resource": { "kind": "relationship", "id": "REL-00188", "attr": {} },
       "action": "read",
-      "expected": "DENY"
+      "expected": "ALLOW"
     },
     {
       "id": "REL-003",
@@ -262,16 +262,16 @@
     },
     {
       "id": "REL-006",
-      "description": "RM with empty book cannot read any relationship",
-      "tags": ["relationship", "rm", "book", "deny"],
+      "description": "chat_user with an empty book: Cerbos grants STRUCTURAL read; the empty-book DENY is enforced downstream by the coverage service (verified e2e via rm_guest). Cerbos asserts structural allow only.",
+      "tags": ["relationship", "chat_user", "structural", "coverage-delegated", "allow"],
       "principal": {
         "id": "rm_new",
-        "roles": ["relationship_manager"],
-        "attr": { "tenant_id": "default", "book": [], "segments": ["wealth"], "clearance": "1" }
+        "roles": ["chat_user"],
+        "attr": { "tenant_id": "default", "book": [], "segments": { "wealth": "internal" } }
       },
       "resource": { "kind": "relationship", "id": "REL-00042", "attr": {} },
       "action": "read",
-      "expected": "DENY"
+      "expected": "ALLOW"
     },
     {
       "id": "IAM-001",
@@ -499,16 +499,16 @@
     },
     {
       "id": "SEC-003",
-      "description": "INVARIANT: clearance-1 RM cannot reach restricted-classified agent",
+      "description": "INVARIANT: a chat_user holding only the internal tier in wealth cannot reach the most-sensitive (confidential-pii) wealth agent — classification ceiling holds (internal < confidential-pii)",
       "tags": ["security", "classification", "deny", "critical", "invariant"],
       "principal": {
         "id": "rm_junior",
-        "roles": ["relationship_manager"],
-        "attr": { "tenant_id": "default", "segments": ["wealth"], "clearance": "1", "book": [] }
+        "roles": ["chat_user"],
+        "attr": { "tenant_id": "default", "segments": { "wealth": "internal" } }
       },
       "resource": {
-        "kind": "agent", "id": "restricted-agent",
-        "attr": { "domain": "wealth-management", "is_mutating": false, "data_classification": "restricted" }
+        "kind": "agent", "id": "wealth-pii-agent",
+        "attr": { "domain": "wealth-management", "audience": "segment", "access_mode": "read", "data_classification": "confidential-pii" }
       },
       "action": "invoke",
       "expected": "DENY"
@@ -531,16 +531,192 @@
     },
     {
       "id": "SEC-005",
-      "description": "INVARIANT: relationship not in book is denied even for high-clearance RM",
-      "tags": ["security", "book", "deny", "critical", "invariant"],
+      "description": "INVARIANT (World-B): relationship structural read is PRINCIPAL-AGNOSTIC — Cerbos must NOT filter by the principal's book (filtering resolution by book would violate 'RESOLVE is principal-agnostic; CHECK is the only gate'). Cerbos grants structural read even for a relationship not in the book; the not-in-book DENY is enforced solely by the coverage service (verified e2e: rm_jane→Okafor, rm_guest→empty book).",
+      "tags": ["security", "structural", "coverage-delegated", "principal-agnostic", "critical", "invariant", "allow"],
       "principal": {
         "id": "rm_vp",
-        "roles": ["relationship_manager"],
-        "attr": { "tenant_id": "default", "book": ["REL-00042"], "segments": ["wealth"], "clearance": "5" }
+        "roles": ["chat_user"],
+        "attr": { "tenant_id": "default", "book": ["REL-00042"], "segments": { "wealth": "confidential-pii" } }
       },
       "resource": { "kind": "relationship", "id": "REL-99999", "attr": {} },
       "action": "read",
+      "expected": "ALLOW"
+    },
+    {
+      "id": "SEC-006",
+      "description": "REGRESSION (cross-tenant leak fix): a bare `user` role must NOT read a user record it does not own in another tenant. Previously own_resource listed roles:[\"user\"] alongside the derived role, and Cerbos ORs them — so the bare role bypassed the owner+tenant scoping. Now own_resource (derived-role only) requires P.id==owner_id AND same tenant.",
+      "tags": ["security", "iam", "own_resource", "cross-tenant", "deny", "critical", "invariant", "regression"],
+      "principal": {
+        "id": "evil_user",
+        "roles": ["user"],
+        "attr": { "tenant_id": "tenant-a" }
+      },
+      "resource": {
+        "kind": "iam-resource", "id": "victim-user",
+        "attr": { "resource_type": "user", "tenant_id": "tenant-b", "owner_id": "someone-else" }
+      },
+      "action": "read",
       "expected": "DENY"
+    },
+    {
+      "id": "SEC-007",
+      "description": "REGRESSION (own_resource legit path preserved): a `user` reading their OWN record in their OWN tenant is still ALLOWed via the own_resource derived role (P.id==owner_id AND same tenant). Confirms the SEC-006 fix did not over-deny self-reads.",
+      "tags": ["security", "iam", "own_resource", "same-tenant", "allow", "regression"],
+      "principal": {
+        "id": "alice",
+        "roles": ["user"],
+        "attr": { "tenant_id": "default" }
+      },
+      "resource": {
+        "kind": "iam-resource", "id": "alice",
+        "attr": { "resource_type": "user", "tenant_id": "default", "owner_id": "alice" }
+      },
+      "action": "read",
+      "expected": "ALLOW"
+    },
+    {
+      "id": "SEC-008",
+      "description": "REGRESSION (cross-tenant leak fix): policy_author must NOT create a policy in another tenant. Previously the policy_drafter rule listed roles:[\"policy_author\"] alongside the derived role (OR'd), bypassing the tenant match; now the rule is derived-role only (policy_drafter requires same tenant).",
+      "tags": ["security", "iam", "policy_author", "cross-tenant", "deny", "critical", "invariant", "regression"],
+      "principal": {
+        "id": "pol_author_a",
+        "roles": ["policy_author"],
+        "attr": { "tenant_id": "tenant-a" }
+      },
+      "resource": {
+        "kind": "iam-resource", "id": "pol-b",
+        "attr": { "resource_type": "policy", "tenant_id": "tenant-b", "owner_id": "" }
+      },
+      "action": "create",
+      "expected": "DENY"
+    },
+    {
+      "id": "SEC-009",
+      "description": "REGRESSION (cross-tenant leak fix): policy_approver must NOT approve/deploy a policy in another tenant. Previously the policy_approver rule listed roles:[\"policy_approver\"] alongside the derived role (OR'd), bypassing the tenant match; now derived-role only (policy_approver_role requires same tenant).",
+      "tags": ["security", "iam", "policy_approver", "cross-tenant", "deny", "critical", "invariant", "regression"],
+      "principal": {
+        "id": "pol_approver_a",
+        "roles": ["policy_approver"],
+        "attr": { "tenant_id": "tenant-a" }
+      },
+      "resource": {
+        "kind": "iam-resource", "id": "pol-b",
+        "attr": { "resource_type": "policy", "tenant_id": "tenant-b", "owner_id": "" }
+      },
+      "action": "deploy_policy",
+      "expected": "DENY"
+    },
+    {
+      "id": "SEC-010",
+      "description": "REGRESSION (fail-closed fix): an agent with a `public`/unrecognised data_classification must NOT be invocable by a segment member. The classification ladder ranks unknown as 0, and `rank >= 0` was always true (fail-OPEN). Now the resource side requires a recognised classification (internal/confidential/confidential-pii), so a segment member with a real tier is still DENIED for an unclassified agent.",
+      "tags": ["security", "agent", "classification", "fail-closed", "deny", "critical", "invariant", "regression"],
+      "principal": {
+        "id": "rm_jane",
+        "roles": ["chat_user"],
+        "attr": { "tenant_id": "default", "segments": { "wealth": "confidential-pii" } }
+      },
+      "resource": {
+        "kind": "agent", "id": "unclassified-agent",
+        "attr": { "domain": "wealth-management", "audience": "segment", "access_mode": "read", "data_classification": "public" }
+      },
+      "action": "invoke",
+      "expected": "DENY"
+    },
+    {
+      "id": "SEC-011",
+      "description": "REGRESSION (fail-closed fix): an agent with a MISSING data_classification must also fail closed for a segment member (same root cause as SEC-010 — a typo'd or omitted classification ranks 0).",
+      "tags": ["security", "agent", "classification", "fail-closed", "deny", "critical", "invariant", "regression"],
+      "principal": {
+        "id": "rm_jane",
+        "roles": ["chat_user"],
+        "attr": { "tenant_id": "default", "segments": { "wealth": "confidential-pii" } }
+      },
+      "resource": {
+        "kind": "agent", "id": "no-class-agent",
+        "attr": { "domain": "wealth-management", "audience": "segment", "access_mode": "read" }
+      },
+      "action": "invoke",
+      "expected": "DENY"
+    },
+    {
+      "id": "ABAC-001",
+      "description": "analyst_amy (wealth@confidential) invokes internal-classified wealth knowledge agent — classification gate allows (confidential >= internal)",
+      "tags": ["agent", "abac", "chat_user", "classification", "allow"],
+      "principal": {
+        "id": "analyst_amy",
+        "roles": ["chat_user"],
+        "attr": { "tenant_id": "default", "segments": { "wealth": "confidential" } }
+      },
+      "resource": {
+        "kind": "agent", "id": "wealth-market-research",
+        "attr": { "domain": "wealth-management", "audience": "segment", "access_mode": "read", "data_classification": "internal" }
+      },
+      "action": "invoke",
+      "expected": "ALLOW"
+    },
+    {
+      "id": "ABAC-002",
+      "description": "analyst_amy (wealth@confidential) cannot invoke confidential-pii wealth agent — per-segment classification gate denies (confidential < confidential-pii)",
+      "tags": ["agent", "abac", "chat_user", "classification", "deny", "critical"],
+      "principal": {
+        "id": "analyst_amy",
+        "roles": ["chat_user"],
+        "attr": { "tenant_id": "default", "segments": { "wealth": "confidential" } }
+      },
+      "resource": {
+        "kind": "agent", "id": "wealth-holdings",
+        "attr": { "domain": "wealth-management", "audience": "segment", "access_mode": "read", "data_classification": "confidential-pii" }
+      },
+      "action": "invoke",
+      "expected": "DENY"
+    },
+    {
+      "id": "ABAC-003",
+      "description": "rm_jane (wealth@pii, servicing@confidential) cannot invoke an insurance-segment agent — segment gate denies (no insurance segment)",
+      "tags": ["agent", "abac", "chat_user", "segment", "deny", "critical"],
+      "principal": {
+        "id": "rm_jane",
+        "roles": ["chat_user"],
+        "attr": { "tenant_id": "default", "segments": { "wealth": "confidential-pii", "servicing": "confidential" } }
+      },
+      "resource": {
+        "kind": "agent", "id": "insurance-policy",
+        "attr": { "domain": "insurance", "audience": "segment", "access_mode": "read", "data_classification": "internal" }
+      },
+      "action": "invoke",
+      "expected": "DENY"
+    },
+    {
+      "id": "ABAC-004",
+      "description": "uw_sam (insurance@pii) invokes an enterprise HR knowledge agent — audience=enterprise skips the segment gate, open to all authenticated users",
+      "tags": ["agent", "abac", "chat_user", "enterprise", "allow"],
+      "principal": {
+        "id": "uw_sam",
+        "roles": ["chat_user"],
+        "attr": { "tenant_id": "default", "segments": { "insurance": "confidential-pii" } }
+      },
+      "resource": {
+        "kind": "agent", "id": "hr-policy-qa",
+        "attr": { "domain": "hr", "audience": "enterprise", "access_mode": "read", "data_classification": "internal" }
+      },
+      "action": "invoke",
+      "expected": "ALLOW"
+    },
+    {
+      "id": "ABAC-005",
+      "description": "rm_jane (wealth@pii) invokes confidential-pii wealth agent — segment + classification baseline pass (pii >= pii)",
+      "tags": ["agent", "abac", "chat_user", "classification", "segment", "allow"],
+      "principal": {
+        "id": "rm_jane",
+        "roles": ["chat_user"],
+        "attr": { "tenant_id": "default", "segments": { "wealth": "confidential-pii", "servicing": "confidential" } }
+      },
+      "resource": {
+        "kind": "agent", "id": "wealth-holdings",
+        "attr": { "domain": "wealth-management", "audience": "segment", "access_mode": "read", "data_classification": "confidential-pii" }
+      },
+      "action": "invoke",
+      "expected": "ALLOW"
     }
   ]
 }

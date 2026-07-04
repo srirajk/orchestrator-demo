@@ -165,18 +165,21 @@ public class AgentHarness {
         // executing.acquire() — it unmounts from its carrier, freeing the OS thread
         // for other work. This is the correct pattern: no platform thread pool needed.
         Future<JsonNode> future = vtExecutor.submit(() -> {
-            boolean acquiredExecuting = false;
+            // Phase 1: leave the queue. Whether we successfully acquire an executing
+            // slot OR the acquire() is interrupted (future cancelled on SLA timeout),
+            // the queue permit is released exactly once in this finally — so a
+            // timed-out call parked on acquire() can never leak its queue permit.
             try {
                 executing.acquire();  // park this virtual thread until a slot opens
-                acquiredExecuting = true;
-                queued.release();     // slot acquired — free the queue permit
+            } finally {
+                queued.release();     // free the queue permit deterministically
+            }
+            // Phase 2: executing slot is held — run the call and release it on the way out.
+            try {
                 return CircuitBreaker.decorateCallable(cb,
                         () -> adapter.invoke(node.agent(), node.input())).call();
             } finally {
-                if (acquiredExecuting) executing.release();
-                // If acquire() was interrupted (future cancelled while parked),
-                // acquiredExecuting=false and executing permit was never taken — no release needed.
-                // queued permit is handled by the outer catch block in that case.
+                executing.release();
             }
         });
 
@@ -213,12 +216,9 @@ public class AgentHarness {
                 emitLatencyTimer(agentId, agent.protocol(), latency);
                 return breakerResult;
             }
-            // queued.release() already ran inside the VT (line after executing.acquire()).
-            // The only exception: if executing.acquire() itself was interrupted before
-            // queued.release() could run — in that case the queue permit is still held.
-            if (cause instanceof InterruptedException) {
-                queued.release();
-            }
+            // queued.release() always runs inside the VT (phase-1 finally), whether the
+            // executing slot was acquired or the acquire() was interrupted — so there is
+            // no queue permit to reconcile here.
             log.warn("Agent {} FAILED: {}", agentId, cause != null ? cause.getMessage() : "unknown", cause);
             String msg = cause != null && cause.getMessage() != null
                     ? cause.getMessage() : e.getClass().getSimpleName();

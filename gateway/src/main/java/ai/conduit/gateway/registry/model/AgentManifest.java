@@ -23,6 +23,7 @@ public record AgentManifest(
         String version,
         Provider provider,
         String domain,
+        String audience,
         @JsonProperty("sub_domain")          String subDomain,
         @JsonProperty("max_response_tokens") Integer maxResponseTokens,
         String protocol,
@@ -64,7 +65,7 @@ public record AgentManifest(
     ) {}
 
     public record Constraints(
-            @JsonProperty("is_mutating")          boolean isMutating,
+            @JsonProperty("access_mode")          String accessMode,
             @JsonProperty("data_classification")  String dataClassification,
             @JsonProperty("sla_timeout_ms")        int slaTimeoutMs
     ) {}

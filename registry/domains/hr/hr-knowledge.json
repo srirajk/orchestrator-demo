@@ -1,0 +1,19 @@
+{
+  "sub_domain_id": "hr-knowledge",
+  "display_name": "HR Knowledge Base",
+  "parent_domain": "hr",
+  "resource_scoped": false,
+
+  "entity_types": [
+    {
+      "key": "policy_topic",
+      "extract_as": "policy_topic",
+      "kind": "literal",
+      "display": "HR policy topic",
+      "id_pattern": "(parental.leave|maternity|paternity|pto|vacation|sick.leave|benefits|401k|health.insurance|conduct|ethics|performance|learning|tuition|wellness)",
+      "required": false
+    }
+  ],
+
+  "agents": ["acme.hr.policy_qa"]
+}

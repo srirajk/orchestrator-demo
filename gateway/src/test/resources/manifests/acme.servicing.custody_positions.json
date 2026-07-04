@@ -7,6 +7,7 @@
     "organization": "Meridian Demo Bank"
   },
   "domain": "asset-servicing",
+  "audience": "segment",
   "sub_domain": "custody-operations",
   "max_response_tokens": 2000,
   "protocol": "mcp",
@@ -46,7 +47,7 @@
     }
   ],
   "constraints": {
-    "is_mutating": false,
+    "access_mode": "read",
     "data_classification": "confidential",
     "sla_timeout_ms": 30000
   }

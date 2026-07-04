@@ -7,6 +7,7 @@
     "organization": "Meridian Demo Bank"
   },
   "domain": "wealth-management",
+  "audience": "segment",
   "sub_domain": "private-banking",
   "max_response_tokens": 2000,
   "protocol": "http",
@@ -34,7 +35,12 @@
         "current holdings for the Whitman relationship",
         "portfolio allocation for this client",
         "what is this account invested in",
-        "position breakdown for the relationship"
+        "position breakdown for the relationship",
+        "portfolio summary for this client",
+        "portfolio value and top positions",
+        "show me the portfolio for this relationship",
+        "total portfolio value",
+        "what does the portfolio hold"
       ],
       "inputModes": [
         "application/json"
@@ -45,7 +51,7 @@
     }
   ],
   "constraints": {
-    "is_mutating": false,
+    "access_mode": "read",
     "data_classification": "confidential-pii",
     "sla_timeout_ms": 30000
   }

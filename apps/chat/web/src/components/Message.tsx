@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
-import { Copy, Check } from 'lucide-react'
+import { Copy, Check, LoaderCircle } from 'lucide-react'
 import clsx from 'clsx'
 import type { Message as MessageType } from '../api/types'
 
@@ -11,9 +11,14 @@ function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
 
   async function handleCopy() {
-    await navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Clipboard API unavailable on insecure origins or when permission is denied
+      console.warn('Clipboard write failed')
+    }
   }
 
   return (
@@ -32,8 +37,14 @@ interface Props {
   isStreaming?: boolean
 }
 
+function formatTiming(ms: number): string {
+  return `${(ms / 1000).toFixed(1)}s`
+}
+
 export function Message({ message, isStreaming }: Props) {
   const isUser = message.role === 'user'
+  const showStreamingSpinner = isStreaming && message.content.length === 0
+  const timing = !isUser ? message.clientTiming : undefined
 
   const formattedTime = new Date(message.createdAt).toLocaleTimeString([], {
     hour: '2-digit',
@@ -64,6 +75,14 @@ export function Message({ message, isStreaming }: Props) {
         >
           {isUser ? (
             <p className="whitespace-pre-wrap">{message.content}</p>
+          ) : showStreamingSpinner ? (
+            <span
+              className="inline-flex h-5 min-w-5 items-center justify-center text-axiom-500"
+              role="status"
+              aria-label="Loading response"
+            >
+              <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
+            </span>
           ) : (
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
@@ -132,11 +151,19 @@ export function Message({ message, isStreaming }: Props) {
               {message.content}
             </ReactMarkdown>
           )}
-          {isStreaming && (
+          {isStreaming && !showStreamingSpinner && (
             <span className="inline-block w-1.5 h-4 ml-0.5 bg-axiom-500 rounded-sm animate-pulse align-middle" />
           )}
         </div>
-        <span className="muted-copy text-xs px-1">{formattedTime}</span>
+        <div className="flex flex-wrap items-center gap-2 px-1">
+          <span className="muted-copy text-xs">{formattedTime}</span>
+          {timing?.ttftMs !== undefined && (
+            <span className="rounded-full border border-line bg-white px-2 py-0.5 text-[11px] font-medium text-ink-500 shadow-sm">
+              first token {formatTiming(timing.ttftMs)}
+              {timing.totalMs !== undefined ? ` · ${formatTiming(timing.totalMs)} total` : ''}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   )
