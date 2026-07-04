@@ -124,6 +124,7 @@ export function ChatPane() {
     () => (isStreaming && streamingContent === '' ? selectPipelineStage(traceEvents) : null),
     [isStreaming, streamingContent, traceEvents],
   )
+  const showAccessNotice = !!accessNotice && !(isStreaming && streamingContent === '')
 
   const createConversation = useCreateConversation()
 
@@ -341,7 +342,7 @@ export function ChatPane() {
         </div>
 
         {/* Access notice — full denial is an alert; partial access is informational. */}
-        {accessNotice && (
+        {showAccessNotice && (
           <div
             role={accessNotice.kind === 'full-denial' ? 'alert' : 'status'}
             className={
