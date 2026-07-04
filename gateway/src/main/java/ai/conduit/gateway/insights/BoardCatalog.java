@@ -62,12 +62,12 @@ public class BoardCatalog {
     private List<PanelSpec> boardOverview(Range range) {
         String w = range.promWindow();
         return List.of(
-                stat("requests_24h", "Requests (24h)", "count",
+                statDelta(range, "requests_24h", "Requests (24h)", "count",
                         "sum(increase(conduit_request_outcome_total[" + w + "]))"),
-                stat("answered_rate", "Answered rate", "%",
+                statDelta(range, "answered_rate", "Answered rate", "%",
                         "sum(increase(conduit_request_outcome_total{outcome=\"ANSWERED\"}[" + w + "]))"
                       + " / clamp_min(sum(increase(conduit_request_outcome_total[" + w + "])),1) * 100"),
-                stat("agent_calls_24h", "Agent calls (24h)", "count",
+                statDelta(range, "agent_calls_24h", "Agent calls (24h)", "count",
                         "sum(increase(conduit_agent_calls_total[" + w + "]))"),
                 stat("fanout_avg_ms", "Avg fan-out", "ms",
                         "sum(rate(conduit_fanout_duration_seconds_sum[" + w + "]))"
@@ -83,16 +83,19 @@ public class BoardCatalog {
     private List<PanelSpec> boardTrafficIntent(Range range) {
         String w = range.promWindow();
         return List.of(
-                stat("questions_24h", "Questions (24h)", "count",
+                statDelta(range, "questions_24h", "Questions (24h)", "count",
                         "sum(increase(chat_intent_total[" + w + "]))"),
-                statNoData("ttft_p95", "Time-to-first-token p95", "s", "stat",
-                        s -> {
-                            OptionalDouble v = s.prom().scalar(
-                                    "histogram_quantile(0.95, sum(rate(conduit_ttft_seconds_bucket[" + w + "])) by (le))");
-                            return v.isPresent()
-                                    ? Panel.stat("ttft_p95", "Time-to-first-token p95", "s", v.getAsDouble())
-                                    : Panel.unavailable("ttft_p95", "Time-to-first-token p95", "stat", "s");
-                        }),
+                // Pipeline latency (time-to-first-token): avg + p50/p95/p99 off the TTFT histogram.
+                // NaN (no data yet) is dropped by the source → the panel degrades to unavailable.
+                stat("ttft_avg", "TTFT avg", "s",
+                        "sum(rate(conduit_ttft_seconds_sum[" + w + "]))"
+                      + " / clamp_min(sum(rate(conduit_ttft_seconds_count[" + w + "])),0.0001)"),
+                stat("ttft_p50", "TTFT p50", "s",
+                        "histogram_quantile(0.50, sum(rate(conduit_ttft_seconds_bucket[" + w + "])) by (le))"),
+                stat("ttft_p95", "TTFT p95", "s",
+                        "histogram_quantile(0.95, sum(rate(conduit_ttft_seconds_bucket[" + w + "])) by (le))"),
+                stat("ttft_p99", "TTFT p99", "s",
+                        "histogram_quantile(0.99, sum(rate(conduit_ttft_seconds_bucket[" + w + "])) by (le))"),
                 area("questions_over_time", "Questions over time", "q/s",
                         "sum(rate(chat_intent_total[" + RATE_WIN + "]))"),
                 donut("intent_mix", "Intent mix", "count",
@@ -106,11 +109,16 @@ public class BoardCatalog {
     private List<PanelSpec> boardGovernance(Range range) {
         String w = range.promWindow();
         return List.of(
-                stat("allow_rate", "Allow rate", "%",
+                statDelta(range, "allow_rate", "Allow rate", "%",
                         "sum(increase(conduit_authz_decisions_total{decision=\"ALLOW\"}[" + w + "]))"
                       + " / clamp_min(sum(increase(conduit_authz_decisions_total[" + w + "])),1) * 100"),
-                stat("decisions_24h", "Authorization checks (24h)", "count",
+                statDelta(range, "decisions_24h", "Authorization checks (24h)", "count",
                         "sum(increase(conduit_authz_decisions_total[" + w + "]))"),
+                // Coverage gaps: turns that ended in a clarification or an access denial — the
+                // "we couldn't just answer" tail. Outcome labels are metric values, not domain
+                // literals (World B).
+                statDelta(range, "coverage_gaps", "Coverage gaps (clarify + denied)", "count",
+                        "sum(increase(conduit_request_outcome_total{outcome=~\"CLARIFIED|DENIED\"}[" + w + "]))"),
                 donut("decision_mix", "Allow vs deny", "count",
                         "sum by (decision) (increase(conduit_authz_decisions_total[" + w + "]))", "decision"),
                 bars("decisions_by_resource", "Checks by resource type", "count",
@@ -212,6 +220,25 @@ public class BoardCatalog {
     }
 
     // ── PanelSpec builders (Prometheus) ──────────────────────────────────────────
+
+    /**
+     * A {@code stat} panel carrying a period-over-period {@code delta}: the same query evaluated
+     * now vs one {@link Range} window earlier (Prometheus {@code time=} at now − window). The
+     * delta is omitted when there is no prior-window value; the whole panel is unavailable when
+     * the current value is absent. Instance method — it captures the request's {@link Range}.
+     */
+    private PanelSpec statDelta(Range range, String id, String title, String unit, String promql) {
+        long windowSec = range.windowSeconds();
+        return new PanelSpec(id, title, "stat", unit, s -> {
+            OptionalDouble cur = s.prom().scalar(promql);
+            if (cur.isEmpty()) return Panel.unavailable(id, title, "stat", unit);
+            long priorEval = System.currentTimeMillis() / 1000L - windowSec;
+            OptionalDouble prior = s.prom().scalarAt(promql, priorEval);
+            return prior.isPresent()
+                    ? Panel.stat(id, title, unit, cur.getAsDouble(), cur.getAsDouble() - prior.getAsDouble())
+                    : Panel.stat(id, title, unit, cur.getAsDouble());
+        });
+    }
 
     private static PanelSpec stat(String id, String title, String unit, String promql) {
         return new PanelSpec(id, title, "stat", unit, s ->

@@ -38,6 +38,19 @@ public enum Range {
     /** Langfuse lookback in days for board 7's daily-metrics queries. */
     public int langfuseDays() { return langfuseDays; }
 
+    /**
+     * Window length in seconds — the same span as {@link #promWindow()}, used for
+     * (a) period-over-period deltas (evaluate a stat one window earlier), and
+     * (b) the Langfuse metrics API {@code fromTimestamp} (now − window).
+     */
+    public long windowSeconds() {
+        return switch (this) {
+            case H24 -> 86_400L;
+            case D7  -> 604_800L;
+            case D30 -> 2_592_000L;
+        };
+    }
+
     /** The wire/query-param value ({@code 24h}/{@code 7d}/{@code 30d}). */
     public String key() { return window; }
 

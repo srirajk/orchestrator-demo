@@ -83,6 +83,16 @@ public class PrometheusMetricsSource implements MetricsSource {
         return vs.isEmpty() ? OptionalDouble.empty() : OptionalDouble.of(vs.get(0).value());
     }
 
+    /**
+     * Same instant query evaluated at a PAST timestamp ({@code &time=epochSeconds}) — the query's
+     * own {@code [w]} range-vector window then reports the prior window's value. Used to compute
+     * period-over-period deltas (this window vs the one before it). Empty on no finite result.
+     */
+    public OptionalDouble scalarAt(String promql, long epochSeconds) {
+        List<LabeledValue> vs = instant(promql, null, epochSeconds);
+        return vs.isEmpty() ? OptionalDouble.empty() : OptionalDouble.of(vs.get(0).value());
+    }
+
     // ── Instant vector grouped by one label ─────────────────────────────────────
 
     /**
@@ -91,9 +101,19 @@ public class PrometheusMetricsSource implements MetricsSource {
      * Values that are NaN/Inf are dropped so panels never render a fabricated figure.
      */
     public List<LabeledValue> instant(String promql, String labelKey) {
+        return instant(promql, labelKey, null);
+    }
+
+    /**
+     * As {@link #instant(String, String)} but, when {@code atEpochSeconds} is non-null, evaluates
+     * the query at that past instant (Prometheus {@code time} param) — used for prior-window deltas.
+     */
+    public List<LabeledValue> instant(String promql, String labelKey, Long atEpochSeconds) {
         List<LabeledValue> out = new ArrayList<>();
         try {
-            JsonNode data = query("/api/v1/query", "query=" + enc(promql)).path("data");
+            String form = "query=" + enc(promql);
+            if (atEpochSeconds != null) form += "&time=" + atEpochSeconds;
+            JsonNode data = query("/api/v1/query", form).path("data");
             if (!"vector".equals(data.path("resultType").asText())) {
                 // scalar result type: {"resultType":"scalar","result":[ts, "value"]}
                 JsonNode res = data.path("result");
