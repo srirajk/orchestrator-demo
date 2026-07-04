@@ -29,26 +29,29 @@ import java.util.function.Function;
 @Component
 public class BoardCatalog {
 
-    // Query windows (infrastructure constants, not domain knowledge).
-    private static final String LOOKBACK    = "24h";          // instant increase() window
-    private static final String RATE_WIN    = "5m";           // rate() window for series
+    // Query windows (infrastructure constants, not domain knowledge). The aggregation lookback
+    // (increase()/rate() over trend/table/stat panels) is now the caller-selected {@link Range};
+    // the short rate window and the range-query span/step below stay fixed.
+    private static final String RATE_WIN    = "5m";           // rate() window for "over time" series
     private static final Duration RANGE_WIN = Duration.ofHours(6);   // range-query span
     private static final Duration STEP       = Duration.ofMinutes(15); // ~24 points over 6h
-    private static final int LF_DAYS        = 30;             // Langfuse lookback (days)
 
-    private final Map<Integer, List<PanelSpec>> boards = Map.of(
-            1, boardOverview(),
-            2, boardTrafficIntent(),
-            3, boardGovernance(),
-            4, boardAgentPerformance(),
-            5, boardReliability(),
-            6, boardLiveTrace(),
-            7, boardCostQuality()
+    // Board id → builder. Panels are built per request so the selected {@link Range} threads into
+    // every lookback window; the shape/type of each panel is identical across ranges.
+    private final Map<Integer, Function<Range, List<PanelSpec>>> boards = Map.of(
+            1, this::boardOverview,
+            2, this::boardTrafficIntent,
+            3, this::boardGovernance,
+            4, this::boardAgentPerformance,
+            5, this::boardReliability,
+            6, this::boardLiveTrace,
+            7, this::boardCostQuality
     );
 
-    /** Panels for a board id, or {@code null} if the id is not 1–7. */
-    public List<PanelSpec> panelsFor(int boardId) {
-        return boards.get(boardId);
+    /** Panels for a board id at the given {@link Range}, or {@code null} if the id is not 1–7. */
+    public List<PanelSpec> panelsFor(int boardId, Range range) {
+        Function<Range, List<PanelSpec>> builder = boards.get(boardId);
+        return builder == null ? null : builder.apply(range);
     }
 
     public boolean exists(int boardId) {
@@ -56,34 +59,36 @@ public class BoardCatalog {
     }
 
     // ── Board 1 — Executive Overview ─────────────────────────────────────────────
-    private List<PanelSpec> boardOverview() {
+    private List<PanelSpec> boardOverview(Range range) {
+        String w = range.promWindow();
         return List.of(
                 stat("requests_24h", "Requests (24h)", "count",
-                        "sum(increase(conduit_request_outcome_total[" + LOOKBACK + "]))"),
+                        "sum(increase(conduit_request_outcome_total[" + w + "]))"),
                 stat("answered_rate", "Answered rate", "%",
-                        "sum(increase(conduit_request_outcome_total{outcome=\"ANSWERED\"}[" + LOOKBACK + "]))"
-                      + " / clamp_min(sum(increase(conduit_request_outcome_total[" + LOOKBACK + "])),1) * 100"),
+                        "sum(increase(conduit_request_outcome_total{outcome=\"ANSWERED\"}[" + w + "]))"
+                      + " / clamp_min(sum(increase(conduit_request_outcome_total[" + w + "])),1) * 100"),
                 stat("agent_calls_24h", "Agent calls (24h)", "count",
-                        "sum(increase(conduit_agent_calls_total[" + LOOKBACK + "]))"),
+                        "sum(increase(conduit_agent_calls_total[" + w + "]))"),
                 stat("fanout_avg_ms", "Avg fan-out", "ms",
-                        "sum(rate(conduit_fanout_duration_seconds_sum[" + LOOKBACK + "]))"
-                      + " / clamp_min(sum(rate(conduit_fanout_duration_seconds_count[" + LOOKBACK + "])),1) * 1000"),
+                        "sum(rate(conduit_fanout_duration_seconds_sum[" + w + "]))"
+                      + " / clamp_min(sum(rate(conduit_fanout_duration_seconds_count[" + w + "])),1) * 1000"),
                 area("request_volume", "Request volume", "req/s",
                         "sum(rate(conduit_request_outcome_total[" + RATE_WIN + "]))"),
                 donut("outcome_mix", "Outcome mix", "count",
-                        "sum by (outcome) (increase(conduit_request_outcome_total[" + LOOKBACK + "]))", "outcome")
+                        "sum by (outcome) (increase(conduit_request_outcome_total[" + w + "]))", "outcome")
         );
     }
 
     // ── Board 2 — Traffic & Intent ───────────────────────────────────────────────
-    private List<PanelSpec> boardTrafficIntent() {
+    private List<PanelSpec> boardTrafficIntent(Range range) {
+        String w = range.promWindow();
         return List.of(
                 stat("questions_24h", "Questions (24h)", "count",
-                        "sum(increase(chat_intent_total[" + LOOKBACK + "]))"),
+                        "sum(increase(chat_intent_total[" + w + "]))"),
                 statNoData("ttft_p95", "Time-to-first-token p95", "s", "stat",
                         s -> {
                             OptionalDouble v = s.prom().scalar(
-                                    "histogram_quantile(0.95, sum(rate(conduit_ttft_seconds_bucket[" + LOOKBACK + "])) by (le))");
+                                    "histogram_quantile(0.95, sum(rate(conduit_ttft_seconds_bucket[" + w + "])) by (le))");
                             return v.isPresent()
                                     ? Panel.stat("ttft_p95", "Time-to-first-token p95", "s", v.getAsDouble())
                                     : Panel.unavailable("ttft_p95", "Time-to-first-token p95", "stat", "s");
@@ -91,60 +96,65 @@ public class BoardCatalog {
                 area("questions_over_time", "Questions over time", "q/s",
                         "sum(rate(chat_intent_total[" + RATE_WIN + "]))"),
                 donut("intent_mix", "Intent mix", "count",
-                        "sum by (type) (increase(chat_intent_total[" + LOOKBACK + "]))", "type"),
+                        "sum by (type) (increase(chat_intent_total[" + w + "]))", "type"),
                 bars("adoption_by_role", "Adoption by role", "count",
-                        "sum by (role) (increase(conduit_adoption_total[" + LOOKBACK + "]))", "role")
+                        "sum by (role) (increase(conduit_adoption_total[" + w + "]))", "role")
         );
     }
 
     // ── Board 3 — Governance / Authorization ─────────────────────────────────────
-    private List<PanelSpec> boardGovernance() {
+    private List<PanelSpec> boardGovernance(Range range) {
+        String w = range.promWindow();
         return List.of(
                 stat("allow_rate", "Allow rate", "%",
-                        "sum(increase(conduit_authz_decisions_total{decision=\"ALLOW\"}[" + LOOKBACK + "]))"
-                      + " / clamp_min(sum(increase(conduit_authz_decisions_total[" + LOOKBACK + "])),1) * 100"),
+                        "sum(increase(conduit_authz_decisions_total{decision=\"ALLOW\"}[" + w + "]))"
+                      + " / clamp_min(sum(increase(conduit_authz_decisions_total[" + w + "])),1) * 100"),
                 stat("decisions_24h", "Authorization checks (24h)", "count",
-                        "sum(increase(conduit_authz_decisions_total[" + LOOKBACK + "]))"),
+                        "sum(increase(conduit_authz_decisions_total[" + w + "]))"),
                 donut("decision_mix", "Allow vs deny", "count",
-                        "sum by (decision) (increase(conduit_authz_decisions_total[" + LOOKBACK + "]))", "decision"),
+                        "sum by (decision) (increase(conduit_authz_decisions_total[" + w + "]))", "decision"),
                 bars("decisions_by_resource", "Checks by resource type", "count",
-                        "sum by (resource_type) (increase(conduit_authz_decisions_total[" + LOOKBACK + "]))", "resource_type"),
+                        "sum by (resource_type) (increase(conduit_authz_decisions_total[" + w + "]))", "resource_type"),
                 bars("denials_by_agent", "Denials by agent", "count",
-                        "sum by (agentId) (increase(conduit_agent_denials_total[" + LOOKBACK + "]))", "agentId"),
+                        "sum by (agentId) (increase(conduit_agent_denials_total[" + w + "]))", "agentId"),
                 table("authz_ledger", "Authorization ledger", "count",
-                        "sum by (decision, resource_type, source) (increase(conduit_authz_decisions_total[" + LOOKBACK + "]))",
+                        "sum by (decision, resource_type, source) (increase(conduit_authz_decisions_total[" + w + "]))",
                         List.of("decision", "resource_type", "source"))
         );
     }
 
     // ── Board 4 — Agent Performance ──────────────────────────────────────────────
-    private List<PanelSpec> boardAgentPerformance() {
+    private List<PanelSpec> boardAgentPerformance(Range range) {
+        String w = range.promWindow();
         return List.of(
                 bars("latency_by_agent", "Avg latency by agent", "ms",
-                        "sum by (agentId) (rate(conduit_agent_latency_seconds_sum[" + LOOKBACK + "]))"
-                      + " / clamp_min(sum by (agentId) (rate(conduit_agent_latency_seconds_count[" + LOOKBACK + "])),0.0001) * 1000",
+                        "sum by (agentId) (rate(conduit_agent_latency_seconds_sum[" + w + "]))"
+                      + " / clamp_min(sum by (agentId) (rate(conduit_agent_latency_seconds_count[" + w + "])),0.0001) * 1000",
                         "agentId"),
                 bars("selection_by_agent", "Selection frequency by agent", "count",
-                        "sum by (agentId) (increase(conduit_resolver_selection_total[" + LOOKBACK + "]))", "agentId"),
+                        "sum by (agentId) (increase(conduit_resolver_selection_total[" + w + "]))", "agentId"),
                 donut("calls_by_protocol", "Calls by protocol", "count",
-                        "sum by (protocol) (increase(conduit_agent_calls_total[" + LOOKBACK + "]))", "protocol"),
+                        "sum by (protocol) (increase(conduit_agent_calls_total[" + w + "]))", "protocol"),
                 line("fanout_trend", "Fan-out avg (trend)", "ms",
                         "sum(rate(conduit_fanout_duration_seconds_sum[" + RATE_WIN + "]))"
                       + " / clamp_min(sum(rate(conduit_fanout_duration_seconds_count[" + RATE_WIN + "])),0.0001) * 1000"),
                 table("agent_calls_table", "Agent call outcomes", "count",
-                        "sum by (agentId, protocol, status) (increase(conduit_agent_calls_total[" + LOOKBACK + "]))",
+                        "sum by (agentId, protocol, status) (increase(conduit_agent_calls_total[" + w + "]))",
                         List.of("agentId", "protocol", "status"))
         );
     }
 
     // ── Board 5 — Reliability / Resilience ───────────────────────────────────────
-    private List<PanelSpec> boardReliability() {
+    // Instant gauges (breakers/threads/bulkheads) have no lookback window and are range-invariant;
+    // only the error-rate ratio aggregates over the selected window.
+    private List<PanelSpec> boardReliability(Range range) {
+        String w = range.promWindow();
         return List.of(
                 stat("breakers_open", "Circuit breakers open", "count",
                         "count(conduit_circuit_breaker_state == 2) or vector(0)"),
                 stat("error_rate", "Agent error rate", "%",
-                        "(sum(increase(conduit_agent_calls_total{status!=\"OK\"}[" + LOOKBACK + "])) or vector(0))"
-                      + " / clamp_min(sum(increase(conduit_agent_calls_total[" + LOOKBACK + "])),1) * 100"),
+                        "(sum(increase(conduit_agent_calls_total{status!=\"OK\"}[" + w + "])) or vector(0))"
+                      + " / clamp_min(sum(increase(conduit_agent_calls_total[" + w + "])),1) * 100"),
                 stat("jvm_threads", "JVM live threads", "count",
                         "sum(jvm_threads_live_threads)"),
                 bars("bulkhead_executing", "Bulkhead executing by agent", "count",
@@ -160,18 +170,20 @@ public class BoardCatalog {
     // The live per-request glass-box trace streams over the existing /trace/** SSE endpoint
     // (Tempo-backed). This board renders the aggregate per-agent latency waterfall from
     // Prometheus so the board is self-contained; the UI's live gantt consumes /trace/**.
-    private List<PanelSpec> boardLiveTrace() {
+    private List<PanelSpec> boardLiveTrace(Range range) {
+        String w = range.promWindow();
         return List.of(
                 statNoData("trace_waterfall", "Per-agent latency waterfall", "ms", "waterfall",
                         s -> {
                             List<Map<String, Object>> rows = s.prom().instantRows(
-                                    "sum by (agentId) (rate(conduit_agent_latency_seconds_sum[" + LOOKBACK + "]))"
-                                  + " / clamp_min(sum by (agentId) (rate(conduit_agent_latency_seconds_count[" + LOOKBACK + "])),0.0001) * 1000",
+                                    "sum by (agentId) (rate(conduit_agent_latency_seconds_sum[" + w + "]))"
+                                  + " / clamp_min(sum by (agentId) (rate(conduit_agent_latency_seconds_count[" + w + "])),0.0001) * 1000",
                                     List.of("agentId"));
                             return rows.isEmpty()
                                     ? Panel.unavailable("trace_waterfall", "Per-agent latency waterfall", "waterfall", "ms")
                                     : Panel.table("trace_waterfall", "Per-agent latency waterfall", "waterfall", "ms", rows);
                         }),
+                // "now" panels are deliberately recent-window and stay fixed (like the 5m rate series).
                 stat("fanout_p_now", "Avg fan-out (5m)", "ms",
                         "sum(rate(conduit_fanout_duration_seconds_sum[" + RATE_WIN + "]))"
                       + " / clamp_min(sum(rate(conduit_fanout_duration_seconds_count[" + RATE_WIN + "])),0.0001) * 1000"),
@@ -181,18 +193,19 @@ public class BoardCatalog {
     }
 
     // ── Board 7 — Cost & Quality (Langfuse) ──────────────────────────────────────
-    private List<PanelSpec> boardCostQuality() {
+    private List<PanelSpec> boardCostQuality(Range range) {
+        int days = range.langfuseDays();
         return List.of(
                 langfuse("total_cost", "Model cost (30d)", "USD", "stat",
-                        s -> asStat("total_cost", "Model cost (30d)", "USD", s.langfuse().totalCost(LF_DAYS))),
+                        s -> asStat("total_cost", "Model cost (30d)", "USD", s.langfuse().totalCost(days))),
                 langfuse("total_tokens", "Tokens (30d)", "count", "stat",
-                        s -> asStat("total_tokens", "Tokens (30d)", "count", s.langfuse().totalTokens(LF_DAYS))),
+                        s -> asStat("total_tokens", "Tokens (30d)", "count", s.langfuse().totalTokens(days))),
                 langfuse("total_traces", "Traces (30d)", "count", "stat",
-                        s -> asStat("total_traces", "Traces (30d)", "count", s.langfuse().totalTraces(LF_DAYS))),
+                        s -> asStat("total_traces", "Traces (30d)", "count", s.langfuse().totalTraces(days))),
                 langfuse("cost_by_day", "Cost over time", "USD", "line",
-                        s -> asSeries("cost_by_day", "Cost over time", "line", "USD", s.langfuse().costByDay(LF_DAYS))),
+                        s -> asSeries("cost_by_day", "Cost over time", "line", "USD", s.langfuse().costByDay(days))),
                 langfuse("tokens_by_day", "Token usage over time", "count", "area",
-                        s -> asSeries("tokens_by_day", "Token usage over time", "area", "count", s.langfuse().tokensByDay(LF_DAYS))),
+                        s -> asSeries("tokens_by_day", "Token usage over time", "area", "count", s.langfuse().tokensByDay(days))),
                 langfuse("eval_scores", "Eval scores", "score", "bars",
                         s -> asCategorical("eval_scores", "Eval scores", "bars", "score", s.langfuse().evalScores(50)))
         );

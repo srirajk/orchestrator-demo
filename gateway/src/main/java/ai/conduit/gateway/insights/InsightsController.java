@@ -12,6 +12,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -45,7 +46,9 @@ public class InsightsController {
     }
 
     @GetMapping("/boards/{boardId}")
-    public ResponseEntity<?> board(@PathVariable int boardId, Authentication auth) {
+    public ResponseEntity<?> board(@PathVariable int boardId,
+                                   @RequestParam(name = "range", required = false) String rangeParam,
+                                   Authentication auth) {
         Principal principal = resolvePrincipal(auth);
         if (principal == null) {
             return ResponseEntity.status(401).body(Map.of("error", "unauthorized"));
@@ -56,9 +59,11 @@ public class InsightsController {
         if (!catalog.exists(boardId)) {
             return ResponseEntity.status(404).body(Map.of("error", "not_found", "reason", "no board " + boardId));
         }
-        List<PanelSpec> specs = catalog.panelsFor(boardId);
+        // Fail-safe: absent/blank/unknown range → the 24h default (never a 400).
+        Range range = Range.from(rangeParam);
+        List<PanelSpec> specs = catalog.panelsFor(boardId, range);
         Board board = executor.render(boardId, specs);
-        log.debug("Insights board {} served to principal={}", boardId, principal.id());
+        log.debug("Insights board {} (range={}) served to principal={}", boardId, range.key(), principal.id());
         return ResponseEntity.ok(board);
     }
 
