@@ -6,7 +6,7 @@ import { MessageList } from './MessageList'
 import { Composer } from './Composer'
 import { TraceRail } from './TraceRail'
 import { useConversationDetail, useCreateConversation } from '../hooks/useConversations'
-import { useTraceStream, selectAccessNotice } from '../hooks/useTraceStream'
+import { useTraceStream, selectAccessNotice, selectPipelineStage } from '../hooks/useTraceStream'
 import { apiStream } from '../api/client'
 import { iterateSseData } from '../lib/gatewayTrace'
 import type { Message, MessageClientTiming } from '../api/types'
@@ -120,6 +120,10 @@ export function ChatPane() {
   // Glass-box: subscribe to this conversation's live authorization/pipeline trace.
   const { events: traceEvents, status: traceStatus } = useTraceStream(isNew ? undefined : id)
   const accessNotice = useMemo(() => selectAccessNotice(traceEvents), [traceEvents])
+  const pipelineStage = useMemo(
+    () => (isStreaming && streamingContent === '' ? selectPipelineStage(traceEvents) : null),
+    [isStreaming, streamingContent, traceEvents],
+  )
 
   const createConversation = useCreateConversation()
 
@@ -363,6 +367,7 @@ export function ChatPane() {
           messages={messages}
           streamingContent={streamingContent}
           streamingTiming={streamingTiming}
+          pipelineStage={pipelineStage}
           isLoading={!isNew && isLoading}
         />
 

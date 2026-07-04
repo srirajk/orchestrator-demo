@@ -118,7 +118,83 @@ export interface TraceAccessNotice {
   message: string
 }
 
+export type PipelineStageKey = 'understanding' | 'routing' | 'access' | 'gathering' | 'composing'
+
+export interface PipelineStage {
+  key: PipelineStageKey
+  index: number
+  label: string
+  agentCount?: number
+}
+
 type DomainKey = 'asset-servicing' | 'wealth' | 'insurance' | 'market-research' | 'hr'
+
+const PIPELINE_STAGES: Array<Omit<PipelineStage, 'label' | 'agentCount'>> = [
+  { key: 'understanding', index: 0 },
+  { key: 'routing', index: 1 },
+  { key: 'access', index: 2 },
+  { key: 'gathering', index: 3 },
+  { key: 'composing', index: 4 },
+]
+
+/**
+ * Selects the furthest pipeline stage represented by trace frames from the current turn.
+ * The caller controls visibility so the same selector can be reused while a request is active.
+ */
+export function selectPipelineStage(events: TraceEvent[]): PipelineStage {
+  let stageIndex = 0
+  let agentCount: number | undefined
+
+  for (const evt of events) {
+    const data = evt.data ?? {}
+    switch (evt.type) {
+      case 'request_start':
+      case 'intent_classified':
+        stageIndex = Math.max(stageIndex, 0)
+        break
+      case 'agents_resolved': {
+        const selectedCount = Array.isArray(data.selected) ? data.selected.length : undefined
+        const resolvedCount = typeof data.agentCount === 'number' ? data.agentCount : selectedCount
+        if (resolvedCount && resolvedCount > 0) agentCount = resolvedCount
+        stageIndex = Math.max(stageIndex, 1)
+        break
+      }
+      case 'gate':
+      case 'entitlement_check':
+      case 'check_denied':
+        stageIndex = Math.max(stageIndex, 2)
+        break
+      case 'agent_start':
+      case 'agent_complete':
+        stageIndex = Math.max(stageIndex, 3)
+        break
+      case 'synthesis_start':
+        stageIndex = Math.max(stageIndex, 4)
+        break
+      default:
+        break
+    }
+  }
+
+  return pipelineStageForIndex(stageIndex, agentCount)
+}
+
+export function pipelineStageForIndex(index: number, agentCount?: number): PipelineStage {
+  const stage = PIPELINE_STAGES[Math.max(0, Math.min(index, PIPELINE_STAGES.length - 1))]
+  const label = stage.key === 'routing'
+    ? agentCount
+      ? `Routing to ${agentCount} specialist agents…`
+      : 'Routing to specialist agents…'
+    : stage.key === 'access'
+      ? 'Checking your access…'
+      : stage.key === 'gathering'
+        ? 'Gathering the data…'
+        : stage.key === 'composing'
+          ? 'Composing your answer…'
+          : 'Understanding your question…'
+
+  return { ...stage, label, agentCount }
+}
 
 /**
  * Derives the user-facing access notice for the current turn. Some routed agents may be denied
