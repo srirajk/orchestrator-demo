@@ -35,7 +35,12 @@
         "current holdings for the Whitman relationship",
         "portfolio allocation for this client",
         "what is this account invested in",
-        "position breakdown for the relationship"
+        "position breakdown for the relationship",
+        "portfolio summary for this client",
+        "portfolio value and top positions",
+        "show me the portfolio for this relationship",
+        "total portfolio value",
+        "what does the portfolio hold"
       ],
       "inputModes": [
         "application/json"
