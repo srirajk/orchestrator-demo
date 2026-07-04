@@ -514,7 +514,7 @@ services:
       IAM_LIBRECHAT_CLIENT_ID: "meridian-librechat"
       IAM_LIBRECHAT_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-meridian-client-secret-dev}
       IAM_LIBRECHAT_REDIRECT_URI: ${IAM_LIBRECHAT_REDIRECT_URI:-http://localhost:3080/oauth/openid/callback}
-      IAM_CONDUIT_CHAT_POST_LOGOUT_REDIRECT_URI: ${IAM_CONDUIT_CHAT_POST_LOGOUT_REDIRECT_URI:-http://localhost:8099/api/auth/login}
+      IAM_CONDUIT_CHAT_POST_LOGOUT_REDIRECT_URI: ${IAM_CONDUIT_CHAT_POST_LOGOUT_REDIRECT_URI:-http://localhost:8099/}
       # Audience stamped on Axiom access tokens that are forwarded to the gateway.
       IAM_GATEWAY_AUDIENCE: ${IAM_GATEWAY_AUDIENCE:-conduit-gateway}
       # Persist the RSA signing key (+ its stable kid) to a named volume so a restart does not
@@ -585,7 +585,7 @@ services:
       OIDC_CLIENT_SECRET: ${CHAT_OIDC_CLIENT_SECRET:-conduit-chat-secret}
       # Must match EXACTLY the redirect-uri Axiom already has registered (never change Axiom).
       OIDC_REDIRECT_URI: ${CHAT_OIDC_REDIRECT_URI:-http://localhost:8099/api/auth/callback}
-      CHAT_POST_LOGOUT_REDIRECT_URI: ${CHAT_POST_LOGOUT_REDIRECT_URI:-http://localhost:8099/api/auth/login}
+      CHAT_POST_LOGOUT_REDIRECT_URI: ${CHAT_POST_LOGOUT_REDIRECT_URI:-http://localhost:8099/}
       # ── Session cookie ─────────────────────────────────────────────────────────
       # Session cookie must NOT be Secure over http (demo runs on http://localhost:8099).
       COOKIE_SECURE: ${CHAT_COOKIE_SECURE:-false}

@@ -78,7 +78,7 @@ iam:
       client-secret: ${IAM_LIBRECHAT_CLIENT_SECRET:meridian-client-secret-dev}
       redirect-uri: ${IAM_LIBRECHAT_REDIRECT_URI:http://localhost:3080/oauth/openid/callback}
     conduit-chat:
-      post-logout-redirect-uri: ${IAM_CONDUIT_CHAT_POST_LOGOUT_REDIRECT_URI:http://localhost:8099/api/auth/login}
+      post-logout-redirect-uri: ${IAM_CONDUIT_CHAT_POST_LOGOUT_REDIRECT_URI:http://localhost:8099/}
     admin-ui:
       client-id: ${IAM_ADMIN_UI_CLIENT_ID:admin-ui-client}
       client-secret: ${IAM_ADMIN_UI_CLIENT_SECRET:admin-ui-secret}

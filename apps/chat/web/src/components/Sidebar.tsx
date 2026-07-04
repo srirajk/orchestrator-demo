@@ -163,12 +163,7 @@ export function Sidebar() {
   }
 
   function handleLogout() {
-    fetch('/api/auth/logout', {
-      method: 'POST',
-      credentials: 'include',
-    }).finally(() => {
-      window.location.assign(`${window.location.pathname}${window.location.search}${window.location.hash}` || '/')
-    })
+    window.location.assign('/api/auth/logout')
   }
 
   // Filter conversations by search query (title match, case-insensitive)

@@ -112,7 +112,7 @@ public class SecurityConfig {
     @Value("${iam.oauth2.conduit-chat.redirect-uri:http://localhost:8099/api/auth/callback}")
     private String conduitChatRedirectUri;
 
-    @Value("${iam.oauth2.conduit-chat.post-logout-redirect-uri:http://localhost:8099/api/auth/login}")
+    @Value("${iam.oauth2.conduit-chat.post-logout-redirect-uri:http://localhost:8099/}")
     private String conduitChatPostLogoutRedirectUri;
 
     @Value("${iam.oauth2.conduit-insights.client-id:conduit-insights}")
@@ -323,6 +323,8 @@ public class SecurityConfig {
                 .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
                 .redirectUri(conduitChatRedirectUri)
                 .postLogoutRedirectUri(conduitChatPostLogoutRedirectUri)
+                .postLogoutRedirectUri("http://localhost:8099/")
+                .postLogoutRedirectUri("http://localhost:8099/api/auth/login")
                 .scope(OidcScopes.OPENID)
                 .scope(OidcScopes.PROFILE)
                 .scope(OidcScopes.EMAIL)
