@@ -83,14 +83,14 @@ export async function completeCallback(search: string): Promise<AuthSession> {
   const params = new URLSearchParams(search)
   const error = params.get('error')
   if (error) {
-    throw new Error(params.get('error_description') || error)
+    throw new Error(params.get('error_description') || 'Axiom sign-in did not complete.')
   }
 
   const code = params.get('code')
   const state = params.get('state')
   const pkce = readPkce()
   if (!code || !state || !pkce || pkce.state !== state) {
-    throw new Error('The sign-in response could not be verified. Please try again.')
+    throw new Error('Axiom could not verify this sign-in response. Please try again.')
   }
 
   const body = new URLSearchParams({
@@ -111,17 +111,17 @@ export async function completeCallback(search: string): Promise<AuthSession> {
 
   if (!response.ok) {
     const text = await response.text().catch(() => response.statusText)
-    throw new Error(`Axiom token exchange failed: ${response.status} ${text}`)
+    throw new Error(`Axiom token exchange did not complete: ${response.status} ${text}`)
   }
 
   const token = (await response.json()) as TokenResponse
   if (!token.access_token) {
-    throw new Error('Axiom did not return an access token.')
+    throw new Error('Axiom did not return an access token for this session.')
   }
 
   const claims = decodeJwt(token.id_token || token.access_token)
   if (claims.nonce && claims.nonce !== pkce.nonce) {
-    throw new Error('The sign-in nonce could not be verified. Please try again.')
+    throw new Error('Axiom could not verify this sign-in nonce. Please try again.')
   }
 
   const session: AuthSession = {
