@@ -489,6 +489,10 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/meridian
       SPRING_DATASOURCE_USERNAME: meridian
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-meridian_dev}
+      SPRING_DATA_REDIS_HOST: redis-stack
+      SPRING_DATA_REDIS_PORT: "6379"
+      SPRING_DATA_REDIS_DATABASE: "4"
+      IAM_OAUTH2_AUTHORIZATION_STORE_REDIS_KEY_PREFIX: iam:oauth2
       IAM_ISSUER_URL: ${IAM_ISSUER_URL:-http://host.docker.internal:8084}
       IAM_ADMIN_PASSWORD: ${IAM_ADMIN_PASSWORD:-Meridian@2024}
       CERBOS_HOST: cerbos
@@ -513,6 +517,8 @@ services:
     volumes:
       - iam-signing-key:/app/keys
     depends_on:
+      redis-stack:
+        condition: service_healthy
       postgres:
         condition: service_healthy
       cerbos:
