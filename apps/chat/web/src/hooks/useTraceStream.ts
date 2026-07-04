@@ -118,18 +118,24 @@ export interface TraceAccessNotice {
   message: string
 }
 
+type DomainKey = 'asset-servicing' | 'wealth' | 'insurance' | 'market-research' | 'hr'
+
 /**
  * Derives the user-facing access notice for the current turn. Some routed agents may be denied
  * while another agent still answers; that is partial access, not a failed turn.
  */
 export function selectAccessNotice(events: TraceEvent[]): TraceAccessNotice | null {
-  let deniedDomain: string | null = null
-  let answeredDomain: string | null = null
+  const deniedDomains = new Set<DomainKey>()
+  const answeredDomains = new Set<DomainKey>()
+  let promptDomain: DomainKey | null = null
   let deniedRelationship = false
   let hasAnswer = false
 
   for (const evt of events) {
     const data = evt.data ?? {}
+    if (evt.type === 'request_start') {
+      promptDomain = inferPromptDomain(String(data.prompt ?? '')) ?? promptDomain
+    }
     if (
       (evt.type === 'request_complete' && Number(data.successCount ?? 0) > 0) ||
       (evt.type === 'synthesis_start' && Number(data.successCount ?? 0) > 0)
@@ -138,23 +144,35 @@ export function selectAccessNotice(events: TraceEvent[]): TraceAccessNotice | nu
     }
     if (evt.type === 'agent_complete' && String(data.status ?? '').toLowerCase() !== 'failed') {
       hasAnswer = true
-      answeredDomain ??= humanDomain(data)
+      const domain = domainFromData(data)
+      if (domain) answeredDomains.add(domain)
     }
 
     if (evt.type === 'gate' && data.effect === 'deny') {
-      deniedDomain = humanDomain(data)
+      const domain = domainFromData(data)
+      if (domain) deniedDomains.add(domain)
       deniedRelationship ||= data.gate === 'coverage'
     } else if (evt.type === 'entitlement_check' && data.allowed === false) {
-      deniedDomain = humanDomain(data)
+      const domain = domainFromData(data)
+      if (domain) deniedDomains.add(domain)
       deniedRelationship = true
     }
   }
 
-  if (!deniedDomain && !deniedRelationship) return null
+  if (deniedDomains.size === 0 && !deniedRelationship) return null
 
   if (hasAnswer) {
-    const withheld = deniedDomain ?? 'some restricted data'
-    const showing = answeredDomain ? `Showing ${answeredDomain}. ` : 'Showing the data you can access. '
+    const relevantDeniedDomains = [...deniedDomains].filter((domain) =>
+      promptDomain === null || promptDomain === domain || answeredDomains.has(domain),
+    )
+    if (relevantDeniedDomains.length === 0 && !deniedRelationship) return null
+
+    const withheldDomain = relevantDeniedDomains[0] ?? [...deniedDomains][0] ?? null
+    const answeredDomain = [...answeredDomains][0] ?? null
+    const withheld = withheldDomain ? humanDomain(withheldDomain) : 'some restricted data'
+    const showing = answeredDomain
+      ? `Showing ${humanDomain(answeredDomain)}. `
+      : 'Showing the data you can access. '
     return {
       kind: 'partial-access',
       title: 'Partial access',
@@ -162,16 +180,17 @@ export function selectAccessNotice(events: TraceEvent[]): TraceAccessNotice | nu
     }
   }
 
+  const deniedDomain = [...deniedDomains][0] ?? null
   return {
     kind: 'full-denial',
     title: 'Access denied',
     message: deniedRelationship
       ? "You don't have access to this client relationship."
-      : `You don't have access to the ${deniedDomain ?? 'requested data'}.`,
+      : `You don't have access to the ${deniedDomain ? humanDomain(deniedDomain) : 'requested data'}.`,
   }
 }
 
-function humanDomain(data: Record<string, unknown>): string | null {
+function domainFromData(data: Record<string, unknown>): DomainKey | null {
   const haystack = [
     data.domain,
     data.segment,
@@ -186,13 +205,64 @@ function humanDomain(data: Record<string, unknown>): string | null {
 
   if (!haystack) return null
   if (haystack.includes('asset-servicing') || haystack.includes('asset servicing')) {
-    return 'asset-servicing (custody & settlement) data'
+    return 'asset-servicing'
   }
-  if (haystack.includes('wealth')) return 'wealth data'
-  if (haystack.includes('insurance') || haystack.includes('underwriting')) return 'insurance data'
+  if (haystack.includes('wealth')) return 'wealth'
+  if (haystack.includes('insurance') || haystack.includes('underwriting')) return 'insurance'
   if (haystack.includes('market-research') || haystack.includes('market research')) {
-    return 'market research data'
+    return 'market-research'
   }
-  if (haystack.includes('hr') || haystack.includes('policy')) return 'HR policy data'
+  if (haystack.includes('hr') || haystack.includes('policy')) return 'hr'
   return null
+}
+
+function inferPromptDomain(prompt: string): DomainKey | null {
+  const text = prompt.toLowerCase()
+  if (!text) return null
+  if (
+    text.includes('settlement') ||
+    text.includes('custody') ||
+    text.includes('corporate action') ||
+    text.includes('cash management') ||
+    text.includes('nav') ||
+    text.includes('sterling')
+  ) {
+    return 'asset-servicing'
+  }
+  if (
+    text.includes('holding') ||
+    text.includes('portfolio') ||
+    text.includes('family office') ||
+    text.includes('performance') ||
+    text.includes('risk profile') ||
+    text.includes('goal') ||
+    text.includes('whitman')
+  ) {
+    return 'wealth'
+  }
+  if (
+    text.includes('insurance') ||
+    text.includes('underwriting') ||
+    text.includes('policy') ||
+    text.includes('claim') ||
+    text.includes('okafor')
+  ) {
+    return 'insurance'
+  }
+  return null
+}
+
+function humanDomain(domain: DomainKey): string {
+  switch (domain) {
+    case 'asset-servicing':
+      return 'asset-servicing (custody & settlement) data'
+    case 'wealth':
+      return 'wealth data'
+    case 'insurance':
+      return 'insurance data'
+    case 'market-research':
+      return 'market research data'
+    case 'hr':
+      return 'HR policy data'
+  }
 }

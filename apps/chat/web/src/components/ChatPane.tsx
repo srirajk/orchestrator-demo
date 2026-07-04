@@ -9,7 +9,7 @@ import { useConversationDetail, useCreateConversation } from '../hooks/useConver
 import { useTraceStream, selectAccessNotice } from '../hooks/useTraceStream'
 import { apiStream } from '../api/client'
 import { iterateSseData } from '../lib/gatewayTrace'
-import type { Message } from '../api/types'
+import type { Message, MessageClientTiming } from '../api/types'
 
 const PENDING_SEND_KEY = 'conduit.chat.pendingSend'
 const PENDING_SEND_MAX_AGE_MS = 10 * 60 * 1000
@@ -18,6 +18,12 @@ interface PendingSend {
   conversationId: string | null
   content: string
   createdAt: number
+}
+
+type LocalMessage = Message & {
+  optimistic?: {
+    baseCount: number
+  }
 }
 
 function savePendingSend(conversationId: string | null, content: string) {
@@ -55,6 +61,35 @@ function takePendingSend(conversationId: string | null): string | null {
   return pending.content
 }
 
+function normalizedContent(content: string): string {
+  return content.trim().replace(/\s+/g, ' ')
+}
+
+function sameMessageContent(a: Message, b: Message): boolean {
+  return a.role === b.role && normalizedContent(a.content) === normalizedContent(b.content)
+}
+
+function serverConfirmsLocalMessage(
+  serverMessages: Message[],
+  localMessage: LocalMessage,
+): boolean {
+  const baseCount = localMessage.optimistic?.baseCount ?? 0
+  return serverMessages.some((serverMessage, index) =>
+    index >= baseCount && sameMessageContent(serverMessage, localMessage),
+  )
+}
+
+function localTwinForServerMessage(
+  localMessages: LocalMessage[],
+  serverMessage: Message,
+  serverIndex: number,
+): LocalMessage | undefined {
+  return localMessages.find((localMessage) => {
+    const baseCount = localMessage.optimistic?.baseCount ?? 0
+    return serverIndex >= baseCount && sameMessageContent(serverMessage, localMessage)
+  })
+}
+
 export function ChatPane() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -64,8 +99,9 @@ export function ChatPane() {
 
   const { data, isLoading } = useConversationDetail(isNew ? undefined : id)
 
-  const [localMessages, setLocalMessages] = useState<Message[]>([])
+  const [localMessages, setLocalMessages] = useState<LocalMessage[]>([])
   const [streamingContent, setStreamingContent] = useState<string | null>(null)
+  const [streamingTiming, setStreamingTiming] = useState<MessageClientTiming | null>(null)
   const [isStreaming, setIsStreaming] = useState(false)
   const [railCollapsed, setRailCollapsed] = useState(false)
   const [restoredDraft, setRestoredDraft] = useState<{ id: number; content: string } | null>(null)
@@ -112,26 +148,39 @@ export function ChatPane() {
     abortRef.current?.abort()
     setLocalMessages([])
     setStreamingContent(null)
+    setStreamingTiming(null)
     setIsStreaming(false)
   }, [id])
 
-  // Once the server message count exceeds what it was at send time and we are no longer
-  // streaming, the server has confirmed the exchange — clear local optimistic messages so they
-  // don't appear as duplicates alongside the real server messages (Fix: bug 1).
+  // Drop confirmed local user bubbles as soon as their server twin arrives, but keep confirmed
+  // assistant locals around as hidden timing metadata for the just-rendered server message.
   useEffect(() => {
-    if (!isStreaming && serverMessages.length > sendBaseCountRef.current) {
-      setLocalMessages([])
+    setLocalMessages((prev) => {
+      const next = prev.filter((localMessage) => {
+        const confirmed = serverConfirmsLocalMessage(serverMessages, localMessage)
+        return !confirmed || (localMessage.role === 'assistant' && localMessage.clientTiming)
+      })
+      return next.length === prev.length ? prev : next
+    })
+    if (!isStreaming && serverMessages.length >= sendBaseCountRef.current + 2) {
       sendBaseCountRef.current = serverMessages.length
     }
-  }, [serverMessages.length, isStreaming])
+  }, [serverMessages, isStreaming])
 
-  // Merge server messages with local optimistic messages, de-duplicating by id.
-  // Local ids are "local-*" so they never collide with server UUIDs. This ensures the
-  // optimistic user message is always visible while the assistant reply streams in, even
-  // when the conversation already has prior server messages (length-based either/or was the bug).
+  // Merge server messages with local optimistic messages, de-duplicating by turn content.
+  // The BFF persists the user row before the assistant row, so a server user confirmation alone
+  // must not remove the local assistant answer that just finished streaming.
   const messages = useMemo(() => {
-    const serverIds = new Set(serverMessages.map((m) => m.id))
-    return [...serverMessages, ...localMessages.filter((m) => !serverIds.has(m.id))]
+    const enrichedServerMessages = serverMessages.map((serverMessage, index) => {
+      const localTwin = localTwinForServerMessage(localMessages, serverMessage, index)
+      return localTwin?.clientTiming
+        ? { ...serverMessage, clientTiming: localTwin.clientTiming }
+        : serverMessage
+    })
+    const visibleLocalMessages = localMessages.filter(
+      (localMessage) => !serverConfirmsLocalMessage(serverMessages, localMessage),
+    )
+    return [...enrichedServerMessages, ...visibleLocalMessages]
   }, [serverMessages, localMessages])
 
   const handleSend = useCallback(
@@ -147,6 +196,7 @@ export function ChatPane() {
           })
           convId = conv.id
           savePendingSend(convId, content)
+          clearPendingSend(convId, content)
           preserveNextIdRef.current = conv.id
           navigate(`/c/${convId}`, { replace: true })
         } catch (err) {
@@ -154,25 +204,31 @@ export function ChatPane() {
           return
         }
       }
+      clearPendingSend(convId, content)
 
       // Snapshot server message count before adding optimistic messages so we can detect
       // when the server has caught up (Fix: bug 1 — use ref so no stale-closure risk).
-      sendBaseCountRef.current = serverMsgCountRef.current
+      const baseCount = serverMsgCountRef.current
+      sendBaseCountRef.current = baseCount
 
       // Optimistically append user message
-      const userMsg: Message = {
+      const userMsg: LocalMessage = {
         id: `local-${Date.now()}`,
         role: 'user',
         content,
         createdAt: new Date().toISOString(),
+        optimistic: { baseCount },
       }
       setLocalMessages((prev) => [...prev, userMsg])
 
       // Start streaming
       setIsStreaming(true)
       setStreamingContent('')
+      setStreamingTiming(null)
 
       abortRef.current = new AbortController()
+      const startedAt = performance.now()
+      let ttftMs: number | undefined
 
       try {
         const resp = await apiStream(`/api/conversations/${convId}/messages`, {
@@ -195,14 +251,21 @@ export function ChatPane() {
         for await (const data of iterateSseData(resp.body)) {
           if (data === '[DONE]') {
             // Finalize
-            const assistantMsg: Message = {
+            const timing: MessageClientTiming = {
+              ...(ttftMs !== undefined ? { ttftMs } : {}),
+              totalMs: performance.now() - startedAt,
+            }
+            const assistantMsg: LocalMessage = {
               id: `local-assistant-${Date.now()}`,
               role: 'assistant',
               content: accumulated,
               createdAt: new Date().toISOString(),
+              clientTiming: timing,
+              optimistic: { baseCount },
             }
             setLocalMessages((prev) => [...prev, assistantMsg])
             setStreamingContent(null)
+            setStreamingTiming(null)
             setIsStreaming(false)
             // Invalidate to pull real messages from server
             void qc.invalidateQueries({ queryKey: ['conversation', convId] })
@@ -215,6 +278,10 @@ export function ChatPane() {
             }
             const delta = parsed.choices?.[0]?.delta?.content ?? ''
             if (delta) {
+              if (ttftMs === undefined) {
+                ttftMs = performance.now() - startedAt
+                setStreamingTiming({ ttftMs })
+              }
               accumulated += delta
               setStreamingContent(accumulated)
             }
@@ -224,11 +291,17 @@ export function ChatPane() {
         }
 
         // If we reach here without [DONE], finalize with what we have
-        const assistantMsg: Message = {
+        const timing: MessageClientTiming = {
+          ...(ttftMs !== undefined ? { ttftMs } : {}),
+          totalMs: performance.now() - startedAt,
+        }
+        const assistantMsg: LocalMessage = {
           id: `local-assistant-${Date.now()}`,
           role: 'assistant',
           content: accumulated,
           createdAt: new Date().toISOString(),
+          clientTiming: timing,
+          optimistic: { baseCount },
         }
         setLocalMessages((prev) => [...prev, assistantMsg])
       } catch (err) {
@@ -240,6 +313,7 @@ export function ChatPane() {
         }
       } finally {
         setStreamingContent(null)
+        setStreamingTiming(null)
         setIsStreaming(false)
         void qc.invalidateQueries({ queryKey: ['conversation', convId] })
         void qc.invalidateQueries({ queryKey: ['conversations'] })
@@ -288,6 +362,7 @@ export function ChatPane() {
         <MessageList
           messages={messages}
           streamingContent={streamingContent}
+          streamingTiming={streamingTiming}
           isLoading={!isNew && isLoading}
         />
 

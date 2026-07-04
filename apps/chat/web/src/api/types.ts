@@ -13,11 +13,17 @@ export interface Conversation {
   archived?: boolean
 }
 
+export interface MessageClientTiming {
+  ttftMs?: number
+  totalMs?: number
+}
+
 export interface Message {
   id: string
   role: 'user' | 'assistant' | 'system'
   content: string
   createdAt: string
+  clientTiming?: MessageClientTiming
 }
 
 export interface ConversationDetail {

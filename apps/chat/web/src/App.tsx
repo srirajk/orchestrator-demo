@@ -26,7 +26,6 @@ export default function App() {
             <Routes>
               <Route element={<Layout />}>
                 <Route path="/" element={<Navigate to="/c/new" replace />} />
-                <Route path="/c/new" element={<ChatPane />} />
                 <Route path="/c/:id" element={<ChatPane />} />
                 <Route path="*" element={<Navigate to="/c/new" replace />} />
               </Route>

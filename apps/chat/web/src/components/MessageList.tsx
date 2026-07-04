@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { MessageSquare } from 'lucide-react'
 import { Message } from './Message'
-import type { Message as MessageType } from '../api/types'
+import type { Message as MessageType, MessageClientTiming } from '../api/types'
 
 function LoadingSkeleton() {
   return (
@@ -19,10 +19,11 @@ function LoadingSkeleton() {
 interface Props {
   messages: MessageType[]
   streamingContent: string | null
+  streamingTiming?: MessageClientTiming | null
   isLoading?: boolean
 }
 
-export function MessageList({ messages, streamingContent, isLoading }: Props) {
+export function MessageList({ messages, streamingContent, streamingTiming, isLoading }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -67,6 +68,7 @@ export function MessageList({ messages, streamingContent, isLoading }: Props) {
             role: 'assistant',
             content: streamingContent,
             createdAt: new Date().toISOString(),
+            clientTiming: streamingTiming ?? undefined,
           }}
           isStreaming={true}
         />
