@@ -112,28 +112,87 @@ export function useTraceStream(conversationId: string | undefined): UseTraceStre
   return { events, status, clear }
 }
 
-export interface TraceDenial {
-  gate: string
-  reason: string
+export interface TraceAccessNotice {
+  kind: 'full-denial' | 'partial-access'
+  title: string
+  message: string
 }
 
 /**
- * Derives the access-denied state for the current turn from its trace frames: the last `gate`
- * frame with {@code effect === 'deny'} (or an `entitlement_check` that was not allowed). Returns
- * null when nothing was denied. Drives the explicit "Access denied → gate: reason" banner.
+ * Derives the user-facing access notice for the current turn. Some routed agents may be denied
+ * while another agent still answers; that is partial access, not a failed turn.
  */
-export function selectDenial(events: TraceEvent[]): TraceDenial | null {
-  let denial: TraceDenial | null = null
+export function selectAccessNotice(events: TraceEvent[]): TraceAccessNotice | null {
+  let deniedDomain: string | null = null
+  let answeredDomain: string | null = null
+  let deniedRelationship = false
+  let hasAnswer = false
+
   for (const evt of events) {
     const data = evt.data ?? {}
+    if (
+      (evt.type === 'request_complete' && Number(data.successCount ?? 0) > 0) ||
+      (evt.type === 'synthesis_start' && Number(data.successCount ?? 0) > 0)
+    ) {
+      hasAnswer = true
+    }
+    if (evt.type === 'agent_complete' && String(data.status ?? '').toLowerCase() !== 'failed') {
+      hasAnswer = true
+      answeredDomain ??= humanDomain(data)
+    }
+
     if (evt.type === 'gate' && data.effect === 'deny') {
-      denial = { gate: String(data.gate ?? 'authorization'), reason: String(data.reason ?? '') }
+      deniedDomain = humanDomain(data)
+      deniedRelationship ||= data.gate === 'coverage'
     } else if (evt.type === 'entitlement_check' && data.allowed === false) {
-      denial = {
-        gate: 'coverage',
-        reason: String(data.reason ?? `not authorized for ${String(data.relationshipId ?? 'this resource')}`),
-      }
+      deniedDomain = humanDomain(data)
+      deniedRelationship = true
     }
   }
-  return denial
+
+  if (!deniedDomain && !deniedRelationship) return null
+
+  if (hasAnswer) {
+    const withheld = deniedDomain ?? 'some restricted data'
+    const showing = answeredDomain ? `Showing ${answeredDomain}. ` : 'Showing the data you can access. '
+    return {
+      kind: 'partial-access',
+      title: 'Partial access',
+      message: `${showing}You don't have access to the ${withheld} for this client.`,
+    }
+  }
+
+  return {
+    kind: 'full-denial',
+    title: 'Access denied',
+    message: deniedRelationship
+      ? "You don't have access to this client relationship."
+      : `You don't have access to the ${deniedDomain ?? 'requested data'}.`,
+  }
+}
+
+function humanDomain(data: Record<string, unknown>): string | null {
+  const haystack = [
+    data.domain,
+    data.segment,
+    data.agent,
+    data.agentId,
+    data.source,
+    data.reason,
+  ]
+    .filter((value) => value !== undefined && value !== null)
+    .map((value) => String(value).toLowerCase())
+    .join(' ')
+
+  if (!haystack) return null
+  if (haystack.includes('asset-servicing') || haystack.includes('asset servicing')) {
+    return 'asset-servicing (custody & settlement) data'
+  }
+  if (haystack.includes('wealth')) return 'wealth data'
+  if (haystack.includes('insurance') || haystack.includes('underwriting')) return 'insurance data'
+  if (haystack.includes('market-research') || haystack.includes('market research')) {
+    return 'market research data'
+  }
+  if (haystack.includes('hr') || haystack.includes('policy')) return 'HR policy data'
+  return null
 }

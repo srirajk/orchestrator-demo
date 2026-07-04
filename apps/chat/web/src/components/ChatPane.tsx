@@ -1,12 +1,12 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react'
-import { ShieldX } from 'lucide-react'
+import { Info, ShieldX } from 'lucide-react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { MessageList } from './MessageList'
 import { Composer } from './Composer'
 import { TraceRail } from './TraceRail'
 import { useConversationDetail, useCreateConversation } from '../hooks/useConversations'
-import { useTraceStream, selectDenial } from '../hooks/useTraceStream'
+import { useTraceStream, selectAccessNotice } from '../hooks/useTraceStream'
 import { apiStream } from '../api/client'
 import { iterateSseData } from '../lib/gatewayTrace'
 import type { Message } from '../api/types'
@@ -83,7 +83,7 @@ export function ChatPane() {
 
   // Glass-box: subscribe to this conversation's live authorization/pipeline trace.
   const { events: traceEvents, status: traceStatus } = useTraceStream(isNew ? undefined : id)
-  const denial = useMemo(() => selectDenial(traceEvents), [traceEvents])
+  const accessNotice = useMemo(() => selectAccessNotice(traceEvents), [traceEvents])
 
   const createConversation = useCreateConversation()
 
@@ -262,16 +262,24 @@ export function ChatPane() {
           <h1 className="section-heading truncate">{conversationTitle}</h1>
         </div>
 
-        {/* Explicit access-denied banner — the entitlement/denial trust story. */}
-        {denial && (
+        {/* Access notice — full denial is an alert; partial access is informational. */}
+        {accessNotice && (
           <div
-            role="alert"
-            className="mx-4 mt-3 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+            role={accessNotice.kind === 'full-denial' ? 'alert' : 'status'}
+            className={
+              accessNotice.kind === 'full-denial'
+                ? 'mx-4 mt-3 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800'
+                : 'mx-4 mt-3 flex items-start gap-2 rounded-md border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900'
+            }
           >
-            <ShieldX size={18} className="mt-0.5 shrink-0 text-red-600" />
+            {accessNotice.kind === 'full-denial' ? (
+              <ShieldX size={18} className="mt-0.5 shrink-0 text-red-600" />
+            ) : (
+              <Info size={18} className="mt-0.5 shrink-0 text-sky-600" />
+            )}
             <p>
-              <span className="font-semibold">Access denied → {denial.gate}</span>
-              {denial.reason ? <span>: {denial.reason}</span> : null}
+              <span className="font-semibold">{accessNotice.title}</span>
+              <span>: {accessNotice.message}</span>
             </p>
           </div>
         )}

@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.client.ClientAuthorizationException;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
 import org.springframework.security.oauth2.client.OAuth2AuthorizeRequest;
@@ -90,10 +91,11 @@ public class AccessTokenService {
         lock.lock();
         try {
             client = authorizedClientManager.authorize(authorizeRequest);
+        } catch (ClientAuthorizationException ex) {
+            removeAuthorizedClient(authentication, request, response);
+            throw new UnauthorizedException("OIDC session expired; re-authentication required", ex);
         } catch (OAuth2AuthorizationException ex) {
-            if (response != null) {
-                authorizedClientRepository.removeAuthorizedClient(REGISTRATION_ID, authentication, request, response);
-            }
+            removeAuthorizedClient(authentication, request, response);
             throw new UnauthorizedException("OIDC session expired; re-authentication required", ex);
         } finally {
             lock.unlock();
@@ -101,7 +103,19 @@ public class AccessTokenService {
         if (client == null || client.getAccessToken() == null) {
             throw new UnauthorizedException("No OIDC access token available; re-authentication required");
         }
-        return client.getAccessToken().getTokenValue();
+        String tokenValue = client.getAccessToken().getTokenValue();
+        if (tokenValue == null || tokenValue.isBlank()) {
+            throw new UnauthorizedException("No OIDC access token available; re-authentication required");
+        }
+        return tokenValue;
+    }
+
+    private void removeAuthorizedClient(Authentication authentication,
+                                        HttpServletRequest request,
+                                        HttpServletResponse response) {
+        if (response != null) {
+            authorizedClientRepository.removeAuthorizedClient(REGISTRATION_ID, authentication, request, response);
+        }
     }
 
     private static ServletRequestAttributes currentAttributes() {

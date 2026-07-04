@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotWritableException;
+import org.springframework.security.oauth2.client.ClientAuthorizationException;
 import org.springframework.security.oauth2.core.OAuth2AuthorizationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -73,14 +74,14 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse("Unauthorized", ex.getMessage()));
     }
 
-    @ExceptionHandler(OAuth2AuthorizationException.class)
+    @ExceptionHandler({ClientAuthorizationException.class, OAuth2AuthorizationException.class})
     public ResponseEntity<ErrorResponse> handleOAuth2Authorization(OAuth2AuthorizationException ex,
                                                                     HttpServletResponse response) {
         if (response.isCommitted()) {
             log.debug("[auth] OAuth2 authorization failed after response committed: {}", ex.getMessage());
             return null;
         }
-        log.debug("[auth] OAuth2 authorization failed: {}", ex.getMessage());
+        log.debug("[auth] OAuth2 authorization failed ({}): {}", ex.getError().getErrorCode(), ex.getMessage());
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(new ErrorResponse("Unauthorized", "OIDC session expired; re-authentication required"));
     }
