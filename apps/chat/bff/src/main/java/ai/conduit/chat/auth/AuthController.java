@@ -4,14 +4,19 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.client.registration.ClientRegistration;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
 import java.net.URI;
@@ -39,7 +44,20 @@ public class AuthController {
     private static final String AUTHORIZATION_REQUEST_URI = "/oauth2/authorization/conduit-chat";
     private static final String LOGIN_URI = "/api/auth/login";
     private static final String SESSION_COOKIE_NAME = "SESSION";
+    private static final String REGISTRATION_ID = "conduit-chat";
+    private static final String END_SESSION_ENDPOINT = "end_session_endpoint";
     public static final String LOGIN_RETURN_TO_SESSION_ATTRIBUTE = "conduit.chat.loginReturnTo";
+
+    private final ClientRegistrationRepository clientRegistrationRepository;
+    private final String postLogoutRedirectUri;
+
+    public AuthController(
+            ClientRegistrationRepository clientRegistrationRepository,
+            @Value("${conduit.chat.auth.post-logout-redirect-uri:http://localhost:8099/api/auth/login}")
+            String postLogoutRedirectUri) {
+        this.clientRegistrationRepository = clientRegistrationRepository;
+        this.postLogoutRedirectUri = postLogoutRedirectUri;
+    }
 
     @GetMapping("/login")
     public void login(@RequestParam(name = "returnTo", required = false) String returnTo,
@@ -76,6 +94,10 @@ public class AuthController {
      */
     @RequestMapping(value = "/logout", method = {RequestMethod.GET, RequestMethod.POST})
     public ResponseEntity<Map<String, Boolean>> logout(HttpServletRequest request, HttpServletResponse response) {
+        URI redirect = RequestMethod.GET.name().equalsIgnoreCase(request.getMethod())
+                ? oidcLogoutRedirectUri()
+                : null;
+
         HttpSession session = request.getSession(false);
         if (session != null) {
             try {
@@ -93,8 +115,37 @@ public class AuthController {
         response.addCookie(cookie);
 
         if (RequestMethod.GET.name().equalsIgnoreCase(request.getMethod())) {
-            return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(LOGIN_URI)).build();
+            return ResponseEntity.status(HttpStatus.FOUND)
+                    .location(redirect != null ? redirect : URI.create(LOGIN_URI))
+                    .build();
         }
         return ResponseEntity.ok(Map.of("loggedOut", true));
+    }
+
+    private URI oidcLogoutRedirectUri() {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        Object principal = authentication == null ? null : authentication.getPrincipal();
+        if (!(principal instanceof OidcUser oidcUser) || oidcUser.getIdToken() == null) {
+            return null;
+        }
+
+        ClientRegistration registration = clientRegistrationRepository.findByRegistrationId(REGISTRATION_ID);
+        if (registration == null) {
+            return null;
+        }
+
+        Object endpoint = registration.getProviderDetails()
+                .getConfigurationMetadata()
+                .get(END_SESSION_ENDPOINT);
+        if (!(endpoint instanceof String endSessionEndpoint) || endSessionEndpoint.isBlank()) {
+            return null;
+        }
+
+        return UriComponentsBuilder.fromUriString(endSessionEndpoint)
+                .queryParam("id_token_hint", oidcUser.getIdToken().getTokenValue())
+                .queryParam("post_logout_redirect_uri", postLogoutRedirectUri)
+                .build()
+                .encode()
+                .toUri();
     }
 }

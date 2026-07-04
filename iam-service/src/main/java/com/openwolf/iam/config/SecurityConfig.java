@@ -112,6 +112,9 @@ public class SecurityConfig {
     @Value("${iam.oauth2.conduit-chat.redirect-uri:http://localhost:8099/api/auth/callback}")
     private String conduitChatRedirectUri;
 
+    @Value("${iam.oauth2.conduit-chat.post-logout-redirect-uri:http://localhost:8099/api/auth/login}")
+    private String conduitChatPostLogoutRedirectUri;
+
     @Value("${iam.oauth2.admin-ui.client-id:admin-ui-client}")
     private String adminUiClientId;
 
@@ -310,6 +313,7 @@ public class SecurityConfig {
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
                 .redirectUri(conduitChatRedirectUri)
+                .postLogoutRedirectUri(conduitChatPostLogoutRedirectUri)
                 .scope(OidcScopes.OPENID)
                 .scope(OidcScopes.PROFILE)
                 .scope(OidcScopes.EMAIL)

@@ -75,6 +75,8 @@ management:
 
 conduit:
   chat:
+    auth:
+      post-logout-redirect-uri: ${CHAT_POST_LOGOUT_REDIRECT_URI:http://localhost:8099/api/auth/login}
     gateway:
       base-url: ${GATEWAY_BASE:http://gateway:8080}
       model: ${GATEWAY_MODEL:conduit-assistant}
