@@ -1532,3 +1532,26 @@
 
 | 12:10 | Proved chat memory COMPACTION e2e via REAL BFF OIDC session (rm_jane); found+fixed lost-update bug nulling Conversation.summary | ConversationService.java, ContextAssembler.java | summary now persists (facts-free, carries "ESG-screened tech"), summaryAttached=true, turn-16 callback recalled after turn-2 dropped from window; world-b CRITICAL=0 | ~40k |
 | 13:23 | Instrumented BFF memory compaction with 4 Prometheus metrics (summary_attached_total, context_messages, tokens, summary_generation_seconds); added Prometheus scrape target for conduit-chat:8095; added CompactionSummaryNeverAttached alert rule; added Grafana compaction dashboard; verified all 4 metrics in Prometheus with attached_true=1 after 46 real turns | ContextAssembler.java, LlmSummaryService.java, pom.xml, prometheus.yml, alerting-rules.yml, compaction.json, docker-compose.yml | success | ~4500 |
+| 09:54 | Session end: 60 writes across 24 files (model-prices.json, seed-langfuse-models.py, ChatService.java, Range.java, PrometheusMetricsSource.java) | 26 reads | ~66038 tok |
+| 10:18 | Session end: 60 writes across 24 files (model-prices.json, seed-langfuse-models.py, ChatService.java, Range.java, PrometheusMetricsSource.java) | 26 reads | ~66038 tok |
+| 10:20 | Session end: 60 writes across 24 files (model-prices.json, seed-langfuse-models.py, ChatService.java, Range.java, PrometheusMetricsSource.java) | 26 reads | ~66038 tok |
+| 10:21 | Session end: 60 writes across 24 files (model-prices.json, seed-langfuse-models.py, ChatService.java, Range.java, PrometheusMetricsSource.java) | 26 reads | ~66038 tok |
+| 10:31 | Session end: 60 writes across 24 files (model-prices.json, seed-langfuse-models.py, ChatService.java, Range.java, PrometheusMetricsSource.java) | 26 reads | ~66038 tok |
+| 10:33 | Session end: 60 writes across 24 files (model-prices.json, seed-langfuse-models.py, ChatService.java, Range.java, PrometheusMetricsSource.java) | 26 reads | ~66038 tok |
+| 10:36 | Session end: 60 writes across 24 files (model-prices.json, seed-langfuse-models.py, ChatService.java, Range.java, PrometheusMetricsSource.java) | 26 reads | ~66038 tok |
+| 10:37 | Created ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/insights/ModelPricing.java | — | ~2022 |
+| 10:38 | Edited ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/insights/LangfuseMetricsSource.java | 3→4 lines | ~41 |
+| 10:38 | Edited ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/insights/LangfuseMetricsSource.java | 3→4 lines | ~52 |
+| 10:38 | Edited ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/insights/LangfuseMetricsSource.java | 2→3 lines | ~28 |
+| 10:38 | Edited ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/insights/LangfuseMetricsSource.java | expanded (+7 lines) | ~231 |
+| 10:38 | Edited ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/insights/LangfuseMetricsSource.java | modified totalCost() | ~272 |
+| 10:39 | Edited ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/insights/LangfuseMetricsSource.java | modified costByDay() | ~328 |
+| 10:39 | Edited ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/insights/LangfuseMetricsSource.java | added 2 condition(s) | ~514 |
+| 10:39 | Edited ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/insights/LangfuseMetricsSource.java | added 2 condition(s) | ~651 |
+| 10:40 | Edited ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/insights/LangfuseMetricsSource.java | added 1 condition(s) | ~533 |
+| 10:40 | Edited ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/insights/LangfuseMetricsSource.java | modified costMetrics() | ~161 |
+| 10:40 | Edited ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/insights/InsightsController.java | 5→6 lines | ~67 |
+| 10:40 | Edited ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/insights/InsightsController.java | 2→3 lines | ~47 |
+| 10:41 | Edited ../orchestrator-chat/gateway/src/main/resources/application.yml | expanded (+8 lines) | ~198 |
+| 10:47 | Session end: 74 writes across 26 files (model-prices.json, seed-langfuse-models.py, ChatService.java, Range.java, PrometheusMetricsSource.java) | 26 reads | ~71533 tok |
+| 10:54 | Session end: 74 writes across 26 files (model-prices.json, seed-langfuse-models.py, ChatService.java, Range.java, PrometheusMetricsSource.java) | 26 reads | ~71533 tok |

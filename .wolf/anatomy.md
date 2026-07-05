@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-07-05T13:08:21.933Z
-> Files: 1012 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-07-05T14:41:04.512Z
+> Files: 1021 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/
 
@@ -304,10 +304,11 @@
 
 - `BoardCatalog.java` — Declarative catalog of the 7 Insights boards and their panels, each bound to a PromQL query (~4998 tok)
 - `InsightsAuthorizer.java` — Governance gate for {@code /v1/insights/*} — admin-gated through the SAME Cerbos/ABAC PDP path (~715 tok)
-- `InsightsController.java` — Conduit Insights API — native, admin-gated analytics inside the gateway. (~2350 tok)
+- `InsightsController.java` — Conduit Insights API — native, admin-gated analytics inside the gateway. (~2378 tok)
 - `InsightsExecutor.java` — Structured, deadline-bounded, partial-tolerant fan-out engine for a board's panels — the (~2350 tok)
-- `LangfuseMetricsSource.java` — {@link MetricsSource} over the Langfuse public API (cost, token usage, eval scores). (~4546 tok)
+- `LangfuseMetricsSource.java` — {@link MetricsSource} over the Langfuse public API (cost, token usage, eval scores). (~5881 tok)
 - `MetricsSource.java` — Seam over a queryable metrics backend (hard-rule g: build the simple path, leave the (~256 tok)
+- `ModelPricing.java` — Config-driven LLM token pricing for Conduit's cost analytics. (~2022 tok)
 - `PanelSpec.java` — A declarative panel: its identity/type/unit plus a {@code producer} that queries the (~259 tok)
 - `PrometheusMetricsSource.java` — {@link MetricsSource} over the Prometheus HTTP API (PromQL). (~2695 tok)
 - `Range.java` — Selectable analytics time-range for an Insights board — the three windows the UI's timeframe (~685 tok)
@@ -350,7 +351,7 @@
 
 ## ../orchestrator-chat/gateway/src/main/resources/
 
-- `application.yml` (~2412 tok)
+- `application.yml` (~2589 tok)
 
 ## ../orchestrator-chat/gateway/src/test/java/ai/conduit/gateway/domain/auth/
 
@@ -774,6 +775,13 @@
 - `memory.md` — Chronological action log for session work and outcomes. (~2771 tok)
 - `OPENWOLF.md` — OpenWolf operating protocol for navigation, memory, bug logging, and session-end updates. (~1675 tok)
 
+## Glass-box authorization gate trace (2026-07-03)
+
+- `apps/chat/web/src/components/TraceRail.tsx` — collapsible Decision-trace rail: intent→resolve→gate rows (✓/✗ + reason)→answer. (~1400 tok)
+- `apps/chat/web/src/hooks/useTraceStream.ts` — conversation-scoped trace SSE hook + selectDenial(). (~900 tok)
+- `apps/chat/web/src/lib/gatewayTrace.ts` — vendored mirror of @conduit/gateway-client SSE parse + trace types (Docker build-context safe). (~600 tok)
+- `gateway/.../telemetry/event/GateData.java` — Trace payload for one authz gate decision: {gate, effect, reason, agent}; audience|segment|classification|coverage. (~350 tok)
+
 ## admin-ui/
 
 - `.env.example` — Documents optional Vite gateway proxy override and admin JWT storage keys. (~55 tok)
@@ -860,6 +868,9 @@
 - `Teams.tsx` — EMPTY — renders modal (~3886 tok)
 - `Users.tsx` — Users screen; per-segment "Segments & clearance" row editor (segment+tier rows, dup/required validation, live segments+classification-schema options), table shows per-segment chips, default chat_user role (~7200 tok)
 - `Workbench.tsx` — Tiny route wrapper around features/workbench/WorkbenchPage (~30 tok)
+
+## apps/admin/ (Axiom Admin Console — split from admin-ui)
+
 
 ## conduit-ui-tests/
 
@@ -1699,6 +1710,9 @@
 - `jwt_verify.py` — verify_bearer_token (~1103 tok)
 - `telemetry.py` — setup_telemetry, agent_span (~1312 tok)
 
+## packages/ (monorepo shared libs — additive split)
+
+
 ## phases/
 
 - `PHASE-1.md` — Phase 1 — Skeleton & First Streamed Reply (~466 tok)
@@ -1773,8 +1787,8 @@
 - `seed-demo.sh` — Meridian Gateway — Phoenix/Tempo demo seed (~176 tok)
 - `seed-users.sh` — seed-users.sh — Idempotently seed demo principals into Redis. (~1048 tok)
 - `seed-users.sh` — seed-users.sh — Idempotently seed demo principals into Redis. (~910 tok)
-- `smoke.sh` — smoke.sh — full API/CLI smoke for Conduit. Run against a live stack (docker compose up). (~1581 tok)
 - `smoke-ui.sh` — Tier-1 fast gate (invoked first by smoke.sh): 10 health URLs 200, CORS preflights per browser origin (chat→BFF :8099, admin→iam :5182→:8084), 4 personas mint JWT. No LLM/sleeps; exit=#failures. (~550 tok)
+- `smoke.sh` — smoke.sh — full API/CLI smoke for Conduit. Run against a live stack (docker compose up). (~1581 tok)
 - `verify-telemetry-e2e.sh` — ───────────────────────────────────────────────────────────────────────────── (~1151 tok)
 - `verify.sh` — Full verification script — runs after each phase to confirm acceptance criteria. (~713 tok)
 - `wait-for-healthy.sh` — Wait until all core docker-compose services report healthy, then exit 0. (~323 tok)
@@ -1873,33 +1887,3 @@
 ## user-mgmt/tests/
 
 - `test_user_mgmt.py` — Tests: jwks_has_correct_structure, jwks_e_is_65537, jwks_n_length, issue_token_returns_rs256_jwt + 20 more (~7203 tok)
-
-## packages/ (monorepo shared libs — additive split)
-
-- `packages/ui/tailwind.preset.js` — Axiom Tailwind preset (colors: axiom/gold/ink/canvas/line, enterprise+gold-focus shadows) shared by all surfaces
-- `packages/ui/styles/tokens.css` — @conduit/ui base + component CSS tokens (surface-card, surface-panel, sidebar-link, section-heading); copy of admin-ui index.css
-- `packages/ui/src/index.ts` — @conduit/ui barrel: Button, Input/Textarea/Select, Badge/RoleBadge, Dialog, Toast, Skeleton, EmptyState, Panel, StatusPill
-- `packages/ui/src/components/*.tsx` — shared React primitives copied from admin-ui components/ui + workbench Panel/StatusPill
-- `packages/ui/package.json` — @conduit/ui; peer react/react-dom; deps clsx+lucide-react; tsc build to dist
-- `packages/gateway-client/src/client.ts` — GatewayClient: chatCompletion, streamChatCompletion/streamChatContent (OpenAI SSE), streamTraceEvents, traceStreamRequest, listDomains/listAgents/traceHealth
-- `packages/gateway-client/src/sse.ts` — dependency-free SSE parse (iterateSseData, splitSseBlocks, sseDataFromBlock)
-- `packages/gateway-client/src/{types,selectors,events,format}.ts` — wire types + manifest selectors + trace event tone/title/detail helpers
-- `packages/gateway-client/package.json` — @conduit/gateway-client; zero runtime deps; tsc build to dist
-- `package.json` (root) — npm workspaces: packages/*, apps/admin; build:packages/build:admin scripts
-
-## apps/admin/ (Axiom Admin Console — split from admin-ui)
-
-- `apps/admin/**` — standalone copy of admin-ui (name: axiom-admin); Dashboard/Users/Teams/Roles/Policies(Cerbos)/Audit + operator Workbench; builds via `npm run build`; keeps local ui/gateway copies (does not yet consume @conduit packages)
-
-## Glass-box authorization gate trace (2026-07-03)
-- `gateway/.../telemetry/event/GateData.java` — Trace payload for one authz gate decision: {gate, effect, reason, agent}; audience|segment|classification|coverage. (~350 tok)
-- `gateway/.../domain/auth/EntitlementService.java` — +explainStructuralGates(): per-agent gate breakdown sourced from Cerbos (invoke + invoke_membership), World-B clean.
-- `gateway/.../domain/auth/CerbosEntitlementAdapter.java` — +checkAgentMembership(): membership-only `invoke_membership` probe; buildAgentRequest parametrized by action.
-- `gateway/.../domain/chat/ChatService.java` — publishes ordered `gate` frames (structural + coverage allow/deny) in handleFetchData.
-- `infra/cerbos/policies/agent_resource.yaml` — +`invoke_membership` action (segment membership without the classification-rank gate) for the glass-box trace.
-- `apps/chat/bff/.../chat/TraceController.java` — GET /api/conversations/{id}/trace/stream; ownership-checked SSE proxy of the gateway trace stream.
-- `apps/chat/bff/.../chat/GatewayClient.java` — +openTraceStream(conversationId).
-- `apps/chat/web/src/lib/gatewayTrace.ts` — vendored mirror of @conduit/gateway-client SSE parse + trace types (Docker build-context safe). (~600 tok)
-- `apps/chat/web/src/hooks/useTraceStream.ts` — conversation-scoped trace SSE hook + selectDenial(). (~900 tok)
-- `apps/chat/web/src/components/TraceRail.tsx` — collapsible Decision-trace rail: intent→resolve→gate rows (✓/✗ + reason)→answer. (~1400 tok)
-- `apps/chat/web/src/components/ChatPane.tsx` — wires the rail + "Access denied → gate: reason" banner.
