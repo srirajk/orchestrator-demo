@@ -474,7 +474,7 @@ function OverviewView({
               ))}
             </div>
           ) : (
-            <EmptyState>Decision feed is collecting live authorization ledger rows.</EmptyState>
+            <EmptyState>No decision-feed rows for this range.</EmptyState>
           )}
         </PanelShell>
         <PanelShell className="col12" title="Outcomes & failure taxonomy" caption="conduit_request_outcome_total — every request classified by how it ended">
@@ -523,7 +523,7 @@ function TrustView({ boards }: { boards: Record<number, Board> }) {
               ))}
             </div>
           ) : (
-            <EmptyState>Authorization ledger rows are collecting.</EmptyState>
+            <EmptyState>No authorization-ledger rows for this range.</EmptyState>
           )}
         </PanelShell>
       </div>
@@ -554,7 +554,7 @@ function AgentsView({ boards, onNavigate }: { boards: Record<number, Board>; onN
           tag="Needs attention"
         />
       ) : (
-        <SystemNotice tone="nom" tag="All nominal" message="Agent fleet telemetry is collecting for this range." />
+        <SystemNotice tone="nom" tag="All nominal" message="No agent-fleet telemetry for this range." />
       )}
       <div className="grid">
         <PanelShell className="col7" title="Agent fleet" caption="Calls · success · p95 · current range">
@@ -565,7 +565,7 @@ function AgentsView({ boards, onNavigate }: { boards: Record<number, Board>; onN
               ))}
             </div>
           ) : (
-            <EmptyState>Agent call outcome rows are collecting.</EmptyState>
+            <EmptyState>No agent-outcome rows for this range.</EmptyState>
           )}
         </PanelShell>
         <PanelShell className="col5" title="Latency by stage" caption="Where the time goes · gateway trace waterfall">
@@ -612,7 +612,7 @@ function EconomicsView({ boards, cost, range }: { boards: Record<number, Board>;
         message={
           cost
             ? `${currency(cost.unitEconomics.costPerQuestionUsd)} / question · ${compactNumber(cost.totalTokens)} tokens over ${compactNumber(cost.questions)} questions.`
-            : 'Cost endpoint is collecting.'
+            : 'No cost data for this range.'
         }
       />
       <div className="grid">
@@ -674,7 +674,7 @@ function AnswerQualityView({
         message={
           scores.length > 0
             ? `Independent continuous scores are live across ${compactNumber(cost?.questions ?? 0)} questions.`
-            : 'Continuous answer-quality scores are collecting.'
+            : 'No answer-quality scores for this range.'
         }
       />
       <div className="grid">
@@ -782,7 +782,7 @@ function UserView({
               ))}
             </div>
           ) : (
-            <EmptyState>User-level continuous eval is collecting.</EmptyState>
+            <EmptyState>No user-level eval scores for this range.</EmptyState>
           )}
         </PanelShell>
         <PanelShell className="col5" title="Memory compactions" caption="Long sessions summarized to fit context">
@@ -1168,7 +1168,7 @@ function AgentFleetRow({ row }: { row: TableRecord }) {
 }
 
 function BreakerList({ rows }: { rows: TableRecord[] }) {
-  if (!rows.length) return <EmptyState>Breaker state rows are collecting.</EmptyState>
+  if (!rows.length) return <EmptyState>No breaker-state rows for this range.</EmptyState>
 
   return (
     <div className="breaker-list">
@@ -1436,7 +1436,7 @@ function initialsFor(name: string): string {
 }
 
 function collecting(): string {
-  return 'collecting...'
+  return 'N/A'
 }
 
 function rowKey(row: TableRecord, index: number): string {
