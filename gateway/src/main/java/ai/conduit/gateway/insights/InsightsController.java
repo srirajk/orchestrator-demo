@@ -101,6 +101,7 @@ public class InsightsController {
         body.put("range", range.key());
         body.put("currency", "USD");
         body.put("totalCostUsd", round(totals.costUsd(), 6));
+        body.put("costEstimated", totals.estimated());
         body.put("totalTokens", (long) totals.tokens());
         body.put("questions", questions);
         Map<String, Object> unit = new LinkedHashMap<>();
@@ -151,6 +152,7 @@ public class InsightsController {
             m.put("costUsd", round(s.costUsd(), 6));
             m.put("tokens", (long) s.tokens());
             m.put("count", s.count());
+            m.put("estimated", s.estimated());
             out.add(m);
         }
         return out;
