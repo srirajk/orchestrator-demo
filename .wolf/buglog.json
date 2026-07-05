@@ -7,7 +7,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/orchestration/harness/AgentHarness.java",
       "root_cause": "5 lines replaced/restructured",
-      "fix": "Rewrote 40\u219255 lines (5 removed)",
+      "fix": "Rewrote 40→55 lines (5 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -39,7 +39,7 @@
       "error_message": "Significant refactor of ",
       "file": "eval/eval_deepeval.py",
       "root_cause": "4 lines replaced/restructured",
-      "fix": "Rewrote 10\u21928 lines (4 removed) | Also: Spot-check 3 hero answers for faithfulness using d; print(f\" Faithfulness Spot-Check (3 hero prompts v",
+      "fix": "Rewrote 10→8 lines (4 removed) | Also: Spot-check 3 hero answers for faithfulness using d; print(f\" Faithfulness Spot-Check (3 hero prompts v",
       "tags": [
         "auto-detected",
         "refactor",
@@ -55,7 +55,7 @@
       "error_message": "Significant refactor of ",
       "file": "mock-agents/wealth/shared/fault_knobs.py",
       "root_cause": "17 lines replaced/restructured",
-      "fix": "Rewrote 42\u219228 lines (17 removed)",
+      "fix": "Rewrote 42→28 lines (17 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -103,7 +103,7 @@
       "error_message": "Wrong reference: false should be true",
       "file": "infra/cerbos/config.yaml",
       "root_cause": "Used \"false\" instead of \"true\"",
-      "fix": "Changed false \u2192 true",
+      "fix": "Changed false → true",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -167,7 +167,7 @@
       "error_message": "Significant refactor of ",
       "file": ".claude/worktrees/agent-a3c0915360f71cbe6/admin-ui/src/pages/Policies.tsx",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 7\u21925 lines (2 removed)",
+      "fix": "Rewrote 7→5 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -182,8 +182,8 @@
       "timestamp": "2026-06-27T20:51:11.435Z",
       "error_message": "CSS fix: data, queryKey",
       "file": ".claude/worktrees/agent-a3c0915360f71cbe6/admin-ui/src/pages/Policies.tsx",
-      "root_cause": "data: roles = [] \u2192 segmentsData; queryKey: ['roles'], queryFn: rolesApi.list \u2192 ['segments'], queryFn: adminApi.segments",
-      "fix": "Changed data: roles = [] \u2192 segmentsData; queryKey: ['roles'], queryFn: rolesApi.list \u2192 ['segments'], queryFn: adminApi.segments",
+      "root_cause": "data: roles = [] → segmentsData; queryKey: ['roles'], queryFn: rolesApi.list → ['segments'], queryFn: adminApi.segments",
+      "fix": "Changed data: roles = [] → segmentsData; queryKey: ['roles'], queryFn: rolesApi.list → ['segments'], queryFn: adminApi.segments",
       "tags": [
         "auto-detected",
         "style-fix",
@@ -199,7 +199,7 @@
       "error_message": "Significant refactor of ",
       "file": ".claude/worktrees/agent-a3c0915360f71cbe6/user-mgmt/main.py",
       "root_cause": "3 lines replaced/restructured",
-      "fix": "Rewrote 57\u219273 lines (3 removed) | Also: metadata_={; }, | Also: if not result.scalar_one_or_none():; .where(Group.type == \"team\")",
+      "fix": "Rewrote 57→73 lines (3 removed) | Also: metadata_={; }, | Also: if not result.scalar_one_or_none():; .where(Group.type == \"team\")",
       "tags": [
         "auto-detected",
         "refactor",
@@ -215,7 +215,7 @@
       "error_message": "Wrong reference: None should be team_meta_map",
       "file": ".claude/worktrees/agent-a3c0915360f71cbe6/user-mgmt/main.py",
       "root_cause": "Used \"None\" instead of \"team_meta_map\"",
-      "fix": "Changed None \u2192 team_meta_map",
+      "fix": "Changed None → team_meta_map",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -230,8 +230,8 @@
       "timestamp": "2026-06-28T00:25:07.599Z",
       "error_message": "CSS fix: to",
       "file": "admin-ui/src/components/Sidebar.tsx",
-      "root_cause": "to: '/policies',label: 'Policies',  icon: FileText \u2192 '/audit',   label: 'Audit Log', icon: Clock",
-      "fix": "Changed to: '/policies',label: 'Policies',  icon: FileText \u2192 '/audit',   label: 'Audit Log', icon: Clock",
+      "root_cause": "to: '/policies',label: 'Policies',  icon: FileText → '/audit',   label: 'Audit Log', icon: Clock",
+      "fix": "Changed to: '/policies',label: 'Policies',  icon: FileText → '/audit',   label: 'Audit Log', icon: Clock",
       "tags": [
         "auto-detected",
         "style-fix",
@@ -279,7 +279,7 @@
       "error_message": "Wrong reference: access_token should be accessToken",
       "file": "admin-ui/src/pages/Login.tsx",
       "root_cause": "Used \"access_token\" instead of \"accessToken\"",
-      "fix": "Changed access_token \u2192 accessToken",
+      "fix": "Changed access_token → accessToken",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -294,8 +294,8 @@
       "timestamp": "2026-06-28T00:58:37.542Z",
       "error_message": "CSS fix: EMPTY",
       "file": "admin-ui/src/pages/Users.tsx",
-      "root_cause": "EMPTY: Omit<UserType, 'id' | 'admin_domains'> = { \u2192 Omit<UserType, 'id' | 'adminDomains' | 'isActive' | 'createdAt'> = {",
-      "fix": "Changed EMPTY: Omit<UserType, 'id' | 'admin_domains'> = { \u2192 Omit<UserType, 'id' | 'adminDomains' | 'isActive' | 'createdAt'> = {",
+      "root_cause": "EMPTY: Omit<UserType, 'id' | 'admin_domains'> = { → Omit<UserType, 'id' | 'adminDomains' | 'isActive' | 'createdAt'> = {",
+      "fix": "Changed EMPTY: Omit<UserType, 'id' | 'admin_domains'> = { → Omit<UserType, 'id' | 'adminDomains' | 'isActive' | 'createdAt'> = {",
       "tags": [
         "auto-detected",
         "style-fix",
@@ -311,7 +311,7 @@
       "error_message": "Wrong reference: name should be username",
       "file": "admin-ui/src/pages/Users.tsx",
       "root_cause": "Used \"name\" instead of \"username\"",
-      "fix": "Changed name \u2192 username",
+      "fix": "Changed name → username",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -343,7 +343,7 @@
       "error_message": "Wrong reference: name should be username",
       "file": "admin-ui/src/pages/Dashboard.tsx",
       "root_cause": "Used \"name\" instead of \"username\"",
-      "fix": "Changed name \u2192 username",
+      "fix": "Changed name → username",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -359,7 +359,7 @@
       "error_message": "Wrong reference: name should be username",
       "file": "admin-ui/src/pages/Teams.tsx",
       "root_cause": "Used \"name\" instead of \"username\"",
-      "fix": "Changed name \u2192 username",
+      "fix": "Changed name → username",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -374,8 +374,8 @@
       "timestamp": "2026-06-28T01:08:12.473Z",
       "error_message": "CSS fix: EMPTY",
       "file": "admin-ui/src/pages/Teams.tsx",
-      "root_cause": "EMPTY: Omit<Team, 'member_count' | 'members'> = { \u2192 Omit<Team, 'memberCount' | 'members'> = {",
-      "fix": "Changed EMPTY: Omit<Team, 'member_count' | 'members'> = { \u2192 Omit<Team, 'memberCount' | 'members'> = {",
+      "root_cause": "EMPTY: Omit<Team, 'member_count' | 'members'> = { → Omit<Team, 'memberCount' | 'members'> = {",
+      "fix": "Changed EMPTY: Omit<Team, 'member_count' | 'members'> = { → Omit<Team, 'memberCount' | 'members'> = {",
       "tags": [
         "auto-detected",
         "style-fix",
@@ -455,7 +455,7 @@
       "error_message": "Wrong reference: total should be totalElements",
       "file": "admin-ui/src/pages/AuditLog.tsx",
       "root_cause": "Used \"total\" instead of \"totalElements\"",
-      "fix": "Changed total \u2192 totalElements",
+      "fix": "Changed total → totalElements",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -471,7 +471,7 @@
       "error_message": "Significant refactor of ",
       "file": "infra/cerbos/policies/agent_resource.yaml",
       "root_cause": "4 lines replaced/restructured",
-      "fix": "Rewrote 19\u219225 lines (4 removed)",
+      "fix": "Rewrote 19→25 lines (4 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -502,7 +502,7 @@
       "timestamp": "2026-06-28T01:41:32.258Z",
       "error_message": "Missing error handling in unknown",
       "file": "infra/cerbos/policies/iam_resource.yaml",
-      "root_cause": "Code path had no error handling \u2014 exceptions would propagate uncaught",
+      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
       "fix": "Added try/catch block",
       "tags": [
         "auto-detected",
@@ -519,7 +519,7 @@
       "error_message": "Significant refactor of ",
       "file": "infra/cerbos/policies/iam_derived_roles.yaml",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 9\u219212 lines (2 removed)",
+      "fix": "Rewrote 9→12 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -535,7 +535,7 @@
       "error_message": "Significant refactor of ",
       "file": "infra/cerbos/policies/iam_resource.yaml",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 10\u219212 lines (2 removed)",
+      "fix": "Rewrote 10→12 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -551,7 +551,7 @@
       "error_message": "Wrong reference: name should be id",
       "file": "e2e/tests/09-cerbos-authz.spec.ts",
       "root_cause": "Used \"name\" instead of \"id\"",
-      "fix": "Changed name \u2192 id",
+      "fix": "Changed name → id",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -567,7 +567,7 @@
       "error_message": "Significant refactor of ",
       "file": "iam-service/src/main/java/com/openwolf/iam/service/PolicyService.java",
       "root_cause": "7 lines replaced/restructured",
-      "fix": "Rewrote 14\u219235 lines (7 removed)",
+      "fix": "Rewrote 14→35 lines (7 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -599,7 +599,7 @@
       "error_message": "Significant refactor of ",
       "file": "docker-compose.yml",
       "root_cause": "4 lines replaced/restructured",
-      "fix": "Rewrote 4\u21926 lines (4 removed)",
+      "fix": "Rewrote 4→6 lines (4 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -630,7 +630,7 @@
       "timestamp": "2026-06-28T03:38:47.853Z",
       "error_message": "Missing error handling in unknown",
       "file": "iam-service/src/main/java/com/openwolf/iam/controller/AuthController.java",
-      "root_cause": "Code path had no error handling \u2014 exceptions would propagate uncaught",
+      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
       "fix": "Added try/catch block",
       "tags": [
         "auto-detected",
@@ -647,7 +647,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/config/SecurityConfig.java",
       "root_cause": "5 lines replaced/restructured",
-      "fix": "Rewrote 6\u21926 lines (5 removed)",
+      "fix": "Rewrote 6→6 lines (5 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -694,7 +694,7 @@
       "timestamp": "2026-06-28T04:06:03.501Z",
       "error_message": "Missing error handling in unknown",
       "file": "iam-service/src/main/java/com/openwolf/iam/controller/AuthController.java",
-      "root_cause": "Code path had no error handling \u2014 exceptions would propagate uncaught",
+      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
       "fix": "Added try/catch block",
       "tags": [
         "auto-detected",
@@ -708,7 +708,7 @@
     {
       "id": "bug-045",
       "timestamp": "2026-06-28T04:30:00.000Z",
-      "error_message": "E2E getJwt() sends {user_id} body and reads data.access_token \u2014 both wrong for Java iam-service API",
+      "error_message": "E2E getJwt() sends {user_id} body and reads data.access_token — both wrong for Java iam-service API",
       "file": "e2e/tests/helpers.ts",
       "root_cause": "Python user-mgmt POST /auth/token expected {user_id: string} and returned {access_token}. Java iam-service expects {username, password} and returns {accessToken}.",
       "fix": "Changed body to {username: userId, password: 'Meridian@2024'} and read data.accessToken",
@@ -870,7 +870,7 @@
     {
       "id": "bug-054",
       "timestamp": "2026-06-28T04:30:00.000Z",
-      "error_message": "04-entitlements.spec.ts:12 and :51 timeout \u2014 'Target page, context or browser has been closed' at helpers.ts:109",
+      "error_message": "04-entitlements.spec.ts:12 and :51 timeout — 'Target page, context or browser has been closed' at helpers.ts:109",
       "file": "e2e/playwright.config.ts",
       "root_cause": "Playwright test timeout was 90_000ms. LibreChat browser UI tests require ~15-20s login + ~60-80s LLM synthesis = 75-100s, exceeding the timeout. When timeout fires, Playwright closes the page context and page.waitForTimeout() throws 'page closed'.",
       "fix": "Increased timeout from 90_000 to 180_000ms in playwright.config.ts. Both UI tests now complete in ~90-96s and pass within 180s.",
@@ -890,7 +890,7 @@
       "error_message": "Significant refactor of ",
       "file": "docs/gateway-domain-architecture.md",
       "root_cause": "3 lines replaced/restructured",
-      "fix": "Rewrote 13\u219236 lines (3 removed)",
+      "fix": "Rewrote 13→36 lines (3 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -906,7 +906,7 @@
       "error_message": "Significant refactor of ",
       "file": "docs/gateway-domain-architecture.md",
       "root_cause": "6 lines replaced/restructured",
-      "fix": "Rewrote 12\u219218 lines (6 removed) | Also: | **0 \u2014 Foundation** | `DomainManifest` + `DomainM; | | `ConversationSession` extension (add clientNam",
+      "fix": "Rewrote 12→18 lines (6 removed) | Also: | **0 — Foundation** | `DomainManifest` + `DomainM; | | `ConversationSession` extension (add clientNam",
       "tags": [
         "auto-detected",
         "refactor",
@@ -954,7 +954,7 @@
       "error_message": "Wrong reference: false should be true",
       "file": "librechat/librechat.yaml",
       "root_cause": "Used \"false\" instead of \"true\"",
-      "fix": "Changed false \u2192 true",
+      "fix": "Changed false → true",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -970,7 +970,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityExtractor.java",
       "root_cause": "11 lines replaced/restructured",
-      "fix": "Rewrote 20\u219212 lines (11 removed)",
+      "fix": "Rewrote 20→12 lines (11 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1002,7 +1002,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/resources/application.yml",
       "root_cause": "9 lines replaced/restructured",
-      "fix": "Rewrote 16\u219219 lines (9 removed)",
+      "fix": "Rewrote 16→19 lines (9 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1018,7 +1018,7 @@
       "error_message": "Significant refactor of ",
       "file": "iam-service/src/main/java/com/openwolf/iam/auth/JwtClaimsCustomizer.java",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 7\u21928 lines (2 removed)",
+      "fix": "Rewrote 7→8 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1066,7 +1066,7 @@
       "error_message": "Wrong reference: HttpStatus should be HttpStatusCode",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/coverage/CoverageClient.java",
       "root_cause": "Used \"HttpStatus\" instead of \"HttpStatusCode\"",
-      "fix": "Changed HttpStatus \u2192 HttpStatusCode",
+      "fix": "Changed HttpStatus → HttpStatusCode",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -1097,8 +1097,8 @@
       "timestamp": "2026-06-29T01:35:43.813Z",
       "error_message": "Missing error handling in unknown",
       "file": "gateway/src/main/java/ai/meridian/gateway/synthesis/answer/AnswerSynthesizer.java",
-      "root_cause": "Code path had no error handling \u2014 exceptions would propagate uncaught",
-      "fix": "Added try/catch block | Also: // Role delta first \u2014 same pattern as synthesize() to avoid ; emitter.send(SseEmitter.event().data(roleDelta(completionId,",
+      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
+      "fix": "Added try/catch block | Also: // Role delta first — same pattern as synthesize() to avoid ; emitter.send(SseEmitter.event().data(roleDelta(completionId,",
       "tags": [
         "auto-detected",
         "error-handling",
@@ -1113,7 +1113,7 @@
       "timestamp": "2026-06-29T01:36:21.501Z",
       "error_message": "Missing error handling in unknown",
       "file": "e2e/tests/helpers.ts",
-      "root_cause": "Code path had no error handling \u2014 exceptions would propagate uncaught",
+      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
       "fix": "Added try/catch block",
       "tags": [
         "auto-detected",
@@ -1178,7 +1178,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 11\u219218 lines (2 removed)",
+      "fix": "Rewrote 11→18 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1194,7 +1194,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/manifest/DomainManifestStore.java",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 4\u21927 lines (2 removed)",
+      "fix": "Rewrote 4→7 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1226,7 +1226,7 @@
       "error_message": "Wrong reference: meridian_dev should be $",
       "file": "docker-compose.yml",
       "root_cause": "Used \"meridian_dev\" instead of \"$\"",
-      "fix": "Changed meridian_dev \u2192 $",
+      "fix": "Changed meridian_dev → $",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -1242,7 +1242,7 @@
       "error_message": "Significant refactor of ",
       "file": "docker-compose.yml",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 3\u21923 lines (2 removed) | Also: POSTGRES_USER: langfuse; POSTGRES_PASSWORD: langfuse | Also: CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:; CLICKHOUSE_USER: clickhouse | Also: LANGFUSE_INIT_PROJECT_PUBLIC_KEY: pk-lf-meridian-p; LANGFUSE_INIT_PROJECT_SECRET_KEY: sk-lf-meridian-s",
+      "fix": "Rewrote 3→3 lines (2 removed) | Also: POSTGRES_USER: langfuse; POSTGRES_PASSWORD: langfuse | Also: CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:; CLICKHOUSE_USER: clickhouse | Also: LANGFUSE_INIT_PROJECT_PUBLIC_KEY: pk-lf-meridian-p; LANGFUSE_INIT_PROJECT_SECRET_KEY: sk-lf-meridian-s",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1274,7 +1274,7 @@
       "error_message": "Wrong reference: EXPECTED_AUDIENCE should be expectedAudience",
       "file": "gateway/src/main/java/ai/meridian/gateway/config/SecurityConfig.java",
       "root_cause": "Used \"EXPECTED_AUDIENCE\" instead of \"expectedAudience\"",
-      "fix": "Changed EXPECTED_AUDIENCE \u2192 expectedAudience",
+      "fix": "Changed EXPECTED_AUDIENCE → expectedAudience",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -1306,7 +1306,7 @@
       "error_message": "Wrong reference: Meridian should be IAM_USER_PASSWORD",
       "file": "e2e/tests/helpers.ts",
       "root_cause": "Used \"Meridian\" instead of \"IAM_USER_PASSWORD\"",
-      "fix": "Changed Meridian \u2192 IAM_USER_PASSWORD",
+      "fix": "Changed Meridian → IAM_USER_PASSWORD",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -1322,7 +1322,7 @@
       "error_message": "Wrong reference: Meridian should be IAM_ADMIN_PASSWORD",
       "file": "e2e/tests/admin-ui.spec.ts",
       "root_cause": "Used \"Meridian\" instead of \"IAM_ADMIN_PASSWORD\"",
-      "fix": "Changed Meridian \u2192 IAM_ADMIN_PASSWORD",
+      "fix": "Changed Meridian → IAM_ADMIN_PASSWORD",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -1338,7 +1338,7 @@
       "error_message": "Wrong reference: Meridian should be IAM_USER_PASSWORD",
       "file": "e2e/tests/03-jwt-identity.spec.ts",
       "root_cause": "Used \"Meridian\" instead of \"IAM_USER_PASSWORD\"",
-      "fix": "Changed Meridian \u2192 IAM_USER_PASSWORD",
+      "fix": "Changed Meridian → IAM_USER_PASSWORD",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -1354,7 +1354,7 @@
       "error_message": "Wrong reference: Meridian should be IAM_USER_PASSWORD",
       "file": "e2e/tests/08-domain-authz.spec.ts",
       "root_cause": "Used \"Meridian\" instead of \"IAM_USER_PASSWORD\"",
-      "fix": "Changed Meridian \u2192 IAM_USER_PASSWORD",
+      "fix": "Changed Meridian → IAM_USER_PASSWORD",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -1370,7 +1370,7 @@
       "error_message": "Wrong reference: Meridian should be IAM_ADMIN_PASSWORD",
       "file": "e2e/tests/09-cerbos-authz.spec.ts",
       "root_cause": "Used \"Meridian\" instead of \"IAM_ADMIN_PASSWORD\"",
-      "fix": "Changed Meridian \u2192 IAM_ADMIN_PASSWORD",
+      "fix": "Changed Meridian → IAM_ADMIN_PASSWORD",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -1386,7 +1386,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/auth/PrincipalStore.java",
       "root_cause": "6 lines replaced/restructured",
-      "fix": "Rewrote 10\u219212 lines (6 removed)",
+      "fix": "Rewrote 10→12 lines (6 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1402,7 +1402,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
       "root_cause": "6 lines replaced/restructured",
-      "fix": "Rewrote 6\u21923 lines (6 removed)",
+      "fix": "Rewrote 6→3 lines (6 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1418,7 +1418,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/test/java/ai/meridian/gateway/domain/auth/AuthzFromMembershipTest.java",
       "root_cause": "10 lines replaced/restructured",
-      "fix": "Rewrote 16\u219210 lines (10 removed) | Also: void entitlementService_adminRole_grantsAccessRega; // platform_admin/admin: Cerbos returns ALLOW (pol | Also: void entitlementService_rmWithoutRelInBook_denied(; // Cerbos denies REL-00188 because it's not in rm_",
+      "fix": "Rewrote 16→10 lines (10 removed) | Also: void entitlementService_adminRole_grantsAccessRega; // platform_admin/admin: Cerbos returns ALLOW (pol | Also: void entitlementService_rmWithoutRelInBook_denied(; // Cerbos denies REL-00188 because it's not in rm_",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1464,7 +1464,7 @@
     {
       "id": "bug-091",
       "timestamp": "2026-06-29T03:00:00Z",
-      "error_message": "DomainManifestStore init fails: named capturing group is missing trailing } \u2014 Failed to parse domain manifest wealth-management.json",
+      "error_message": "DomainManifestStore init fails: named capturing group is missing trailing } — Failed to parse domain manifest wealth-management.json",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/manifest/DomainManifestStore.java",
       "root_cause": "resolveEnvVars() called Matcher.appendReplacement() with unquoted m.group(0) as fallback when env var was not set. m.group(0) contains ${WEALTH_COVERAGE_URL} which Matcher.appendReplacement interprets as a named back-reference, throwing IllegalArgumentException.",
       "fix": "Changed fallback to use Matcher.quoteReplacement(m.group(0)) so ${ is treated as literal text.",
@@ -1484,7 +1484,7 @@
       "error_message": "Significant refactor of ",
       "file": "e2e/tests/09-cerbos-authz.spec.ts",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 23\u219224 lines (2 removed) | Also: // SUITE 2 \u2014 Relationship resource (prune-before-f; test.describe('Relationship resource authz \u2014 book- | Also: * Calls the Cerbos PDP REST API at :3592 for every; * Cerbos policies enforce the correct decisions be",
+      "fix": "Rewrote 23→24 lines (2 removed) | Also: // SUITE 2 — Relationship resource (prune-before-f; test.describe('Relationship resource authz — book- | Also: * Calls the Cerbos PDP REST API at :3592 for every; * Cerbos policies enforce the correct decisions be",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1500,7 +1500,7 @@
       "error_message": "Significant refactor of ",
       "file": "e2e/tests/10-coverage-flow.spec.ts",
       "root_cause": "7 lines replaced/restructured",
-      "fix": "Rewrote 12\u219219 lines (7 removed)",
+      "fix": "Rewrote 12→19 lines (7 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1515,7 +1515,7 @@
       "timestamp": "2026-06-29T03:31:20.316Z",
       "error_message": "Missing error handling in unknown",
       "file": "e2e/tests/10-coverage-flow.spec.ts",
-      "root_cause": "Code path had no error handling \u2014 exceptions would propagate uncaught",
+      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
       "fix": "Added try/catch block",
       "tags": [
         "auto-detected",
@@ -1548,7 +1548,7 @@
       "error_message": "Wrong reference: 240_000 should be 360_000",
       "file": "e2e/tests/07-multi-turn.spec.ts",
       "root_cause": "Used \"240_000\" instead of \"360_000\"",
-      "fix": "Changed 240_000 \u2192 360_000",
+      "fix": "Changed 240_000 → 360_000",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -1564,7 +1564,7 @@
       "error_message": "Significant refactor of ",
       "file": "iam-service/src/main/java/com/openwolf/iam/config/SecurityConfig.java",
       "root_cause": "6 lines replaced/restructured",
-      "fix": "Rewrote 22\u219232 lines (6 removed)",
+      "fix": "Rewrote 22→32 lines (6 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1580,7 +1580,7 @@
       "error_message": "Significant refactor of ",
       "file": "iam-service/src/main/java/com/openwolf/iam/config/SecurityConfig.java",
       "root_cause": "11 lines replaced/restructured",
-      "fix": "Rewrote 16\u219210 lines (11 removed)",
+      "fix": "Rewrote 16→10 lines (11 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1596,7 +1596,7 @@
       "error_message": "Wrong reference: 75_000 should be 120_000",
       "file": "e2e/tests/helpers.ts",
       "root_cause": "Used \"75_000\" instead of \"120_000\"",
-      "fix": "Changed 75_000 \u2192 120_000",
+      "fix": "Changed 75_000 → 120_000",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -1644,7 +1644,7 @@
       "error_message": "Significant refactor of ",
       "file": "e2e/tests/10-coverage-flow.spec.ts",
       "root_cause": "8 lines replaced/restructured",
-      "fix": "Rewrote 13\u219224 lines (8 removed)",
+      "fix": "Rewrote 13→24 lines (8 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1659,7 +1659,7 @@
       "timestamp": "2026-06-29T16:02:52.746Z",
       "error_message": "Missing error handling in unknown",
       "file": "docs/WORLD-B-LOCKDOWN.md",
-      "root_cause": "Code path had no error handling \u2014 exceptions would propagate uncaught",
+      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
       "fix": "Added try/catch block",
       "tags": [
         "auto-detected",
@@ -1676,7 +1676,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/registry/loader/RegistryBootstrapLoader.java",
       "root_cause": "7 lines replaced/restructured",
-      "fix": "Rewrote 37\u219245 lines (7 removed)",
+      "fix": "Rewrote 37→45 lines (7 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1692,7 +1692,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityExtractor.java",
       "root_cause": "3 lines replaced/restructured",
-      "fix": "Rewrote 5\u219212 lines (3 removed)",
+      "fix": "Rewrote 5→12 lines (3 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1708,7 +1708,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/synthesis/answer/AnswerSynthesizer.java",
       "root_cause": "6 lines replaced/restructured",
-      "fix": "Rewrote 7\u219213 lines (6 removed)",
+      "fix": "Rewrote 7→13 lines (6 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1756,7 +1756,7 @@
       "error_message": "Wrong reference: RESOURCE_REL should be resourceType",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/auth/CerbosEntitlementAdapter.java",
       "root_cause": "Used \"RESOURCE_REL\" instead of \"resourceType\"",
-      "fix": "Changed RESOURCE_REL \u2192 resourceType",
+      "fix": "Changed RESOURCE_REL → resourceType",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -1772,7 +1772,7 @@
       "error_message": "Significant refactor of ",
       "file": "mock-agents/wealth-coverage/tests/test_coverage.py",
       "root_cause": "4 lines replaced/restructured",
-      "fix": "Rewrote 5\u21927 lines (4 removed)",
+      "fix": "Rewrote 5→7 lines (4 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1836,7 +1836,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 19\u219227 lines (2 removed)",
+      "fix": "Rewrote 19→27 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1884,7 +1884,7 @@
       "error_message": "Significant refactor of ",
       "file": "docs/MODEL-SELECTION.md",
       "root_cause": "8 lines replaced/restructured",
-      "fix": "Rewrote 15\u219229 lines (8 removed) | Also: It would (a) blow the p99 latency budget on routin; (b) cost ~10\u00d7 on bounded tasks for no quality gain",
+      "fix": "Rewrote 15→29 lines (8 removed) | Also: It would (a) blow the p99 latency budget on routin; (b) cost ~10× on bounded tasks for no quality gain",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1900,7 +1900,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/manifest/SubDomainManifest.java",
       "root_cause": "6 lines replaced/restructured",
-      "fix": "Rewrote 21\u219234 lines (6 removed)",
+      "fix": "Rewrote 21→34 lines (6 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1932,7 +1932,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/manifest/EffectiveManifest.java",
       "root_cause": "7 lines replaced/restructured",
-      "fix": "Rewrote 11\u219216 lines (7 removed)",
+      "fix": "Rewrote 11→16 lines (7 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -1948,7 +1948,7 @@
       "error_message": "Wrong reference: requiresRelationship should be requiresContext",
       "file": "gateway/src/test/java/ai/meridian/gateway/domain/manifest/EffectiveManifestTest.java",
       "root_cause": "Used \"requiresRelationship\" instead of \"requiresContext\"",
-      "fix": "Changed requiresRelationship \u2192 requiresContext",
+      "fix": "Changed requiresRelationship → requiresContext",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -1980,7 +1980,7 @@
       "error_message": "Wrong reference: requiresRelationship should be requiresContext",
       "file": "gateway/src/test/java/ai/meridian/gateway/domain/manifest/EffectiveManifestMergeTest.java",
       "root_cause": "Used \"requiresRelationship\" instead of \"requiresContext\"",
-      "fix": "Changed requiresRelationship \u2192 requiresContext",
+      "fix": "Changed requiresRelationship → requiresContext",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2028,7 +2028,7 @@
       "error_message": "Wrong reference: SYSTEM_PROMPT should be systemPrompt",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/intent/IntentClassifier.java",
       "root_cause": "Used \"SYSTEM_PROMPT\" instead of \"systemPrompt\"",
-      "fix": "Changed SYSTEM_PROMPT \u2192 systemPrompt",
+      "fix": "Changed SYSTEM_PROMPT → systemPrompt",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2060,7 +2060,7 @@
       "error_message": "Wrong reference: SYSTEM_PROMPT should be systemPrompt",
       "file": "gateway/src/main/java/ai/meridian/gateway/synthesis/answer/AnswerSynthesizer.java",
       "root_cause": "Used \"SYSTEM_PROMPT\" instead of \"systemPrompt\"",
-      "fix": "Changed SYSTEM_PROMPT \u2192 systemPrompt",
+      "fix": "Changed SYSTEM_PROMPT → systemPrompt",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2076,7 +2076,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
       "root_cause": "4 lines replaced/restructured",
-      "fix": "Rewrote 8\u219213 lines (4 removed)",
+      "fix": "Rewrote 8→13 lines (4 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2124,7 +2124,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/synthesis/input/EntityResolver.java",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 11\u219221 lines (2 removed)",
+      "fix": "Rewrote 11→21 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2140,7 +2140,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/session/ConversationSessionStore.java",
       "root_cause": "4 lines replaced/restructured",
-      "fix": "Rewrote 32\u219249 lines (4 removed)",
+      "fix": "Rewrote 32→49 lines (4 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2252,7 +2252,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 6\u219210 lines (2 removed)",
+      "fix": "Rewrote 6→10 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2268,7 +2268,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/test/java/ai/meridian/gateway/domain/session/ConversationSessionTest.java",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 7\u219218 lines (2 removed)",
+      "fix": "Rewrote 7→18 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2284,7 +2284,7 @@
       "error_message": "Significant refactor of ",
       "file": "docs/WORLD-B-LOCKDOWN.md",
       "root_cause": "3 lines replaced/restructured",
-      "fix": "Rewrote 3\u21926 lines (3 removed)",
+      "fix": "Rewrote 3→6 lines (3 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2300,7 +2300,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/resources/agent-manifest.schema.json",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 4\u21924 lines (2 removed) | Also: \"description\": \"Coarse business bucket the resolve; \"enum\": [\"wealth-management\", \"asset-servicing\"]",
+      "fix": "Rewrote 4→4 lines (2 removed) | Also: \"description\": \"Coarse business bucket the resolve; \"enum\": [\"wealth-management\", \"asset-servicing\"]",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2363,7 +2363,7 @@
       "timestamp": "2026-06-29T19:00:00.000Z",
       "error_message": "Insurance query naming POL-77001 wrongly clarifies 'which policy?' once a second domain is onboarded; gateway checks relationship_id instead of policy_id",
       "file": "gateway/src/main/java/ai/meridian/gateway/domain/chat/ChatService.java",
-      "root_cause": "handleFetchData derived coverageEntity from coverageEntityType() which uses manifestStore.requiredContextKeys()/entityTypes() \u2014 the cross-domain UNION across ALL sub-domains \u2014 and picked the first key (relationship_id from wealth). The coverage entity was never scoped to the routed sub-domain.",
+      "root_cause": "handleFetchData derived coverageEntity from coverageEntityType() which uses manifestStore.requiredContextKeys()/entityTypes() — the cross-domain UNION across ALL sub-domains — and picked the first key (relationship_id from wealth). The coverage entity was never scoped to the routed sub-domain.",
       "fix": "Added DomainManifestStore.entityTypesFor(subDomainId) (single sub-domain's entity_types) and scoped overloads coverageEntityType(EffectiveManifest)/secondaryEntityType(EffectiveManifest). In handleFetchData, once the resource-scoped agent's EffectiveManifest em is known, re-scope coverageEntity/secondaryEntity/carriedCoverageId from em.requiredContext()+em.subDomainId() before the coverage resolve/check/bind. Follow-up/session paths now use carriedCoverageEntityType(session) which finds whichever required entity the session actually carries (domain-agnostic).",
       "tags": [
         "multi-domain",
@@ -2382,7 +2382,7 @@
       "error_message": "Significant refactor of ",
       "file": "infra/promtail/promtail.yaml",
       "root_cause": "3 lines replaced/restructured",
-      "fix": "Rewrote 12\u219218 lines (3 removed)",
+      "fix": "Rewrote 12→18 lines (3 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2446,7 +2446,7 @@
       "error_message": "Significant refactor of ",
       "file": "mock-agents/tests/test_live.py",
       "root_cause": "7 lines replaced/restructured",
-      "fix": "Rewrote 20\u219228 lines (7 removed) | Also: def test_empty_book_denies_all(self):; \"\"\"An RM with an empty book is denied every relati",
+      "fix": "Rewrote 20→28 lines (7 removed) | Also: def test_empty_book_denies_all(self):; \"\"\"An RM with an empty book is denied every relati",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2478,7 +2478,7 @@
       "error_message": "Significant refactor of ",
       "file": "eval/langfuse_continuous.py",
       "root_cause": "5 lines replaced/restructured",
-      "fix": "Rewrote 39\u219257 lines (5 removed)",
+      "fix": "Rewrote 39→57 lines (5 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2493,7 +2493,7 @@
       "timestamp": "2026-06-29T23:16:46.869Z",
       "error_message": "Missing error handling in unknown",
       "file": "gateway/src/main/java/ai/meridian/gateway/infrastructure/telemetry/TraceEventPublisher.java",
-      "root_cause": "Code path had no error handling \u2014 exceptions would propagate uncaught",
+      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
       "fix": "Added try/catch block",
       "tags": [
         "auto-detected",
@@ -2510,7 +2510,7 @@
       "error_message": "Significant refactor of ",
       "file": "eval/langfuse_continuous.py",
       "root_cause": "3 lines replaced/restructured",
-      "fix": "Rewrote 23\u219227 lines (3 removed)",
+      "fix": "Rewrote 23→27 lines (3 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2542,7 +2542,7 @@
       "error_message": "Significant refactor of ",
       "file": "eval/langfuse_continuous.py",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 5\u21927 lines (2 removed)",
+      "fix": "Rewrote 5→7 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2558,7 +2558,7 @@
       "error_message": "Significant refactor of ",
       "file": "scripts/seed-users.sh",
       "root_cause": "3 lines replaced/restructured",
-      "fix": "Rewrote 20\u219236 lines (3 removed)",
+      "fix": "Rewrote 20→36 lines (3 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2622,7 +2622,7 @@
       "error_message": "Wrong reference: Meridian should be Conduit",
       "file": "docs/PROJECT-OVERVIEW.md",
       "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
-      "fix": "Changed Meridian \u2192 Conduit",
+      "fix": "Changed Meridian → Conduit",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2638,7 +2638,7 @@
       "error_message": "Wrong reference: Meridian should be Conduit",
       "file": "docs/AGENTS.md",
       "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
-      "fix": "Changed Meridian \u2192 Conduit",
+      "fix": "Changed Meridian → Conduit",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2654,7 +2654,7 @@
       "error_message": "Wrong reference: Meridian should be Conduit",
       "file": "docs/OPERATOR-RUNBOOK.md",
       "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
-      "fix": "Changed Meridian \u2192 Conduit",
+      "fix": "Changed Meridian → Conduit",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2670,7 +2670,7 @@
       "error_message": "Wrong reference: Meridian should be Conduit",
       "file": "docs/gateway-domain-architecture.md",
       "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
-      "fix": "Changed Meridian \u2192 Conduit",
+      "fix": "Changed Meridian → Conduit",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2686,7 +2686,7 @@
       "error_message": "Wrong reference: Meridian should be Conduit",
       "file": "docs/technical-architecture-clear-boundaries.md",
       "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
-      "fix": "Changed Meridian \u2192 Conduit",
+      "fix": "Changed Meridian → Conduit",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2702,7 +2702,7 @@
       "error_message": "Wrong reference: Meridian should be Conduit",
       "file": "docs/domain-onboarding-standard.md",
       "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
-      "fix": "Changed Meridian \u2192 Conduit",
+      "fix": "Changed Meridian → Conduit",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2718,7 +2718,7 @@
       "error_message": "Wrong reference: Meridian should be Conduit",
       "file": "docs/MODEL-SELECTION.md",
       "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
-      "fix": "Changed Meridian \u2192 Conduit",
+      "fix": "Changed Meridian → Conduit",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2734,7 +2734,7 @@
       "error_message": "Wrong reference: meridian should be conduit",
       "file": "docs/WORLD-B-LOCKDOWN.md",
       "root_cause": "Used \"meridian\" instead of \"conduit\"",
-      "fix": "Changed meridian \u2192 conduit",
+      "fix": "Changed meridian → conduit",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2750,7 +2750,7 @@
       "error_message": "Wrong reference: Meridian should be Conduit",
       "file": "docs/agent-catalog.md",
       "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
-      "fix": "Changed Meridian \u2192 Conduit",
+      "fix": "Changed Meridian → Conduit",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2766,7 +2766,7 @@
       "error_message": "Wrong reference: Meridian should be Conduit",
       "file": "BUILD_REPORT.md",
       "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
-      "fix": "Changed Meridian \u2192 Conduit",
+      "fix": "Changed Meridian → Conduit",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2782,7 +2782,7 @@
       "error_message": "Wrong reference: Meridian should be Conduit",
       "file": "CLAUDE.md",
       "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
-      "fix": "Changed Meridian \u2192 Conduit",
+      "fix": "Changed Meridian → Conduit",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2798,7 +2798,7 @@
       "error_message": "Wrong reference: Meridian should be Conduit",
       "file": "registry/README.md",
       "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
-      "fix": "Changed Meridian \u2192 Conduit",
+      "fix": "Changed Meridian → Conduit",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2830,7 +2830,7 @@
       "error_message": "Wrong reference: Meridian should be Conduit",
       "file": ".claude/skills/meridian-agent/SKILL.md",
       "root_cause": "Used \"Meridian\" instead of \"Conduit\"",
-      "fix": "Changed Meridian \u2192 Conduit",
+      "fix": "Changed Meridian → Conduit",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -2846,7 +2846,7 @@
       "error_message": "Significant refactor of ",
       "file": "iam-service/src/main/java/com/openwolf/iam/auth/JwtClaimsCustomizer.java",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 12\u219217 lines (2 removed)",
+      "fix": "Rewrote 12→17 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2878,7 +2878,7 @@
       "error_message": "Significant refactor of ",
       "file": "docker-compose.yml",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 5\u21923 lines (2 removed)",
+      "fix": "Rewrote 5→3 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2891,7 +2891,7 @@
     {
       "id": "bug-180",
       "timestamp": "2026-06-30T05:21:00.000Z",
-      "error_message": "LibreChat OIDC SSO: 'Callback authentication failed \u2014 server responded with an error in the response body'; login failed for rm_jane",
+      "error_message": "LibreChat OIDC SSO: 'Callback authentication failed — server responded with an error in the response body'; login failed for rm_jane",
       "file": "iam-service/src/main/java/com/openwolf/iam/config/SecurityConfig.java, auth/JwtClaimsCustomizer.java, auth/OidcClaimEnricher.java",
       "root_cause": "TWO bugs. (1) Client meridian-librechat registered only for CLIENT_SECRET_BASIC, but LibreChat's openid-client sends credentials via client_secret_post -> Spring AS rejected with 'Client authentication failed: authentication_method' -> invalid_client. (2) id_token/userinfo carried only `sub` because the JWT customizer enriched ACCESS_TOKEN only; LibreChat needs email/name to provision the user.",
       "fix": "(1) Added ClientAuthenticationMethod.CLIENT_SECRET_POST to the librechat RegisteredClient (alongside BASIC). (2) Extended JwtClaimsCustomizer to handle ID_TOKEN and added OidcClaimEnricher.enrichIdToken() returning email, email_verified, preferred_username, name (from principal + display_name attr). Verified full flow via curl: client_secret_post exchange -> HTTP 200, id_token+userinfo carry email/name, LibreChat callback -> 'login success', openid user created in Mongo.",
@@ -2915,7 +2915,7 @@
       "error_message": "Significant refactor of ",
       "file": "docs/DIAGRAM-PROMPTS.md",
       "root_cause": "3 lines replaced/restructured",
-      "fix": "Rewrote 4\u219217 lines (3 removed) | Also: user([\"Relationship Manager\"]); lc[\"LibreChat \u2014 chat UI<br/>OpenAI-compatible clie | Also: > Create a detailed technical architecture diagram; > Manager\" \u2192 a box \"LibreChat (chat UI, OpenAI-com",
+      "fix": "Rewrote 4→17 lines (3 removed) | Also: user([\"Relationship Manager\"]); lc[\"LibreChat — chat UI<br/>OpenAI-compatible clie | Also: > Create a detailed technical architecture diagram; > Manager\" → a box \"LibreChat (chat UI, OpenAI-com",
       "tags": [
         "auto-detected",
         "refactor",
@@ -2931,7 +2931,7 @@
       "error_message": "Significant refactor of ",
       "file": "TODO.md",
       "root_cause": "4 lines replaced/restructured",
-      "fix": "Rewrote 7\u219211 lines (4 removed)",
+      "fix": "Rewrote 7→11 lines (4 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -3011,7 +3011,7 @@
       "error_message": "Significant refactor of ",
       "file": "infra/grafana/provisioning/dashboards/conduit-demo.json",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 18\u219210 lines (2 removed) | Also: },; {",
+      "fix": "Rewrote 18→10 lines (2 removed) | Also: },; {",
       "tags": [
         "auto-detected",
         "refactor",
@@ -3075,7 +3075,7 @@
       "error_message": "Wrong reference: List should be ArrayList",
       "file": "gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java",
       "root_cause": "Used \"List\" instead of \"ArrayList\"",
-      "fix": "Changed List \u2192 ArrayList",
+      "fix": "Changed List → ArrayList",
       "tags": [
         "auto-detected",
         "wrong-reference",
@@ -3091,7 +3091,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java",
       "root_cause": "5 lines replaced/restructured",
-      "fix": "Rewrote 14\u219228 lines (5 removed)",
+      "fix": "Rewrote 14→28 lines (5 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -3107,7 +3107,7 @@
       "error_message": "Significant refactor of ",
       "file": "docker-compose.yml",
       "root_cause": "2 lines replaced/restructured",
-      "fix": "Rewrote 11\u219212 lines (2 removed)",
+      "fix": "Rewrote 11→12 lines (2 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -3157,7 +3157,7 @@
     {
       "id": "bug-196",
       "timestamp": "2026-07-01T15:11:00.000Z",
-      "error_message": "QA \u00a72 browser run: LibreChat hero answer rendered but #send-button stayed disabled beyond 180s, blocking follow-up. Pre-rebuild run also showed settlement/cash unavailable due MCP timeouts.",
+      "error_message": "QA §2 browser run: LibreChat hero answer rendered but #send-button stayed disabled beyond 180s, blocking follow-up. Pre-rebuild run also showed settlement/cash unavailable due MCP timeouts.",
       "file": "librechat/librechat.yaml, gateway/src/main/java/ai/conduit/gateway/api/v1/chat/ChatCompletionsController.java, gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java, mock-agents/servicing/server.py",
       "root_cause": "Not fixed in this session. Evidence: Playwright screenshot shows rendered answer with disabled send button; gateway logs show full fan-out succeeded post-rebuild and AnswerSynthesizer call started, but LibreChat did not consider the stream complete within the QA timeout. Pre-rebuild servicing MCP emitted Starlette AssertionError and gateway timed out both MCP tools.",
       "fix": "Pending investigation. Check SSE completion/DONE delivery to LibreChat and whether LibreChat is waiting on a generation/title/summarize job despite titleConvo=false. Separately inspect servicing MCP ASGI middleware errors seen before rebuild.",
@@ -3277,7 +3277,7 @@
       "timestamp": "2026-07-01T19:07:48.497Z",
       "error_message": "Missing error handling in unknown",
       "file": "gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java",
-      "root_cause": "Code path had no error handling \u2014 exceptions would propagate uncaught",
+      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
       "fix": "Added try/catch block",
       "tags": [
         "auto-detected",
@@ -3294,7 +3294,7 @@
       "error_message": "Significant refactor of ",
       "file": "gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java",
       "root_cause": "5 lines replaced/restructured",
-      "fix": "Rewrote 18\u219225 lines (5 removed)",
+      "fix": "Rewrote 18→25 lines (5 removed)",
       "tags": [
         "auto-detected",
         "refactor",
@@ -3307,10 +3307,10 @@
     {
       "id": "bug-205",
       "timestamp": "2026-07-01",
-      "error_message": "Multi-turn client pivot: naming a new client (Okafor) after another (Whitman) answered against the prior client \u2014 no re-resolution, no entitlement re-check (Codex QA #2/#3)",
+      "error_message": "Multi-turn client pivot: naming a new client (Okafor) after another (Whitman) answered against the prior client — no re-resolution, no entitlement re-check (Codex QA #2/#3)",
       "file": "gateway/.../domain/intent/IntentClassifier.java, gateway/.../domain/chat/ChatService.java",
-      "root_cause": "(1) combined intent+extraction echoed the prior turn's resolved id from history as the entity reference; (2) coverage pipeline precedence inverted \u2014 session-carried id won over a client named this turn (resolve was only in the else-branch).",
-      "fix": "(1) scope extraction to the LATEST user message + deterministic guard dropping extracted values matching the manifest id_pattern absent from that message; (2) flip precedence \u2014 a client named THIS turn resolves + re-authorizes; carried id reused only when none named.",
+      "root_cause": "(1) combined intent+extraction echoed the prior turn's resolved id from history as the entity reference; (2) coverage pipeline precedence inverted — session-carried id won over a client named this turn (resolve was only in the else-branch).",
+      "fix": "(1) scope extraction to the LATEST user message + deterministic guard dropping extracted values matching the manifest id_pattern absent from that message; (2) flip precedence — a client named THIS turn resolves + re-authorizes; carried id reused only when none named.",
       "tags": [
         "session",
         "carry-forward",
@@ -3400,7 +3400,12 @@
       "file": ".wolf/designqc-captures",
       "root_cause": "DesignQC's spawned dev-server environment could not execute npm even though npm and node are available on the interactive shell PATH.",
       "fix": "Recorded the tooling failure; UI changes continued with npm build verification planned.",
-      "tags": ["designqc", "npm", "tooling", "admin-ui"],
+      "tags": [
+        "designqc",
+        "npm",
+        "tooling",
+        "admin-ui"
+      ],
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-07-01T21:33:55Z"
@@ -3412,7 +3417,12 @@
       "file": "admin-ui/node_modules",
       "root_cause": "The admin-ui workspace had no installed node_modules, so the build script could not find the local TypeScript compiler.",
       "fix": "Ran npm ci from admin-ui using the existing package-lock, then reran npm run build successfully.",
-      "tags": ["admin-ui", "build", "typescript", "npm"],
+      "tags": [
+        "admin-ui",
+        "build",
+        "typescript",
+        "npm"
+      ],
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-07-01T21:41:08Z"
@@ -3424,8 +3434,16 @@
       "file": "admin-ui/.wolf/designqc-captures",
       "root_cause": "The managed sandbox blocked local port listening and browser process launch for screenshot QA.",
       "fix": "Reran npm run dev with approved escalation, then reran OpenWolf DesignQC with approved browser escalation and captured screenshots successfully.",
-      "tags": ["admin-ui", "designqc", "sandbox", "vite", "browser"],
-      "related_bugs": ["bug-206"],
+      "tags": [
+        "admin-ui",
+        "designqc",
+        "sandbox",
+        "vite",
+        "browser"
+      ],
+      "related_bugs": [
+        "bug-206"
+      ],
       "occurrences": 1,
       "last_seen": "2026-07-01T21:44:52Z"
     },
@@ -3529,7 +3547,14 @@
       "file": "admin-ui/src/features/workbench/WorkbenchPage.tsx, admin-ui/src/features/workbench/api.ts, iam-service/src/main/java/com/openwolf/iam/controller/AuthController.java",
       "root_cause": "Workbench had no Axiom-minted persona token exchange and reused readAdminToken() for chat and trace requests.",
       "fix": "Added platform-admin-gated /auth/impersonate with audited short-lived JWTs, wired Workbench persona selection from usersApi.list(), and send persona Bearer tokens to chat plus trace stream.",
-      "tags": ["admin-ui", "workbench", "auth", "impersonation", "jwt", "world-b"],
+      "tags": [
+        "admin-ui",
+        "workbench",
+        "auth",
+        "impersonation",
+        "jwt",
+        "world-b"
+      ],
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-07-02T07:56:34Z"
@@ -3541,7 +3566,13 @@
       "file": "admin-ui/src/api/client.ts, admin-ui/src/pages/Users.tsx",
       "root_cause": "usersApi.list() returned the raw paginated response, so Users.tsx called array methods on an object and crashed the route without a boundary.",
       "fix": "Mapped usersApi.list() to PageResponse.content, added route ErrorBoundary, visible users error state, and corrected create/update payloads to match IAM DTOs.",
-      "tags": ["admin-ui", "users", "pagination", "api-contract", "crash"],
+      "tags": [
+        "admin-ui",
+        "users",
+        "pagination",
+        "api-contract",
+        "crash"
+      ],
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-07-02T07:56:34Z"
@@ -3553,7 +3584,13 @@
       "file": "admin-ui/src/features/workbench/hooks/useTraceStream.ts, gateway/src/main/java/ai/conduit/gateway/infrastructure/telemetry/TraceEventPublisher.java, gateway/src/main/java/ai/conduit/gateway/api/v1/trace/TraceStreamController.java",
       "root_cause": "Client whitelisted null conversationId events and the gateway trace stream broadcast every event to every subscriber; local event state was append-only across conversation resets.",
       "fix": "Added optional server-side conversationId filtering for trace subscribers, made Workbench connect with the current conversationId, dropped non-matching events, and cleared events/request tracking when persona or conversation changes.",
-      "tags": ["admin-ui", "gateway", "trace", "sse", "isolation"],
+      "tags": [
+        "admin-ui",
+        "gateway",
+        "trace",
+        "sse",
+        "isolation"
+      ],
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-07-02T07:56:34Z"
@@ -3565,7 +3602,12 @@
       "file": "admin-ui/src/pages/Policies.tsx",
       "root_cause": "The UI treated RoleResponse.id as the policy role identifier, but Cerbos policies and the policy generator expect role names.",
       "fix": "Changed policy role selection to store role.name, surfaced policy data load errors, and kept the Axiom/gold visual treatment consistent.",
-      "tags": ["admin-ui", "policies", "cerbos", "policyforge"],
+      "tags": [
+        "admin-ui",
+        "policies",
+        "cerbos",
+        "policyforge"
+      ],
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-07-02T07:56:34Z"
@@ -3577,10 +3619,1996 @@
       "file": "scripts/smoke.sh, gateway/pom.xml, tests/integration/test_gateway_coverage.py",
       "root_cause": "macOS Codex sandbox denied localhost sockets for curl/Python/Redis-backed tests.",
       "fix": "Stopped/reran the invalid smoke attempt and reran smoke, Maven gateway tests, Playwright, and pytest integration with approved unsandboxed execution.",
-      "tags": ["testing", "sandbox", "localhost", "verification"],
+      "tags": [
+        "testing",
+        "sandbox",
+        "localhost",
+        "verification"
+      ],
       "related_bugs": [],
       "occurrences": 1,
       "last_seen": "2026-07-02T07:56:34Z"
+    },
+    {
+      "id": "bug-223",
+      "timestamp": "2026-07-02T12:50:19.392Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/apps/chat/server/src/index.ts",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 3→3 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "ts"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T12:50:19.392Z"
+    },
+    {
+      "id": "bug-224",
+      "timestamp": "2026-07-02T12:51:58.272Z",
+      "error_message": "Missing import: ./types/session",
+      "file": "../orchestrator-chat/apps/chat/server/src/index.ts",
+      "root_cause": "Module(s) not imported: ./types/session",
+      "fix": "Added import(s) for ./types/session",
+      "tags": [
+        "auto-detected",
+        "missing-import",
+        "ts"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T12:51:58.272Z"
+    },
+    {
+      "id": "bug-225",
+      "timestamp": "2026-07-02T12:56:37.500Z",
+      "error_message": "Function not marked async",
+      "file": "../orchestrator-chat/apps/chat/server/src/routes/auth.ts",
+      "root_cause": "Function uses await but wasn't declared async",
+      "fix": "Added async modifier",
+      "tags": [
+        "auto-detected",
+        "async-fix",
+        "ts"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T12:56:37.500Z"
+    },
+    {
+      "id": "bug-226",
+      "timestamp": "2026-07-02T13:02:51.302Z",
+      "error_message": "Type error",
+      "file": "../orchestrator-chat/apps/chat/server/src/db/models/Conversation.ts",
+      "root_cause": "Missing or incorrect type annotation",
+      "fix": "Added type assertion/annotation",
+      "tags": [
+        "auto-detected",
+        "type-fix",
+        "ts"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T13:02:51.302Z"
+    },
+    {
+      "id": "bug-227",
+      "timestamp": "2026-07-02T13:45:17.989Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/apps/chat/bff/src/main/java/ai/conduit/chat/config/SecurityConfig.java",
+      "root_cause": "3 lines replaced/restructured",
+      "fix": "Rewrote 8→4 lines (3 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T13:45:17.989Z"
+    },
+    {
+      "id": "bug-228",
+      "timestamp": "2026-07-02T13:55:38.035Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/docker-compose.yml",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 18→33 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "yml"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T13:55:38.035Z"
+    },
+    {
+      "id": "bug-229",
+      "timestamp": "2026-07-02T14:29:38.791Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/apps/chat/bff/src/main/java/ai/conduit/chat/config/AppProperties.java",
+      "root_cause": "16 lines replaced/restructured",
+      "fix": "Rewrote 44→61 lines (16 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T14:29:38.791Z"
+    },
+    {
+      "id": "bug-230",
+      "timestamp": "2026-07-02T14:31:33.482Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/apps/chat/bff/src/main/resources/application.yml",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 9→15 lines (2 removed) | Also: recent-messages: ${CHAT_RECENT_MESSAGES:8}; summary-after-messages: ${CHAT_SUMMARY_AFTER:12}",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "yml"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-07-02T14:32:02.418Z"
+    },
+    {
+      "id": "bug-231",
+      "timestamp": "2026-07-02T14:32:08.843Z",
+      "error_message": "Wrong reference: INFO should be $",
+      "file": "../orchestrator-chat/apps/chat/bff/src/main/resources/application.yml",
+      "root_cause": "Used \"INFO\" instead of \"$\"",
+      "fix": "Changed INFO → $",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "yml"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T14:32:08.843Z"
+    },
+    {
+      "id": "bug-232",
+      "timestamp": "2026-07-02T14:32:32.649Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/docker-compose.yml",
+      "root_cause": "16 lines replaced/restructured",
+      "fix": "Rewrote 23→36 lines (16 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "yml"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T14:32:32.649Z"
+    },
+    {
+      "id": "bug-233",
+      "timestamp": "2026-07-02T14:40:15.620Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/docker-compose.yml",
+      "root_cause": "5 lines replaced/restructured",
+      "fix": "Rewrote 5→7 lines (5 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "yml"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T14:40:15.620Z"
+    },
+    {
+      "id": "bug-234",
+      "timestamp": "2026-07-02T15:45:00.000Z",
+      "error_message": "TEST-KIT personas rm_guest and uw_sam cannot authenticate with Meridian@2024 via Axiom /auth/login or /auth/token.",
+      "file": "TEST-KIT.md / Axiom seed data",
+      "root_cause": "Admin user lookup returned null records for rm_guest and uw_sam even though TEST-KIT lists them as seeded personas.",
+      "fix": "Not fixed in this run; seed or provision these personas in Axiom, or update TEST-KIT to mark them trusted-hop only.",
+      "tags": [
+        "test-kit",
+        "persona",
+        "axiom",
+        "seed-data",
+        "auth"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T15:45:00.000Z"
+    },
+    {
+      "id": "bug-235",
+      "timestamp": "2026-07-02T15:45:00.000Z",
+      "error_message": "TEST-KIT persona data does not match live seed state: rm_jane has only wealth segment; rm_carlos has Axiom book REL-00042/REL-00188/REL-00201 while wealth-coverage returns an empty book.",
+      "file": "TEST-KIT.md / Axiom seed data / wealth-coverage seed data",
+      "root_cause": "Axiom user records and coverage-service book-of-business are out of sync with each other and with TEST-KIT.md.",
+      "fix": "Not fixed in this run; reconcile Axiom persona records, coverage-service data, and TEST-KIT expectations.",
+      "tags": [
+        "test-kit",
+        "persona",
+        "coverage",
+        "seed-data",
+        "book-of-business"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T15:45:00.000Z"
+    },
+    {
+      "id": "bug-236",
+      "timestamp": "2026-07-02T15:45:00.000Z",
+      "error_message": "rm_jane cash-position prompt returned only allocation percentage and said exact cash amount is not provided, but TEST-KIT expects grounded servicing cash.",
+      "file": "gateway/chat response via Conduit Chat",
+      "root_cause": "Live rm_jane JWT has only wealth segment, so the response appears to summarize wealth allocation rather than servicing cash-management data.",
+      "fix": "Not fixed in this run; grant/seed servicing access for rm_jane or adjust the expected scenario.",
+      "tags": [
+        "test-kit",
+        "rm_jane",
+        "servicing",
+        "cash",
+        "grounding"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T15:45:00.000Z"
+    },
+    {
+      "id": "bug-237",
+      "timestamp": "2026-07-02T15:45:00.000Z",
+      "error_message": "Glass-box trace for Okafor denial did not show an explicit entitlement CHECK deny event; trace jumped from agents_resolved to request_complete agentCount=0.",
+      "file": "gateway /trace/stream",
+      "root_cause": "Coverage/entitlement denial is not emitted as a first-class trace event in the captured stream.",
+      "fix": "Not fixed in this run; emit CHECK/coverage-deny trace data before completing denied requests.",
+      "tags": [
+        "test-kit",
+        "glassbox",
+        "trace",
+        "entitlement",
+        "coverage"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T15:45:00.000Z"
+    },
+    {
+      "id": "bug-238",
+      "timestamp": "2026-07-02T15:45:00.000Z",
+      "error_message": "Vague rm_jane holdings prompt clarified without listing persona book options, contrary to TEST-KIT expected clarify listing own book.",
+      "file": "gateway/chat clarification response",
+      "root_cause": "Clarification path asks for client name or relationship ID but does not include discovered coverage resources.",
+      "fix": "Not fixed in this run; include persona coverage options in clarify responses or update TEST-KIT expectation.",
+      "tags": [
+        "test-kit",
+        "clarify",
+        "coverage",
+        "rm_jane"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T15:45:00.000Z"
+    },
+    {
+      "id": "bug-239",
+      "timestamp": "2026-07-02T15:45:00.000Z",
+      "error_message": "uw_sam trusted-hop out-of-book insurance denial said 'That client is not in your coverage' for POL-88003 instead of policy-specific language.",
+      "file": "insurance domain denial message / gateway response",
+      "root_cause": "Insurance denial copy appears to fall back to client relationship wording.",
+      "fix": "Not fixed in this run; use insurance manifest denial copy for policy-scoped denials.",
+      "tags": [
+        "test-kit",
+        "insurance",
+        "denial-copy",
+        "manifest"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T15:45:00.000Z"
+    },
+    {
+      "id": "bug-240",
+      "timestamp": "2026-07-02T16:24:50.310Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/mock-agents/wealth-coverage/data.py",
+      "root_cause": "3 lines replaced/restructured",
+      "fix": "Rewrote 17→31 lines (3 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "py"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T16:24:50.310Z"
+    },
+    {
+      "id": "bug-241",
+      "timestamp": "2026-07-02T16:27:16.824Z",
+      "error_message": "Incorrect value in code",
+      "file": "../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/config/SecurityConfig.java",
+      "root_cause": "Had \"/v1/chat/completions\"",
+      "fix": "Changed to 't 401, but identity is taken\n                // O",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T16:27:16.824Z"
+    },
+    {
+      "id": "bug-242",
+      "timestamp": "2026-07-02T16:27:53.062Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 4→6 lines (2 removed) | Also: private String mapDenialReason(String reason) {; // denial_messages map. The gateway holds no domai",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-07-02T16:29:55.935Z"
+    },
+    {
+      "id": "bug-243",
+      "timestamp": "2026-07-02T16:29:17.709Z",
+      "error_message": "Wrong reference: EntitlementCheckData should be CheckDeniedData",
+      "file": "../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java",
+      "root_cause": "Used \"EntitlementCheckData\" instead of \"CheckDeniedData\"",
+      "fix": "Changed EntitlementCheckData → CheckDeniedData",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T16:29:17.709Z"
+    },
+    {
+      "id": "bug-244",
+      "timestamp": "2026-07-02T16:31:49.411Z",
+      "error_message": "Incorrect value in code",
+      "file": "../orchestrator-chat/scripts/smoke.sh",
+      "root_cause": "Had \"X-User-Id: rm_jane\"",
+      "fix": "Changed to \"Authorization: Bearer $TOK\"",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "sh"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-07-02T16:32:09.620Z"
+    },
+    {
+      "id": "bug-245",
+      "timestamp": "2026-07-02T16:33:07.847Z",
+      "error_message": "Missing await",
+      "file": "../orchestrator-chat/tests/e2e/tests/07-multi-turn.spec.ts",
+      "root_cause": "Async call without await — returned Promise instead of value",
+      "fix": "Added await to async call",
+      "tags": [
+        "auto-detected",
+        "async-fix",
+        "ts"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T16:33:07.847Z"
+    },
+    {
+      "id": "bug-246",
+      "timestamp": "2026-07-02T16:33:34.330Z",
+      "error_message": "Type error",
+      "file": "../orchestrator-chat/tests/e2e/tests/03-jwt-identity.spec.ts",
+      "root_cause": "Missing or incorrect type annotation",
+      "fix": "Added type assertion/annotation",
+      "tags": [
+        "auto-detected",
+        "type-fix",
+        "ts"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T16:33:34.330Z"
+    },
+    {
+      "id": "bug-247",
+      "timestamp": "2026-07-02T18:05:10.000Z",
+      "error_message": "Canonical :8099 Playwright login specs fail waiting for legacy #email selector after redirect to Axiom Username/Password login",
+      "file": "../orchestrator-chat/tests/e2e/tests/00-login.spec.ts",
+      "root_cause": "The checked-in browser specs still target the legacy LibreChat email/password login contract and default URLs, while the canonical chat app redirects to Axiom OIDC at host.docker.internal:8084/login.",
+      "fix": "No code changed in this review pass; update e2e helpers/specs to use :8099, Axiom Username/Password selectors, and the new OIDC flow.",
+      "tags": [
+        "e2e",
+        "playwright",
+        "oidc",
+        "test-harness"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T18:05:10.000Z"
+    },
+    {
+      "id": "bug-248",
+      "timestamp": "2026-07-02T18:05:10.000Z",
+      "error_message": "Admin console browser login on :5182 returns 403 Invalid CORS request",
+      "file": "../orchestrator-chat/apps/admin",
+      "root_cause": "Browser-origin POST from http://localhost:5182/login to /api/auth/login includes Origin/Referer and is rejected as CORS, while the same proxied login without Origin succeeds with 200.",
+      "fix": "No code changed in this review pass; align IAM/admin-console CORS/proxy config so http://localhost:5182 is an allowed origin for browser login.",
+      "tags": [
+        "admin-console",
+        "cors",
+        "auth",
+        "browser"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T18:05:10.000Z"
+    },
+    {
+      "id": "bug-249",
+      "timestamp": "2026-07-02T18:05:10.000Z",
+      "error_message": "conduit-chat logged post-stream persistence failed when browser was closed mid-stream during summary test",
+      "file": "../orchestrator-chat/apps/chat/bff/src/main/java/ai/conduit/chat/chat/ChatStreamService.java",
+      "root_cause": "The test closed the browser while the final streamed response was still active; the BFF logged InterruptedException and failed post-stream persistence for that conversation.",
+      "fix": "No code changed in this review pass; consider making stream-abort persistence/idempotency robust, or classify this as expected client-abort behavior if acceptable.",
+      "tags": [
+        "chat",
+        "streaming",
+        "persistence",
+        "client-abort"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T18:05:10.000Z"
+    },
+    {
+      "id": "bug-250",
+      "timestamp": "2026-07-02T18:19:13.160Z",
+      "error_message": "Null/undefined access in ",
+      "file": "../orchestrator-chat/apps/chat/bff/src/main/java/ai/conduit/chat/chat/ChatStreamService.java",
+      "root_cause": "Property access on potentially null/undefined value",
+      "fix": "Added null safety (optional chaining or null check)",
+      "tags": [
+        "auto-detected",
+        "null-safety",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T18:19:13.160Z"
+    },
+    {
+      "id": "bug-251",
+      "timestamp": "2026-07-02T18:23:03.560Z",
+      "error_message": "Incorrect value in code",
+      "file": "../orchestrator-chat/tests/e2e/playwright.config.ts",
+      "root_cause": "Had 'http://localhost:3080'",
+      "fix": "Changed to 'http://localhost:8099'",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "ts"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T18:23:03.560Z"
+    },
+    {
+      "id": "bug-252",
+      "timestamp": "2026-07-02T18:40:54.853Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/apps/chat/bff/src/main/java/ai/conduit/chat/chat/ChatStreamService.java",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 5→11 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T18:40:54.853Z"
+    },
+    {
+      "id": "bug-253",
+      "timestamp": "2026-07-02T23:06:36.129Z",
+      "error_message": "CSS fix: null",
+      "file": "../orchestrator-chat/apps/admin/src/pages/Policies.tsx",
+      "root_cause": "null: p.filename) → p.id)",
+      "fix": "Changed null: p.filename) → p.id)",
+      "tags": [
+        "auto-detected",
+        "style-fix",
+        "tsx"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T23:06:36.129Z"
+    },
+    {
+      "id": "bug-254",
+      "timestamp": "2026-07-02T23:08:19.021Z",
+      "error_message": "CSS fix: to",
+      "file": "../orchestrator-chat/apps/admin/src/components/Sidebar.tsx",
+      "root_cause": "to: '/workbench', label: 'Workbench', icon: MessagesSquare → '/audit',   label: 'Audit Log', icon: Clock",
+      "fix": "Changed to: '/workbench', label: 'Workbench', icon: MessagesSquare → '/audit',   label: 'Audit Log', icon: Clock",
+      "tags": [
+        "auto-detected",
+        "style-fix",
+        "tsx"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-02T23:08:19.021Z"
+    },
+    {
+      "id": "bug-255",
+      "timestamp": "2026-07-03T04:19:09.707Z",
+      "error_message": "Incorrect value in code",
+      "file": ".claude/worktrees/agent-a9525c1575ed263bd/CONDUIT-CHAT-BUILD-CHECKLIST.md",
+      "root_cause": "Had \"Access denied\"",
+      "fix": "Changed to `packages/gateway-client`",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T04:19:09.707Z"
+    },
+    {
+      "id": "bug-256",
+      "timestamp": "2026-07-03T04:24:17.213Z",
+      "error_message": "Incorrect value in code",
+      "file": "../orchestrator-chat/registry/agent-manifest.schema.json",
+      "root_cause": "Had \"protocol\"",
+      "fix": "Changed to \"audience\"",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "json"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T04:24:17.213Z"
+    },
+    {
+      "id": "bug-257",
+      "timestamp": "2026-07-03T04:27:42.644Z",
+      "error_message": "Null/undefined access in ",
+      "file": "../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/auth/Principal.java",
+      "root_cause": "Property access on potentially null/undefined value",
+      "fix": "Added null safety (optional chaining or null check)",
+      "tags": [
+        "auto-detected",
+        "null-safety",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T04:27:42.644Z"
+    },
+    {
+      "id": "bug-258",
+      "timestamp": "2026-07-03T04:28:32.815Z",
+      "error_message": "Missing guard clause",
+      "file": "../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/auth/EntitlementService.java",
+      "root_cause": "No early return/throw for edge case: manifest == null",
+      "fix": "Added guard clause: if (manifest == null)",
+      "tags": [
+        "auto-detected",
+        "guard-clause",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T04:28:32.815Z"
+    },
+    {
+      "id": "bug-259",
+      "timestamp": "2026-07-03T04:29:35.411Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/gateway/src/test/java/ai/conduit/gateway/domain/auth/AuthzFromMembershipTest.java",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 11→13 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T04:29:35.411Z"
+    },
+    {
+      "id": "bug-260",
+      "timestamp": "2026-07-03T04:30:08.682Z",
+      "error_message": "Incorrect value in code",
+      "file": "../orchestrator-chat/gateway/src/test/java/ai/conduit/gateway/domain/auth/AuthzFromMembershipTest.java",
+      "root_cause": "Had \"wealth-private-banking\"",
+      "fix": "Changed to \"confidential-pii\"",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T04:30:08.682Z"
+    },
+    {
+      "id": "bug-261",
+      "timestamp": "2026-07-03T04:37:27.413Z",
+      "error_message": "Null/undefined access in ",
+      "file": "../orchestrator-chat/iam-service/src/main/java/com/openwolf/iam/auth/OidcClaimEnricher.java",
+      "root_cause": "Property access on potentially null/undefined value",
+      "fix": "Added null safety (optional chaining or null check)",
+      "tags": [
+        "auto-detected",
+        "null-safety",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T04:37:27.413Z"
+    },
+    {
+      "id": "bug-262",
+      "timestamp": "2026-07-03T04:40:44.345Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/iam-service/src/main/java/com/openwolf/iam/controller/AuthController.java",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 3→5 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T04:40:44.345Z"
+    },
+    {
+      "id": "bug-263",
+      "timestamp": "2026-07-03T04:41:05.569Z",
+      "error_message": "Null/undefined access in ",
+      "file": "../orchestrator-chat/iam-service/src/main/java/com/openwolf/iam/controller/AuthController.java",
+      "root_cause": "Property access on potentially null/undefined value",
+      "fix": "Added null safety (optional chaining or null check)",
+      "tags": [
+        "auto-detected",
+        "null-safety",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T04:41:05.569Z"
+    },
+    {
+      "id": "bug-264",
+      "timestamp": "2026-07-03T04:44:08.567Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/infra/cerbos/policies/relationship_resource.yaml",
+      "root_cause": "3 lines replaced/restructured",
+      "fix": "Rewrote 6→7 lines (3 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "yaml"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T04:44:08.567Z"
+    },
+    {
+      "id": "bug-265",
+      "timestamp": "2026-07-03T04:44:20.130Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/infra/cerbos/policies/domain_resource.yaml",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 7→8 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "yaml"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T04:44:20.130Z"
+    },
+    {
+      "id": "bug-266",
+      "timestamp": "2026-07-03T05:10:15.680Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/registry/manifests/acme.wealth.market_research.json",
+      "root_cause": "4 lines replaced/restructured",
+      "fix": "Rewrote 9→5 lines (4 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "json"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T05:10:15.680Z"
+    },
+    {
+      "id": "bug-267",
+      "timestamp": "2026-07-03T05:10:18.545Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/registry/manifests/acme.hr.policy_qa.json",
+      "root_cause": "4 lines replaced/restructured",
+      "fix": "Rewrote 9→5 lines (4 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "json"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T05:10:18.545Z"
+    },
+    {
+      "id": "bug-268",
+      "timestamp": "2026-07-03T05:20:23.343Z",
+      "error_message": "Wrong reference: isRequired should be required",
+      "file": "../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java",
+      "root_cause": "Used \"isRequired\" instead of \"required\"",
+      "fix": "Changed isRequired → required",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T05:20:23.343Z"
+    },
+    {
+      "id": "bug-269",
+      "timestamp": "2026-07-03T05:22:44.300Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java",
+      "root_cause": "3 lines replaced/restructured",
+      "fix": "Rewrote 5→6 lines (3 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T05:22:44.300Z"
+    },
+    {
+      "id": "bug-270",
+      "timestamp": "2026-07-03T05:33:27.234Z",
+      "error_message": "Null/undefined access in ",
+      "file": "../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/auth/EntitlementService.java",
+      "root_cause": "Property access on potentially null/undefined value",
+      "fix": "Added null safety (optional chaining or null check)",
+      "tags": [
+        "auto-detected",
+        "null-safety",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T05:33:27.234Z"
+    },
+    {
+      "id": "bug-271",
+      "timestamp": "2026-07-03T05:33:34.907Z",
+      "error_message": "Wrong reference: IntentClassifiedData should be GateData",
+      "file": "../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java",
+      "root_cause": "Used \"IntentClassifiedData\" instead of \"GateData\"",
+      "fix": "Changed IntentClassifiedData → GateData",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T05:33:34.907Z"
+    },
+    {
+      "id": "bug-272",
+      "timestamp": "2026-07-03T05:35:55.816Z",
+      "error_message": "Missing guard clause",
+      "file": "../orchestrator-chat/packages/gateway-client/src/events.ts",
+      "root_cause": "No early return/throw for edge case: type === 'gate'",
+      "fix": "Added guard clause: if (type === 'gate')",
+      "tags": [
+        "auto-detected",
+        "guard-clause",
+        "ts"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T05:35:55.816Z"
+    },
+    {
+      "id": "bug-273",
+      "timestamp": "2026-07-03T05:36:08.190Z",
+      "error_message": "Wrong return value",
+      "file": "../orchestrator-chat/packages/gateway-client/src/events.ts",
+      "root_cause": "Was returning: getString(data.reason, getString(data.source, 'pol",
+      "fix": "Now returns: getString(data.reason, '')",
+      "tags": [
+        "auto-detected",
+        "return-value",
+        "ts"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T05:36:08.190Z"
+    },
+    {
+      "id": "bug-274",
+      "timestamp": "2026-07-03T05:36:41.690Z",
+      "error_message": "Missing error handling in unknown",
+      "file": "../orchestrator-chat/apps/chat/bff/src/main/java/ai/conduit/chat/chat/GatewayClient.java",
+      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
+      "fix": "Added try/catch block",
+      "tags": [
+        "auto-detected",
+        "error-handling",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T05:36:41.690Z"
+    },
+    {
+      "id": "bug-275",
+      "timestamp": "2026-07-03T05:39:01.160Z",
+      "error_message": "Null/undefined access in ",
+      "file": "../orchestrator-chat/apps/chat/web/src/hooks/useTraceStream.ts",
+      "root_cause": "Property access on potentially null/undefined value",
+      "fix": "Added null safety (optional chaining or null check)",
+      "tags": [
+        "auto-detected",
+        "null-safety",
+        "ts"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T05:39:01.160Z"
+    },
+    {
+      "id": "bug-276",
+      "timestamp": "2026-07-03T05:39:46.628Z",
+      "error_message": "Incorrect value in code",
+      "file": "../orchestrator-chat/apps/chat/web/src/components/TraceRail.tsx",
+      "root_cause": "Had \"font-medium text-ink capitalize leading-tight\"",
+      "fix": "Changed to \"font-medium text-ink-900 capitalize leading-tight",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "tsx"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T05:39:46.628Z"
+    },
+    {
+      "id": "bug-277",
+      "timestamp": "2026-07-03T05:51:33.036Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/apps/chat/web/vite.config.ts",
+      "root_cause": "11 lines replaced/restructured",
+      "fix": "Rewrote 17→6 lines (11 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "ts"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T05:51:33.036Z"
+    },
+    {
+      "id": "bug-278",
+      "timestamp": "2026-07-03T05:51:38.467Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/apps/chat/web/tsconfig.json",
+      "root_cause": "5 lines replaced/restructured",
+      "fix": "Rewrote 7→3 lines (5 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "json"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T05:51:38.467Z"
+    },
+    {
+      "id": "bug-279",
+      "timestamp": "2026-07-03T05:52:04.324Z",
+      "error_message": "Incorrect value in code",
+      "file": "../orchestrator-chat/apps/chat/web/src/hooks/useTraceStream.ts",
+      "root_cause": "Had '@conduit/gateway-client'",
+      "fix": "Changed to '../lib/gatewayTrace'",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "ts"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T05:52:04.324Z"
+    },
+    {
+      "id": "bug-280",
+      "timestamp": "2026-07-03T05:52:18.514Z",
+      "error_message": "Type error",
+      "file": "../orchestrator-chat/apps/chat/web/src/components/TraceRail.tsx",
+      "root_cause": "Missing or incorrect type annotation",
+      "fix": "Added type assertion/annotation",
+      "tags": [
+        "auto-detected",
+        "type-fix",
+        "tsx"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T05:52:18.514Z"
+    },
+    {
+      "id": "bug-281",
+      "timestamp": "2026-07-03T05:52:27.926Z",
+      "error_message": "CSS fix: tone",
+      "file": "../orchestrator-chat/apps/chat/web/src/components/TraceRail.tsx",
+      "root_cause": "tone: 'blue', label: eventTitle(evt) → 'blue', label: `Resolved ${sel",
+      "fix": "Changed tone: 'blue', label: eventTitle(evt) → 'blue', label: `Resolved ${sel",
+      "tags": [
+        "auto-detected",
+        "style-fix",
+        "tsx"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-07-03T05:52:44.456Z"
+    },
+    {
+      "id": "bug-282",
+      "timestamp": "2026-07-03T06:06:33.209Z",
+      "error_message": "Missing error handling in unknown",
+      "file": "../orchestrator-chat/iam-service/src/main/java/com/openwolf/iam/service/AuditService.java",
+      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
+      "fix": "Added try/catch block",
+      "tags": [
+        "auto-detected",
+        "error-handling",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T06:06:33.209Z"
+    },
+    {
+      "id": "bug-283",
+      "timestamp": "2026-07-03T06:07:19.989Z",
+      "error_message": "Missing error handling in unknown",
+      "file": "../orchestrator-chat/iam-service/src/main/java/com/openwolf/iam/auth/JwtClaimsCustomizer.java",
+      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
+      "fix": "Added try/catch block",
+      "tags": [
+        "auto-detected",
+        "error-handling",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T06:07:19.989Z"
+    },
+    {
+      "id": "bug-284",
+      "timestamp": "2026-07-03T06:14:34.217Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/iam-service/src/test/java/com/openwolf/iam/auth/JwtClaimsCustomizerTest.java",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 15→36 lines (2 removed) | Also: new JwtClaimsCustomizer(enricher, \"conduit-gateway; JwtEncodingContext context = contextFor(new OAuth2",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-07-03T06:14:46.698Z"
+    },
+    {
+      "id": "bug-285",
+      "timestamp": "2026-07-03T07:00:05.373Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/eval/cerbos_golden_dataset.json",
+      "root_cause": "5 lines replaced/restructured",
+      "fix": "Rewrote 11→11 lines (5 removed) | Also: \"description\": \"RM with empty book cannot read any; \"tags\": [\"relationship\", \"rm\", \"book\", \"deny\"], | Also: \"description\": \"INVARIANT: relationship not in boo; \"tags\": [\"security\", \"book\", \"deny\", \"critical\", \"",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "json"
+      ],
+      "related_bugs": [],
+      "occurrences": 3,
+      "last_seen": "2026-07-03T07:00:33.636Z"
+    },
+    {
+      "id": "bug-286",
+      "timestamp": "2026-07-03T11:24:20.792Z",
+      "error_message": "Missing error handling in unknown",
+      "file": "../orchestrator-chat/iam-service/src/main/java/com/openwolf/iam/config/SecurityConfig.java",
+      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
+      "fix": "Added try/catch block",
+      "tags": [
+        "auto-detected",
+        "error-handling",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T11:24:20.792Z"
+    },
+    {
+      "id": "bug-287",
+      "timestamp": "2026-07-03T11:25:34.317Z",
+      "error_message": "Missing error handling in unknown",
+      "file": "../orchestrator-chat/apps/chat/bff/src/main/java/ai/conduit/chat/auth/AuthController.java",
+      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
+      "fix": "Added try/catch block",
+      "tags": [
+        "auto-detected",
+        "error-handling",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T11:25:34.317Z"
+    },
+    {
+      "id": "bug-288",
+      "timestamp": "2026-07-03T11:26:30.119Z",
+      "error_message": "Function not marked async",
+      "file": "../orchestrator-chat/apps/chat/bff/src/main/java/ai/conduit/chat/web/GlobalExceptionHandler.java",
+      "root_cause": "Function uses await but wasn't declared async",
+      "fix": "Added async modifier",
+      "tags": [
+        "auto-detected",
+        "async-fix",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T11:26:30.119Z"
+    },
+    {
+      "id": "bug-289",
+      "timestamp": "2026-07-03T11:38:06.143Z",
+      "error_message": "Null/undefined access in ",
+      "file": "../orchestrator-chat/iam-service/src/main/java/com/openwolf/iam/service/UserService.java",
+      "root_cause": "Property access on potentially null/undefined value",
+      "fix": "Added null safety (optional chaining or null check)",
+      "tags": [
+        "auto-detected",
+        "null-safety",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T11:38:06.143Z"
+    },
+    {
+      "id": "bug-290",
+      "timestamp": "2026-07-03T11:38:44.022Z",
+      "error_message": "Incorrect value in code",
+      "file": "../orchestrator-chat/iam-service/src/main/java/com/openwolf/iam/controller/PolicyController.java",
+      "root_cause": "Had \"platform\"",
+      "fix": "Changed to \"insurance\"",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T11:38:44.022Z"
+    },
+    {
+      "id": "bug-291",
+      "timestamp": "2026-07-03T11:39:13.780Z",
+      "error_message": "CSS fix: segments",
+      "file": "../orchestrator-chat/apps/admin/src/hooks/useAuth.tsx",
+      "root_cause": "segments: p.segments || [], → p.segments || {",
+      "fix": "Changed segments: p.segments || [], → p.segments || {",
+      "tags": [
+        "auto-detected",
+        "style-fix",
+        "tsx"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T11:39:13.780Z"
+    },
+    {
+      "id": "bug-292",
+      "timestamp": "2026-07-03T11:44:43.986Z",
+      "error_message": "Wrong reference: role_id should be roleId",
+      "file": "../orchestrator-chat/apps/admin/src/api/client.ts",
+      "root_cause": "Used \"role_id\" instead of \"roleId\"",
+      "fix": "Changed role_id → roleId",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "ts"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T11:44:43.986Z"
+    },
+    {
+      "id": "bug-293",
+      "timestamp": "2026-07-03T11:57:38.252Z",
+      "error_message": "Null/undefined access in ",
+      "file": "../orchestrator-chat/apps/chat/bff/src/main/java/ai/conduit/chat/memory/ContextAssembler.java",
+      "root_cause": "Property access on potentially null/undefined value",
+      "fix": "Added null safety (optional chaining or null check)",
+      "tags": [
+        "auto-detected",
+        "null-safety",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T11:57:38.252Z"
+    },
+    {
+      "id": "bug-294",
+      "timestamp": "2026-07-03T12:07:53.001Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/apps/chat/bff/src/main/java/ai/conduit/chat/conversation/ConversationService.java",
+      "root_cause": "4 lines replaced/restructured",
+      "fix": "Rewrote 15→27 lines (4 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T12:07:53.001Z"
+    },
+    {
+      "id": "bug-295",
+      "timestamp": "2026-07-03T17:11:20.053Z",
+      "error_message": "Missing error handling in unknown",
+      "file": "../orchestrator-chat/apps/chat/bff/src/main/java/ai/conduit/chat/memory/LlmSummaryService.java",
+      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
+      "fix": "Added try/catch block",
+      "tags": [
+        "auto-detected",
+        "error-handling",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T17:11:20.053Z"
+    },
+    {
+      "id": "bug-296",
+      "timestamp": "2026-07-03T18:03:26.559Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/orchestration/harness/AgentHarness.java",
+      "root_cause": "6 lines replaced/restructured",
+      "fix": "Rewrote 7→4 lines (6 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T18:03:26.559Z"
+    },
+    {
+      "id": "bug-297",
+      "timestamp": "2026-07-03T18:03:45.688Z",
+      "error_message": "Null/undefined access in ",
+      "file": "../orchestrator-chat/iam-service/src/main/java/com/openwolf/iam/controller/AuthController.java",
+      "root_cause": "Property access on potentially null/undefined value",
+      "fix": "Added null safety (optional chaining or null check)",
+      "tags": [
+        "auto-detected",
+        "null-safety",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T18:03:45.688Z"
+    },
+    {
+      "id": "bug-298",
+      "timestamp": "2026-07-03T18:05:13.117Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/coverage/CoverageClient.java",
+      "root_cause": "3 lines replaced/restructured",
+      "fix": "Rewrote 19→23 lines (3 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T18:05:13.117Z"
+    },
+    {
+      "id": "bug-299",
+      "timestamp": "2026-07-03T18:05:50.226Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java",
+      "root_cause": "6 lines replaced/restructured",
+      "fix": "Rewrote 17→28 lines (6 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T18:05:50.226Z"
+    },
+    {
+      "id": "bug-300",
+      "timestamp": "2026-07-03T18:06:33.068Z",
+      "error_message": "Wrong reference: user_id should be userId",
+      "file": "../orchestrator-chat/apps/admin/src/api/client.ts",
+      "root_cause": "Used \"user_id\" instead of \"userId\"",
+      "fix": "Changed user_id → userId",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "ts"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T18:06:33.068Z"
+    },
+    {
+      "id": "bug-301",
+      "timestamp": "2026-07-03T18:06:40.787Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/apps/admin/src/api/client.ts",
+      "root_cause": "6 lines replaced/restructured",
+      "fix": "Rewrote 11→5 lines (6 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "ts"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T18:06:40.787Z"
+    },
+    {
+      "id": "bug-302",
+      "timestamp": "2026-07-03T18:06:59.432Z",
+      "error_message": "Incorrect value in code",
+      "file": "../orchestrator-chat/apps/admin/src/pages/Roles.tsx",
+      "root_cause": "Had \"h-4 w-16\"",
+      "fix": "Changed to \"h-4 w-12\"",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "tsx"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T18:06:59.432Z"
+    },
+    {
+      "id": "bug-303",
+      "timestamp": "2026-07-03T18:07:08.489Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java",
+      "root_cause": "4 lines replaced/restructured",
+      "fix": "Rewrote 5→9 lines (4 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T18:07:08.489Z"
+    },
+    {
+      "id": "bug-304",
+      "timestamp": "2026-07-03T18:07:13.135Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/apps/admin/src/pages/Roles.tsx",
+      "root_cause": "22 lines replaced/restructured",
+      "fix": "Rewrote 29→6 lines (22 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "tsx"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T18:07:13.135Z"
+    },
+    {
+      "id": "bug-305",
+      "timestamp": "2026-07-03T18:07:21.213Z",
+      "error_message": "CSS fix: id",
+      "file": "../orchestrator-chat/apps/admin/src/pages/Teams.tsx",
+      "root_cause": "id: t.domainId || '', → '',",
+      "fix": "Changed id: t.domainId || '', → '',",
+      "tags": [
+        "auto-detected",
+        "style-fix",
+        "tsx"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T18:07:21.213Z"
+    },
+    {
+      "id": "bug-306",
+      "timestamp": "2026-07-03T18:07:27.093Z",
+      "error_message": "Null/undefined access in ",
+      "file": "../orchestrator-chat/apps/admin/src/pages/Teams.tsx",
+      "root_cause": "Property access on potentially null/undefined value",
+      "fix": "Added null safety (optional chaining or null check)",
+      "tags": [
+        "auto-detected",
+        "null-safety",
+        "tsx"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T18:07:27.093Z"
+    },
+    {
+      "id": "bug-307",
+      "timestamp": "2026-07-03T18:07:33.422Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/mock-agents/wealth/shared/jwt_verify.py",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 22→38 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "py"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T18:07:33.422Z"
+    },
+    {
+      "id": "bug-308",
+      "timestamp": "2026-07-03T18:07:42.667Z",
+      "error_message": "Wrong return value",
+      "file": "../orchestrator-chat/mock-agents/wealth/shared/jwt_verify.py",
+      "root_cause": "Was returning: True, None, None  # Fail open when JWKS unreachabl",
+      "fix": "Now returns: True, None, None",
+      "tags": [
+        "auto-detected",
+        "return-value",
+        "py"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T18:07:42.667Z"
+    },
+    {
+      "id": "bug-309",
+      "timestamp": "2026-07-03T18:07:55.226Z",
+      "error_message": "CSS fix: data",
+      "file": "../orchestrator-chat/apps/admin/src/pages/Dashboard.tsx",
+      "root_cause": "data: stats, isLoading: statsLoading → stats, isLoading: statsLoading, isError: statsIsError, error: statsError, refetch: refetchStats",
+      "fix": "Changed data: stats, isLoading: statsLoading → stats, isLoading: statsLoading, isError: statsIsError, error: statsError, refetch: refetchStats",
+      "tags": [
+        "auto-detected",
+        "style-fix",
+        "tsx"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T18:07:55.226Z"
+    },
+    {
+      "id": "bug-310",
+      "timestamp": "2026-07-03T18:08:57.946Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/apps/chat/bff/src/main/java/ai/conduit/chat/memory/LlmSummaryService.java",
+      "root_cause": "6 lines replaced/restructured",
+      "fix": "Rewrote 7→15 lines (6 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T18:08:57.946Z"
+    },
+    {
+      "id": "bug-311",
+      "timestamp": "2026-07-03T18:09:07.440Z",
+      "error_message": "Missing error handling in unknown",
+      "file": "../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java",
+      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
+      "fix": "Added try/catch block | Also: // Idle watchdog: BufferedReader.readLine() has no read dead; // response headers (mid-generation) would block until the 1",
+      "tags": [
+        "auto-detected",
+        "error-handling",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-07-03T18:09:20.963Z"
+    },
+    {
+      "id": "bug-312",
+      "timestamp": "2026-07-03T18:09:28.078Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/apps/chat/bff/src/main/java/ai/conduit/chat/config/AppProperties.java",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 13→19 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T18:09:28.078Z"
+    },
+    {
+      "id": "bug-313",
+      "timestamp": "2026-07-03T18:09:57.969Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/apps/chat/bff/src/main/java/ai/conduit/chat/memory/ContextAssembler.java",
+      "root_cause": "17 lines replaced/restructured",
+      "fix": "Rewrote 31→47 lines (17 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T18:09:57.969Z"
+    },
+    {
+      "id": "bug-314",
+      "timestamp": "2026-07-03T18:10:18.398Z",
+      "error_message": "Missing guard clause",
+      "file": "../orchestrator-chat/apps/chat/web/src/api/client.ts",
+      "root_cause": "No early return/throw for edge case: !resp.ok",
+      "fix": "Added guard clause: if (!resp.ok)",
+      "tags": [
+        "auto-detected",
+        "guard-clause",
+        "ts"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T18:10:18.398Z"
+    },
+    {
+      "id": "bug-315",
+      "timestamp": "2026-07-03T18:10:44.315Z",
+      "error_message": "Missing error handling in function",
+      "file": "../orchestrator-chat/apps/chat/web/src/components/Message.tsx",
+      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
+      "fix": "Added try/catch block",
+      "tags": [
+        "auto-detected",
+        "error-handling",
+        "tsx"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T18:10:44.315Z"
+    },
+    {
+      "id": "bug-316",
+      "timestamp": "2026-07-03T18:10:55.523Z",
+      "error_message": "Type error",
+      "file": "../orchestrator-chat/apps/chat/web/src/components/Sidebar.tsx",
+      "root_cause": "Missing or incorrect type annotation",
+      "fix": "Added type assertion/annotation",
+      "tags": [
+        "auto-detected",
+        "type-fix",
+        "tsx"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T18:10:55.523Z"
+    },
+    {
+      "id": "bug-317",
+      "timestamp": "2026-07-03T18:11:09.977Z",
+      "error_message": "Null/undefined access in ",
+      "file": "../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/auth/JwksClient.java",
+      "root_cause": "Property access on potentially null/undefined value",
+      "fix": "Added null safety (optional chaining or null check)",
+      "tags": [
+        "auto-detected",
+        "null-safety",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T18:11:09.977Z"
+    },
+    {
+      "id": "bug-318",
+      "timestamp": "2026-07-03T18:11:10.363Z",
+      "error_message": "CSS fix: data",
+      "file": "../orchestrator-chat/apps/chat/web/src/components/Sidebar.tsx",
+      "root_cause": "data: conversations = [], isLoading → allConversations = [], isLoading",
+      "fix": "Changed data: conversations = [], isLoading → allConversations = [], isLoading",
+      "tags": [
+        "auto-detected",
+        "style-fix",
+        "tsx"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T18:11:10.363Z"
+    },
+    {
+      "id": "bug-319",
+      "timestamp": "2026-07-03T18:12:03.478Z",
+      "error_message": "Null/undefined access in ",
+      "file": "../orchestrator-chat/apps/chat/bff/src/main/java/ai/conduit/chat/message/MessageService.java",
+      "root_cause": "Property access on potentially null/undefined value",
+      "fix": "Added null safety (optional chaining or null check)",
+      "tags": [
+        "auto-detected",
+        "null-safety",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T18:12:03.478Z"
+    },
+    {
+      "id": "bug-320",
+      "timestamp": "2026-07-03T18:12:30.055Z",
+      "error_message": "Missing error handling in unknown",
+      "file": "../orchestrator-chat/apps/chat/bff/src/main/java/ai/conduit/chat/chat/ChatController.java",
+      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
+      "fix": "Added try/catch block",
+      "tags": [
+        "auto-detected",
+        "error-handling",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T18:12:30.055Z"
+    },
+    {
+      "id": "bug-321",
+      "timestamp": "2026-07-03T18:15:50.495Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java",
+      "root_cause": "3 lines replaced/restructured",
+      "fix": "Rewrote 5→3 lines (3 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T18:15:50.495Z"
+    },
+    {
+      "id": "bug-322",
+      "timestamp": "2026-07-03T18:42:00.536Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/coverage/CoverageClient.java",
+      "root_cause": "3 lines replaced/restructured",
+      "fix": "Rewrote 19→25 lines (3 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T18:42:00.536Z"
+    },
+    {
+      "id": "bug-323",
+      "timestamp": "2026-07-03T18:42:23.045Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/mock-agents/wealth-coverage/main.py",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 7→9 lines (2 removed) | Also: def resolve_entity(body: ResolveRequest) -> Covera; \"RESOLVE reference=%r type=%s principal=%s\",",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "py"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-07-03T18:42:35.330Z"
+    },
+    {
+      "id": "bug-324",
+      "timestamp": "2026-07-03T18:49:03.655Z",
+      "error_message": "Incorrect value in code",
+      "file": "../orchestrator-chat/registry/manifests/acme.hr.policy_qa.json",
+      "root_cause": "Had \"health-insurance\"",
+      "fix": "Changed to \"health-benefits\"",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "json"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-03T18:49:03.655Z"
+    },
+    {
+      "id": "bug-325",
+      "timestamp": "2026-07-04T05:08:08.668Z",
+      "error_message": "Incorrect value in code",
+      "file": "../orchestrator-chat/apps/chat/web/src/hooks/useTraceStream.ts",
+      "root_cause": "Had `@conduit/gateway-client`",
+      "fix": "Changed to `iterateSseData`",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "ts"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-04T05:08:08.668Z"
+    },
+    {
+      "id": "bug-326",
+      "timestamp": "2026-07-04T15:49:53.608Z",
+      "error_message": "Missing error handling in unknown",
+      "file": "conduit-ui-tests/CODEX-PIPELINE-PROGRESS.md",
+      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
+      "fix": "Added try/catch block",
+      "tags": [
+        "auto-detected",
+        "error-handling",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-04T15:49:53.608Z"
+    },
+    {
+      "id": "bug-327",
+      "timestamp": "2026-07-04T16:36:42.609Z",
+      "error_message": "Wrong reference: Okafro should be Okafor",
+      "file": "conduit-ui-tests/CODEX-NOTICE-FLICKER-FIX.md",
+      "root_cause": "Used \"Okafro\" instead of \"Okafor\"",
+      "fix": "Changed Okafro → Okafor",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-04T16:36:42.609Z"
+    },
+    {
+      "id": "bug-328",
+      "timestamp": "2026-07-04T19:50:54.372Z",
+      "error_message": "Missing error handling in unknown",
+      "file": "../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/auth/CerbosEntitlementAdapter.java",
+      "root_cause": "Code path had no error handling — exceptions would propagate uncaught",
+      "fix": "Added try/catch block",
+      "tags": [
+        "auto-detected",
+        "error-handling",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-04T19:50:54.372Z"
+    },
+    {
+      "id": "bug-329",
+      "timestamp": "2026-07-04T19:53:24.233Z",
+      "error_message": "Null/undefined access in ",
+      "file": "../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java",
+      "root_cause": "Property access on potentially null/undefined value",
+      "fix": "Added null safety (optional chaining or null check)",
+      "tags": [
+        "auto-detected",
+        "null-safety",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-04T19:53:24.233Z"
+    },
+    {
+      "id": "bug-330",
+      "timestamp": "2026-07-04T20:01:43.530Z",
+      "error_message": "Wrong reference: 200 should be 50",
+      "file": "../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/insights/BoardCatalog.java",
+      "root_cause": "Used \"200\" instead of \"50\"",
+      "fix": "Changed 200 → 50",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-04T20:01:43.530Z"
+    },
+    {
+      "id": "bug-331",
+      "timestamp": "2026-07-04T20:16:49.811Z",
+      "error_message": "Wrong return value",
+      "file": "../orchestrator-chat/iam-service/src/main/java/com/openwolf/iam/config/SecurityConfig.java",
+      "root_cause": "Was returning: new InMemoryRegisteredClientRepository(gatewayClie",
+      "fix": "Now returns: new InMemoryRegisteredClientRepository(gatewayClie",
+      "tags": [
+        "auto-detected",
+        "return-value",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-04T20:16:49.811Z"
+    },
+    {
+      "id": "bug-332",
+      "timestamp": "2026-07-04T21:02:09.070Z",
+      "error_message": "Significant refactor of ",
+      "file": "conduit-ui-tests/CODEX-INSIGHTS-AUTH.md",
+      "root_cause": "3 lines replaced/restructured",
+      "fix": "Rewrote 3→5 lines (3 removed) | Also: 1. Scaffold `apps/insights/web` (Vite + React + TS; 2. **Branded landing** — a Conduit Insights sign-i",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "md"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-07-04T21:02:23.665Z"
+    },
+    {
+      "id": "bug-333",
+      "timestamp": "2026-07-04T22:59:23.081Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/insights/BoardCatalog.java",
+      "root_cause": "15 lines replaced/restructured",
+      "fix": "Rewrote 28→31 lines (15 removed) | Also: private List<PanelSpec> boardReliability() {; \"(sum(increase(conduit_agent_calls_total{status!=\\",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-07-04T23:00:44.489Z"
+    },
+    {
+      "id": "bug-334",
+      "timestamp": "2026-07-04T23:01:43.238Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/insights/InsightsController.java",
+      "root_cause": "3 lines replaced/restructured",
+      "fix": "Rewrote 17→21 lines (3 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-04T23:01:43.238Z"
+    },
+    {
+      "id": "bug-335",
+      "timestamp": "2026-07-04T23:47:15.840Z",
+      "error_message": "Null/undefined access in ",
+      "file": "../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java",
+      "root_cause": "Property access on potentially null/undefined value",
+      "fix": "Added null safety (optional chaining or null check) | Also: /**; * Segment slicing tags ({@code \"segment:<name>\"}) from the p",
+      "tags": [
+        "auto-detected",
+        "null-safety",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-07-04T23:47:47.353Z"
+    },
+    {
+      "id": "bug-336",
+      "timestamp": "2026-07-04T23:47:30.925Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java",
+      "root_cause": "2 lines replaced/restructured",
+      "fix": "Rewrote 3→5 lines (2 removed)",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-04T23:47:30.925Z"
+    },
+    {
+      "id": "bug-337",
+      "timestamp": "2026-07-04T23:49:54.609Z",
+      "error_message": "Null/undefined access in ",
+      "file": "../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/insights/PrometheusMetricsSource.java",
+      "root_cause": "Property access on potentially null/undefined value",
+      "fix": "Added null safety (optional chaining or null check)",
+      "tags": [
+        "auto-detected",
+        "null-safety",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-04T23:49:54.609Z"
+    },
+    {
+      "id": "bug-338",
+      "timestamp": "2026-07-04T23:51:08.076Z",
+      "error_message": "Null/undefined access in ",
+      "file": "../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/insights/LangfuseMetricsSource.java",
+      "root_cause": "Property access on potentially null/undefined value",
+      "fix": "Added null safety (optional chaining or null check)",
+      "tags": [
+        "auto-detected",
+        "null-safety",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-04T23:51:08.076Z"
+    },
+    {
+      "id": "bug-339",
+      "timestamp": "2026-07-04T23:52:51.030Z",
+      "error_message": "Significant refactor of ",
+      "file": "../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/insights/BoardCatalog.java",
+      "root_cause": "9 lines replaced/restructured",
+      "fix": "Rewrote 14→17 lines (9 removed) | Also: stat(\"allow_rate\", \"Allow rate\", \"%\",; stat(\"decisions_24h\", \"Authorization checks (24h)\"",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "java"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-07-04T23:53:05.336Z"
+    },
+    {
+      "id": "bug-340",
+      "timestamp": "2026-07-05T01:44:05.603Z",
+      "error_message": "Incorrect value in code",
+      "file": "../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/conduit-ops-plane.html",
+      "root_cause": "Had \"iv\"",
+      "fix": "Changed to \"us\"",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "html"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-05T01:44:05.603Z"
+    },
+    {
+      "id": "bug-341",
+      "timestamp": "2026-07-05T02:07:00.199Z",
+      "error_message": "Significant refactor of ",
+      "file": "../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/conduit-ops-plane.html",
+      "root_cause": "10 lines replaced/restructured",
+      "fix": "Rewrote 12→5 lines (10 removed) | Also: <div class=\"p col7\"><div class=\"hd\"><h3>Quality ou; <div class=\"cap\">Answers the evaluator scored low ",
+      "tags": [
+        "auto-detected",
+        "refactor",
+        "html"
+      ],
+      "related_bugs": [],
+      "occurrences": 2,
+      "last_seen": "2026-07-05T02:07:49.914Z"
+    },
+    {
+      "id": "bug-342",
+      "timestamp": "2026-07-05T02:07:55.404Z",
+      "error_message": "Incorrect value in code",
+      "file": "../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/conduit-ops-plane.html",
+      "root_cause": "Had 'Quality & Economics'",
+      "fix": "Changed to 'Economics'",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "html"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-05T02:07:55.404Z"
+    },
+    {
+      "id": "bug-343",
+      "timestamp": "2026-07-05T02:34:53.285Z",
+      "error_message": "Incorrect value in code",
+      "file": "../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/conduit-ops-plane.html",
+      "root_cause": "Had \"badge b-near\"",
+      "fix": "Changed to \"display:flex;gap:8px\"",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "html"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-05T02:34:53.285Z"
+    },
+    {
+      "id": "bug-344",
+      "timestamp": "2026-07-05T03:35:18.799Z",
+      "error_message": "Incorrect value in code",
+      "file": "../orchestrator-chat/apps/insights/web/src/App.tsx",
+      "root_cause": "Had 'collecting...'",
+      "fix": "Changed to 'N/A'",
+      "tags": [
+        "auto-detected",
+        "wrong-value",
+        "tsx"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-05T03:35:18.799Z"
+    },
+    {
+      "id": "bug-345",
+      "timestamp": "2026-07-05T03:51:34.217Z",
+      "error_message": "Wrong reference: histogram_quantile should be chat_summary_generation_seconds_max",
+      "file": "../orchestrator-chat/infra/grafana/provisioning/dashboards/compaction.json",
+      "root_cause": "Used \"histogram_quantile\" instead of \"chat_summary_generation_seconds_max\"",
+      "fix": "Changed histogram_quantile → chat_summary_generation_seconds_max",
+      "tags": [
+        "auto-detected",
+        "wrong-reference",
+        "json"
+      ],
+      "related_bugs": [],
+      "occurrences": 1,
+      "last_seen": "2026-07-05T03:51:34.217Z"
     }
   ]
 }

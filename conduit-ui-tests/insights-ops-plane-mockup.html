@@ -1,0 +1,540 @@
+<title>Conduit Insights — Operations Plane</title>
+<style>
+  :root{
+    --bg:#0B1220; --panel:#131C2E; --panel-2:#182339; --line:#22304C;
+    --ink:#EAF0FA; --muted:#8A9AB8; --faint:#5C6E90;
+    --gold:#F0C45A; --green:#3DD68C; --amber:#F5B14C; --red:#F0655A; --blue:#5B9BF0;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+    font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(1200px 600px at 80% -10%,rgba(240,196,90,.05),transparent),
+      radial-gradient(900px 500px at -10% 110%,rgba(91,155,240,.05),transparent);}
+  .app{display:grid;grid-template-columns:236px 1fr;min-height:100vh}
+  /* ---- rail ---- */
+  .rail{background:linear-gradient(180deg,#0E1728,#0B1220);border-right:1px solid var(--line);
+    padding:20px 14px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh}
+  .brand{display:flex;align-items:center;gap:11px;padding:2px 6px 18px}
+  .mark{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--gold),#D8A63C);
+    color:#1A1206;font-weight:800;display:grid;place-items:center;font-size:19px;box-shadow:0 4px 14px rgba(240,196,90,.25)}
+  .brand h1{font-size:15px;margin:0;letter-spacing:.2px}
+  .brand p{margin:0;font-size:11px;color:var(--faint)}
+  .nav-label{font-size:10px;letter-spacing:.14em;color:var(--faint);text-transform:uppercase;padding:12px 8px 5px}
+  .nav{display:flex;flex-direction:column;gap:2px}
+  .nav button{all:unset;cursor:pointer;display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:9px;
+    color:var(--muted);font-size:13.5px;font-weight:500;transition:.15s}
+  .nav button .q{font-size:10.5px;color:var(--faint);margin-left:auto}
+  .nav button:hover{background:var(--panel);color:var(--ink)}
+  .nav button.on{background:linear-gradient(90deg,rgba(240,196,90,.14),rgba(240,196,90,.03));color:var(--ink);
+    box-shadow:inset 2px 0 0 var(--gold)}
+  .nav .ic{width:16px;text-align:center;opacity:.9}
+  .rail-foot{margin-top:auto;border-top:1px solid var(--line);padding-top:12px;font-size:11px;color:var(--faint)}
+  .clr{display:flex;align-items:center;gap:7px;color:var(--muted);margin-bottom:9px}
+  .clr .dot{width:7px;height:7px;border-radius:2px;background:var(--gold)}
+  .who{display:flex;align-items:center;gap:9px}
+  .who .av{width:26px;height:26px;border-radius:7px;background:var(--panel-2);display:grid;place-items:center;
+    font-size:11px;font-weight:700;color:var(--gold)}
+  /* ---- main ---- */
+  .main{padding:20px 26px 40px;overflow-x:hidden}
+  .top{display:flex;align-items:center;gap:14px;margin-bottom:20px}
+  .top h2{font-size:20px;margin:0;letter-spacing:-.2px}
+  .top .sub{color:var(--faint);font-size:12.5px;margin-top:2px}
+  .spacer{flex:1}
+  .seg{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:3px;gap:2px}
+  .seg button{all:unset;cursor:pointer;padding:5px 12px;border-radius:6px;font-size:12.5px;color:var(--muted);font-weight:500}
+  .seg button.on{background:var(--panel-2);color:var(--ink);box-shadow:0 1px 0 rgba(255,255,255,.03)}
+  .fresh{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);
+    background:var(--panel);border:1px solid var(--line);padding:5px 10px;border-radius:20px}
+  .pulse{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(61,214,140,.6);
+    animation:p 2s infinite}
+  @keyframes p{70%{box-shadow:0 0 0 7px rgba(61,214,140,0)}100%{box-shadow:0 0 0 0 rgba(61,214,140,0)}}
+  /* ---- state strip ---- */
+  .strip{display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr 1fr;gap:12px;margin-bottom:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:15px 16px}
+  .health{background:linear-gradient(135deg,rgba(61,214,140,.10),var(--panel));border-color:rgba(61,214,140,.3)}
+  .health .h{display:flex;align-items:center;gap:9px;font-weight:600;font-size:13px}
+  .health .big{font-size:22px;font-weight:700;margin-top:9px;letter-spacing:-.3px}
+  .health .s{color:var(--muted);font-size:12px;margin-top:2px}
+  .kpi .l{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em}
+  .kpi .v{font-family:var(--mono);font-size:25px;font-weight:600;margin-top:7px;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+  .kpi .d{font-size:11.5px;margin-top:4px;display:flex;align-items:center;gap:5px}
+  .up{color:var(--green)} .down{color:var(--red)} .flat{color:var(--faint)}
+  /* ---- attention ---- */
+  .attn{display:flex;align-items:center;gap:14px;background:linear-gradient(90deg,rgba(245,177,76,.10),var(--panel));
+    border:1px solid rgba(245,177,76,.32);border-radius:14px;padding:14px 18px;margin-bottom:18px}
+  .attn .tag{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);font-weight:700}
+  .attn .msg{font-size:14px}.attn .msg b{color:var(--amber)}
+  .attn a{margin-left:auto;color:var(--ink);background:var(--panel-2);border:1px solid var(--line);
+    padding:7px 13px;border-radius:8px;font-size:12.5px;text-decoration:none;white-space:nowrap}
+  .attn.nom{background:linear-gradient(90deg,rgba(61,214,140,.08),var(--panel));border-color:rgba(61,214,140,.28)}
+  .attn.nom .tag{color:var(--green)}
+  /* ---- grid + panels ---- */
+  .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+  .p{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .p h3{margin:0 0 3px;font-size:13.5px;font-weight:600}
+  .p .cap{color:var(--faint);font-size:11.5px;margin-bottom:14px}
+  .col6{grid-column:span 6}.col4{grid-column:span 4}.col8{grid-column:span 8}.col12{grid-column:span 12}
+  .badge{font-size:10px;padding:3px 8px;border-radius:20px;font-weight:600;letter-spacing:.03em;display:inline-flex;align-items:center;gap:5px}
+  .b-live{background:rgba(61,214,140,.14);color:var(--green)}
+  .b-near{background:rgba(245,177,76,.14);color:var(--amber)}
+  .hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .hd h3{margin:0}
+  /* feed */
+  .feed{display:flex;flex-direction:column}
+  .row{display:flex;align-items:center;gap:12px;padding:11px 4px;border-top:1px solid var(--line)}
+  .row:first-child{border-top:0}
+  .row .av{width:28px;height:28px;border-radius:8px;background:var(--panel-2);display:grid;place-items:center;font-size:11px;font-weight:700;color:var(--gold);flex:none}
+  .row .q{flex:1;min-width:0}
+  .row .q b{font-weight:600;font-size:13px}
+  .row .q .t{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:340px}
+  .st{font-size:11px;padding:3px 9px;border-radius:20px;font-weight:600;white-space:nowrap}
+  .st.ok{background:rgba(61,214,140,.14);color:var(--green)}
+  .st.cl{background:rgba(91,155,240,.14);color:var(--blue)}
+  .st.dn{background:rgba(240,101,90,.15);color:var(--red)}
+  .row .ms{font-family:var(--mono);color:var(--faint);font-size:12px;width:52px;text-align:right;font-variant-numeric:tabular-nums}
+  .row.clk{cursor:pointer;border-radius:9px}.row.clk:hover{background:var(--panel-2)}
+  /* bars */
+  .bar{display:grid;grid-template-columns:120px 1fr 66px;align-items:center;gap:12px;margin:9px 0}
+  .bar .bl{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bar .track{height:9px;background:var(--panel-2);border-radius:6px;overflow:hidden}
+  .bar .fill{height:100%;border-radius:6px;background:linear-gradient(90deg,var(--gold),#E7B44A)}
+  .bar .bv{font-family:var(--mono);font-size:12.5px;text-align:right;color:var(--ink);font-variant-numeric:tabular-nums}
+  /* donut */
+  .donut{display:flex;align-items:center;gap:20px}
+  .leg{display:flex;flex-direction:column;gap:8px}
+  .leg div{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+  .leg .sw{width:10px;height:10px;border-radius:3px}
+  /* area chart */
+  svg{display:block;width:100%}
+  .gline{stroke:var(--line);stroke-width:1}
+  /* gauges */
+  .gauges{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+  .gauge{text-align:center}
+  .gauge .gv{font-family:var(--mono);font-size:30px;font-weight:600;font-variant-numeric:tabular-nums}
+  .gauge .gl{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .ring{position:relative;width:88px;height:88px;margin:0 auto 8px}
+  /* ---- investigate / narrative ---- */
+  .lookup{display:flex;gap:10px;margin-bottom:18px;max-width:560px}
+  .lookup input{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px 14px;
+    color:var(--ink);font-family:var(--mono);font-size:13px}
+  .lookup button{all:unset;cursor:pointer;background:var(--gold);color:#1A1206;font-weight:700;padding:0 20px;border-radius:10px;font-size:13px}
+  .story{position:relative;padding-left:8px}
+  .step{position:relative;display:grid;grid-template-columns:34px 1fr auto;gap:14px;padding:0 0 22px}
+  .step:last-child{padding-bottom:0}
+  .step .node{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:15px;z-index:1;
+    background:var(--panel-2);border:1px solid var(--line)}
+  .step.ok .node{border-color:rgba(61,214,140,.4);color:var(--green)}
+  .step.deny .node{border-color:rgba(240,101,90,.4);color:var(--red)}
+  .step:not(:last-child):before{content:"";position:absolute;left:16px;top:34px;bottom:0;width:2px;background:var(--line)}
+  .step .txt{padding-top:6px}
+  .step .txt .s{font-size:14px;line-height:1.5}
+  .step .txt .s b{color:var(--gold);font-weight:600}
+  .step .txt .s .ent{color:var(--green);font-weight:600}
+  .step .txt .meta{color:var(--faint);font-size:12px;margin-top:3px;font-family:var(--mono)}
+  .step .time{font-family:var(--mono);color:var(--faint);font-size:12px;padding-top:8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .scores{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
+  .chip{font-family:var(--mono);font-size:12px;background:var(--panel-2);border:1px solid var(--line);
+    padding:5px 11px;border-radius:8px;color:var(--muted)}
+  .chip b{color:var(--green)}
+  .view{display:none}.view.on{display:block}
+  .note{color:var(--faint);font-size:11.5px;margin-top:14px}
+  .ext{font-size:11px;color:var(--blue);text-decoration:none;border:1px solid var(--line);padding:3px 9px;border-radius:7px;white-space:nowrap}
+  .ext:hover{background:var(--panel-2)}
+  .hist{display:flex;align-items:flex-end;gap:5px;height:78px;margin-top:8px}
+  .hist .hb{flex:1;background:linear-gradient(180deg,var(--blue),rgba(91,155,240,.22));border-radius:4px 4px 0 0;min-height:4px}
+  .pcts{display:flex;gap:20px;margin-top:13px}
+  .pcts div{font-size:11.5px;color:var(--faint)}.pcts b{font-family:var(--mono);color:var(--ink);font-size:15px;display:block;margin-top:2px;font-variant-numeric:tabular-nums}
+  .runs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .runbox{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px 13px}
+  .runbox .rl{font-size:10.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.05em}
+  .runbox .rv{font-family:var(--mono);font-size:19px;margin-top:3px;font-variant-numeric:tabular-nums}
+  .brk{display:flex;align-items:center;justify-content:space-between;padding:7px 2px;border-top:1px solid var(--line);font-size:12.5px}
+  .brk:first-child{border-top:0}
+  .brk .cl{width:9px;height:9px;border-radius:50%;background:var(--green);display:inline-block;margin-right:8px;vertical-align:middle}
+  .out{display:flex;align-items:center;gap:12px;padding:10px 6px;border-top:1px solid var(--line);cursor:pointer}
+  .out:first-child{border-top:0}.out:hover{background:var(--panel-2);border-radius:8px}
+  .out .sc{font-family:var(--mono);font-weight:700;font-size:15px;width:44px;font-variant-numeric:tabular-nums}
+  .out .sc.lo{color:var(--red)}.out .sc.mid{color:var(--amber)}
+  .out .oq{flex:1;min-width:0}.out .oq b{font-size:13px}.out .oq .t{color:var(--muted);font-size:12px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .out .arw{color:var(--faint);font-size:11.5px;white-space:nowrap}
+  .wf{margin-top:8px}
+  .wfr{display:grid;grid-template-columns:150px 1fr 56px;align-items:center;gap:12px;margin:7px 0;font-size:12px}
+  .wfr .wl{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .wtrack{position:relative;height:16px;background:var(--panel-2);border-radius:4px}
+  .wbar{position:absolute;top:2px;height:12px;border-radius:3px;background:linear-gradient(90deg,var(--gold),#E7B44A)}
+  .wbar.a{background:linear-gradient(90deg,var(--blue),#4785d8)}
+  .wfr .wt{font-family:var(--mono);color:var(--faint);text-align:right;font-variant-numeric:tabular-nums}
+  .upick{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  .uchip{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;cursor:pointer;font-size:12.5px;color:var(--muted)}
+  .uchip:hover{border-color:var(--faint)}
+  .uchip.on{border-color:var(--gold);color:var(--ink);background:linear-gradient(90deg,rgba(240,196,90,.10),var(--panel))}
+  .uchip .av{width:22px;height:22px;border-radius:6px;background:var(--panel-2);display:grid;place-items:center;font-size:10px;font-weight:700;color:var(--gold)}
+  .gate{display:flex;align-items:center;gap:16px;background:linear-gradient(90deg,rgba(61,214,140,.12),var(--panel));border:1px solid rgba(61,214,140,.35);border-radius:14px;padding:16px 20px;margin-bottom:18px}
+  .gate .gk{width:52px;height:52px;border-radius:13px;background:rgba(61,214,140,.15);display:grid;place-items:center;font-size:26px;color:var(--green);flex:none}
+  .gate .gt{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--green);font-weight:700}
+  .gate .gh{font-size:19px;font-weight:700;margin-top:3px}
+  .gate .gs{color:var(--muted);font-size:12.5px;margin-top:3px;font-family:var(--mono)}
+  .evr{display:grid;grid-template-columns:1fr auto;gap:8px;padding:13px 0;border-top:1px solid var(--line);align-items:center}
+  .evr:first-child{border-top:0}
+  .evr .sn{font-size:13.5px;font-weight:500}.evr .sn .sd{color:var(--faint);font-size:11.5px;margin-top:2px;font-weight:400}
+  .evr .sv{font-family:var(--mono);font-size:19px;font-variant-numeric:tabular-nums}.evr .sv.pass{color:var(--green)}
+  .pr{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:8px}
+  .prbox{text-align:center;background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:18px 12px}
+  .prbox .pv{font-family:var(--mono);font-size:32px;font-weight:600;color:var(--green);font-variant-numeric:tabular-nums}
+  .prbox .pl{font-size:11.5px;color:var(--muted);margin-top:4px}
+  @media(max-width:1080px){.app{grid-template-columns:1fr}.rail{display:none}.strip{grid-template-columns:1fr 1fr}.col6,.col8,.col4{grid-column:span 12}}
+</style>
+
+<div class="app">
+  <aside class="rail">
+    <div class="brand"><div class="mark">C</div><div><h1>Conduit Insights</h1><p>Operations plane</p></div></div>
+    <div class="nav-label">Operate</div>
+    <nav class="nav" id="nav">
+      <button class="on" data-v="ov"><span class="ic">◎</span> Overview <span class="q">working?</span></button>
+      <button data-v="tr"><span class="ic">⛨</span> Trust &amp; Governance <span class="q">safe?</span></button>
+      <button data-v="ag"><span class="ic">⚙</span> Agents &amp; Pipeline <span class="q">running?</span></button>
+      <button data-v="ec"><span class="ic">◆</span> Economics <span class="q">cost?</span></button>
+    </nav>
+    <div class="nav-label">Evaluate</div>
+    <nav class="nav">
+      <button data-v="aq"><span class="ic">◈</span> Answer quality <span class="q">trust?</span></button>
+    </nav>
+    <div class="nav-label">Audit &amp; investigate</div>
+    <nav class="nav"><button data-v="us"><span class="ic">◉</span> By user</button><button data-v="iv"><span class="ic">⌕</span> Decision replay</button></nav>
+    <div class="rail-foot">
+      <div class="clr"><span class="dot"></span> Viewing at: highest classification</div>
+      <div class="who"><span class="av">IA</span><div>Insights Admin<br><span style="color:var(--faint)">conduit_admin</span></div></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="top">
+      <div><h2 id="vt">Overview</h2><div class="sub" id="vs">Is the gateway working? — live state across all traffic</div></div>
+      <div class="spacer"></div>
+      <div class="fresh"><span class="pulse"></span> Live · synced 3s ago</div>
+      <div class="seg"><button>24h</button><button class="on">7d</button><button>30d</button></div>
+    </div>
+
+    <!-- OVERVIEW -->
+    <section class="view on" id="ov">
+      <div class="strip">
+        <div class="card health">
+          <div class="h"><span class="pulse"></span> System health</div>
+          <div class="big">All systems nominal</div>
+          <div class="s">9 agents live · 3 domains · 0 breakers open</div>
+        </div>
+        <div class="card kpi"><div class="l">Requests</div><div class="v">1,337</div><div class="d up">▲ 12% vs prior 7d</div></div>
+        <div class="card kpi"><div class="l">Answer rate</div><div class="v">94.2%</div><div class="d up">▲ 1.4 pts</div></div>
+        <div class="card kpi"><div class="l">p95 latency</div><div class="v">0.70s</div><div class="d flat">● steady</div></div>
+        <div class="card kpi"><div class="l">Cost / question</div><div class="v">$0.0005</div><div class="d down">▼ 8%</div></div>
+      </div>
+
+      <div class="attn">
+        <span class="tag">Needs attention</span>
+        <span class="msg"><b>Asset-Servicing</b> agent p95 up <b>32%</b> vs prior window (0.9s → 1.2s) — 6 slow calls in the last hour.</span>
+        <a href="#" onclick="go('ag');return false">Investigate →</a>
+      </div>
+
+      <div class="grid">
+        <div class="p col8">
+          <div class="hd"><h3>Request volume</h3><span class="badge b-live"><span class="pulse"></span> Live</span></div>
+          <svg viewBox="0 0 720 170" preserveAspectRatio="none" height="170">
+            <line class="gline" x1="0" y1="42" x2="720" y2="42"/><line class="gline" x1="0" y1="85" x2="720" y2="85"/><line class="gline" x1="0" y1="128" x2="720" y2="128"/>
+            <defs><linearGradient id="ag" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#F0C45A" stop-opacity=".33"/><stop offset="1" stop-color="#F0C45A" stop-opacity="0"/></linearGradient></defs>
+            <path d="M0,132 L60,120 L120,128 L180,96 L240,104 L300,72 L360,80 L420,54 L480,66 L540,40 L600,52 L660,30 L720,44 L720,170 L0,170 Z" fill="url(#ag)"/>
+            <path d="M0,132 L60,120 L120,128 L180,96 L240,104 L300,72 L360,80 L420,54 L480,66 L540,40 L600,52 L660,30 L720,44" fill="none" stroke="#F0C45A" stroke-width="2.2"/>
+            <circle cx="720" cy="44" r="4" fill="#F0C45A"/>
+          </svg>
+        </div>
+        <div class="p col4">
+          <h3>Outcome mix</h3><div class="cap">Last 7 days</div>
+          <div class="donut">
+            <svg width="112" height="112" viewBox="0 0 42 42"><circle cx="21" cy="21" r="15.9" fill="none" stroke="#182339" stroke-width="6"/>
+              <circle cx="21" cy="21" r="15.9" fill="none" stroke="#3DD68C" stroke-width="6" stroke-dasharray="80 20" stroke-dashoffset="25" transform="rotate(-90 21 21)"/>
+              <circle cx="21" cy="21" r="15.9" fill="none" stroke="#5B9BF0" stroke-width="6" stroke-dasharray="11 89" stroke-dashoffset="-55" transform="rotate(-90 21 21)"/>
+              <circle cx="21" cy="21" r="15.9" fill="none" stroke="#F0655A" stroke-width="6" stroke-dasharray="9 91" stroke-dashoffset="-66" transform="rotate(-90 21 21)"/></svg>
+            <div class="leg">
+              <div><span class="sw" style="background:#3DD68C"></span> Answered · 80%</div>
+              <div><span class="sw" style="background:#5B9BF0"></span> Clarified · 11%</div>
+              <div><span class="sw" style="background:#F0655A"></span> Denied · 9%</div>
+            </div>
+          </div>
+        </div>
+        <div class="p col12">
+          <div class="hd"><h3>Live decision feed</h3><span class="badge b-live"><span class="pulse"></span> Live</span></div>
+          <div class="feed">
+            <div class="row clk" onclick="go('iv')"><span class="av">RC</span><div class="q"><b>rm_carlos</b> · <span class="t">"Give me a risk summary for my top client."</span></div><span class="st ok">answered</span><span class="ms">2.1s</span></div>
+            <div class="row"><span class="av">MF</span><div class="q"><b>multi_rm_fischer</b> · <span class="t">"What's changed in the Okafor portfolio this quarter?"</span></div><span class="st ok">answered</span><span class="ms">1.8s</span></div>
+            <div class="row"><span class="av">WB</span><div class="q"><b>wealth_adv_bianchi</b> · <span class="t">"Show me holdings for the Whitman Family Office"</span></div><span class="st cl">clarified</span><span class="ms">0.4s</span></div>
+            <div class="row"><span class="av">RN</span><div class="q"><b>rm_nakamura</b> · <span class="t">"Pull the commercial-loan exposure for Northwind"</span></div><span class="st dn">denied · entitlement</span><span class="ms">0.1s</span></div>
+            <div class="row"><span class="av">AA</span><div class="q"><b>analyst_amy</b> · <span class="t">"Summarize insurance claims flagged this week"</span></div><span class="st ok">answered</span><span class="ms">2.4s</span></div>
+          </div>
+        </div>
+        <div class="p col12"><div class="hd"><h3>Outcomes &amp; failure taxonomy</h3><a class="ext" href="#" onclick="return false">↗ Grafana</a></div>
+          <div class="cap">conduit_request_outcome_total — every request classified by how it ended</div>
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px">
+            <div class="runbox"><div class="rl" style="color:var(--green)">✓ Answered</div><div class="rv">1,204</div></div>
+            <div class="runbox"><div class="rl" style="color:var(--blue)">◑ Clarified</div><div class="rv">92</div></div>
+            <div class="runbox"><div class="rl" style="color:var(--amber)">⛔ Forbidden · authz</div><div class="rv">121</div></div>
+            <div class="runbox"><div class="rl" style="color:var(--amber)">? Not found · no resolve</div><div class="rv">14</div></div>
+            <div class="runbox"><div class="rl" style="color:var(--red)">✕ Error · agent/LLM</div><div class="rv">6</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TRUST -->
+    <section class="view" id="tr">
+      <div class="attn nom"><span class="tag">All nominal</span><span class="msg">No policy violations. Every request passed all three gates or was correctly denied.</span></div>
+      <div class="strip" style="grid-template-columns:1fr 1fr 1fr 1fr">
+        <div class="card kpi"><div class="l">Authz decisions</div><div class="v">1,412</div><div class="d flat">segment · class · coverage</div></div>
+        <div class="card kpi"><div class="l">Denied</div><div class="v">121</div><div class="d flat">9% · all legitimate</div></div>
+        <div class="card kpi"><div class="l">Coverage gaps</div><div class="v">18</div><div class="d down">▼ unmet demand</div></div>
+        <div class="card kpi"><div class="l">Fabricated IDs</div><div class="v">0</div><div class="d up">● zero, by design</div></div>
+      </div>
+      <div class="grid" style="margin-top:14px">
+        <div class="p col6"><h3>Denials by gate</h3><div class="cap">Where the three-gate ABAC stopped a request</div>
+          <div class="bar"><span class="bl">Segment</span><div class="track"><div class="fill" style="width:64%"></div></div><span class="bv">78</span></div>
+          <div class="bar"><span class="bl">Data classification</span><div class="track"><div class="fill" style="width:26%"></div></div><span class="bv">31</span></div>
+          <div class="bar"><span class="bl">Coverage (book)</span><div class="track"><div class="fill" style="width:10%"></div></div><span class="bv">12</span></div>
+        </div>
+        <div class="p col6"><h3>Denials by segment</h3><div class="cap">Which books hit the wall</div>
+          <div class="bar"><span class="bl">Commercial</span><div class="track"><div class="fill" style="width:70%"></div></div><span class="bv">54</span></div>
+          <div class="bar"><span class="bl">Wealth</span><div class="track"><div class="fill" style="width:45%"></div></div><span class="bv">35</span></div>
+          <div class="bar"><span class="bl">Insurance</span><div class="track"><div class="fill" style="width:28%"></div></div><span class="bv">21</span></div>
+          <div class="bar"><span class="bl">HR</span><div class="track"><div class="fill" style="width:14%"></div></div><span class="bv">11</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- AGENTS -->
+    <section class="view" id="ag">
+      <div class="attn"><span class="tag">Needs attention</span><span class="msg"><b>Asset-Servicing</b> p95 up <b>32%</b> — 6 slow calls this hour. Circuit breaker healthy.</span><a href="#" onclick="return false">View agent →</a></div>
+      <div class="grid">
+        <div class="p col7"><h3>Agent fleet</h3><div class="cap">Calls · success · p95 · last 7d</div>
+          <div class="feed">
+            <div class="row"><div class="q"><b>Wealth · Holdings</b><br><span class="t">HTTP · 512 calls</span></div><span class="st ok">99.6%</span><span class="ms">0.5s</span></div>
+            <div class="row"><div class="q"><b>Wealth · Risk-Analytics</b><br><span class="t">HTTP · 388 calls</span></div><span class="st ok">99.1%</span><span class="ms">0.7s</span></div>
+            <div class="row"><div class="q"><b>Asset-Servicing · Positions</b><br><span class="t">MCP · 274 calls</span></div><span class="st cl">98.2%</span><span class="ms">1.2s</span></div>
+            <div class="row"><div class="q"><b>Insurance · Claims</b><br><span class="t">HTTP · 201 calls</span></div><span class="st ok">99.5%</span><span class="ms">0.6s</span></div>
+          </div>
+        </div>
+        <div class="p col5"><h3>Latency by stage</h3><div class="cap">Where the time goes · median</div>
+          <div class="bar"><span class="bl">Intent classify</span><div class="track"><div class="fill" style="width:12%"></div></div><span class="bv">120ms</span></div>
+          <div class="bar"><span class="bl">Resolve refs</span><div class="track"><div class="fill" style="width:8%"></div></div><span class="bv">80ms</span></div>
+          <div class="bar"><span class="bl">Entitlement</span><div class="track"><div class="fill" style="width:6%"></div></div><span class="bv">60ms</span></div>
+          <div class="bar"><span class="bl">Agent fan-out</span><div class="track"><div class="fill" style="width:100%"></div></div><span class="bv">1.40s</span></div>
+          <div class="bar"><span class="bl">Synthesis (TTFT)</span><div class="track"><div class="fill" style="width:20%"></div></div><span class="bv">270ms</span></div>
+        </div>
+        <div class="p col7"><div class="hd"><h3>Runtime &amp; resilience</h3><a class="ext" href="#" onclick="return false">↗ Grafana</a></div>
+          <div class="runs">
+            <div class="runbox"><div class="rl">Virtual threads active</div><div class="rv">1,284</div></div>
+            <div class="runbox"><div class="rl">Bulkhead exec / queued</div><div class="rv">18 / 0</div></div>
+            <div class="runbox"><div class="rl">JVM heap</div><div class="rv">412 / 900<span style="font-size:12px;color:var(--faint)"> MB</span></div></div>
+            <div class="runbox"><div class="rl">Timeouts · 7d</div><div class="rv">3</div></div>
+          </div>
+          <div style="margin-top:12px">
+            <div class="brk"><span><span class="cl"></span> Holdings</span><span style="color:var(--green)">closed</span></div>
+            <div class="brk"><span><span class="cl"></span> Risk-Analytics</span><span style="color:var(--green)">closed</span></div>
+            <div class="brk"><span><span class="cl" style="background:var(--amber)"></span> Positions · Asset-Svc</span><span style="color:var(--amber)">half-open</span></div>
+            <div class="brk"><span><span class="cl"></span> Claims</span><span style="color:var(--green)">closed</span></div>
+          </div>
+        </div>
+        <div class="p col5"><div class="hd"><h3>Latency distribution</h3><a class="ext" href="#" onclick="return false">↗ Grafana</a></div><div class="cap">Request duration histogram · 7d</div>
+          <div class="hist"><div class="hb" style="height:18%"></div><div class="hb" style="height:46%"></div><div class="hb" style="height:82%"></div><div class="hb" style="height:100%"></div><div class="hb" style="height:68%"></div><div class="hb" style="height:42%"></div><div class="hb" style="height:26%"></div><div class="hb" style="height:15%"></div><div class="hb" style="height:8%"></div><div class="hb" style="height:5%"></div></div>
+          <div class="pcts"><div>p50<b>0.42s</b></div><div>p95<b>0.70s</b></div><div>p99<b>0.71s</b></div></div>
+        </div>
+        <div class="p col6"><div class="hd"><h3>Agent selection</h3><a class="ext" href="#" onclick="return false">↗ Grafana</a></div><div class="cap">Which agents the router chose · 7d</div>
+          <div class="bar"><span class="bl">Holdings</span><div class="track"><div class="fill" style="width:100%"></div></div><span class="bv">512</span></div>
+          <div class="bar"><span class="bl">Risk-Analytics</span><div class="track"><div class="fill" style="width:76%"></div></div><span class="bv">388</span></div>
+          <div class="bar"><span class="bl">Positions</span><div class="track"><div class="fill" style="width:53%"></div></div><span class="bv">274</span></div>
+          <div class="bar"><span class="bl">Claims</span><div class="track"><div class="fill" style="width:39%"></div></div><span class="bv">201</span></div>
+        </div>
+        <div class="p col6"><h3>Intent mix</h3><div class="cap">chat_intent_total · by type · 7d</div>
+          <div class="bar"><span class="bl">Fetch data</span><div class="track"><div class="fill" style="width:100%"></div></div><span class="bv">72%</span></div>
+          <div class="bar"><span class="bl">Follow-up</span><div class="track"><div class="fill" style="width:22%"></div></div><span class="bv">16%</span></div>
+          <div class="bar"><span class="bl">Clarify</span><div class="track"><div class="fill" style="width:12%"></div></div><span class="bv">9%</span></div>
+          <div class="bar"><span class="bl">Chit-chat</span><div class="track"><div class="fill" style="width:4%"></div></div><span class="bv">3%</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ECONOMICS -->
+    <section class="view" id="ec">
+      <div class="attn nom"><span class="tag">Cost verdict</span><span class="msg">$0.0005 / question · trending <b>down 8%</b>. Wealth drives 82% of spend; gpt-4o costs 2× per call for 9% of traffic.</span></div>
+      <div class="grid">
+        <div class="p col7"><div class="hd"><h3>Cost by segment</h3><span class="badge b-live"><span class="pulse"></span> Live</span></div>
+          <div class="cap">Total $0.059 · $0.0005 / question · 2,896 tokens / question</div>
+          <div class="bar"><span class="bl">Wealth</span><div class="track"><div class="fill" style="width:100%"></div></div><span class="bv">$0.048</span></div>
+          <div class="bar"><span class="bl">Insurance</span><div class="track"><div class="fill" style="width:21%"></div></div><span class="bv">$0.0099</span></div>
+          <div class="bar"><span class="bl">Servicing</span><div class="track"><div class="fill" style="width:17%"></div></div><span class="bv">$0.0083</span></div>
+          <div class="bar"><span class="bl">HR</span><div class="track"><div class="fill" style="width:6%"></div></div><span class="bv">$0.0029</span></div>
+        </div>
+        <div class="p col6"><h3>Cost by model</h3><div class="cap">Config-driven pricing · per-model breakdown</div>
+          <div class="bar"><span class="bl">gpt-4o</span><div class="track"><div class="fill" style="width:100%"></div></div><span class="bv">$0.0405</span></div>
+          <div class="bar"><span class="bl">gpt-4o-mini</span><div class="track"><div class="fill" style="width:45%"></div></div><span class="bv">$0.0184</span></div>
+        </div>
+        <div class="p col6"><h3>Top cost by user</h3><div class="cap">Resolved via lookup — not stored in telemetry</div>
+          <div class="bar"><span class="bl">rm_carlos</span><div class="track"><div class="fill" style="width:100%"></div></div><span class="bv">$0.0223</span></div>
+          <div class="bar"><span class="bl">multi_rm_fischer</span><div class="track"><div class="fill" style="width:31%"></div></div><span class="bv">$0.0068</span></div>
+          <div class="bar"><span class="bl">wealth_adv_bianchi</span><div class="track"><div class="fill" style="width:27%"></div></div><span class="bv">$0.0060</span></div>
+        </div>
+        <div class="p col5"><div class="hd"><h3>Cost over time</h3><span class="badge b-live"><span class="pulse"></span> Live</span></div><div class="cap">Daily model spend · config-driven pricing</div>
+          <svg viewBox="0 0 400 120" height="120" preserveAspectRatio="none"><line class="gline" x1="0" y1="40" x2="400" y2="40"/><line class="gline" x1="0" y1="80" x2="400" y2="80"/><path d="M0,96 L57,88 L114,92 L171,72 L228,80 L285,58 L342,64 L400,52 L400,120 L0,120 Z" fill="rgba(240,196,90,.16)"/><path d="M0,96 L57,88 L114,92 L171,72 L228,80 L285,58 L342,64 L400,52" fill="none" stroke="#F0C45A" stroke-width="2"/></svg>
+          <div class="pcts"><div>cost/day<b>$0.008</b></div><div>tokens/day<b>50.4k</b></div><div>$/question<b>$0.0005</b></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ANSWER QUALITY -->
+    <section class="view" id="aq">
+      <div class="attn nom"><span class="tag">Quality verdict</span><span class="msg">Answers are <b>grounded and safe</b> (0.97 / 1.00). <b>Relevance 0.81</b> is the one to watch — 3 low-scoring answers to review.</span></div>
+      <div class="grid">
+        <div class="p col7"><div class="hd"><h3>Continuous answer quality</h3><span style="display:flex;gap:8px"><span class="badge" style="background:rgba(61,214,140,.14);color:var(--green)">✓ Build certified · CI</span><span class="badge b-near">◐ Near real-time · 4m ago</span></span></div>
+          <div class="cap">Every production answer sampled + scored by an <b>independent</b> LLM judge — the model does not grade itself</div>
+          <div class="gauges" style="grid-template-columns:1fr 1fr 1fr 1fr">
+            <div class="gauge"><div class="ring"><svg width="80" height="80" viewBox="0 0 42 42"><circle cx="21" cy="21" r="15.9" fill="none" stroke="#182339" stroke-width="5"/><circle cx="21" cy="21" r="15.9" fill="none" stroke="#3DD68C" stroke-width="5" stroke-dasharray="97 3" stroke-dashoffset="25" transform="rotate(-90 21 21)"/></svg></div><div class="gv">0.97</div><div class="gl">Grounding</div></div>
+            <div class="gauge"><div class="ring"><svg width="80" height="80" viewBox="0 0 42 42"><circle cx="21" cy="21" r="15.9" fill="none" stroke="#182339" stroke-width="5"/><circle cx="21" cy="21" r="15.9" fill="none" stroke="#3DD68C" stroke-width="5" stroke-dasharray="100 0" stroke-dashoffset="25" transform="rotate(-90 21 21)"/></svg></div><div class="gv">1.00</div><div class="gl">Safety</div></div>
+            <div class="gauge"><div class="ring"><svg width="80" height="80" viewBox="0 0 42 42"><circle cx="21" cy="21" r="15.9" fill="none" stroke="#182339" stroke-width="5"/><circle cx="21" cy="21" r="15.9" fill="none" stroke="#F5B14C" stroke-width="5" stroke-dasharray="81 19" stroke-dashoffset="25" transform="rotate(-90 21 21)"/></svg></div><div class="gv">0.81</div><div class="gl">Relevance</div></div>
+            <div class="gauge"><div class="ring"><svg width="80" height="80" viewBox="0 0 42 42"><circle cx="21" cy="21" r="15.9" fill="none" stroke="#182339" stroke-width="5"/><circle cx="21" cy="21" r="15.9" fill="none" stroke="#3DD68C" stroke-width="5" stroke-dasharray="100 0" stroke-dashoffset="25" transform="rotate(-90 21 21)"/></svg></div><div class="gv">1.00</div><div class="gl">Honesty</div></div>
+          </div>
+        </div>
+        <div class="p col5"><div class="hd"><h3>Grounding distribution</h3><span class="badge b-near">◐ 4m ago</span></div><div class="cap">Most answers cluster high — the tail is what to fix</div>
+          <div class="hist"><div class="hb" style="height:6%;background:linear-gradient(180deg,#F0655A,rgba(240,101,90,.2))"></div><div class="hb" style="height:9%;background:linear-gradient(180deg,#F5B14C,rgba(245,177,76,.2))"></div><div class="hb" style="height:14%"></div><div class="hb" style="height:22%"></div><div class="hb" style="height:38%"></div><div class="hb" style="height:60%"></div><div class="hb" style="height:100%;background:linear-gradient(180deg,#3DD68C,rgba(61,214,140,.2))"></div></div>
+          <div class="pcts"><div>median<b>0.98</b></div><div>p10<b>0.72</b></div><div>&lt;0.7<b>3 answers</b></div></div>
+        </div>
+        <div class="p col7"><div class="hd"><h3>Needs review — low-scoring answers</h3><a class="ext" href="#" onclick="return false">↗ Langfuse</a></div>
+          <div class="cap">Click any to replay the decision and see <b>why</b> it scored low</div>
+          <div class="out" onclick="go('iv')"><span class="sc lo">0.58</span><div class="oq"><b>rm_nakamura</b><span class="t">"Summarize the loan covenants for Northwind"</span></div><span class="arw">grounding →</span></div>
+          <div class="out" onclick="go('iv')"><span class="sc lo">0.61</span><div class="oq"><b>analyst_amy</b><span class="t">"What's the trend across all flagged claims?"</span></div><span class="arw">grounding →</span></div>
+          <div class="out" onclick="go('iv')"><span class="sc mid">0.72</span><div class="oq"><b>multi_rm_fischer</b><span class="t">"Compare Okafor vs Whitman risk posture"</span></div><span class="arw">relevance →</span></div>
+        </div>
+        <div class="p col5"><h3>Grounding by model</h3><div class="cap">Is one model less trustworthy? — a real procurement question</div>
+          <div class="bar"><span class="bl">gpt-4o</span><div class="track"><div class="fill" style="width:98%;background:linear-gradient(90deg,#3DD68C,#2fb877)"></div></div><span class="bv">0.98</span></div>
+          <div class="bar"><span class="bl">gpt-4o-mini</span><div class="track"><div class="fill" style="width:95%;background:linear-gradient(90deg,#3DD68C,#2fb877)"></div></div><span class="bv">0.96</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- GATEWAY EVAL -->
+    <section class="view" id="ge">
+      <div class="gate"><div class="gk">✓</div><div><div class="gt">Release gate · DeepEval</div><div class="gh">PASSED — build certified</div><div class="gs">142 golden cases · last run 2h ago · commit 358005c · all thresholds met</div></div></div>
+      <div class="grid">
+        <div class="p col7"><div class="hd"><h3>Decision accuracy — the gateway's own judgment</h3><a class="ext" href="#" onclick="return false">↗ Langfuse experiment</a></div>
+          <div class="cap">Scored against golden datasets — not the answer, the <b>decisions</b></div>
+          <div class="evr"><div class="sn">Routing accuracy<div class="sd">did it select the right agents · conduit-routing set · 64 cases</div></div><div class="sv pass">96.9%</div></div>
+          <div class="evr"><div class="sn">Intent classification<div class="sd">FETCH · FOLLOW-UP · CLARIFY · CHITCHAT</div></div><div class="sv pass">98.4%</div></div>
+          <div class="evr"><div class="sn">Clarify correctness<div class="sd">clarified exactly when required context was missing</div></div><div class="sv pass">94.1%</div></div>
+          <div class="evr"><div class="sn">Coverage / resolution<div class="sd">resolved references without inventing IDs</div></div><div class="sv pass">100%</div></div>
+        </div>
+        <div class="p col5"><div class="hd"><h3>Entitlement policy correctness</h3><a class="ext" href="#" onclick="return false">↗ Cerbos</a></div>
+          <div class="cap">142 golden ALLOW/DENY cases run against the live PDP — <b>proving authorization is correct</b></div>
+          <div class="pr">
+            <div class="prbox"><div class="pv">1.00</div><div class="pl">Precision<br>no wrongful ALLOW</div></div>
+            <div class="prbox"><div class="pv">0.99</div><div class="pl">Recall<br>no wrongful DENY</div></div>
+          </div>
+          <div class="note" style="margin-top:14px">1 borderline case flagged for policy review · <a class="ext" href="#" onclick="return false">view case →</a></div>
+        </div>
+        <div class="p col12"><div class="hd"><h3>Certification across releases</h3><span class="badge b-live">regression gate</span></div>
+          <div class="cap">Every release re-scored against the golden sets — accuracy must not regress to ship</div>
+          <svg viewBox="0 0 720 116" height="116" preserveAspectRatio="none"><line class="gline" x1="0" y1="29" x2="720" y2="29"/><line class="gline" x1="0" y1="58" x2="720" y2="58"/><line class="gline" x1="0" y1="87" x2="720" y2="87"/>
+            <path d="M0,44 L120,40 L240,46 L360,34 L480,30 L600,28 L720,26" fill="none" stroke="#3DD68C" stroke-width="2.4"/>
+            <path d="M0,70 L120,64 L240,60 L360,58 L480,50 L600,48 L720,44" fill="none" stroke="#5B9BF0" stroke-width="2.2"/>
+            <circle cx="720" cy="26" r="4" fill="#3DD68C"/><circle cx="720" cy="44" r="4" fill="#5B9BF0"/></svg>
+          <div class="pcts"><div style="color:var(--green)">■ Routing / policy accuracy</div><div style="color:var(--blue)">■ Answer faithfulness</div><div>7 releases · all passed the gate</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- USERS -->
+    <section class="view" id="us">
+      <div class="upick">
+        <div class="uchip on"><span class="av">RC</span> rm_carlos · Wealth</div>
+        <div class="uchip"><span class="av">MF</span> multi_rm_fischer</div>
+        <div class="uchip"><span class="av">WB</span> wealth_adv_bianchi</div>
+        <div class="uchip"><span class="av">AA</span> analyst_amy · Insurance</div>
+        <div class="uchip"><span class="av">RN</span> rm_nakamura · Commercial</div>
+      </div>
+      <div class="strip" style="grid-template-columns:1.4fr 1fr 1fr 1fr">
+        <div class="card"><div style="display:flex;align-items:center;gap:10px;font-weight:600;font-size:15px"><span style="width:32px;height:32px;border-radius:9px;background:var(--panel-2);display:grid;place-items:center;font-size:12px;font-weight:700;color:var(--gold)">RC</span> rm_carlos</div><div style="color:var(--muted);font-size:12px;margin-top:9px">Wealth · Relationship Manager · active 3m ago</div></div>
+        <div class="card kpi"><div class="l">Cost · 7d</div><div class="v">$0.022</div><div class="d flat">39% of wealth spend</div></div>
+        <div class="card kpi"><div class="l">Questions</div><div class="v">12</div><div class="d up">▲ most active RM</div></div>
+        <div class="card kpi"><div class="l">Avg grounding</div><div class="v">0.94</div><div class="d flat">● healthy</div></div>
+      </div>
+      <div class="grid">
+        <div class="p col7"><div class="hd"><h3>Their conversations</h3><span class="badge" style="background:var(--panel-2);color:var(--faint)">via conversation-store adapter</span></div>
+          <div class="cap">Click any to replay how it was decided</div>
+          <div class="feed">
+            <div class="row clk" onclick="go('iv')"><div class="q"><b>"Give me a risk summary for my top client."</b><span class="t">grounding 0.97 · 2 agents</span></div><span class="st ok">answered</span><span class="ms">2.1s</span></div>
+            <div class="row clk" onclick="go('iv')"><div class="q"><b>"What's the exposure on the Whitman book?"</b><span class="t">grounding 0.94 · 1 agent</span></div><span class="st ok">answered</span><span class="ms">1.6s</span></div>
+            <div class="row clk" onclick="go('iv')"><div class="q"><b>"Summarize Q3 across all my clients."</b><span class="t">grounding 0.89 · ⟳ memory compacted (31 turns)</span></div><span class="st ok">answered</span><span class="ms">3.2s</span></div>
+            <div class="row"><div class="q"><b>"Pull the commercial loan book for Northwind."</b><span class="t">outside coverage</span></div><span class="st dn">denied</span><span class="ms">0.1s</span></div>
+          </div>
+        </div>
+        <div class="p col5"><h3>Entitlement decisions</h3><div class="cap">What this principal may reach · by domain</div>
+          <div class="brk"><span><span class="cl"></span> Wealth · holdings</span><span style="color:var(--green)">allowed</span></div>
+          <div class="brk"><span><span class="cl"></span> Wealth · risk</span><span style="color:var(--green)">allowed</span></div>
+          <div class="brk"><span><span class="cl" style="background:var(--red)"></span> Commercial · loans</span><span style="color:var(--red)">denied · segment</span></div>
+          <div class="brk"><span><span class="cl" style="background:var(--red)"></span> Insurance · claims</span><span style="color:var(--red)">denied · segment</span></div>
+        </div>
+        <div class="p col7"><div class="hd"><h3>Continuous eval — this user</h3><span class="badge b-near">◐ Near real-time</span></div>
+          <div class="cap">Every answer sampled + scored by the independent evaluator</div>
+          <div class="scores" style="margin-top:2px"><span class="chip">grounding <b>0.94</b></span><span class="chip">safety <b>1.00</b></span><span class="chip">relevance <b>0.83</b></span><span class="chip">partial-honesty <b>1.00</b></span></div>
+          <div class="out" onclick="go('iv')" style="margin-top:10px"><span class="sc mid">0.89</span><div class="oq"><span class="t">"Summarize Q3 across all my clients" — lowest-scored answer</span></div><span class="arw">review →</span></div>
+        </div>
+        <div class="p col5"><h3>Memory compactions</h3><div class="cap">Long sessions summarized to fit context</div>
+          <div class="brk"><span>Q3 client summary</span><span style="color:var(--muted)">31 turns → ⟳ compacted</span></div>
+          <div class="brk"><span>Whitman deep-dive</span><span style="color:var(--faint)">no compaction</span></div>
+          <div class="brk"><span>Risk summary</span><span style="color:var(--faint)">no compaction</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- INVESTIGATE -->
+    <section class="view" id="iv">
+      <div class="lookup"><input value="demo-rm_carlos-wealth-book" spellcheck="false"><button>Replay →</button></div>
+      <div class="p col12">
+        <div class="hd"><h3>Decision replay — how this answer was produced</h3><span class="badge b-live">6 requests · gateway-native</span></div>
+        <div class="story">
+          <div class="step ok"><div class="node">◎</div><div class="txt"><div class="s"><b>rm_carlos</b> asked <b>"Give me a risk summary for my top client."</b></div><div class="meta">conversation demo-rm_carlos-wealth-book · request 7c7c1aa4</div></div><div class="time">t0</div></div>
+          <div class="step"><div class="node">✎</div><div class="txt"><div class="s">Classified as <b>FETCH_DATA</b> — a data request, not chit-chat.</div><div class="meta">intent classifier · glm/gpt · deterministic route</div></div><div class="time">+120ms</div></div>
+          <div class="step"><div class="node">⌖</div><div class="txt"><div class="s">Resolved <b>"my top client"</b> → a relationship id via deterministic lookup — <b>no ID invented.</b></div><div class="meta">principal-agnostic resolve · REL-•••• (masked)</div></div><div class="time">+60ms</div></div>
+          <div class="step ok"><div class="node">⛨</div><div class="txt"><div class="s">Entitlement check <span class="ent">✓ passed</span> — <b>wealth</b> segment, <b>confidential</b> classification, in coverage.</div><div class="meta">Cerbos (structural) + coverage service (data-aware book)</div></div><div class="time">+60ms</div></div>
+          <div class="step"><div class="node">⚙</div><div class="txt"><div class="s">Fanned out to <b>2 agents</b> in parallel — Holdings + Risk-Analytics — joined to deadline.</div><div class="meta">HTTP · virtual threads · 2/2 returned</div></div><div class="time">+1.40s</div></div>
+          <div class="step ok"><div class="node">◆</div><div class="txt"><div class="s">Synthesized one grounded answer from agent data — <b>the model summarized, it did not compute.</b></div>
+            <div class="scores"><span class="chip">grounding <b>0.97</b></span><span class="chip">safety <b>1.00</b></span><span class="chip">relevance <b>0.81</b></span></div></div><div class="time">2.1s total</div></div>
+        </div>
+        <div class="hd" style="margin-top:24px"><h3>Span timeline — precise timing</h3><a class="ext" href="#" onclick="return false">↗ Langfuse trace</a></div>
+        <div class="wf">
+          <div class="wfr"><span class="wl">Intent classify</span><div class="wtrack"><div class="wbar" style="left:0;width:6%"></div></div><span class="wt">120ms</span></div>
+          <div class="wfr"><span class="wl">Resolve refs</span><div class="wtrack"><div class="wbar" style="left:6%;width:4%"></div></div><span class="wt">80ms</span></div>
+          <div class="wfr"><span class="wl">Entitlement</span><div class="wtrack"><div class="wbar" style="left:10%;width:3%"></div></div><span class="wt">60ms</span></div>
+          <div class="wfr"><span class="wl">Agent · Holdings</span><div class="wtrack"><div class="wbar a" style="left:13%;width:60%"></div></div><span class="wt">1.28s</span></div>
+          <div class="wfr"><span class="wl">Agent · Risk-Analytics</span><div class="wtrack"><div class="wbar a" style="left:13%;width:66%"></div></div><span class="wt">1.40s</span></div>
+          <div class="wfr"><span class="wl">Synthesis (TTFT)</span><div class="wtrack"><div class="wbar" style="left:79%;width:13%"></div></div><span class="wt">270ms</span></div>
+        </div>
+        <div class="note">Content shown at your data classification (highest). Classification-based redaction of trace content is a coming control. Narrative for humans · span timeline for precision · both from the same gateway-native trace.</div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+  function go(v){
+    document.querySelectorAll('.view').forEach(s=>s.classList.toggle('on',s.id===v));
+    document.querySelectorAll('#nav button,[data-v]').forEach(b=>b.classList&&b.classList.toggle('on',b.dataset&&b.dataset.v===v));
+    var meta={ov:['Overview','Is the gateway working? — live state across all traffic'],
+      tr:['Trust & Governance','Is it safe? — the three-gate ABAC in action'],
+      ag:['Agents & Pipeline','How is it running? — fleet health and where the time goes'],
+      ec:['Economics','What is it costing? — cost per question, by segment / model / user'],
+      aq:['Answer quality','Can you trust the answers? — continuous, independent evaluation of every response'],
+      ge:['Gateway eval','Can you prove the gateway decides correctly? — golden-dataset certification'],
+      us:['By user','Per-principal audit — cost, quality, entitlements, and every conversation'],
+      iv:['Investigate','What happened here? — replay any decision by conversation id']};
+    if(meta[v]){document.getElementById('vt').textContent=meta[v][0];document.getElementById('vs').textContent=meta[v][1];}
+    window.scrollTo(0,0);
+  }
+  document.querySelectorAll('[data-v]').forEach(b=>b.addEventListener('click',()=>go(b.dataset.v)));
+</script>
