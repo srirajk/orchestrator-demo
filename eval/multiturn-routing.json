@@ -1,0 +1,49 @@
+{
+  "description": "Multi-turn context-aware routing regression guard. Reproduces the keyword-less-follow-up misroute fixed by context-enriched, domain-coherent routing (docs/ROUTING-CONTEXT-FIX.md). Drive as ONE conversation (LibreChat/BFF sends the growing window each turn); the gateway routes on the recent-user-turn window, derives the domain from a broad semantic pass + margin gate, then re-scopes. Principal rm_jane covers REL-00042 (Whitman) and REL-00099 (Calderon); Okafor is NOT in the book. No domain literal is embedded in the gateway — expected_domain is asserted from the winning agent manifest's own domain field.",
+  "principal": "rm_jane",
+  "turns": [
+    {
+      "id": "mt_01_whitman",
+      "user": "Give me a summary of the Whitman Family Office holdings",
+      "intent": "FETCH_DATA",
+      "expected_domain": "wealth-management",
+      "expected_outcome": "ANSWERED",
+      "must_not_route": ["acme.insurance.claim_status"],
+      "note": "Baseline in-coverage wealth query — must keep working."
+    },
+    {
+      "id": "mt_02_okafor_out_of_coverage",
+      "user": "Show me Okafor holdings",
+      "intent": "FETCH_DATA",
+      "expected_domain": "wealth-management",
+      "expected_outcome": "DENIED",
+      "must_not_route": ["acme.insurance.claim_status"],
+      "note": "Out-of-coverage: routes to wealth (has domain vocabulary), coverage CHECK denies. Clean deny, NOT misrouted to insurance."
+    },
+    {
+      "id": "mt_03_calderon_keywordless_followup",
+      "user": "can you then summarize for Calderon Trust (REL-00099)?",
+      "intent": "FETCH_DATA",
+      "expected_domain": "wealth-management",
+      "expected_outcome": "ANSWERED",
+      "must_not_route": ["acme.insurance.claim_status"],
+      "note": "THE fix. Keyword-less follow-up; bare-message routing scored insurance.claim_status @0.312 and pruned wealth → wrong deny. Context-enriched routing now routes to wealth; Calderon is in the book → succeeds."
+    },
+    {
+      "id": "mt_04_calderon_terse_with_id",
+      "user": "Calderon Trust (REL-00099)?",
+      "intent": "CLARIFY",
+      "expected_outcome": "CLARIFIED",
+      "must_not_route": ["acme.insurance.claim_status"],
+      "note": "Terse, no actionable ask → classifier says CLARIFY → routed on the bare message (no context carry) → margin-abstain → clean clarification, not the noise loop."
+    },
+    {
+      "id": "mt_05_calderon_bare",
+      "user": "Calderon Trust ?",
+      "intent": "CLARIFY",
+      "expected_outcome": "CLARIFIED",
+      "must_not_route": ["acme.insurance.claim_status"],
+      "note": "Bare name → CLARIFY intent, routed on bare message, top score in noise band → deterministic clarification. Must NOT inherit a confident domain from history and answer."
+    }
+  ]
+}

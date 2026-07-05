@@ -434,6 +434,7 @@
 - `Dockerfile` — Docker container definition (~86 tok)
 - `eval_deepeval.py` — PartialHonestyMetric: configure_judge_model, measure, a_measure, is_successful + 6 more (~5444 tok)
 - `golden-prompts.json` (~3317 tok)
+- `multiturn-routing.json` — Multi-turn context-aware routing regression guard (Calderon keyword-less-follow-up fix); expected domain/outcome + must_not_route per turn. (~600 tok)
 - `langfuse_continuous.py` — check_grounding, check_partial_honesty, llm_judge (~7457 tok)
 - `langfuse_run_experiment.py` — Run a Langfuse experiment against the meridian-routing dataset. (~4132 tok)
 - `langfuse_seed_datasets.py` — Seed Langfuse datasets from eval/golden-prompts.json. (~3565 tok)
@@ -646,7 +647,7 @@
 
 ## gateway/src/main/java/ai/meridian/gateway/resolver/service/
 
-- `AgentResolver.java` — Resolver — Stage A + Stage B from the spec. (~1067 tok)
+- `AgentResolver.java` — Resolver — Stage A+B. resolve(prompt,domain) for /debug; resolveContextual(routingText) for chat: conversation-enriched embedding + confidence/margin abstain (decisive-score OR domain-margin), no rigid single-domain scope so cross-domain fan-out is preserved. (~1400 tok)
 
 ## gateway/src/main/java/ai/meridian/gateway/synthesis/answer/
 

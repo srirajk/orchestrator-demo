@@ -66,6 +66,15 @@ conduit:
     confidence-floor: 0.30       # absolute cosine similarity floor
     relative-floor-factor: 0.65  # dynamic floor = max(absolute, topScore * factor); prunes long-tail matches
     top-k: 10
+    # Min gap between the leading candidate and the best OTHER-domain candidate for the leader's
+    # domain to be trusted as the query's scope (context-aware chat routing). Below this the query
+    # is in the cross-domain noise band → abstain to a deterministic clarification. Margin-based
+    # (not a raw absolute cutoff) so a lone low-confidence out-of-domain hit is never trusted.
+    domain-margin: 0.05
+  chat:
+    # Recent user turns (incl. current) concatenated into the routing query so keyword-less
+    # follow-ups inherit the conversation's domain vocabulary. Bounded to limit domain drift.
+    routing-context-turns: 4
     # Domain-neutral entity-resolution endpoint (legacy fallback resolver; the live World-B path
     # resolves via CoverageClient using the manifest's coverage.resolve_url). No domain literal.
     entity-resolve-url: ${CONDUIT_RESOLVER_ENTITY_RESOLVE_URL:http://mock-crm:8085/entities/resolve}

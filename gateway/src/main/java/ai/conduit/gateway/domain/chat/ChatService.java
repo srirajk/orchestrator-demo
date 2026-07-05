@@ -71,6 +71,15 @@ public class ChatService {
     private static final Logger log = LoggerFactory.getLogger(ChatService.class);
     static final String MODEL_ID = "conduit-assistant";
 
+    /**
+     * How many recent user turns (including the current one) are concatenated into the routing
+     * query so a keyword-less follow-up inherits the conversation's domain vocabulary. Bounded so a
+     * long conversation cannot drift the routed domain; recent turns dominate. Configuration, not a
+     * constant (CLAUDE.md §5) — tunable without a rebuild.
+     */
+    @org.springframework.beans.factory.annotation.Value("${conduit.chat.routing-context-turns:4}")
+    private int routingContextTurns;
+
     private static final List<String> TITLE_TRIGGERS = List.of(
             "generate a concise", "generate a short", "provide a title",
             "name this conversation", "title for this"
@@ -235,7 +244,7 @@ public class ChatService {
             switch (intentResult.intent()) {
                 case FETCH_DATA -> handleFetchData(request, emitter, latestPrompt,
                         conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan,
-                        intentResult.extractedEntities(), streamId);
+                        intentResult.extractedEntities(), streamId, true);
                 case FOLLOW_UP  -> handleFollowUp(request, emitter, latestPrompt,
                         conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan, streamId);
                 // CLARIFY is routed through the SAME deterministic coverage path as FETCH_DATA
@@ -243,9 +252,15 @@ public class ChatService {
                 // discover/intersect/`required ∩ resolved = ∅` check inside handleFetchData
                 // produces the proper numbered clarification from the RM's book — not a bare,
                 // LLM-judged manifest message.
+                //
+                // carryContext=false: a CLARIFY turn is, by the classifier's own determination, a
+                // terse under-specified ask ("Calderon Trust?") with no actionable request. We route
+                // it on the bare message only — NOT enriched with prior-turn domain vocabulary — so
+                // it cannot inherit a confident domain from history and be answered; it stays a
+                // clarification. Enriching it would collapse the FETCH_DATA/CLARIFY distinction.
                 case CLARIFY    -> handleFetchData(request, emitter, latestPrompt,
                         conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan,
-                        intentResult.extractedEntities(), streamId);
+                        intentResult.extractedEntities(), streamId, false);
                 case CHITCHAT   -> handleChitchat(request, emitter, conversationId, requestId, requestStart, streamId);
             }
 
@@ -268,7 +283,8 @@ public class ChatService {
                                   String userId,
                                   Principal jwtPrincipal,
                                   String requestId, long requestStart, Span rootSpan,
-                                  EntityBag preExtracted, String streamId) throws Exception {
+                                  EntityBag preExtracted, String streamId,
+                                  boolean carryContext) throws Exception {
         Span span = tracer.spanBuilder("chat.fetch_data").startSpan();
         // coverageRelId is set by the coverage pipeline before synthesis.
         String coverageRelId = null;
@@ -284,7 +300,18 @@ public class ChatService {
         // union's first key. They are plain locals (captured by no lambda) so reassignment is safe.
         EntityType coverageEntity = coverageEntityType();
         try {
-            ResolverResult resolved = resolver.resolve(latestPrompt);
+            // ── CONTEXT-AWARE ROUTING ────────────────────────────────────────────────
+            // Route on conversation-enriched text (recent user turns) rather than the bare last
+            // message. Enrichment lets the resolver's confidence/margin gate derive the query's
+            // domain from the conversation's established vocabulary and abstain on a lone
+            // out-of-domain hit. This fixes keyword-less follow-ups
+            // ("summarize for Calderon Trust (REL-00099)?") that otherwise scored in the
+            // cross-domain noise band and were misrouted. For CLARIFY turns (carryContext=false)
+            // we route on the bare message so a terse under-specified ask cannot inherit a
+            // confident domain from history and be answered. No domain literal here — the domain
+            // decision comes from the winning agent manifest's own domain field in the resolver.
+            String routingText = carryContext ? buildRoutingQuery(request) : latestPrompt;
+            ResolverResult resolved = resolver.resolveContextual(routingText);
 
             List<AgentsResolvedData.AgentRef> selectedRefs = resolved.selected().stream()
                     .map(c -> new AgentsResolvedData.AgentRef(
@@ -728,6 +755,30 @@ public class ChatService {
             if ("user".equals(m.role()) && m.content() != null) return m.content();
         }
         return "";
+    }
+
+    /**
+     * Builds the routing query by concatenating the most recent user turns (bounded by
+     * {@code routingContextTurns}, current turn last) so a keyword-less follow-up inherits the
+     * conversation's established domain vocabulary. This is the "carried topic" the resolver uses to
+     * derive the query's domain (plan §2). Only USER turns are included — assistant answers would
+     * inject their own vocabulary and skew the embedding. No domain knowledge here: it is raw
+     * conversation text. Falls back to the latest user message when there is only one turn.
+     */
+    private String buildRoutingQuery(ChatRequest request) {
+        String latest = extractLatestUserMessage(request);
+        if (request.messages() == null || request.messages().isEmpty()) return latest;
+        int window = Math.max(1, routingContextTurns);
+        List<String> userTurns = new ArrayList<>();
+        for (int i = request.messages().size() - 1; i >= 0 && userTurns.size() < window; i--) {
+            Message m = request.messages().get(i);
+            if ("user".equals(m.role()) && m.content() != null && !m.content().isBlank()) {
+                userTurns.add(m.content().trim());
+            }
+        }
+        if (userTurns.size() <= 1) return latest;
+        java.util.Collections.reverse(userTurns);  // oldest → newest (current turn last)
+        return String.join("\n", userTurns);
     }
 
     /**
