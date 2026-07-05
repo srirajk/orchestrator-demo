@@ -6,29 +6,39 @@ import {
   BarChart3,
   CircleAlert,
   Clock3,
+  DollarSign,
   Gauge,
   GitBranch,
   Layers3,
   LineChart,
   LockKeyhole,
   LogOut,
+  MessageSquareText,
   PieChart,
   RefreshCcw,
+  Search,
   ShieldCheck,
+  SlidersHorizontal,
   Table2,
   TimerReset,
+  TrendingUp,
   WalletCards,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import {
   Board,
+  ConversationTrace,
+  CostSummary,
   InsightsAccessDeniedError,
   InsightsUnauthorizedError,
   LabeledValue,
   Panel,
   Point,
+  RangeKey,
+  fetchConversationTrace,
   fetchInsightsBoard,
+  fetchInsightsCost,
   verifyInsightsAccess,
 } from './api'
 import { AuthSession, clearSession, completeCallback, getSession, startSignIn } from './auth'
@@ -146,6 +156,12 @@ const STATUS_COPY = {
   loading: 'Loading board',
   retry: 'Retry',
 }
+
+const RANGE_OPTIONS: Array<{ label: string; value: RangeKey }> = [
+  { label: '24h', value: '24h' },
+  { label: '7d', value: '7d' },
+  { label: '30d', value: '30d' },
+]
 
 export default function App() {
   const [state, setState] = useState<AppState>(() => {
@@ -291,12 +307,21 @@ function ErrorPage({ message }: { message: string }) {
 
 function InsightsShell({ initialBoard, session }: { initialBoard: Board; session: AuthSession }) {
   const [activeBoardId, setActiveBoardId] = useState(1)
-  const [boardsById, setBoardsById] = useState<Record<number, Board>>({ 1: initialBoard })
+  const [range, setRange] = useState<RangeKey>('24h')
+  const [boardsByKey, setBoardsByKey] = useState<Record<string, Board>>({ [boardCacheKey(1, '24h')]: initialBoard })
   const [loadingBoardId, setLoadingBoardId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [cost, setCost] = useState<CostSummary | null>(null)
+  const [costError, setCostError] = useState<string | null>(null)
+  const [costLoading, setCostLoading] = useState(false)
+  const [qualityBoard, setQualityBoard] = useState<Board | null>(null)
+  const [qualityLoading, setQualityLoading] = useState(false)
+  const [trace, setTrace] = useState<ConversationTrace | null>(null)
+  const [traceError, setTraceError] = useState<string | null>(null)
+  const [traceLoading, setTraceLoading] = useState(false)
 
   const activeBoardMeta = BOARDS.find((board) => board.id === activeBoardId) ?? BOARDS[0]
-  const activeBoard = boardsById[activeBoardId]
+  const activeBoard = boardsByKey[boardCacheKey(activeBoardId, range)]
   const initials = useMemo(() => {
     return (
       session.profile.name
@@ -308,16 +333,27 @@ function InsightsShell({ initialBoard, session }: { initialBoard: Board; session
     )
   }, [session.profile.name])
 
+  useEffect(() => {
+    void loadBoard(activeBoardId, range)
+    void loadCost(range)
+    void loadQuality(range)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [range])
+
   async function openBoard(boardId: number) {
     setActiveBoardId(boardId)
     setError(null)
+    await loadBoard(boardId, range)
+  }
 
-    if (boardsById[boardId]) return
+  async function loadBoard(boardId: number, nextRange: RangeKey, force = false) {
+    const key = boardCacheKey(boardId, nextRange)
+    if (!force && boardsByKey[key]) return
 
     setLoadingBoardId(boardId)
     try {
-      const board = await fetchInsightsBoard(session, boardId)
-      setBoardsById((current) => ({ ...current, [boardId]: board }))
+      const board = await fetchInsightsBoard(session, boardId, nextRange)
+      setBoardsByKey((current) => ({ ...current, [key]: board }))
     } catch (loadError) {
       if (loadError instanceof InsightsUnauthorizedError) {
         clearSession()
@@ -327,6 +363,62 @@ function InsightsShell({ initialBoard, session }: { initialBoard: Board; session
       setError(loadError instanceof Error ? loadError.message : 'Board did not load.')
     } finally {
       setLoadingBoardId(null)
+    }
+  }
+
+  async function loadCost(nextRange: RangeKey) {
+    setCostLoading(true)
+    setCostError(null)
+    try {
+      setCost(await fetchInsightsCost(session, nextRange))
+    } catch (loadError) {
+      if (loadError instanceof InsightsUnauthorizedError) {
+        clearSession()
+        window.location.assign('/')
+        return
+      }
+      setCostError(loadError instanceof Error ? loadError.message : 'Cost metrics did not load.')
+    } finally {
+      setCostLoading(false)
+    }
+  }
+
+  async function loadQuality(nextRange: RangeKey) {
+    setQualityLoading(true)
+    try {
+      setQualityBoard(await fetchInsightsBoard(session, 7, nextRange))
+    } catch {
+      setQualityBoard(null)
+    } finally {
+      setQualityLoading(false)
+    }
+  }
+
+  async function refreshOperations() {
+    await Promise.all([
+      loadBoard(activeBoardId, range, true),
+      loadCost(range),
+      loadQuality(range),
+    ])
+  }
+
+  async function loadTrace(conversationId: string) {
+    const trimmed = conversationId.trim()
+    if (!trimmed) return
+
+    setTraceLoading(true)
+    setTraceError(null)
+    try {
+      setTrace(await fetchConversationTrace(session, trimmed, 20))
+    } catch (loadError) {
+      if (loadError instanceof InsightsUnauthorizedError) {
+        clearSession()
+        window.location.assign('/')
+        return
+      }
+      setTraceError(loadError instanceof Error ? loadError.message : 'Conversation trace did not load.')
+    } finally {
+      setTraceLoading(false)
     }
   }
 
@@ -368,25 +460,245 @@ function InsightsShell({ initialBoard, session }: { initialBoard: Board; session
           </div>
         </header>
 
-        <section className="board-tabs" aria-label="Board shortcuts">
-          {BOARDS.map((board) => (
-            <button
-              key={board.id}
-              type="button"
-              className={clsx('board-tab', board.id === activeBoardId && 'board-tab-active')}
-              onClick={() => void openBoard(board.id)}
-            >
-              {board.id}
-            </button>
-          ))}
+        <section className="ops-command-bar" aria-label="Operations controls">
+          <div className="range-control" aria-label="Analytics range">
+            <SlidersHorizontal size={16} aria-hidden="true" />
+            {RANGE_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={clsx('range-button', option.value === range && 'range-button-active')}
+                onClick={() => setRange(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <button type="button" className="refresh-button" onClick={() => void refreshOperations()}>
+            <RefreshCcw size={16} aria-hidden="true" />
+            Refresh
+          </button>
         </section>
 
-        {loadingBoardId === activeBoardId && <BoardLoading />}
-        {error && <BoardError message={error} onRetry={() => void openBoard(activeBoardId)} />}
-        {activeBoard && loadingBoardId !== activeBoardId && !error && (
-          <BoardView board={activeBoard} boardId={activeBoardId} />
-        )}
+        <div className="operations-layout">
+          <section className="board-main" aria-label="Board canvas">
+            <section className="board-tabs" aria-label="Board shortcuts">
+              {BOARDS.map((board) => (
+                <button
+                  key={board.id}
+                  type="button"
+                  className={clsx('board-tab', board.id === activeBoardId && 'board-tab-active')}
+                  onClick={() => void openBoard(board.id)}
+                >
+                  {board.id}
+                </button>
+              ))}
+            </section>
+
+            {loadingBoardId === activeBoardId && <BoardLoading />}
+            {error && <BoardError message={error} onRetry={() => void openBoard(activeBoardId)} />}
+            {activeBoard && loadingBoardId !== activeBoardId && !error && (
+              <BoardView board={activeBoard} boardId={activeBoardId} />
+            )}
+          </section>
+
+          <aside className="ops-rail" aria-label="Operations plane">
+            <CostPanel cost={cost} error={costError} loading={costLoading} />
+            <QualityPanel board={qualityBoard} loading={qualityLoading} />
+            <TraceLookupPanel error={traceError} loading={traceLoading} onLoadTrace={loadTrace} trace={trace} />
+          </aside>
+        </div>
       </main>
+    </div>
+  )
+}
+
+function CostPanel({ cost, error, loading }: { cost: CostSummary | null; error: string | null; loading: boolean }) {
+  const topModel = cost?.byModel?.[0]
+
+  return (
+    <section className="ops-card" aria-labelledby="unit-economics-title">
+      <header className="ops-card-header">
+        <div>
+          <p className="panel-kicker">Unit economics</p>
+          <h2 id="unit-economics-title">Cost controls</h2>
+        </div>
+        <span className="panel-icon panel-icon-green">
+          <DollarSign size={17} aria-hidden="true" />
+        </span>
+      </header>
+      {loading && <MiniState text="Loading cost metrics" />}
+      {!loading && error && <MiniState tone="warn" text="Cost metrics did not load" />}
+      {!loading && !error && cost && (
+        <>
+          <div className="economics-grid">
+            <MetricTile label="Total cost" value={currency(cost.totalCostUsd)} />
+            <MetricTile label="Cost per question" value={currency(cost.unitEconomics.costPerQuestionUsd)} />
+            <MetricTile label="Tokens" value={compactNumber(cost.totalTokens)} />
+            <MetricTile label="Tokens per question" value={compactNumber(cost.unitEconomics.tokensPerQuestion)} />
+          </div>
+          <div className="ops-list">
+            <span>Top model</span>
+            <strong>{topModel ? formatLabel(topModel.label) : 'No model data'}</strong>
+          </div>
+          <SliceList slices={cost.byModel} title="Cost by model" />
+          <SliceList slices={cost.bySegment} title="Cost by segment" />
+        </>
+      )}
+      {!loading && !error && !cost && <MiniState text="Cost metrics are pending" />}
+    </section>
+  )
+}
+
+function QualityPanel({ board, loading }: { board: Board | null; loading: boolean }) {
+  const evalPanel = board?.panels.find((panel) => panel.id === 'eval_scores')
+  const scores = labeledRows(evalPanel?.rows)
+  const traces = board?.panels.find((panel) => panel.id === 'total_traces')
+  const tokens = board?.panels.find((panel) => panel.id === 'total_tokens')
+
+  return (
+    <section className="ops-card" aria-labelledby="quality-title">
+      <header className="ops-card-header">
+        <div>
+          <p className="panel-kicker">Continuous scores</p>
+          <h2 id="quality-title">Langfuse quality</h2>
+        </div>
+        <span className="panel-icon panel-icon-purple">
+          <TrendingUp size={17} aria-hidden="true" />
+        </span>
+      </header>
+      {loading && <MiniState text="Loading quality scores" />}
+      {!loading && (
+        <>
+          <div className="quality-strip">
+            <MetricTile label="Traces" value={formatValue(traces?.value ?? 0, traces?.unit)} />
+            <MetricTile label="Tokens" value={formatValue(tokens?.value ?? 0, tokens?.unit)} />
+          </div>
+          {scores.length > 0 ? (
+            <div className="score-list">
+              {scores.slice(0, 4).map((score) => (
+                <div className="score-row" key={score.label}>
+                  <span>{formatLabel(score.label)}</span>
+                  <strong>{formatValue(score.value, 'score')}</strong>
+                  <div className="score-track">
+                    <span style={{ width: `${Math.max(Math.min(score.value, 1) * 100, 4)}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <MiniState text="No continuous score data yet" />
+          )}
+        </>
+      )}
+    </section>
+  )
+}
+
+function TraceLookupPanel({
+  error,
+  loading,
+  onLoadTrace,
+  trace,
+}: {
+  error: string | null
+  loading: boolean
+  onLoadTrace: (conversationId: string) => Promise<void>
+  trace: ConversationTrace | null
+}) {
+  const [conversationId, setConversationId] = useState('')
+
+  return (
+    <section className="ops-card" aria-labelledby="trace-title">
+      <header className="ops-card-header">
+        <div>
+          <p className="panel-kicker">Decision replay</p>
+          <h2 id="trace-title">Conversation trace</h2>
+        </div>
+        <span className="panel-icon">
+          <MessageSquareText size={17} aria-hidden="true" />
+        </span>
+      </header>
+      <form
+        className="trace-form"
+        onSubmit={(event) => {
+          event.preventDefault()
+          void onLoadTrace(conversationId)
+        }}
+      >
+        <label htmlFor="conversation-id">Conversation ID</label>
+        <div>
+          <input
+            id="conversation-id"
+            name="conversationId"
+            onChange={(event) => setConversationId(event.target.value)}
+            placeholder="Paste conversation ID"
+            value={conversationId}
+          />
+          <button type="submit" className="trace-button" disabled={loading || !conversationId.trim()}>
+            <Search size={16} aria-hidden="true" />
+            Load
+          </button>
+        </div>
+      </form>
+      {loading && <MiniState text="Loading conversation trace" />}
+      {!loading && error && <MiniState tone="warn" text="Trace did not load" />}
+      {!loading && trace && (
+        <div className="trace-result">
+          <div className="trace-summary">
+            <MetricTile label="Requests" value={compactNumber(trace.requestCount)} />
+            <MetricTile label="Events" value={compactNumber(trace.requests.reduce((sum, request) => sum + request.eventCount, 0))} />
+          </div>
+          <div className="trace-list">
+            {trace.requests.slice(0, 4).map((request) => (
+              <div key={request.requestId}>
+                <span>{request.requestId}</span>
+                <strong>{compactNumber(request.eventCount)} events</strong>
+              </div>
+            ))}
+            {trace.requests.length === 0 && <span>No trace events found for this conversation.</span>}
+          </div>
+        </div>
+      )}
+      {!loading && !trace && !error && <MiniState text="Load a conversation to replay the decision trace" />}
+    </section>
+  )
+}
+
+function MetricTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="metric-tile">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  )
+}
+
+function SliceList({ slices, title }: { slices: Array<{ label: string; costUsd: number }>; title: string }) {
+  if (!slices || slices.length === 0) return null
+  const max = Math.max(...slices.map((slice) => slice.costUsd), 0.0001)
+
+  return (
+    <div className="slice-list">
+      <h3>{title}</h3>
+      {slices.slice(0, 4).map((slice) => (
+        <div className="slice-row" key={`${title}-${slice.label}`}>
+          <span>{formatLabel(slice.label)}</span>
+          <div className="slice-track">
+            <span style={{ width: `${Math.max((slice.costUsd / max) * 100, 4)}%` }} />
+          </div>
+          <strong>{currency(slice.costUsd)}</strong>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function MiniState({ text, tone = 'neutral' }: { text: string; tone?: 'neutral' | 'warn' }) {
+  return (
+    <div className={clsx('mini-state', tone === 'warn' && 'mini-state-warn')}>
+      <Clock3 size={15} aria-hidden="true" />
+      <span>{text}</span>
     </div>
   )
 }
@@ -705,6 +1017,10 @@ function labelForType(type: Panel['type']) {
 
 function titleForPanel(panel: Panel) {
   return PANEL_TITLES[panel.id] ?? panel.title
+}
+
+function boardCacheKey(boardId: number, range: RangeKey) {
+  return `${range}:${boardId}`
 }
 
 function labeledRows(rows: Panel['rows']): LabeledValue[] {
