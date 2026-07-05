@@ -468,11 +468,11 @@
 
 ## gateway/src/main/java/ai/conduit/gateway/domain/chat/
 
-- `ChatService.java` — Entry point from the controller — called on a virtual thread after the async boundary. (~15192 tok)
+- `ChatService.java` — Entry point from the controller — called on a virtual thread after the async boundary. Routes FETCH with bias-to-fetch (hasGroundedResolvableReference→resolveContextual entityKnown); FOLLOW_UP fallthrough to fetch when a grounded entity + confident route exist; routing-abstained FETCH degrades to grounded history synthesis when prior assistant data exists (hasPriorAssistantData). bug-233. (~15600 tok)
 
 ## gateway/src/main/java/ai/conduit/gateway/domain/intent/
 
-- `IntentClassifier.java` — Stage A of the request pipeline: classifies the user's intent before routing. (~5667 tok)
+- `IntentClassifier.java` — Stage A: combined intent+entity LLM (manifest-compiled prompt, temperature 0). Focal-entity rules (explicit name in latest msg supersedes history; pronoun→last focal; emit typed NAME not a recalled id; named entity→FETCH not CLARIFY) + deterministic deriveFocalReference() [id in latest msg → user-grounded ref → focalIdByNameMatch (proper-noun tokens vs transcript "Name (ID)") → lastFocalSingleId anaphora carry]. Extracts entities for FETCH_DATA AND FOLLOW_UP (bias-to-fetch fallthrough). bug-233. (~6300 tok)
 
 ## gateway/src/main/java/ai/conduit/gateway/synthesis/answer/
 
@@ -647,7 +647,7 @@
 
 ## gateway/src/main/java/ai/meridian/gateway/resolver/service/
 
-- `AgentResolver.java` — Resolver — Stage A+B. resolve(prompt,domain) for /debug; resolveContextual(routingText) for chat: conversation-enriched embedding + confidence/margin abstain (decisive-score OR domain-margin), no rigid single-domain scope so cross-domain fan-out is preserved. (~1400 tok)
+- `AgentResolver.java` — Resolver — Stage A+B. resolve(prompt,domain) for /debug; resolveContextual(routingText[,entityKnown]) for chat: conversation-enriched embedding + confidence/margin abstain (decisive-score OR domain-margin); entityKnown=true (turn carries an explicit grounded resolvable ref) relaxes the abstain gate so a terse id/name follow-up inherits the conversation facet and routes (bias-to-fetch, bug-233); no rigid single-domain scope so cross-domain fan-out is preserved. (~1500 tok)
 
 ## gateway/src/main/java/ai/meridian/gateway/synthesis/answer/
 

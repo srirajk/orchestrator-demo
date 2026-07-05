@@ -246,7 +246,8 @@ public class ChatService {
                         conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan,
                         intentResult.extractedEntities(), streamId, true);
                 case FOLLOW_UP  -> handleFollowUp(request, emitter, latestPrompt,
-                        conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan, streamId);
+                        conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan,
+                        intentResult.extractedEntities(), streamId);
                 // CLARIFY is routed through the SAME deterministic coverage path as FETCH_DATA
                 // (hard-rule e): the LLM never decides clarification. The coverage
                 // discover/intersect/`required ∩ resolved = ∅` check inside handleFetchData
@@ -311,7 +312,14 @@ public class ChatService {
             // confident domain from history and be answered. No domain literal here — the domain
             // decision comes from the winning agent manifest's own domain field in the resolver.
             String routingText = carryContext ? buildRoutingQuery(request) : latestPrompt;
-            ResolverResult resolved = resolver.resolveContextual(routingText);
+            // FACET CARRY / BIAS-TO-FETCH: when the current turn already carries an explicit grounded
+            // subject (an id the user typed, or a focal name the deterministic derivation resolved),
+            // the turn is fully specified — only which agents/facet is muddy. Tell the resolver not
+            // to abstain on a low top-vs-noise margin so a terse follow-up ("and for REL-00099?")
+            // inherits the conversation's facet vocabulary and routes, instead of stranding on a
+            // margin tie. Only on the FETCH path (carryContext); CLARIFY turns keep the abstain gate.
+            boolean entityKnown = carryContext && hasGroundedResolvableReference(preExtracted, latestPrompt);
+            ResolverResult resolved = resolver.resolveContextual(routingText, entityKnown);
 
             List<AgentsResolvedData.AgentRef> selectedRefs = resolved.selected().stream()
                     .map(c -> new AgentsResolvedData.AgentRef(
@@ -325,6 +333,21 @@ public class ChatService {
                     new AgentsResolvedData(selectedRefs, skippedRefs)));
 
             if (resolved.fallback() || resolved.selected().isEmpty()) {
+                // BIAS-TO-FETCH / graceful degrade: routing abstained (a vague or aggregate ask
+                // with no confident single route — e.g. "compare cash across both clients",
+                // "total value across my book"). On the context-carrying FETCH path, if the
+                // conversation already holds relevant data, answer from that context instead of
+                // punting — the grounded history synthesis compares/aggregates what was shown and
+                // asks for detail only if it genuinely cannot. CLARIFY-intent turns (carryContext
+                // false) keep the deterministic clarification so a bare under-specified ask still
+                // clarifies (bug-232 behaviour preserved).
+                if (carryContext && hasPriorAssistantData(request)) {
+                    answerSynthesizer.synthesizeFromHistory(request.messages(), latestPrompt, emitter, streamId);
+                    emitRequestOutcome("ANSWERED");
+                    tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
+                            new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                    return;
+                }
                 emitRequestOutcome("FAILED");
                 streamTextAndComplete(emitter, msg("needs_more_detail",
                         "I wasn't sure which services to consult. Please add more detail about what you need."), streamId);
@@ -658,7 +681,25 @@ public class ChatService {
                                  String userId,
                                  Principal jwtPrincipal,
                                  String requestId, long requestStart, Span rootSpan,
-                                 String streamId) throws Exception {
+                                 EntityBag preExtracted, String streamId) throws Exception {
+        // ── BIAS-TO-FETCH FALLTHROUGH ────────────────────────────────────────────
+        // A follow-up whose needed data is not already in context ("what's the performance on that
+        // portfolio?" when only holdings were shown) must fetch it, not answer "no info" from
+        // memory. When the turn carries a single grounded resolvable entity (a name/id the focal
+        // derivation resolved, or an id typed in the message) AND the conversation routes
+        // confidently to agents, serve it through the fetch pipeline. If either is missing it is a
+        // genuine context-answerable follow-up (explain / recap / aggregate) → synthesize from
+        // history. The probe uses entityKnown=true so a terse fresh-data follow-up is not stranded
+        // by the margin abstain; the coverage CHECK remains the access gate.
+        if (preExtracted != null && hasGroundedResolvableReference(preExtracted, latestPrompt)) {
+            ResolverResult probe = resolver.resolveContextual(buildRoutingQuery(request), true);
+            if (!probe.fallback() && !probe.selected().isEmpty()) {
+                log.info("FOLLOW_UP → fetch fallthrough (grounded entity + confident route) requestId={}", requestId);
+                handleFetchData(request, emitter, latestPrompt, conversationId, userId, jwtPrincipal,
+                        requestId, requestStart, rootSpan, preExtracted, streamId, true);
+                return;
+            }
+        }
         Span span = tracer.spanBuilder("chat.follow_up").startSpan();
         try {
             answerSynthesizer.synthesizeFromHistory(request.messages(), latestPrompt, emitter, streamId);
@@ -779,6 +820,43 @@ public class ChatService {
         if (userTurns.size() <= 1) return latest;
         java.util.Collections.reverse(userTurns);  // oldest → newest (current turn last)
         return String.join("\n", userTurns);
+    }
+
+    /**
+     * True when the turn carries an explicit, grounded resolvable entity reference — either a
+     * reference the deterministic focal derivation already placed in {@code preExtracted}, or an
+     * identifier the user literally typed in the latest message (matched against each resolvable
+     * entity type's manifest {@code id_pattern}). Drives the resolver's bias-to-fetch relaxation.
+     * Manifest-driven (entity types + id_pattern) — no domain literal or ID prefix in the gateway.
+     */
+    /**
+     * True when the client-sent window contains prior assistant content to answer from — used to
+     * decide whether a routing-abstained turn can degrade gracefully to grounded history synthesis
+     * rather than punting. Purely structural (role + non-blank content); no domain knowledge.
+     */
+    private boolean hasPriorAssistantData(ChatRequest request) {
+        if (request.messages() == null) return false;
+        return request.messages().stream()
+                .anyMatch(m -> "assistant".equalsIgnoreCase(m.role())
+                        && m.content() != null && !m.content().isBlank());
+    }
+
+    private boolean hasGroundedResolvableReference(EntityBag preExtracted, String latestPrompt) {
+        List<EntityType> resolvables = manifestStore.entityTypes().stream()
+                .filter(EntityType::isResolvable)
+                .collect(Collectors.toList());
+        for (EntityType et : resolvables) {
+            if (preExtracted != null && et.extractAs() != null
+                    && preExtracted.reference(et.extractAs()) != null) {
+                return true;
+            }
+            String pattern = et.idPattern();
+            if (pattern != null && !pattern.isBlank() && latestPrompt != null
+                    && java.util.regex.Pattern.compile(pattern).matcher(latestPrompt).find()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

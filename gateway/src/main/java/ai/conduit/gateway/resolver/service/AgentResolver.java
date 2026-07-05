@@ -121,6 +121,26 @@ public class AgentResolver {
      */
     @Observed(name = "resolver.route.contextual")
     public ResolverResult resolveContextual(String routingText) {
+        return resolveContextual(routingText, false);
+    }
+
+    /**
+     * Context-aware routing with an optional <b>bias-to-fetch</b> relaxation of the abstain gate.
+     *
+     * <p>When {@code entityKnown} is true the current turn already carries an explicit, grounded
+     * subject (an id the user typed, or a name the deterministic focal derivation resolved), so the
+     * turn is NOT genuinely under-specified — only which agents/facet to consult is muddy. In that
+     * case a low top-vs-noise margin must NOT abstain into a clarification (that would strand a
+     * terse but fully-specified follow-up like "and for REL-00099?"); the query is routed with the
+     * normal dynamic floor and the downstream coverage CHECK remains the access gate. When
+     * {@code entityKnown} is false the original confidence/abstain gate applies unchanged, so bare
+     * under-specified asks still clarify (bug-232 behaviour preserved).
+     *
+     * @param routingText conversation-enriched query text (recent user turns), built by the caller
+     * @param entityKnown the turn carries an explicit grounded resolvable entity reference
+     */
+    @Observed(name = "resolver.route.contextual")
+    public ResolverResult resolveContextual(String routingText, boolean entityKnown) {
         List<RoutingCandidate> broad = vectorIndex.search(
                 routingText, null, topK, id -> registry.find(id).orElse(null));
 
@@ -147,8 +167,10 @@ public class AgentResolver {
 
         // Confident when the leader clears the floor AND is either decisively strong on its own
         // (keeps balanced cross-domain queries routable) or clearly beats every other domain.
+        // Bias-to-fetch: a turn carrying an explicit grounded entity is trusted above the floor
+        // regardless of margin — its subject is known; only the facet is being disambiguated.
         boolean confident = leaderScore >= confidenceFloor
-                && (leaderScore >= decisiveScore || margin >= domainMargin);
+                && (entityKnown || leaderScore >= decisiveScore || margin >= domainMargin);
         if (!confident) {
             log.debug("Resolver(contextual): abstain — leader={} domain={} score={} bestOther={} margin={} (need ≥{} or leader ≥{}; floor={})",
                     leader.manifest().agentId(), domain, String.format("%.3f", leaderScore),
