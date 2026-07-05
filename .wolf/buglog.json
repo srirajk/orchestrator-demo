@@ -3868,5 +3868,69 @@
     ],
     "occurrences": 1,
     "last_seen": "2026-07-05"
+  },
+  {
+    "id": "bug-235",
+    "timestamp": "2026-07-05T18:39:52",
+    "error_message": "Out-of-coverage NAMED entity ('show me the Okafor account holdings') clarified with the RM's OWN clients instead of denying.",
+    "file": "gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java",
+    "root_cause": "Under heavy conversational load the intent/entity LLM dropped the freshly-named entity (returned null relationship_reference), so the coverage 'no reference' else-branch dumped the RM's book as a clarification rather than resolving the name.",
+    "fix": "Added a deterministic, principal-agnostic named-entity backstop (resolveNamedReferenceBackstop + properNounPhrases) in the coverage else-branch: proper-noun phrases from the latest message are resolved via the routed sub-domain's coverage service; a UNIQUE resolution runs the coverage CHECK (honest deny if out of book), only genuinely unresolvable/ambiguous names still clarify.",
+    "tags": [
+      "world-b",
+      "coverage",
+      "clarify-vs-deny",
+      "entity-extraction",
+      "gateway"
+    ],
+    "related_bugs": [
+      "bug-233",
+      "bug-234"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-07-05T18:39:52"
+  },
+  {
+    "id": "bug-236",
+    "timestamp": "2026-07-05T18:39:52",
+    "error_message": "Out-of-coverage/unknown wealth ID ('REL-00188?') returned insurance copy 'Which policy are you asking about?'.",
+    "file": "gateway/src/main/java/ai/conduit/gateway/domain/manifest/DomainManifestStore.java, ChatService.java",
+    "root_cause": "A bare identifier carries no domain vocabulary, so embedding routing scored it at noise level (0.338) and picked an unrelated domain's agent \u2014 surfacing the WRONG domain's clarify/deny copy.",
+    "fix": "Added DomainManifestStore.identifyByIdPattern (manifest id_pattern -> owning resource-scoped sub-domain + coverage) and a deterministic identifier pre-check at the top of handleFetchData: an id that RESOLVES and is NOT entitled denies with THAT domain's own copy before routing; not-found/ambiguous/allowed fall through unchanged.",
+    "tags": [
+      "world-b",
+      "routing",
+      "id-pattern",
+      "wrong-domain-copy",
+      "coverage",
+      "gateway"
+    ],
+    "related_bugs": [
+      "bug-238",
+      "bug-235"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-07-05T18:39:52"
+  },
+  {
+    "id": "bug-237",
+    "timestamp": "2026-07-05T18:39:52",
+    "error_message": "Mixed in/out-of-segment ask silently dropped the denied domain; aggregate ask ('total value across my book') fabricated a summed total.",
+    "file": "gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java, ChatService.java",
+    "root_cause": "(a) Structural-gate-pruned agents never reached the synthesizer, so a mixed wealth+insurance ask fulfilled wealth and dropped insurance without a note. (b) synthesizeFromHistory's prompt forbade inventing numbers but not COMPUTING/aggregating them, so the model summed two portfolios itself.",
+    "fix": "(a) Thread structural-gate withheldDomains (from pruned manifests' domain(), World-B clean) into AnswerSynthesizer as WITHHELD sections + prompt rule to state them honestly. (b) Hardened both synthesis prompts to forbid cross-entity aggregation/roll-ups and to say a consolidated roll-up view is needed when an aggregate isn't already present.",
+    "tags": [
+      "world-b",
+      "partial-fulfillment",
+      "compute-guardrail",
+      "synthesis",
+      "segment-gate",
+      "gateway"
+    ],
+    "related_bugs": [
+      "bug-236"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-07-05T18:39:52"
   }
 ]

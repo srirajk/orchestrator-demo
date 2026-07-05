@@ -63,6 +63,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
 import java.util.stream.Collectors;
 
 @Service
@@ -301,6 +302,47 @@ public class ChatService {
         // union's first key. They are plain locals (captured by no lambda) so reassignment is safe.
         EntityType coverageEntity = coverageEntityType();
         try {
+            // ── DETERMINISTIC IDENTIFIER PRE-CHECK ───────────────────────────────────
+            // A bare identifier ("REL-00188?") carries no domain vocabulary, so embedding routing
+            // scores it at noise level and can pick an unrelated domain — surfacing the WRONG
+            // domain's copy ("which policy?" for a wealth id). But the id's manifest id_pattern names
+            // its entity type — and hence its domain — exactly. When such an id RESOLVES
+            // (principal-agnostically, World-B rule f) and the caller is NOT entitled, deny with THAT
+            // domain's own copy, deterministically, before routing. Only a resolved-then-denied
+            // verdict short-circuits; not-found (fake id), ambiguous, or allowed all fall through to
+            // the normal pipeline unchanged. Manifest-driven (id_pattern + resolve_type + coverage) —
+            // no id prefix or domain literal in the gateway.
+            java.util.Optional<ai.conduit.gateway.domain.manifest.DomainManifestStore.IdentifiedReference>
+                    idRef = manifestStore.identifyByIdPattern(latestPrompt);
+            if (idRef.isPresent() && idRef.get().coverage() != null) {
+                var ir = idRef.get();
+                Principal p0 = (jwtPrincipal != null) ? jwtPrincipal : Principal.anonymous();
+                String t0 = jwtPrincipal != null ? jwtPrincipal.tenantId() : "default";
+                String sub0 = ir.subDomain().subDomainId();
+                try {
+                    CoverageResolveResult rr = coverageClient.resolve(
+                        ir.id(), ir.entityType().resolveType(), t0, ir.coverage());
+                    if (rr.resolved() && rr.id() != null) {
+                        CoverageCheckResult check = coverageClient.check(p0.id(), t0, rr.id(), ir.coverage());
+                        if (!check.allowed()) {
+                            emitRequestOutcome("DENIED");
+                            tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
+                                GateData.deny(GateData.GATE_COVERAGE,
+                                    rr.id() + " not in " + p0.id() + "'s book", sub0)));
+                            tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
+                                new CheckDeniedData("coverage", rr.id(), p0.id(), check.reason(), "coverage")));
+                            streamTextAndComplete(emitter, mapDenialReason(check.reason(), sub0), streamId);
+                            tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
+                                new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                            return;
+                        }
+                    }
+                } catch (CoverageClient.CoverageUnavailableException e) {
+                    // Fail open to the normal pipeline — it re-attempts coverage and fails closed there.
+                    log.warn("Identifier pre-check coverage unavailable ({}), falling through", e.getMessage());
+                }
+            }
+
             // ── CONTEXT-AWARE ROUTING ────────────────────────────────────────────────
             // Route on conversation-enriched text (recent user turns) rather than the bare last
             // message. Enrichment lets the resolver's confidence/margin gate derive the query's
@@ -396,6 +438,18 @@ public class ChatService {
                         allowedManifests.size(), manifests.size(), principal.id());
             }
             final List<AgentManifest> finalManifests = allowedManifests;
+
+            // Domains the request referenced but the structural entitlement gate pruned (outside the
+            // caller's access). When the SAME ask mixed an accessible and an inaccessible domain
+            // (e.g. wealth + insurance), the accessible part is still fulfilled below — these labels
+            // are handed to the synthesizer so it states the withheld part honestly instead of
+            // dropping it silently. Labels come from the pruned manifests' own domain() — World-B clean.
+            final List<String> withheldDomains = manifests.stream()
+                    .filter(m -> allowedManifests.stream().noneMatch(a -> a.agentId().equals(m.agentId())))
+                    .map(AgentManifest::domain)
+                    .filter(d -> d != null && !d.isBlank())
+                    .distinct()
+                    .collect(Collectors.toList());
 
             // ── Domain + agent tags on the root span ──────────────────────────────
             // First-class Langfuse filter chips (domain:*, agent:*) plus cost-by-domain
@@ -537,6 +591,43 @@ public class ChatService {
                             }
 
                         } else {
+                            // No LLM-extracted reference. Before falling back to a book clarification,
+                            // try to resolve any proper-noun the user typed in the LATEST message — the
+                            // extractor can drop a freshly-named entity under heavy conversational load,
+                            // so an out-of-coverage NAMED entity ("the Okafor account") would otherwise
+                            // clarify with the caller's OWN clients rather than deny. Resolution is
+                            // principal-agnostic (World-B rule f); a name that resolves to ONE entity is
+                            // fully specified, so we run the coverage CHECK on it (honest deny if out of
+                            // book). Only a UNIQUE resolution takes this path — a genuinely ambiguous or
+                            // unresolvable name still falls through to the clarification below.
+                            String backstopId = resolveNamedReferenceBackstop(
+                                latestPrompt, coverageEntity, tenantId, coverage);
+                            if (backstopId != null) {
+                                coverageRelId = backstopId;
+                                CoverageCheckResult check = coverageClient.check(
+                                    principalId, tenantId, coverageRelId, coverage);
+                                if (!check.allowed()) {
+                                    emitRequestOutcome("DENIED");
+                                    tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
+                                        GateData.deny(GateData.GATE_COVERAGE,
+                                            coverageRelId + " not in " + principalId + "'s book",
+                                            resourceScopedAgent.agentId())));
+                                    tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
+                                        new CheckDeniedData("coverage", coverageRelId, principalId,
+                                            check.reason(), "coverage")));
+                                    streamTextAndComplete(emitter,
+                                        mapDenialReason(check.reason(), em.subDomainId()), streamId);
+                                    tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
+                                        new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                                    return;
+                                }
+                                // Covered — emit the passing gate frame and fall through to synthesis
+                                // (coverageRelId is injected into the entity bag below).
+                                tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
+                                    GateData.allow(GateData.GATE_COVERAGE,
+                                        coverageRelId + " in " + principalId + "'s book",
+                                        resourceScopedAgent.agentId())));
+                            } else {
                             // No user-authored reference in the sent conversation. Deterministic
                             // CLARIFY: do not guess or auto-select a covered resource.
                             List<CoverageResource> discovered = coverageClient.discover(
@@ -564,6 +655,7 @@ public class ChatService {
                             tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                                 new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
                             return;
+                            }
                         }
 
                     } catch (CoverageClient.CoverageUnavailableException e) {
@@ -667,7 +759,7 @@ public class ChatService {
             tracePublisher.publish(TraceEvent.of("synthesis_start", requestId, conversationId,
                     new SynthesisStartData(results.size(), (int) okCount)));
 
-            answerSynthesizer.synthesize(results, latestPrompt, request.messages(), emitter, streamId);
+            answerSynthesizer.synthesize(results, latestPrompt, request.messages(), emitter, streamId, withheldDomains);
             emitRequestOutcome("ANSWERED");
 
             tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
@@ -912,6 +1004,56 @@ public class ChatService {
             case CLARIFY    -> intentClarifyCounter.increment();
             case CHITCHAT   -> intentChitchatCounter.increment();
         }
+    }
+
+    /**
+     * Deterministic named-entity backstop for the coverage pipeline. The LLM extractor can drop a
+     * freshly-named entity under heavy conversational load; this recovers it WITHOUT the model, by
+     * pulling the proper-noun phrases the user typed in the latest message and resolving each against
+     * the routed sub-domain's coverage service, principal-agnostically (World-B rule f). Returns the
+     * canonical id when EXACTLY ONE phrase resolves UNAMBIGUOUSLY, else null — no phrase resolves, or
+     * resolution is ambiguous, so the caller falls back to a proper clarification (never a guess).
+     * Language-generic (capitalized-word heuristic) + manifest-driven (resolve_type + coverage) — no
+     * domain names or id prefixes in the gateway.
+     */
+    private String resolveNamedReferenceBackstop(String latestPrompt, EntityType coverageEntity,
+                                                 String tenantId, DomainManifest.Coverage coverage) {
+        if (coverageEntity == null || coverage == null || latestPrompt == null || latestPrompt.isBlank()) {
+            return null;
+        }
+        String found = null;
+        for (String phrase : properNounPhrases(latestPrompt)) {
+            try {
+                CoverageResolveResult r = coverageClient.resolve(
+                    phrase, coverageEntity.resolveType(), tenantId, coverage);
+                if (r.resolved() && r.id() != null) {
+                    if (found != null && !found.equals(r.id())) return null; // two distinct → ambiguous
+                    found = r.id();
+                } else if (r.isAmbiguous()) {
+                    return null; // a single phrase is itself ambiguous → clarify, do not guess
+                }
+            } catch (CoverageClient.CoverageUnavailableException e) {
+                return null; // fail closed → fall back to the deterministic clarification
+            }
+        }
+        return found;
+    }
+
+    /** Capitalized proper-noun token (length ≥ 3) — a cheap entity-name heuristic (language-generic). */
+    private static final java.util.regex.Pattern PROPER_NOUN =
+            java.util.regex.Pattern.compile("[A-Z][A-Za-z]{2,}(?:\\s+[A-Z][A-Za-z]{2,})*");
+
+    /**
+     * Maximal runs of consecutive capitalized words in {@code text} — candidate entity names to try
+     * resolving (e.g. "the Okafor account" → ["Okafor"], "Whitman Family Office" → ["Whitman Family
+     * Office"]). Language-generic; carries no domain knowledge.
+     */
+    private static List<String> properNounPhrases(String text) {
+        List<String> out = new ArrayList<>();
+        if (text == null || text.isBlank()) return out;
+        Matcher m = PROPER_NOUN.matcher(text);
+        while (m.find()) out.add(m.group());
+        return out;
     }
 
     /** Sends text tokens as SSE deltas and calls {@code emitter.complete()}. Terminates the stream. */

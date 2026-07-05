@@ -46,6 +46,8 @@
 
   "denial_messages": {
     "not-covered": "That client is not in your coverage.",
+    "not-in-book": "That client is not in your coverage.",
+    "unknown-resource": "That client is not in your coverage.",
     "coverage-transferred": "Coverage for that client has been transferred.",
     "relationship-closed": "That client relationship is no longer active.",
     "default": "Access denied for this client relationship."

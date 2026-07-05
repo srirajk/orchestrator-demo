@@ -469,7 +469,7 @@
 
 ## gateway/src/main/java/ai/conduit/gateway/domain/chat/
 
-- `ChatService.java` — Entry point from the controller — called on a virtual thread after the async boundary. Routes FETCH with bias-to-fetch (hasGroundedResolvableReference→resolveContextual entityKnown); FOLLOW_UP fallthrough to fetch when a grounded entity + confident route exist; routing-abstained FETCH degrades to grounded history synthesis when prior assistant data exists (hasPriorAssistantData). bug-233. (~15600 tok)
+- `ChatService.java` — Entry point from the controller — called on a virtual thread after the async boundary. Routes FETCH with bias-to-fetch (hasGroundedResolvableReference→resolveContextual entityKnown); FOLLOW_UP fallthrough to fetch when a grounded entity + confident route exist; routing-abstained FETCH degrades to grounded history synthesis when prior assistant data exists (hasPriorAssistantData). Deterministic identifier PRE-CHECK (identifyByIdPattern→resolve+CHECK→deny with the id's OWN domain copy before routing, bug-236); coverage else-branch named-entity backstop (resolveNamedReferenceBackstop/properNounPhrases: resolve typed proper-nouns principal-agnostically→CHECK→deny out-of-coverage NAMED entity instead of clarifying, bug-235); withheldDomains (structural-gate-pruned domains) threaded to the synthesizer for honest partial fulfillment (bug-237). bug-233. (~16600 tok)
 
 ## gateway/src/main/java/ai/conduit/gateway/domain/intent/
 
@@ -477,7 +477,7 @@
 
 ## gateway/src/main/java/ai/conduit/gateway/synthesis/answer/
 
-- `AnswerSynthesizer.java` — Synthesizes a grounded, streamed answer from agent outputs using Z.AI GLM. (~7401 tok)
+- `AnswerSynthesizer.java` — Synthesizes a grounded, streamed answer from agent outputs using Z.AI GLM. System prompt forbids cross-entity aggregation/roll-ups (compute guardrail) and renders WITHHELD sections (structural-gate-denied domains) so mixed in/out-of-access asks fulfill the accessible part + state the withheld part; synthesizeFromHistory prompt also forbids computing/aggregating (bug-237). (~7600 tok)
 
 ## gateway/src/main/java/ai/meridian/gateway/
 
@@ -559,7 +559,7 @@
 
 - `ClarificationSchema.java` — Class: ClarificationSchema (~112 tok)
 - `DomainManifest.java` — DomainManifest: Coverage, MemoryCompaction (~272 tok)
-- `DomainManifestStore.java` — Resolves ${VAR_NAME} placeholders in all Coverage URL fields using Spring Environment. (~3435 tok)
+- `DomainManifestStore.java` — Resolves ${VAR_NAME} placeholders in all Coverage URL fields using Spring Environment. identifyByIdPattern(text)→IdentifiedReference: maps a typed id to its owning resource-scoped sub-domain + coverage via manifest id_pattern (bug-236, deterministic domain for a bare id). (~3700 tok)
 - `DomainPrerequisiteValidator.java` — Service: DomainPrerequisiteValidator (~439 tok)
 - `EffectiveManifest.java` — Returns true if this effective manifest declares any required-context entity. (~706 tok)
 - `EntityType.java` — A manifest-declared entity type. This is the load-bearing declaration that makes the (~528 tok)
