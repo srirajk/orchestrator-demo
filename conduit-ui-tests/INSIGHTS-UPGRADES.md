@@ -69,3 +69,21 @@ as manifest config. We already have the manifest infra to show this.
 - **Redis decision-trace TTL = 24h; conversations persist longer → replay deep-dive only works for last 24h**
   (the 48 demo-conversation traces expire in ~24h). Config: `conduit.telemetry.trace-ttl-seconds`.
 - **Recommended:** align to a shared `CONDUIT_RETENTION_DAYS` (e.g. 30d). One-line config change.
+
+## UPGRADE 5 — Intent-classification: swap the model off retired gpt-4o-mini
+**Status:** ✅ diagnosed · ⛔ not applied (separate, tested step — pick up here after compaction)
+**Symptom:** intent classification over-clarifies + loops. e.g. as `rm_jane`, "summarize for Calderon Trust
+(REL-00099)" and "Calderon Trust (REL-00099)?" get **CLARIFY** ("mention the client name and what you need")
+instead of a clean FETCH → clean coverage-deny. (See `images/1.png`, `images/2.png`.)
+**NOT the cause — memory:** the conversation window IS passed to the classifier (`intentClassifier.classify(request.messages())`);
+the gateway is deliberately stateless and re-extracts from the client-sent window each turn.
+**Root cause:** classifier + entity-extractor + synthesizer all run on **`gpt-4o-mini`** — a small model, and
+one OpenAI RETIRED (Mar 2026). Under-powered for the CLARIFY / FETCH / FOLLOW-UP nuance.
+**Fix (config-only, env-driven):** point these off `gpt-4o-mini` → **`glm-4.6`** (the config default the stack
+was meant to use, before the `.env` override):
+`CONDUIT_LLM_INTENT_CLASSIFIER_MODEL`, `CONDUIT_LLM_ENTITY_EXTRACTOR_MODEL`, `CONDUIT_LLM_SYNTHESIZER_MODEL`.
+**Caveat:** provider-dependent — needs the GLM/ZAI key wired + responding; behavior change → test it.
+**Verify:** rebuild gateway, re-run the Calderon/Okafor conversation as `rm_jane` → the ID'd request routes as
+FETCH (clean deny by coverage), no clarify loop.
+**Separate follow-up (bigger, not the model):** make clarify **coverage-aware** (don't offer clients the user
+can't access) + fix the clarify copy.
