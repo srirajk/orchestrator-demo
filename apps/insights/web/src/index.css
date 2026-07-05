@@ -1,12 +1,15 @@
 :root {
-  --bg: #0b1220;
-  --panel: #131c2e;
-  --panel-2: #182339;
-  --line: #22304c;
-  --ink: #eaf0fa;
-  --muted: #8a9ab8;
-  --faint: #5c6e90;
-  --gold: #f0c45a;
+  --bg: #06111f;
+  --panel: #0b1b2f;
+  --panel-2: #132943;
+  --line: #1d3c63;
+  --ink: #f5f7fa;
+  --muted: #b5d2e8;
+  --faint: #85afd3;
+  --gold: #e8bf4f;
+  --gold-strong: #d29f2d;
+  --gold-soft: #f5dc84;
+  --gold-ink: #30200c;
   --green: #3dd68c;
   --amber: #f5b14c;
   --red: #f0655a;
@@ -31,7 +34,7 @@ body {
   margin: 0;
   background: var(--bg);
   background-image:
-    radial-gradient(1200px 600px at 80% -10%, rgba(240, 196, 90, 0.05), transparent),
+    radial-gradient(1200px 600px at 80% -10%, rgba(232, 191, 79, 0.05), transparent),
     radial-gradient(900px 500px at -10% 110%, rgba(91, 155, 240, 0.05), transparent);
   color: var(--ink);
   font-family: var(--sans);
@@ -82,7 +85,7 @@ svg {
   gap: 6px;
   padding: 20px 14px;
   border-right: 1px solid var(--line);
-  background: linear-gradient(180deg, #0e1728, #0b1220);
+  background: linear-gradient(180deg, #0e1726, var(--bg));
 }
 
 .brand {
@@ -98,9 +101,9 @@ svg {
   height: 38px;
   place-items: center;
   border-radius: 10px;
-  background: linear-gradient(135deg, var(--gold), #d8a63c);
-  box-shadow: 0 4px 14px rgba(240, 196, 90, 0.25);
-  color: #1a1206;
+  background: linear-gradient(135deg, var(--gold), var(--gold-strong));
+  box-shadow: 0 4px 14px rgba(232, 191, 79, 0.25);
+  color: var(--gold-ink);
   font-size: 19px;
   font-weight: 800;
 }
@@ -157,7 +160,7 @@ svg {
 }
 
 .nav button.on {
-  background: linear-gradient(90deg, rgba(240, 196, 90, 0.14), rgba(240, 196, 90, 0.03));
+  background: linear-gradient(90deg, rgba(232, 191, 79, 0.14), rgba(232, 191, 79, 0.03));
   box-shadow: inset 2px 0 0 var(--gold);
   color: var(--ink);
 }
@@ -670,7 +673,7 @@ svg {
 .bar .fill {
   height: 100%;
   border-radius: 6px;
-  background: linear-gradient(90deg, var(--gold), #e7b44a);
+  background: linear-gradient(90deg, var(--gold), var(--gold-strong));
 }
 
 .bar .bv {
@@ -769,7 +772,7 @@ svg {
   padding: 0 20px;
   border-radius: 10px;
   background: var(--gold);
-  color: #1a1206;
+  color: var(--gold-ink);
   cursor: pointer;
   font-size: 13px;
   font-weight: 700;
@@ -1098,7 +1101,7 @@ svg {
   top: 2px;
   height: 12px;
   border-radius: 3px;
-  background: linear-gradient(90deg, var(--gold), #e7b44a);
+  background: linear-gradient(90deg, var(--gold), var(--gold-strong));
 }
 
 .wbar.a {
@@ -1138,7 +1141,7 @@ svg {
 
 .uchip.on {
   border-color: var(--gold);
-  background: linear-gradient(90deg, rgba(240, 196, 90, 0.1), var(--panel));
+  background: linear-gradient(90deg, rgba(232, 191, 79, 0.1), var(--panel));
   color: var(--ink);
 }
 
@@ -1185,9 +1188,9 @@ svg {
   min-height: 76px;
   place-items: center;
   padding: 16px;
-  border: 1px dashed rgba(138, 154, 184, 0.26);
+  border: 1px dashed rgba(181, 210, 232, 0.26);
   border-radius: 10px;
-  background: rgba(24, 35, 57, 0.42);
+  background: rgba(19, 41, 67, 0.42);
   color: var(--faint);
   font-size: 12.5px;
   text-align: center;
@@ -1202,7 +1205,7 @@ svg {
   overflow: hidden;
   padding: 32px 18px;
   background:
-    radial-gradient(900px 500px at 80% -10%, rgba(240, 196, 90, 0.08), transparent),
+    radial-gradient(900px 500px at 80% -10%, rgba(232, 191, 79, 0.08), transparent),
     radial-gradient(700px 420px at 0% 100%, rgba(91, 155, 240, 0.08), transparent),
     var(--bg);
   color: var(--ink);
@@ -1212,7 +1215,7 @@ svg {
   position: absolute;
   inset: auto 0 0;
   height: 38vh;
-  background: linear-gradient(90deg, rgba(91, 155, 240, 0.08), rgba(240, 196, 90, 0.1), transparent);
+  background: linear-gradient(90deg, rgba(91, 155, 240, 0.08), rgba(232, 191, 79, 0.1), transparent);
   pointer-events: none;
 }
 
@@ -1222,7 +1225,7 @@ svg {
   padding: 30px;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: rgba(19, 28, 46, 0.96);
+  background: rgba(11, 27, 47, 0.96);
   box-shadow: 0 28px 90px rgba(0, 0, 0, 0.36);
 }
 
@@ -1245,9 +1248,9 @@ svg {
   flex: 0 0 auto;
   place-items: center;
   border-radius: 10px;
-  background: linear-gradient(135deg, var(--gold), #d8a63c);
-  box-shadow: 0 10px 30px rgba(240, 196, 90, 0.18);
-  color: #1a1206;
+  background: linear-gradient(135deg, var(--gold), var(--gold-strong));
+  box-shadow: 0 10px 30px rgba(232, 191, 79, 0.18);
+  color: var(--gold-ink);
   font-weight: 900;
 }
 
@@ -1311,8 +1314,8 @@ svg {
   justify-content: space-between;
   padding: 0 18px;
   background: var(--gold);
-  box-shadow: 0 16px 36px rgba(240, 196, 90, 0.18);
-  color: #1a1206;
+  box-shadow: 0 16px 36px rgba(232, 191, 79, 0.18);
+  color: var(--gold-ink);
 }
 
 .primary-button .button-label {
@@ -1341,7 +1344,7 @@ svg {
 }
 
 .primary-button:hover {
-  background: #f5d984;
+  background: var(--gold-soft);
 }
 
 .secondary-button {
@@ -1380,7 +1383,7 @@ svg {
 .spinner {
   width: 18px;
   height: 18px;
-  border: 2px solid rgba(138, 154, 184, 0.3);
+  border: 2px solid rgba(181, 210, 232, 0.3);
   border-top-color: var(--gold);
   border-radius: 999px;
   animation: spin 800ms linear infinite;
