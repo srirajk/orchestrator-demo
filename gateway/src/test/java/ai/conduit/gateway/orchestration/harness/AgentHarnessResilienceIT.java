@@ -82,13 +82,14 @@ class AgentHarnessResilienceIT {
                 "1.0",                    // version
                 null,                     // provider
                 "wealth",                 // domain
+                "segment",                // audience
                 null,                     // subDomain
                 null,                     // maxResponseTokens
                 protocol,                 // protocol
                 null,                     // connection
                 null,                     // capabilities
                 null,                     // skills
-                new AgentManifest.Constraints(false, "internal", slaMs), // constraints
+                new AgentManifest.Constraints("read", "internal", slaMs), // constraints
                 null,                     // inputSchema  (derived)
                 null,                     // outputSchema (derived)
                 null,                     // resolvedConnection (derived)

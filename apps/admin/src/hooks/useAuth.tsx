@@ -34,7 +34,7 @@ export function decodePayload(token: string): User | null {
       email: p.email || '',
       roles: p.roles || [],
       book: p.book || [],
-      segments: p.segments || [],
+      segments: p.segments || {},
       clearance: p.clearance || 1,
       classification: p.classification || 'public',
       team: p.team || '',

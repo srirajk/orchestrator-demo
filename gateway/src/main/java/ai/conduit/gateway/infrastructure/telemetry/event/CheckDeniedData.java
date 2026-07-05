@@ -7,7 +7,7 @@ package ai.conduit.gateway.infrastructure.telemetry.event;
  *
  * <p>{@code stage} names which authorization layer denied:
  * <ul>
- *   <li>{@code structural}  — Cerbos agent-invoke deny (segment/domain/clearance) — no covered agents</li>
+ *   <li>{@code structural}  — Cerbos agent-invoke deny (audience/segment/classification) — no covered agents</li>
  *   <li>{@code coverage}    — per-domain coverage service says the entity is not in the principal's book</li>
  *   <li>{@code entitlement} — Cerbos resource (relationship) deny</li>
  * </ul>

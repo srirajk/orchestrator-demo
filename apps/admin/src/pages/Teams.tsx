@@ -129,7 +129,8 @@ export function Teams() {
   function openEdit(t: Team) {
     setEdit(t)
     setForm({
-      id: t.domainId || '',
+      id: '',
+      domainId: t.domainId,
       name: t.name,
       description: t.description,
       defaultRoles: t.defaultRoles,
@@ -234,7 +235,15 @@ export function Teams() {
         title={editing ? `Edit ${editing.name}` : 'New team'}
       >
         <div className="space-y-4">
-          {!editing && (
+          {editing ? (
+            <Input
+              label="Domain ID"
+              placeholder="wealth-private-banking"
+              value={form.domainId ?? ''}
+              onChange={e => setForm(f => ({ ...f, domainId: e.target.value || undefined }))}
+              hint="Optional domain association"
+            />
+          ) : (
             <Input
               label="Domain ID"
               placeholder="wealth-private-banking"

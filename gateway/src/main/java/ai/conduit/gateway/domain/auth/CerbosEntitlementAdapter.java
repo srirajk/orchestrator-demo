@@ -40,6 +40,9 @@ public class CerbosEntitlementAdapter {
     private static final String RESOURCE_AGENT    = "agent";
     private static final String ACTION_READ        = "read";
     private static final String ACTION_INVOKE      = "invoke";
+    // Membership-only probe action (glass-box gate trace): tests segment membership WITHOUT the
+    // classification-rank comparison, so the gateway can label a segment-miss vs a classification-miss.
+    private static final String ACTION_INVOKE_MEMBERSHIP = "invoke_membership";
 
     private final RestClient   restClient;
     private final ObjectMapper mapper;
@@ -100,7 +103,8 @@ public class CerbosEntitlementAdapter {
      * <p>Each agent is presented as a resource with attributes:
      * <ul>
      *   <li>{@code domain} — the agent's business domain (e.g. "wealth-management")</li>
-     *   <li>{@code is_mutating} — whether the agent writes data</li>
+     *   <li>{@code audience} — "segment" | "enterprise"</li>
+     *   <li>{@code access_mode} — "read" | "write"</li>
      *   <li>{@code data_classification} — e.g. "confidential-pii", "confidential"</li>
      * </ul>
      *
@@ -114,7 +118,7 @@ public class CerbosEntitlementAdapter {
             List<String> agentIds = manifests.stream()
                     .map(AgentManifest::agentId).toList();
 
-            String requestBody = buildAgentRequest(principal, manifests);
+            String requestBody = buildAgentRequest(principal, manifests, ACTION_INVOKE);
             String responseBody = post(requestBody);
             Map<String, Boolean> results = parseResponse(responseBody, ACTION_INVOKE, agentIds);
             log.debug("Cerbos agent check: principal={} agents={} results={}",
@@ -128,6 +132,32 @@ public class CerbosEntitlementAdapter {
             Map<String, Boolean> denied = new HashMap<>();
             manifests.forEach(m -> denied.put(m.agentId(), false));
             return new BatchResult(denied, "local-fallback-closed");
+        }
+    }
+
+    /**
+     * Batch-check the segment-membership-only probe ({@code invoke_membership}) for the glass-box
+     * gate trace. A {@code true} means the agent's domain maps to a segment the principal holds
+     * (or the agent is enterprise-audience) — <em>ignoring</em> the classification tier. Combined
+     * with the full {@code invoke} verdict, this lets the gateway distinguish a segment-membership
+     * deny from a classification deny WITHOUT knowing the domain→segment mapping (it stays in the
+     * Cerbos policy — World B). This is EXPLANATION only; enforcement remains {@link #checkAgents}.
+     *
+     * @return map of {@code agentId → isMember}; on any error every agent is treated as a non-member.
+     */
+    public Map<String, Boolean> checkAgentMembership(Principal principal, List<AgentManifest> manifests) {
+        if (manifests == null || manifests.isEmpty()) return Map.of();
+        try {
+            List<String> agentIds = manifests.stream().map(AgentManifest::agentId).toList();
+            String requestBody = buildAgentRequest(principal, manifests, ACTION_INVOKE_MEMBERSHIP);
+            String responseBody = post(requestBody);
+            return parseResponse(responseBody, ACTION_INVOKE_MEMBERSHIP, agentIds);
+        } catch (Exception e) {
+            log.warn("Cerbos membership probe failed for principal={}: {} — treating all as non-members",
+                    principal.id(), e.getMessage());
+            Map<String, Boolean> denied = new HashMap<>();
+            manifests.forEach(m -> denied.put(m.agentId(), false));
+            return denied;
         }
     }
 
@@ -162,22 +192,24 @@ public class CerbosEntitlementAdapter {
         return mapper.writeValueAsString(root);
     }
 
-    /** Agent-specific builder — sends domain, is_mutating, data_classification per agent. */
-    private String buildAgentRequest(Principal principal, List<AgentManifest> manifests) throws Exception {
+    /** Agent-specific builder — sends domain, audience, access_mode, data_classification per agent. */
+    private String buildAgentRequest(Principal principal, List<AgentManifest> manifests, String action) throws Exception {
         ObjectNode root = mapper.createObjectNode();
         addPrincipal(root, principal);
 
         ArrayNode resources = root.putArray("resources");
         for (AgentManifest m : manifests) {
             ObjectNode entry   = resources.addObject();
-            entry.putArray("actions").add(ACTION_INVOKE);
+            entry.putArray("actions").add(action);
             ObjectNode resource = entry.putObject("resource");
             resource.put("kind",          RESOURCE_AGENT);
             resource.put("policyVersion", POLICY_VERSION);
             resource.put("id",            m.agentId());
             ObjectNode attr = resource.putObject("attr");
             attr.put("domain",              m.domain() != null ? m.domain() : "");
-            attr.put("is_mutating",         m.constraints() != null && m.constraints().isMutating());
+            attr.put("audience",            m.audience() != null ? m.audience() : "segment");
+            attr.put("access_mode",         m.constraints() != null && m.constraints().accessMode() != null
+                    ? m.constraints().accessMode() : "read");
             attr.put("data_classification", m.constraints() != null
                     ? m.constraints().dataClassification() : "confidential");
         }
@@ -197,10 +229,9 @@ public class CerbosEntitlementAdapter {
 
         // Structural attributes only — no book claim.
         // Book-of-business is enforced by the domain coverage service (DISCOVER/CHECK), not Cerbos.
-        attr.put("clearance", principal.clearance());
-
-        ArrayNode segments = attr.putArray("segments");
-        principal.segments().forEach(segments::add);
+        // segments is a per-segment classification map: segment -> tier held in that segment.
+        ObjectNode segments = attr.putObject("segments");
+        principal.segments().forEach(segments::put);
 
         ArrayNode domains = attr.putArray("domains");
         principal.domains().forEach(domains::add);

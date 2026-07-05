@@ -1,7 +1,17 @@
+function currentSpaPath(): string {
+  return `${window.location.pathname}${window.location.search}${window.location.hash}` || '/'
+}
+
+export function redirectToLogin(): never {
+  const returnTo = encodeURIComponent(currentSpaPath())
+  window.location.assign(`/api/auth/login?returnTo=${returnTo}`)
+  return new Promise<never>(() => {}) as never
+}
+
 /**
  * Generic fetch wrapper.
  * - Always includes credentials: 'include'
- * - On any 401 response: redirects to /api/auth/login
+ * - On any 401 response: redirects to /api/auth/login and preserves the current SPA route.
  */
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const resp = await fetch(path, {
@@ -14,9 +24,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   })
 
   if (resp.status === 401) {
-    window.location.href = '/api/auth/login'
-    // Return a never-resolving promise so callers don't see a value
-    return new Promise(() => {})
+    return redirectToLogin()
   }
 
   if (!resp.ok) {
@@ -24,7 +32,12 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     throw new Error(`API error ${resp.status}: ${text}`)
   }
 
-  return resp.json() as Promise<T>
+  // 204 No Content (and any response with an empty body) must not be passed to resp.json()
+  // or the browser throws "Unexpected end of JSON input". DELETE/archive PATCH return 204.
+  if (resp.status === 204) return undefined as T
+  const text = await resp.text()
+  if (!text) return undefined as T
+  return JSON.parse(text) as T
 }
 
 /**
@@ -43,8 +56,7 @@ export async function apiStream(path: string, init?: RequestInit): Promise<Respo
   })
 
   if (resp.status === 401) {
-    window.location.href = '/api/auth/login'
-    return new Promise(() => {})
+    return redirectToLogin()
   }
 
   if (!resp.ok) {

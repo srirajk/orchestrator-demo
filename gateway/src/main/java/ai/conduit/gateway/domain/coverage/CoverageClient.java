@@ -101,19 +101,25 @@ public class CoverageClient {
      * Resolves a free-text {@code reference} (e.g. "the Whitman account") to a canonical
      * relationship ID.  Returns a result indicating whether resolution was unambiguous,
      * ambiguous (multiple candidates), or not found.
+     *
+     * <p>RESOLVE is principal-agnostic (World-B invariant 5 / hard-rule f): the request is
+     * scoped only by tenant, never by the caller's book.  We send {@code X-Tenant-Id}, exactly
+     * like DISCOVER and CHECK, and deliberately do NOT send a {@code principal_id}.  The book
+     * gate is enforced entirely by the subsequent CHECK call and the gateway-side
+     * candidates ∩ discover intersection — never by filtering resolution.
      */
     public CoverageResolveResult resolve(String reference, String entityType,
-                                          String principalId, DomainManifest.Coverage coverage) {
+                                          String tenantId, DomainManifest.Coverage coverage) {
         String url = coverage.resolveUrl();
         Map<String, String> requestBody = Map.of(
             "reference", reference,
-            "type", entityType,
-            "principal_id", principalId
+            "type", entityType
         );
         try {
             String bodyJson = objectMapper.writeValueAsString(requestBody);
             String responseBody = webClient.post()
                 .uri(url)
+                .header("X-Tenant-Id", tenantId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(BodyInserters.fromValue(bodyJson))
                 .retrieve()

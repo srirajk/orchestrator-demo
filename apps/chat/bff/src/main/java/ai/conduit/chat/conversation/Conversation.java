@@ -32,6 +32,13 @@ public class Conversation {
     /** Facts-free rolling topical summary (topics/intent only). May be null. */
     private String summary;
 
+    /**
+     * Number of messages in the transcript when {@link #summary} was last generated. The
+     * assembler re-triggers regeneration once the transcript grows materially past this, so
+     * the summary "rolls" instead of freezing after the first generation. 0 = never generated.
+     */
+    private int summaryWatermark;
+
     private boolean archived;
 
     @CreatedDate
@@ -87,6 +94,14 @@ public class Conversation {
 
     public void setSummary(String summary) {
         this.summary = summary;
+    }
+
+    public int getSummaryWatermark() {
+        return summaryWatermark;
+    }
+
+    public void setSummaryWatermark(int summaryWatermark) {
+        this.summaryWatermark = summaryWatermark;
     }
 
     public boolean isArchived() {

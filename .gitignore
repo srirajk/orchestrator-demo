@@ -104,3 +104,8 @@ data/
 volumes/
 # Claude Code agent worktrees (isolated, never commit)
 .claude/worktrees/
+
+# throwaway test artifacts / screenshots
+feedback/
+/images/
+*.tmp

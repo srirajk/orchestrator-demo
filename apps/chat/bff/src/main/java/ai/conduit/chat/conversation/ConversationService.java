@@ -2,8 +2,13 @@ package ai.conduit.chat.conversation;
 
 import ai.conduit.chat.message.MessageService;
 import ai.conduit.chat.web.NotFoundException;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -19,10 +24,14 @@ public class ConversationService {
 
     private final ConversationRepository conversationRepository;
     private final MessageService messageService;
+    private final MongoTemplate mongoTemplate;
 
-    public ConversationService(ConversationRepository conversationRepository, MessageService messageService) {
+    public ConversationService(ConversationRepository conversationRepository,
+                               MessageService messageService,
+                               MongoTemplate mongoTemplate) {
         this.conversationRepository = conversationRepository;
         this.messageService = messageService;
+        this.mongoTemplate = mongoTemplate;
     }
 
     public List<Conversation> listActive(String userId) {
@@ -68,18 +77,30 @@ public class ConversationService {
     }
 
     /**
-     * Bumps {@code updatedAt} (via auditing on save) and, if the conversation is still
-     * untitled, derives a title from the first user message.
+     * Bumps {@code updatedAt} and, if the conversation is still untitled, derives a title
+     * from the first user message.
+     *
+     * <p><b>Field-scoped update (not a full-document save).</b> This runs on a background
+     * thread <em>after</em> streaming, concurrently with the fire-and-forget rolling-summary
+     * writer ({@code LlmSummaryService}). The {@code conversation} argument was loaded at the
+     * start of the turn, before the summary writer ran, so its in-memory {@code summary} is
+     * stale (usually null). Persisting the whole entity here would clobber the summary the
+     * summarizer just wrote — a lost update that silently defeats context compaction. We
+     * therefore {@code $set} only {@code title}/{@code updatedAt} and never touch
+     * {@code summary}, so the two writers can no longer race on that field.
      */
     public void touchAndMaybeTitle(Conversation conversation, String firstUserMessage) {
+        Update update = new Update().set("updatedAt", Instant.now());
         String title = conversation.getTitle();
         if (title == null || title.isBlank() || DEFAULT_TITLE.equals(title)) {
             String derived = firstUserMessage.strip();
             if (derived.length() > AUTO_TITLE_MAX_CHARS) {
                 derived = derived.substring(0, AUTO_TITLE_MAX_CHARS);
             }
-            conversation.setTitle(derived);
+            update.set("title", derived);
         }
-        conversationRepository.save(conversation);
+        Query query = new Query(Criteria.where("_id").is(conversation.getId())
+                .and("userId").is(conversation.getUserId()));
+        mongoTemplate.updateFirst(query, update, Conversation.class);
     }
 }

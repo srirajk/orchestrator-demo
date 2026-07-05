@@ -1,5 +1,6 @@
 package ai.conduit.chat.chat;
 
+import ai.conduit.chat.config.AppProperties;
 import ai.conduit.chat.conversation.Conversation;
 import ai.conduit.chat.conversation.ConversationService;
 import ai.conduit.chat.message.MessageService;
@@ -43,15 +44,19 @@ public class ChatStreamService {
     private final ConversationService conversationService;
     private final ObjectMapper objectMapper;
     private final ExecutorService backgroundExecutor;
+    /** Upper bound on the accumulated assistant reply text kept in memory for persistence. */
+    private final int maxReplyChars;
 
     public ChatStreamService(MessageService messageService,
                              ConversationService conversationService,
                              ObjectMapper objectMapper,
-                             ExecutorService backgroundExecutor) {
+                             ExecutorService backgroundExecutor,
+                             AppProperties appProperties) {
         this.messageService = messageService;
         this.conversationService = conversationService;
         this.objectMapper = objectMapper;
         this.backgroundExecutor = backgroundExecutor;
+        this.maxReplyChars = appProperties.gateway().maxReplyChars();
     }
 
     /**
@@ -129,7 +134,15 @@ public class ChatStreamService {
             JsonNode node = objectMapper.readTree(data);
             JsonNode content = node.path("choices").path(0).path("delta").path("content");
             if (content.isTextual()) {
-                assistant.append(content.asText());
+                // Bound in-memory accumulation: an unbounded (or maliciously long) gateway reply
+                // must not grow the retained copy without limit. The client still receives the full
+                // stream (raw bytes are forwarded verbatim); only the persisted copy is capped.
+                int remaining = maxReplyChars - assistant.length();
+                if (remaining <= 0) {
+                    return;
+                }
+                String text = content.asText();
+                assistant.append(text, 0, Math.min(text.length(), remaining));
             }
         } catch (Exception ignored) {
             // Malformed/partial SSE chunk — ignore and keep streaming, as the Node BFF does.

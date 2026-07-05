@@ -124,7 +124,11 @@ public class VectorIndex {
             stringFields.put("agent_id",   manifest.agentId());
             stringFields.put("domain",     manifest.domain());
             stringFields.put("sub_domain", manifest.subDomain() != null ? manifest.subDomain() : "");
-            stringFields.put("is_mutating", manifest.constraints().isMutating() ? "1" : "0");
+            // Internal read-only routing flag: 0 = read (fannable), 1 = write. Derived from the
+            // manifest access_mode (formerly the is_mutating boolean); index field name kept stable
+            // so the "@is_mutating:[0 0]" read-only filter needs no reindex.
+            stringFields.put("is_mutating",
+                    "write".equals(manifest.constraints().accessMode()) ? "1" : "0");
             jedis.hset(key, stringFields);
 
             // Store vector as raw bytes — required for RediSearch VECTOR field

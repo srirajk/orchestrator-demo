@@ -37,9 +37,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.
 /**
  * Verifies JWT → Principal mapping and Cerbos-backed entitlement decisions.
  *
- * <p>JWT carries structural claims only ({@code sub}, {@code roles}, {@code segments},
- * {@code clearance}). No {@code book} claim. Book-of-business is enforced at runtime
- * by the domain coverage service (DISCOVER/CHECK), not embedded in the token.
+ * <p>JWT carries structural claims only ({@code sub}, {@code roles}, {@code segments}
+ * as a per-segment classification map). No {@code book} claim, no numeric clearance.
+ * Book-of-business is enforced at runtime by the domain coverage service (DISCOVER/CHECK),
+ * not embedded in the token.
  *
  * <p>The {@link JwksClient} is replaced with a {@link MockBean} so no real
  * Axiom (iam-service) is needed.
@@ -107,7 +108,6 @@ class AuthzFromMembershipTest {
                 .expirationTime(new Date(System.currentTimeMillis() + 3_600_000L))
                 .issueTime(new Date())
                 .claim("roles", List.of("relationship_manager"))
-                .claim("clearance", 2)
                 .build();
 
         JWSHeader header = new JWSHeader.Builder(JWSAlgorithm.RS256)
@@ -126,13 +126,15 @@ class AuthzFromMembershipTest {
         JWTClaimsSet claims = new JWTClaimsSet.Builder()
                 .subject("rm_jane")
                 .claim("roles", List.of("relationship_manager"))
-                .claim("clearance", 2)
+                .claim("segments", Map.of("wealth", "confidential-pii", "servicing", "confidential"))
                 .build();
 
         Principal fromJwt = Principal.fromJwtClaims(claims);
         assertThat(fromJwt.id()).isEqualTo("rm_jane");
         assertThat(fromJwt.roles()).containsExactly("relationship_manager");
-        assertThat(fromJwt.clearance()).isEqualTo(2);
+        assertThat(fromJwt.segments())
+                .containsEntry("wealth", "confidential-pii")
+                .containsEntry("servicing", "confidential");
         // No book field — structural check only; coverage service handles book-of-business.
 
         // Cerbos structural check would ALLOW relationship_manager.
@@ -242,16 +244,16 @@ class AuthzFromMembershipTest {
         JWTClaimsSet claims = new JWTClaimsSet.Builder()
                 .subject("rm_test_user")
                 .claim("roles", List.of("relationship_manager", "senior_rm"))
-                .claim("segments", List.of("wealth", "servicing"))
-                .claim("clearance", 3)
+                .claim("segments", Map.of("wealth", "confidential-pii", "servicing", "confidential"))
                 .build();
 
         Principal principal = Principal.fromJwtClaims(claims);
 
         assertThat(principal.id()).isEqualTo("rm_test_user");
         assertThat(principal.roles()).containsExactly("relationship_manager", "senior_rm");
-        assertThat(principal.segments()).containsExactlyInAnyOrder("wealth", "servicing");
-        assertThat(principal.clearance()).isEqualTo(3);
+        assertThat(principal.segments())
+                .containsEntry("wealth", "confidential-pii")
+                .containsEntry("servicing", "confidential");
     }
 
     @Test
@@ -264,8 +266,8 @@ class AuthzFromMembershipTest {
         Principal principal = Principal.fromJwtClaims(claims);
 
         assertThat(principal.id()).isEqualTo("rm_minimal");
-        assertThat(principal.roles()).containsExactly("relationship_manager");
-        assertThat(principal.clearance()).isEqualTo(2);
+        assertThat(principal.roles()).containsExactly("chat_user");
+        assertThat(principal.segments()).isEmpty();
     }
 
     // ── Test: EntitlementService delegates to Cerbos adapter ─────────────────────
@@ -273,7 +275,7 @@ class AuthzFromMembershipTest {
     @Test
     void entitlementService_adminRole_grantsAccess() {
         // platform_admin: Cerbos returns ALLOW — EntitlementService honours the verdict.
-        Principal admin = new Principal("admin", "default", List.of("platform_admin"), 5, List.of(), List.of(), List.of());
+        Principal admin = new Principal("admin", "default", List.of("platform_admin"), List.of(), Map.of(), List.of());
         when(cerbosAdapter.checkRelationships(any(), any()))
                 .thenReturn(new CerbosEntitlementAdapter.BatchResult(Map.of("REL-00188", true), "cerbos"));
 
@@ -289,7 +291,7 @@ class AuthzFromMembershipTest {
         // In practice, structural Cerbos check passes for relationship_manager, but the
         // coverage service (DISCOVER/CHECK) would deny Okafor as not in rm_jane's coverage.
         Principal rm = new Principal("rm_jane", "default", List.of("relationship_manager"),
-                2, List.of(), List.of("wealth"), List.of("wealth-private-banking"));
+                List.of(), Map.of("wealth", "confidential-pii"), List.of("wealth-private-banking"));
         when(cerbosAdapter.checkRelationships(any(), any()))
                 .thenReturn(new CerbosEntitlementAdapter.BatchResult(Map.of("REL-00188", false), "cerbos"));
 
@@ -303,7 +305,7 @@ class AuthzFromMembershipTest {
     void entitlementService_cerbosAllows_resultIsAllowed() {
         // Cerbos allows the relationship — EntitlementService relays the approval.
         Principal rm = new Principal("rm_jane", "default", List.of("relationship_manager"),
-                2, List.of(), List.of("wealth"), List.of("wealth-private-banking"));
+                List.of(), Map.of("wealth", "confidential-pii"), List.of("wealth-private-banking"));
         when(cerbosAdapter.checkRelationships(any(), any()))
                 .thenReturn(new CerbosEntitlementAdapter.BatchResult(Map.of("REL-00188", true), "cerbos"));
 

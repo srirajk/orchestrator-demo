@@ -1,0 +1,31 @@
+groups:
+  - name: chat-compaction
+    interval: 30s
+    rules:
+      # Recording rule: ratio of summary-attached turns (attached=true / total).
+      # 0 = compaction is firing but summaries are never attached (silent breakage).
+      - record: chat_compaction_summary_attached_ratio_5m
+        expr: |
+          rate(chat_compaction_summary_attached_total{attached="true"}[5m])
+          /
+          (rate(chat_compaction_summary_attached_total[5m]) > 0)
+
+      # GUARDRAIL ALERT — fires when compaction is active but NO summary is ever attached.
+      # This is the exact condition that would have caught the lost-update bug silently.
+      # Uses sum() to drop the 'attached' label so the two series are comparable.
+      - alert: CompactionSummaryNeverAttached
+        expr: |
+          sum(increase(chat_compaction_summary_attached_total{attached="false"}[30m])) > 0
+          and
+          sum(increase(chat_compaction_summary_attached_total{attached="true"}[30m])) == 0
+        for: 5m
+        labels:
+          severity: warning
+          component: chat-bff
+        annotations:
+          summary: "Memory compaction summary is never attached (silent breakage guardrail)"
+          description: >
+            chat_compaction_summary_attached_total{attached="true"} has not increased in 30m
+            while compaction turns (attached="false") ARE occurring.
+            This is the exact signal for the silent lost-update bug. Check LlmSummaryService
+            and Conversation.setSummary() persistence.

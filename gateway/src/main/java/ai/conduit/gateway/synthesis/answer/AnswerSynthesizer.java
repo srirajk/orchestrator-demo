@@ -16,14 +16,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.BufferedReader;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -57,6 +61,8 @@ public class AnswerSynthesizer {
     private final int maxRetries;
     private final int retryInitialDelayMs;
     private final int retryBackoffMultiplier;
+    private final int requestTimeoutSeconds;
+    private final int streamIdleTimeoutSeconds;
 
     /**
      * Grounding/system prompt, built from a configurable display name. The DATA-block grounding
@@ -78,7 +84,12 @@ public class AnswerSynthesizer {
             @Value("${conduit.assistant.domain-context:an enterprise data assistant for relationship managers}") String domainContext,
             @Value("${conduit.llm.max-retries:3}") int maxRetries,
             @Value("${conduit.llm.retry-initial-delay-ms:2000}") int retryInitialDelayMs,
-            @Value("${conduit.llm.retry-backoff-multiplier:2}") int retryBackoffMultiplier) {
+            @Value("${conduit.llm.retry-backoff-multiplier:2}") int retryBackoffMultiplier,
+            // Per-request timeout (time to receive response headers) and inter-token idle
+            // deadline — without these a stalled LLM pins the synthesis thread + SSE emitter
+            // until the 120s emitter timeout. Defaults fall back to the shared LLM budget.
+            @Value("${conduit.llm.synthesizer.request-timeout-seconds:${conduit.llm.request-timeout-seconds:30}}") int requestTimeoutSeconds,
+            @Value("${conduit.llm.synthesizer.stream-idle-timeout-seconds:30}") int streamIdleTimeoutSeconds) {
         this.mapper = mapper;
         this.tracer = tracer;
         this.baseUrl = baseUrl;
@@ -89,6 +100,8 @@ public class AnswerSynthesizer {
         this.maxRetries = maxRetries;
         this.retryInitialDelayMs = retryInitialDelayMs;
         this.retryBackoffMultiplier = retryBackoffMultiplier;
+        this.requestTimeoutSeconds = requestTimeoutSeconds;
+        this.streamIdleTimeoutSeconds = streamIdleTimeoutSeconds;
         this.systemPrompt =
                 "You are the answer synthesizer for " + displayName + ". Answer using ONLY the "
                 + "data provided in the DATA sections of the user message — the agent outputs are your only "
@@ -379,10 +392,33 @@ public class AnswerSynthesizer {
         boolean reasoningEmitted = false;  // have we already opened the blockquote?
         boolean firstContent = true;        // have we seen the first content token?
 
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(response.body()))) {
+        // Idle watchdog: BufferedReader.readLine() has no read deadline, so a stall AFTER the
+        // response headers (mid-generation) would block until the 120s SSE emitter timeout.
+        // A cheap virtual-thread watchdog closes the body stream once no line has arrived within
+        // the idle window, which unblocks readLine() with an IOException and aborts the stall.
+        final InputStream bodyStream = response.body();
+        final long idleDeadlineMs = streamIdleTimeoutSeconds * 1000L;
+        final AtomicLong lastActivity = new AtomicLong(System.currentTimeMillis());
+        final AtomicBoolean streaming = new AtomicBoolean(true);
+        Thread watchdog = Thread.ofVirtual().name("synth-idle-watchdog").start(() -> {
+            try {
+                while (streaming.get()) {
+                    long idle = System.currentTimeMillis() - lastActivity.get();
+                    if (idle >= idleDeadlineMs) {
+                        log.warn("Synthesis stream idle {}ms (>{}s) — closing stalled LLM stream",
+                                idle, streamIdleTimeoutSeconds);
+                        try { bodyStream.close(); } catch (Exception ignored) {}
+                        return;
+                    }
+                    Thread.sleep(Math.min(500L, Math.max(50L, idleDeadlineMs - idle)));
+                }
+            } catch (InterruptedException ignored) { /* normal shutdown on stream completion */ }
+        });
+
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(bodyStream))) {
             String line;
             while ((line = reader.readLine()) != null) {
+                lastActivity.set(System.currentTimeMillis());
                 if (!line.startsWith("data:")) continue;
                 String data = line.substring("data:".length()).strip();
                 if (data.equals("[DONE]")) break;
@@ -436,6 +472,10 @@ public class AnswerSynthesizer {
                             contentDelta(completionId, created, chunk.content, mapper)));
                 }
             }
+        } finally {
+            // Stop the watchdog so it never closes a fresh stream on a later call.
+            streaming.set(false);
+            watchdog.interrupt();
         }
 
         if (reasoningBuffer.length() > 0) {
@@ -522,6 +562,7 @@ public class AnswerSynthesizer {
 
     private HttpResponse<java.io.InputStream> sendWithRetry(String endpoint, String requestBody) throws Exception {
         int delayMs = retryInitialDelayMs;
+        Exception lastTimeout = null;
         for (int attempt = 1; attempt <= maxRetries; attempt++) {
             // Rebuild the request on each attempt — BodyPublishers.ofString() is one-shot
             // and cannot be replayed after the first send.
@@ -530,15 +571,25 @@ public class AnswerSynthesizer {
                     .header("Content-Type", "application/json")
                     .header("Authorization", "Bearer " + apiKey)
                     .header("Accept", "text/event-stream")
+                    // Bound the wait for response headers — a hung endpoint no longer parks the
+                    // synthesis thread indefinitely. Retried like a 429 (nothing streamed yet).
+                    .timeout(Duration.ofSeconds(requestTimeoutSeconds))
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                     .build();
-            HttpResponse<java.io.InputStream> resp =
-                    httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
-            if (resp.statusCode() != 429 || attempt == maxRetries) return resp;
-            log.warn("LLM rate limited (429), retry {}/{} in {}ms", attempt, maxRetries, delayMs);
+            try {
+                HttpResponse<java.io.InputStream> resp =
+                        httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+                if (resp.statusCode() != 429 || attempt == maxRetries) return resp;
+                log.warn("LLM rate limited (429), retry {}/{} in {}ms", attempt, maxRetries, delayMs);
+            } catch (HttpTimeoutException e) {
+                lastTimeout = e;
+                if (attempt == maxRetries) throw e;
+                log.warn("LLM request timed out (attempt {}/{}), retry in {}ms", attempt, maxRetries, delayMs);
+            }
             Thread.sleep(delayMs);
             delayMs *= retryBackoffMultiplier;
         }
+        if (lastTimeout != null) throw lastTimeout;
         throw new IllegalStateException("unreachable");
     }
 

@@ -31,7 +31,8 @@ public record AppProperties(
      */
     public record Gateway(
             @NotBlank String baseUrl,
-            @NotBlank String model
+            @NotBlank String model,
+            @Min(1) int maxReplyChars
     ) {}
 
     /**
@@ -44,8 +45,13 @@ public record AppProperties(
      *                             exceed this (the latest user message is always included).
      * @param summaryTriggerTokens once the full transcript's estimated tokens exceed this,
      *                             the facts-free rolling summary is (re)generated and, when
-     *                             present, prepended as a leading {@code system} message
-     *                             (counted against {@code maxTokens}).
+     *                             the window actually drops older messages, prepended as a
+     *                             leading {@code system} message (counted against
+     *                             {@code maxTokens}).
+     * @param summaryRefreshMessages once the transcript has grown by this many messages beyond
+     *                             the count captured when the summary was last generated, the
+     *                             summary is regenerated (fire-and-forget) so it keeps rolling
+     *                             rather than freezing after the first generation.
      * @param tokenEncoding        tiktoken encoding used for estimation (e.g.
      *                             {@code cl100k_base}, {@code o200k_base}); falls back to a
      *                             {@code chars/4} heuristic if unavailable.
@@ -53,6 +59,7 @@ public record AppProperties(
     public record Context(
             @Min(1) int maxTokens,
             @Min(1) int summaryTriggerTokens,
+            @Min(1) int summaryRefreshMessages,
             @NotBlank String tokenEncoding
     ) {}
 

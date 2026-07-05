@@ -7,6 +7,7 @@
     "organization": "Meridian Demo Bank"
   },
   "domain": "insurance",
+  "audience": "segment",
   "sub_domain": "claims-servicing",
   "max_response_tokens": 1500,
   "protocol": "http",
@@ -22,7 +23,7 @@
     {
       "id": "get_claim_status",
       "name": "get_claim_status",
-      "description": "Retrieve the status of an insurance claim — amount, status, incident date, and adjuster — by claim ID, or list all claims on a policy.",
+      "description": "Retrieve the status of an insurance claim \u2014 amount, status, incident date, and adjuster \u2014 by claim ID, or list all claims on a policy.",
       "tags": [
         "claim",
         "claim-status",
@@ -47,7 +48,7 @@
     }
   ],
   "constraints": {
-    "is_mutating": false,
+    "access_mode": "read",
     "data_classification": "confidential-pii",
     "sla_timeout_ms": 30000
   }

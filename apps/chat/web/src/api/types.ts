@@ -10,6 +10,12 @@ export interface Conversation {
   title: string
   projectId?: string
   updatedAt: string
+  archived?: boolean
+}
+
+export interface MessageClientTiming {
+  ttftMs?: number
+  totalMs?: number
 }
 
 export interface Message {
@@ -17,6 +23,7 @@ export interface Message {
   role: 'user' | 'assistant' | 'system'
   content: string
   createdAt: string
+  clientTiming?: MessageClientTiming
 }
 
 export interface ConversationDetail {

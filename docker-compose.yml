@@ -63,6 +63,7 @@ services:
     container_name: conduit-prometheus
     volumes:
       - ./infra/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/alerting-rules.yml:/etc/prometheus/alerting-rules.yml:ro
     ports:
       - "9090:9090"
     restart: unless-stopped
@@ -176,6 +177,7 @@ services:
       # World B: agent + domain manifests are read from the mounted ./registry volume,
       # NOT baked into the image. Onboard a domain by dropping JSON here + restart.
       CONDUIT_REGISTRY_LOCATION: file:/registry/
+      CONDUIT_ASSISTANT_DOMAIN_CONTEXT: ${CONDUIT_ASSISTANT_DOMAIN_CONTEXT:-an enterprise assistant for banking staff — covering client financial data, market research, and internal HR policies}
     volumes:
       - ./registry:/registry:ro
     depends_on:
@@ -299,6 +301,44 @@ services:
       PYTHONUNBUFFERED: "1"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8086/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── World B: knowledge agents (no coverage) — market research + HR policy ──────
+
+  wealth-market-research:
+    build:
+      context: ./mock-agents/wealth-market-research
+      dockerfile: Dockerfile
+    container_name: conduit-wealth-market-research
+    ports:
+      - "8089:8089"
+    environment:
+      PYTHONUNBUFFERED: "1"
+      OTEL_SERVICE_NAME: conduit-wealth-market-research
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8089/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  hr-policy:
+    build:
+      context: ./mock-agents/hr-policy
+      dockerfile: Dockerfile
+    container_name: conduit-hr-policy
+    ports:
+      - "8091:8091"
+    environment:
+      PYTHONUNBUFFERED: "1"
+      OTEL_SERVICE_NAME: conduit-hr-policy
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8091/health')"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -449,6 +489,10 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/meridian
       SPRING_DATASOURCE_USERNAME: meridian
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-meridian_dev}
+      SPRING_DATA_REDIS_HOST: redis-stack
+      SPRING_DATA_REDIS_PORT: "6379"
+      SPRING_DATA_REDIS_DATABASE: "4"
+      IAM_OAUTH2_AUTHORIZATION_STORE_REDIS_KEY_PREFIX: iam:oauth2
       IAM_ISSUER_URL: ${IAM_ISSUER_URL:-http://host.docker.internal:8084}
       IAM_ADMIN_PASSWORD: ${IAM_ADMIN_PASSWORD:-Meridian@2024}
       CERBOS_HOST: cerbos
@@ -465,9 +509,17 @@ services:
       IAM_LIBRECHAT_CLIENT_ID: "meridian-librechat"
       IAM_LIBRECHAT_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-meridian-client-secret-dev}
       IAM_LIBRECHAT_REDIRECT_URI: ${IAM_LIBRECHAT_REDIRECT_URI:-http://localhost:3080/oauth/openid/callback}
+      IAM_CONDUIT_CHAT_POST_LOGOUT_REDIRECT_URI: ${IAM_CONDUIT_CHAT_POST_LOGOUT_REDIRECT_URI:-http://localhost:8099/api/auth/login}
       # Audience stamped on Axiom access tokens that are forwarded to the gateway.
       IAM_GATEWAY_AUDIENCE: ${IAM_GATEWAY_AUDIENCE:-conduit-gateway}
+      # Persist the RSA signing key (+ its stable kid) to a named volume so a restart does not
+      # regenerate it and invalidate every live session. See SecurityConfig#loadOrGenerateRsaKey.
+      IAM_SIGNING_KEY_PATH: /app/keys/signing-key.json
+    volumes:
+      - iam-signing-key:/app/keys
     depends_on:
+      redis-stack:
+        condition: service_healthy
       postgres:
         condition: service_healthy
       cerbos:
@@ -528,6 +580,7 @@ services:
       OIDC_CLIENT_SECRET: ${CHAT_OIDC_CLIENT_SECRET:-conduit-chat-secret}
       # Must match EXACTLY the redirect-uri Axiom already has registered (never change Axiom).
       OIDC_REDIRECT_URI: ${CHAT_OIDC_REDIRECT_URI:-http://localhost:8099/api/auth/callback}
+      CHAT_POST_LOGOUT_REDIRECT_URI: ${CHAT_POST_LOGOUT_REDIRECT_URI:-http://localhost:8099/api/auth/login}
       # ── Session cookie ─────────────────────────────────────────────────────────
       # Session cookie must NOT be Secure over http (demo runs on http://localhost:8099).
       COOKIE_SECURE: ${CHAT_COOKIE_SECURE:-false}
@@ -890,3 +943,5 @@ volumes:
   minio-data:
   postgres_data:
   loki-data:
+  # Persists the iam-service RSA signing key so its kid is stable across restarts.
+  iam-signing-key:

@@ -2,13 +2,19 @@ package ai.conduit.chat.memory;
 
 import ai.conduit.chat.config.AppProperties;
 import ai.conduit.chat.conversation.Conversation;
-import ai.conduit.chat.conversation.ConversationRepository;
 import ai.conduit.chat.message.Message;
 import ai.conduit.chat.message.MessageService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -62,26 +68,41 @@ public class LlmSummaryService implements SummaryService {
     private final AppProperties.Summary config;
     private final ExecutorService backgroundExecutor;
     private final MessageService messageService;
-    private final ConversationRepository conversationRepository;
+    private final MongoTemplate mongoTemplate;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
 
     /** Prevents stacking multiple concurrent regenerations for the same conversation. */
     private final Set<String> inFlight = ConcurrentHashMap.newKeySet();
 
+    // --- Metrics ---
+    /** Latency of the LLM summarisation call (fire-and-forget background, but still timed). */
+    private final Timer summaryTimer;
+    /** Count of failed summarisation attempts (LLM non-2xx or exception). */
+    private final Counter summaryErrors;
+
     public LlmSummaryService(AppProperties appProperties,
                              ExecutorService backgroundExecutor,
                              MessageService messageService,
-                             ConversationRepository conversationRepository,
-                             ObjectMapper objectMapper) {
+                             MongoTemplate mongoTemplate,
+                             ObjectMapper objectMapper,
+                             MeterRegistry meterRegistry) {
         this.config = appProperties.summary();
         this.backgroundExecutor = backgroundExecutor;
         this.messageService = messageService;
-        this.conversationRepository = conversationRepository;
+        this.mongoTemplate = mongoTemplate;
         this.objectMapper = objectMapper;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(5))
                 .build();
+
+        this.summaryTimer = Timer.builder("chat_summary_generation_seconds")
+                .description("Latency of the LLM facts-free rolling summary call.")
+                .publishPercentiles(0.5, 0.9, 0.95, 0.99)
+                .register(meterRegistry);
+        this.summaryErrors = Counter.builder("chat_summary_generation_errors_total")
+                .description("Number of failed LLM summary generation attempts (non-2xx or exception).")
+                .register(meterRegistry);
     }
 
     @Override
@@ -111,17 +132,37 @@ public class LlmSummaryService implements SummaryService {
         if (transcript.isEmpty()) {
             return;
         }
+        // Watermark: the number of messages actually summarised. ContextAssembler re-triggers
+        // regeneration once the transcript has grown materially past this, so the summary rolls.
+        int summarizedMessageCount = transcript.size();
         String rendered = renderTranscript(transcript);
-        String summary = callLlm(rendered);
+        // Time the LLM call and count failures. Fire-and-forget: errors are caught by the caller.
+        String summary;
+        try {
+            summary = summaryTimer.recordCallable(() -> callLlm(rendered));
+        } catch (Exception ex) {
+            summaryErrors.increment();
+            throw ex;
+        }
         if (summary == null || summary.isBlank()) {
+            // callLlm returned null (non-2xx or empty body) — count as an error.
+            summaryErrors.increment();
             return; // safe fallback: leave existing summary untouched
         }
-        // Re-load under ownership to avoid clobbering a concurrently-updated document.
-        conversationRepository.findByIdAndUserId(conversationId, userId).ifPresent(c -> {
-            c.setSummary(summary.strip());
-            conversationRepository.save(c);
-            log.debug("[summary] updated rolling summary for {}", conversationId);
-        });
+        // Field-scoped update (never a full-document save from this background writer): $set only
+        // summary + its watermark, scoped by _id+userId. A whole-entity save here would race with
+        // ConversationService#touchAndMaybeTitle and clobber title/projectId/archived (the same
+        // lost-update that was already fixed there). Scoping the update to owned docs also enforces
+        // ownership without a separate read.
+        Query query = new Query(Criteria.where("_id").is(conversationId).and("userId").is(userId));
+        Update update = new Update()
+                .set("summary", summary.strip())
+                .set("summaryWatermark", summarizedMessageCount);
+        long modified = mongoTemplate.updateFirst(query, update, Conversation.class).getModifiedCount();
+        if (modified > 0) {
+            log.debug("[summary] updated rolling summary for {} (watermark={} msgs)",
+                    conversationId, summarizedMessageCount);
+        }
     }
 
     private static String renderTranscript(List<Message> transcript) {

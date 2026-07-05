@@ -1,0 +1,74 @@
+{
+  "agent_id": "acme.hr.policy_qa",
+  "name": "HR Policy Q&A",
+  "description": "Answers questions about Meridian HR policies: parental leave, PTO, benefits, code of conduct, performance management, and learning & development. Enterprise knowledge agent — open to all authenticated users, no coverage check required.",
+  "version": "1.0.0",
+  "provider": {
+    "organization": "Meridian Demo Bank"
+  },
+  "domain": "hr",
+  "audience": "enterprise",
+  "max_response_tokens": 2000,
+  "protocol": "http",
+  "connection": {
+    "openapi_url": "http://hr-policy:8091/openapi.json",
+    "operation_id": "get_policy_qa"
+  },
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false
+  },
+  "skills": [
+    {
+      "id": "get_policy_qa",
+      "name": "get_policy_qa",
+      "description": "Retrieve Meridian HR policy details. Topics: parental_leave, pto, benefits, conduct, performance, learning. Enterprise agent — open to all staff.",
+      "tags": [
+        "hr",
+        "human-resources",
+        "policy",
+        "parental-leave",
+        "maternity",
+        "paternity",
+        "pto",
+        "vacation",
+        "benefits",
+        "401k",
+        "health-benefits",
+        "conduct",
+        "ethics",
+        "performance-review",
+        "learning",
+        "tuition"
+      ],
+      "examples": [
+        "how many weeks of parental leave do I get",
+        "what is the maternity leave policy",
+        "how does PTO accrual work",
+        "how many PTO days do I have",
+        "what are my employee medical and dental benefits",
+        "how does the 401k match work",
+        "what does the employee code of conduct cover",
+        "how do I report an ethics concern",
+        "how does the performance review work",
+        "what is the tuition reimbursement benefit",
+        "learning and development budget",
+        "wellness stipend amount",
+        "how many paid sick days do employees get",
+        "paternity leave entitlement",
+        "what is the PIP process"
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    }
+  ],
+  "constraints": {
+    "access_mode": "read",
+    "data_classification": "internal",
+    "sla_timeout_ms": 5000
+  }
+}

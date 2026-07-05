@@ -61,6 +61,7 @@ public class AuditController {
                 log.getId(),
                 log.getTenantId(),
                 log.getActorId(),
+                log.getClientId(),
                 log.getAction(),
                 log.getResourceType(),
                 log.getResourceId(),

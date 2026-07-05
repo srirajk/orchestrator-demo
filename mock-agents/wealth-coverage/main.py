@@ -63,7 +63,10 @@ class CoverageResolveResult(BaseModel):
 class ResolveRequest(BaseModel):
     reference: str
     type: str = "relationship"
-    principal_id: str
+    # RESOLVE is principal-agnostic (World-B invariant 5): resolution is book-INDEPENDENT and
+    # scoped only by tenant, exactly like DISCOVER/CHECK. principal_id is optional and used for
+    # audit only — never to filter candidates. The CHECK gate is the sole authorization boundary.
+    principal_id: Optional[str] = None
 
 
 # ── endpoints ────────────────────────────────────────────────────────────────
@@ -103,11 +106,13 @@ def check_resource(principal_id: str, resource_id: str, request: Request) -> Cov
     response_model=CoverageResolveResult,
     summary="RESOLVE — map free-text reference to canonical relationship ID",
 )
-def resolve_entity(body: ResolveRequest) -> CoverageResolveResult:
+def resolve_entity(body: ResolveRequest, request: Request) -> CoverageResolveResult:
+    tenant_id = request.headers.get("X-Tenant-Id", "default")
     log.info(
-        "RESOLVE reference=%r type=%s principal=%s",
+        "RESOLVE reference=%r type=%s tenant=%s principal=%s (audit-only)",
         body.reference,
         body.type,
+        tenant_id,
         body.principal_id,
     )
     result = resolve(body.reference, body.type, body.principal_id)

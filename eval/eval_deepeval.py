@@ -318,11 +318,38 @@ class RoutingAccuracyMetric(BaseMetric):
         return self.name
 
 
+# ── Auth ──────────────────────────────────────────────────────────────────────
+# The gateway resolves identity ONLY from the verified JWT `sub` (the trusted-internal
+# X-User-Id hop was removed for security). Every eval call must therefore carry a real
+# RS256 bearer token minted by Axiom (iam-service). /debug/resolve additionally requires
+# a platform_admin/domain_admin role, so the resolver calls use an admin token.
+
+IAM_URL = os.environ.get("IAM_URL", os.environ.get("USER_MGMT_HOST", "http://localhost:8084"))
+EVAL_USER_PASSWORD = os.environ.get("EVAL_USER_PASSWORD", "Meridian@2024")
+EVAL_ADMIN_USER = os.environ.get("EVAL_ADMIN_USER", "admin")
+_token_cache: dict[str, str] = {}
+
+
+def mint_token(username: str) -> str:
+    """Mint (and cache) a gateway-valid JWT for `username` via Axiom /auth/login."""
+    if username in _token_cache:
+        return _token_cache[username]
+    body = json.dumps({"username": username, "password": EVAL_USER_PASSWORD}).encode()
+    req = urllib.request.Request(
+        f"{IAM_URL}/auth/login", data=body,
+        headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        token = json.loads(r.read())["accessToken"]
+    _token_cache[username] = token
+    return token
+
+
 # ── Gateway helpers ───────────────────────────────────────────────────────────
 
 def call_resolver(gateway_url: str, prompt: str) -> list[str]:
     url = f"{gateway_url}/debug/resolve?prompt={urllib.parse.quote(prompt)}"
     req = urllib.request.Request(url)
+    req.add_header("Authorization", f"Bearer {mint_token(EVAL_ADMIN_USER)}")
     with urllib.request.urlopen(req, timeout=15) as r:
         data = json.loads(r.read())
     if data.get("fallback"):
@@ -340,7 +367,8 @@ def call_chat(gateway_url: str, prompt: str, user_id: str = "rm_jane") -> tuple[
     }).encode()
     req = urllib.request.Request(
         url, data=body,
-        headers={"Content-Type": "application/json", "X-User-Id": user_id}
+        headers={"Content-Type": "application/json",
+                 "Authorization": f"Bearer {mint_token(user_id)}"}
     )
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
