@@ -2,6 +2,7 @@ package ai.conduit.gateway.domain.chat;
 
 import ai.conduit.gateway.api.v1.chat.dto.ChatRequest;
 import ai.conduit.gateway.api.v1.chat.dto.Message;
+import ai.conduit.gateway.domain.clarify.ClarificationComposer;
 import ai.conduit.gateway.domain.auth.EntitlementService;
 import ai.conduit.gateway.domain.auth.EntitlementService.EntitlementResult;
 import ai.conduit.gateway.domain.auth.Principal;
@@ -96,6 +97,7 @@ public class ChatService {
     private final TraceEventPublisher      tracePublisher;
     private final CoverageClient           coverageClient;
     private final DomainManifestStore      manifestStore;
+    private final ai.conduit.gateway.domain.clarify.ClarificationComposer clarificationComposer;
     private final Tracer                   tracer;
     private final MeterRegistry meterRegistry;
     private final Counter intentFetchCounter;
@@ -113,6 +115,7 @@ public class ChatService {
                        TraceEventPublisher tracePublisher,
                        CoverageClient coverageClient,
                        DomainManifestStore manifestStore,
+                       ai.conduit.gateway.domain.clarify.ClarificationComposer clarificationComposer,
                        Tracer tracer,
                        MeterRegistry meterRegistry) {
         this.mapper              = mapper;
@@ -125,6 +128,7 @@ public class ChatService {
         this.tracePublisher      = tracePublisher;
         this.coverageClient      = coverageClient;
         this.manifestStore       = manifestStore;
+        this.clarificationComposer = clarificationComposer;
         this.tracer              = tracer;
         this.meterRegistry         = meterRegistry;
         this.intentFetchCounter    = Counter.builder("chat.intent").tag("type","FETCH_DATA").register(meterRegistry);
@@ -571,7 +575,7 @@ public class ChatService {
                                         .filter(c -> discovered.stream()
                                             .anyMatch(d -> d.id().equals(c.id())))
                                         .collect(Collectors.toList());
-                                String question = buildClarificationQuestion(em, filtered, discovered);
+                                String question = buildClarificationQuestion(em, filtered, discovered, request);
                                 emitRequestOutcome("CLARIFIED");
                                 streamTextAndComplete(emitter, question, streamId);
                                 tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
@@ -649,7 +653,7 @@ public class ChatService {
                                 return;
                             }
 
-                            String question = buildClarificationQuestion(em, List.of(), discovered);
+                            String question = buildClarificationQuestion(em, List.of(), discovered, request);
                             emitRequestOutcome("CLARIFIED");
                             streamTextAndComplete(emitter, question, streamId);
                             tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
@@ -837,17 +841,28 @@ public class ChatService {
     }
 
     /**
-     * Builds a clarification question presenting the RM with a numbered list of
-     * client relationships to choose from.
+     * Builds the clarification question over a grounded candidate set. The clarify DECISION is
+     * already made deterministically upstream ({@code extracted ∩ required = ∅}); this only produces
+     * the WORDING. Two manifest-declared styles:
      *
-     * @param em         the effective manifest (provides the question template from clarification schema)
+     * <ul>
+     *   <li><b>template</b> (default, safe): the byte-for-byte deterministic numbered list.</li>
+     *   <li><b>composed</b> (opt-in via {@code clarify_style}): the {@link ClarificationComposer}
+     *       phrases a natural question over the SAME grounded candidates. Its output is validated to
+     *       introduce no identifier outside the candidate set; on any rejection or composer failure
+     *       we fall back to the exact deterministic template. Worst case equals today's behaviour.</li>
+     * </ul>
+     *
+     * @param em         the effective manifest (question template, clarify style/tone, id_pattern)
      * @param candidates disambiguation candidates already narrowed to the RM's book (may be empty
      *                   — falls back to the full discovered list)
      * @param discovered full discovered list for this RM
+     * @param request    the chat request, for recent conversation context (phrasing only)
      */
     private String buildClarificationQuestion(EffectiveManifest em,
                                                List<CoverageResolveResult.ResolveCandidate> candidates,
-                                               List<CoverageResource> discovered) {
+                                               List<CoverageResource> discovered,
+                                               ChatRequest request) {
         ai.conduit.gateway.domain.manifest.ClarificationSchema cs =
                 em.clarificationFor(em.primaryRequiredKey());
         String questionText = (cs != null && cs.question() != null && !cs.question().isBlank())
@@ -869,6 +884,33 @@ public class ChatService {
             options = discovered;
         }
 
+        // The deterministic template is BOTH the default style AND the fallback for the composed
+        // style — computed first so it is always available unchanged.
+        String template = buildDeterministicClarification(questionText, options);
+
+        if (!em.clarifyComposed()) {
+            return template; // default, auditable, byte-for-byte deterministic
+        }
+
+        // Composed style: phrase a natural question over the SAME grounded candidates. The entity
+        // noun + id_pattern come from the routed sub-domain's manifest (World-B: no domain literal
+        // here). Candidates are handed to the composer as DELIMITED DATA; validation rejects any
+        // foreign identifier → fall back to the template.
+        EntityType primary = primaryResolvableEntity(em);
+        String entityNoun = primary != null ? primary.display() : null;
+        String idPattern  = primary != null ? primary.idPattern() : null;
+        List<ClarificationComposer.Candidate> composerCandidates = options.stream()
+                .map(r -> new ClarificationComposer.Candidate(r.id(), r.label()))
+                .collect(Collectors.toList());
+
+        String composed = clarificationComposer.compose(
+                questionText, entityNoun, composerCandidates, idPattern,
+                recentUserContext(request), em.clarifyTone());
+        return composed != null ? composed : template;
+    }
+
+    /** Today's exact deterministic clarification string — the default style and the composed fallback. */
+    private String buildDeterministicClarification(String questionText, List<CoverageResource> options) {
         StringBuilder sb = new StringBuilder(questionText).append("\n");
         int i = 1;
         for (CoverageResource r : options) {
@@ -877,6 +919,32 @@ public class ChatService {
         }
         sb.append("\nReply with the number or relationship ID.");
         return sb.toString();
+    }
+
+    /** The routed sub-domain's primary required RESOLVABLE entity type, or null (manifest-driven). */
+    private EntityType primaryResolvableEntity(EffectiveManifest em) {
+        String key = em.primaryRequiredKey();
+        if (key == null) return null;
+        return manifestStore.entityTypesFor(em.subDomainId()).stream()
+                .filter(et -> key.equals(et.key()) && et.isResolvable())
+                .findFirst()
+                .orElse(null);
+    }
+
+    /** Recent USER turns (newest last) as phrasing context for the composer — never a fact source. */
+    private String recentUserContext(ChatRequest request) {
+        if (request == null || request.messages() == null) return null;
+        int window = Math.max(1, routingContextTurns);
+        List<String> turns = new ArrayList<>();
+        for (int i = request.messages().size() - 1; i >= 0 && turns.size() < window; i--) {
+            Message m = request.messages().get(i);
+            if ("user".equalsIgnoreCase(m.role()) && m.content() != null && !m.content().isBlank()) {
+                turns.add(m.content().trim());
+            }
+        }
+        if (turns.isEmpty()) return null;
+        java.util.Collections.reverse(turns);
+        return String.join("\n", turns);
     }
 
     // ── Private utilities ─────────────────────────────────────────────────────

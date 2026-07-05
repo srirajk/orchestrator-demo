@@ -3932,5 +3932,24 @@
     ],
     "occurrences": 1,
     "last_seen": "2026-07-05T18:39:52"
+  },
+  {
+    "id": "bug-238",
+    "timestamp": "2026-07-05T23:15:00",
+    "error_message": "ClarificationComposer failed (RuntimeException) \u2014 LLM returned HTTP 401; composed clarify silently fell back to the deterministic template for rm_jane/uw_sam.",
+    "file": "docker-compose.yml",
+    "root_cause": "The composer's API-key env used a TRIPLE-nested compose default ${A:-${B:-${C:-}}}. Docker Compose does not reliably resolve triple-nested ${} defaults, yielding an empty/garbled key \u2192 Z.AI 401. Intent classifier worked because it uses only a SINGLE-nested default.",
+    "fix": "Simplified CONDUIT_LLM_CLARIFICATION_COMPOSER_API_KEY to the single-nest pattern the other services use: ${CONDUIT_LLM_CLARIFICATION_COMPOSER_API_KEY:-${ZAI_API_KEY:-}}. Composed clarify then phrased correctly; the 401 path had ALSO proven the fallback (template served, no crash).",
+    "tags": [
+      "clarify-composer",
+      "docker-compose",
+      "env-interpolation",
+      "llm-auth",
+      "world-b",
+      "gateway"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-05T23:15:00"
   }
 ]

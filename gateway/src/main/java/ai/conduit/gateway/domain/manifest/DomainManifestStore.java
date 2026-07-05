@@ -83,7 +83,8 @@ public class DomainManifestStore {
             return d; // nothing changed
         }
         DomainManifest.Coverage resolved = new DomainManifest.Coverage(discoverUrl, checkUrl, resolveUrl, c.cacheTtlSeconds());
-        return new DomainManifest(d.domainId(), d.displayName(), resolved, d.memoryCompaction());
+        return new DomainManifest(d.domainId(), d.displayName(), resolved, d.memoryCompaction(),
+                d.clarifyStyle(), d.clarifyTone());
     }
 
     private String resolveEnvVars(String template) {

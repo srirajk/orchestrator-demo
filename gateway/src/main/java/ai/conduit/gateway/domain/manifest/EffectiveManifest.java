@@ -14,7 +14,11 @@ public record EffectiveManifest(
     Map<String, ClarificationSchema> clarificationSchema,
     DomainManifest.Coverage coverage,
     List<String> mustPreserve,
-    List<String> canDrop
+    List<String> canDrop,
+    // Clarification STYLE policy, sourced from the domain manifest ("template" | "composed").
+    // The clarify DECISION stays deterministic in gateway code; this only governs WORDING.
+    String clarifyStyle,
+    String clarifyTone
 ) {
 
     public static EffectiveManifest merge(DomainManifest domain, SubDomainManifest sub, String agentId) {
@@ -50,8 +54,15 @@ public record EffectiveManifest(
             schema,
             coverage,
             mustPreserve,
-            canDrop
+            canDrop,
+            domain != null ? domain.clarifyStyleOrDefault() : "template",
+            domain != null ? domain.clarifyTone() : null
         );
+    }
+
+    /** True when this domain opts in to LLM-composed (natural) clarification wording. */
+    public boolean clarifyComposed() {
+        return "composed".equalsIgnoreCase(clarifyStyle);
     }
 
     /** Returns true if this effective manifest declares any required-context entity. */

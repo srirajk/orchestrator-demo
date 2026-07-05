@@ -475,6 +475,10 @@
 
 - `IntentClassifier.java` — Stage A: combined intent+entity LLM (manifest-compiled prompt, temperature 0). Focal-entity rules (explicit name in latest msg supersedes history; pronoun→last focal; emit typed NAME not a recalled id; named entity→FETCH not CLARIFY) + deterministic deriveFocalReference() [id in latest msg → user-grounded ref → focalIdByNameMatch (proper-noun tokens vs transcript "Name (ID)") → lastFocalSingleId anaphora carry]. Extracts entities for FETCH_DATA AND FOLLOW_UP (bias-to-fetch fallthrough). bug-233. RECENCY (bug-234): deriveFocalReference() precedence reordered so an anaphoric turn that names no new entity binds to the MOST-RECENTLY-NAMED focal entity (recency carry) BEFORE the grounded-LLM-value fallback; a name shared with the latest message (sharesWord, ≥4 chars) counts as naming-this-turn and supersedes older focus. Fixes pronoun binding to a stale older entity. (~6500 tok)
 
+## gateway/src/main/java/ai/conduit/gateway/domain/clarify/
+
+- `ClarificationComposer.java` — The 4th grounded LLM call site (alongside IntentClassifier / EntityExtractor / AnswerSynthesizer). PHRASES a natural clarify question over a GROUNDED candidate set handed in as DELIMITED DATA; it never DECIDES to clarify (that stays deterministic in ChatService: extracted ∩ required = ∅) and never invents. Generic scaffold; entity noun + optional tone come from the manifest (World-B clean). compose() returns null (→ caller serves the deterministic template) when the LLM is unreachable OR validate() rejects: output blank / too long, contains any id_pattern token outside the candidate id set (core foreign-ID guard), or references no candidate. Non-streaming, single completion, own tight budget (config conduit.llm.clarification-composer.*, defaults inherit intent-classifier Z.AI/flash). (~2400 tok)
+
 ## gateway/src/main/java/ai/conduit/gateway/synthesis/answer/
 
 - `AnswerSynthesizer.java` — Synthesizes a grounded, streamed answer from agent outputs using Z.AI GLM. System prompt forbids cross-entity aggregation/roll-ups (compute guardrail) and renders WITHHELD sections (structural-gate-denied domains) so mixed in/out-of-access asks fulfill the accessible part + state the withheld part; synthesizeFromHistory prompt also forbids computing/aggregating (bug-237). (~7600 tok)
@@ -558,10 +562,10 @@
 ## gateway/src/main/java/ai/meridian/gateway/domain/manifest/
 
 - `ClarificationSchema.java` — Class: ClarificationSchema (~112 tok)
-- `DomainManifest.java` — DomainManifest: Coverage, MemoryCompaction (~272 tok)
+- `DomainManifest.java` — DomainManifest: Coverage, MemoryCompaction + clarify_style/clarify_tone (clarification WORDING policy; clarifyStyleOrDefault()→"template"). (~330 tok)
 - `DomainManifestStore.java` — Resolves ${VAR_NAME} placeholders in all Coverage URL fields using Spring Environment. identifyByIdPattern(text)→IdentifiedReference: maps a typed id to its owning resource-scoped sub-domain + coverage via manifest id_pattern (bug-236, deterministic domain for a bare id). (~3700 tok)
 - `DomainPrerequisiteValidator.java` — Service: DomainPrerequisiteValidator (~439 tok)
-- `EffectiveManifest.java` — Returns true if this effective manifest declares any required-context entity. (~706 tok)
+- `EffectiveManifest.java` — Merged domain+sub-domain view. requiresContext()/primaryRequiredKey()/clarificationFor(); carries clarifyStyle/clarifyTone from the domain manifest with clarifyComposed() helper (drives ChatService.buildClarificationQuestion's template|composed switch). (~760 tok)
 - `EntityType.java` — A manifest-declared entity type. This is the load-bearing declaration that makes the (~528 tok)
 - `SubDomainManifest.java` — Normalise missing optional collections so callers never NPE. (~650 tok)
 

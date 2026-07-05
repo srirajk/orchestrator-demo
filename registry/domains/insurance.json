@@ -1,6 +1,8 @@
 {
   "domain_id": "insurance",
   "display_name": "Insurance",
+  "clarify_style": "composed",
+  "clarify_tone": "warm, concise, and professional — like a helpful colleague",
   "coverage": {
     "discover_url": "${INSURANCE_COVERAGE_URL}/coverage/{principal_id}",
     "check_url": "${INSURANCE_COVERAGE_URL}/coverage/{principal_id}/resources/{id}",

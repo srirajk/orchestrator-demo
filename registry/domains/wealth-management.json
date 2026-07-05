@@ -1,6 +1,8 @@
 {
   "domain_id": "wealth-management",
   "display_name": "Wealth Management",
+  "clarify_style": "composed",
+  "clarify_tone": "warm, concise, and professional — like a helpful colleague",
   "coverage": {
     "discover_url": "${WEALTH_COVERAGE_URL}/coverage/{principal_id}",
     "check_url": "${WEALTH_COVERAGE_URL}/coverage/{principal_id}/resources/{id}",

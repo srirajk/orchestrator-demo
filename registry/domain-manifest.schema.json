@@ -13,6 +13,17 @@
       "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
     },
     "display_name": { "type": "string", "minLength": 1 },
+    "clarify_style": {
+      "type": "string",
+      "enum": ["template", "composed"],
+      "default": "template",
+      "description": "Clarification WORDING policy. 'template' (default) serves the byte-for-byte deterministic question; 'composed' lets the gateway's ClarificationComposer phrase a natural question over the grounded candidate set. The clarify DECISION stays deterministic regardless — this only affects wording, and the deterministic template is always the validated fallback."
+    },
+    "clarify_tone": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional tone/style hint passed to the ClarificationComposer when clarify_style is 'composed' (e.g. 'warm and professional'). Ignored for 'template'."
+    },
     "coverage": {
       "type": "object",
       "additionalProperties": false,
