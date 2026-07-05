@@ -299,3 +299,415 @@ html, body {
   .brand-panel { display: none; }
   .form-panel  { width: 100%; min-width: unset; }
 }
+
+/* Polished Axiom enterprise sign-in */
+:root {
+  --ink: #07111f;
+  --ink-2: #102033;
+  --surface: #ffffff;
+  --page-bg: #f6f8fb;
+  --panel: #eef3f7;
+  --line: #d8e1eb;
+  --line-strong: #b9c6d4;
+  --text: #142235;
+  --subtle: #637083;
+  --accent: #0f766e;
+  --accent-soft: #e7f5f3;
+  --warn: #b42318;
+  --warn-bg: #fff4f2;
+  --warn-line: #f5b5ad;
+  --focus: rgba(15, 118, 110, .22);
+  --radius: 8px;
+  --shadow: 0 24px 60px rgba(7, 17, 31, .14);
+}
+
+html,
+body {
+  min-height: 100%;
+  background: var(--page-bg);
+  color: var(--text);
+}
+
+.page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(420px, 1fr) minmax(420px, 520px);
+  background:
+    linear-gradient(rgba(16, 32, 51, .05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(16, 32, 51, .05) 1px, transparent 1px),
+    var(--page-bg);
+  background-size: 44px 44px;
+}
+
+.brand-panel {
+  flex: none;
+  min-height: 100vh;
+  padding: 56px 64px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .04), rgba(255, 255, 255, 0)),
+    var(--ink);
+  color: var(--surface);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+}
+
+.brand-panel::before,
+.brand-panel::after {
+  display: none;
+}
+
+.axiom-logo,
+.mobile-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  z-index: 1;
+}
+
+.mobile-logo {
+  display: none;
+  margin-bottom: 32px;
+}
+
+.axiom-mark {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: #f4c84f;
+  color: var(--ink);
+  box-shadow: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.axiom-name {
+  color: currentColor;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.1;
+  text-transform: none;
+}
+
+.axiom-kicker {
+  color: rgba(255, 255, 255, .58);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  margin-top: 3px;
+}
+
+.mobile-logo .axiom-name {
+  color: var(--ink);
+}
+
+.mobile-logo .axiom-kicker {
+  color: var(--subtle);
+}
+
+.brand-body {
+  max-width: 500px;
+  position: relative;
+  z-index: 1;
+}
+
+.brand-headline {
+  margin: 0 0 18px;
+  color: var(--surface);
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: 0;
+}
+
+.brand-sub {
+  max-width: 440px;
+  color: rgba(255, 255, 255, .68);
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.trust-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.trust-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, .15);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .06);
+  color: rgba(255, 255, 255, .78);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.trust-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px rgba(15, 118, 110, .16);
+}
+
+.form-panel {
+  width: auto;
+  min-width: 0;
+  min-height: 100vh;
+  padding: 48px;
+  background: rgba(255, 255, 255, .84);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-card {
+  width: min(100%, 420px);
+  padding: 0;
+}
+
+.form-header {
+  margin-bottom: 28px;
+}
+
+.for-label {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.4;
+  margin-bottom: 10px;
+  text-transform: none;
+}
+
+.form-title {
+  color: var(--ink);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+.form-subtitle {
+  color: var(--subtle);
+  font-size: 15px;
+  line-height: 1.55;
+  margin-top: 10px;
+}
+
+.login-form {
+  display: grid;
+  gap: 18px;
+}
+
+.field {
+  margin-bottom: 0;
+}
+
+.field label {
+  color: var(--ink-2);
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+
+.field input {
+  width: 100%;
+  height: 50px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 500;
+  outline: none;
+  padding: 0 14px;
+  transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease;
+}
+
+.field input::placeholder {
+  color: #8a95a5;
+}
+
+.field input:hover {
+  border-color: var(--line-strong);
+}
+
+.field input:focus {
+  border-color: var(--accent);
+  background: var(--surface);
+  box-shadow: 0 0 0 4px var(--focus);
+}
+
+.field input[aria-invalid="true"] {
+  border-color: var(--warn-line);
+}
+
+.field input[aria-invalid="true"]:focus {
+  border-color: var(--warn);
+  box-shadow: 0 0 0 4px rgba(180, 35, 24, .14);
+}
+
+.btn-sign-in {
+  width: 100%;
+  height: 50px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--ink);
+  color: var(--surface);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0;
+  margin-top: 4px;
+  box-shadow: 0 16px 32px rgba(7, 17, 31, .18);
+  transition: background-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+
+.btn-sign-in:hover {
+  background: var(--ink-2);
+  box-shadow: 0 18px 36px rgba(7, 17, 31, .22);
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.btn-sign-in:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.btn-sign-in:active {
+  transform: translateY(0);
+}
+
+.error-banner {
+  margin: 0 0 22px;
+  padding: 13px 14px;
+  border: 1px solid var(--warn-line);
+  border-radius: var(--radius);
+  background: var(--warn-bg);
+  color: var(--warn);
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.error-icon {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--warn);
+  color: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.error-title {
+  color: var(--warn);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.error-copy {
+  color: #8d2d25;
+  font-size: 13px;
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.secure-note {
+  margin-top: 26px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  color: var(--subtle);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.divider,
+.meridian-byline,
+.demo,
+.trust-badges {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .page {
+    display: block;
+    min-height: 100vh;
+    background: var(--page-bg);
+  }
+
+  .brand-panel {
+    display: none;
+  }
+
+  .form-panel {
+    min-height: 100vh;
+    padding: 32px 22px;
+    background: var(--surface);
+  }
+
+  .mobile-logo {
+    display: flex;
+  }
+
+  .login-card {
+    width: min(100%, 430px);
+  }
+
+  .form-title {
+    font-size: 27px;
+  }
+}
+
+@media (max-width: 420px) {
+  .form-panel {
+    padding: 26px 18px;
+    align-items: flex-start;
+  }
+
+  .mobile-logo {
+    margin-bottom: 28px;
+  }
+
+  .form-header {
+    margin-bottom: 24px;
+  }
+
+  .field input,
+  .btn-sign-in {
+    height: 48px;
+  }
+}

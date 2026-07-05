@@ -152,6 +152,7 @@ public class ChatService {
     public void handleChat(ChatRequest request, SseEmitter emitter, String userId,
                            Principal jwtPrincipal, String headerConvId) {
         long   requestStart = System.currentTimeMillis();
+        emitAdoption(jwtPrincipal);   // adoption-by-role (cardinality-safe: role, not user)
         Span   rootSpan     = tracer.spanBuilder("chat.handle").startSpan();
         // Use the OTel trace_id as the single correlation ID across logs, glass-box, and traces.
         String requestId    = rootSpan.getSpanContext().isValid()
@@ -180,6 +181,20 @@ public class ChatService {
         rootSpan.setAttribute("langfuse.user.id", userId != null ? userId : "anonymous");
         rootSpan.setAttribute("langfuse.trace.name", "chat-turn");
         rootSpan.setAttribute("langfuse.trace.input", latestPrompt);
+
+        // ── Slicing dimensions (Phase 2): canonical user_id + segment tags ──────
+        // Make cost/tokens/traces sliceable by principal (user_id) and by business
+        // segment (segment:* tags). Every value comes from the verified JWT principal —
+        // no hardcoded segment/domain literal (World B). These base tags are set on ALL
+        // paths (chitchat, follow-up, early denials); the FETCH_DATA path augments the
+        // same tag array with domain:/agent: chips below (it re-reads segmentTags()).
+        rootSpan.setAttribute("langfuse.trace.user_id", userId != null ? userId : "anonymous");
+        List<String> segTags = segmentTags(jwtPrincipal);
+        if (!segTags.isEmpty()) {
+            rootSpan.setAttribute(AttributeKey.stringArrayKey("langfuse.trace.tags"), segTags);
+            rootSpan.setAttribute("langfuse.metadata.segment",
+                    String.join(",", jwtPrincipal.segments().keySet()));
+        }
 
         // ── W3C Baggage: propagates outward on every downstream HTTP call ─────
         String effectiveUserId = userId != null ? userId : "anonymous";
@@ -348,8 +363,10 @@ public class ChatService {
                     rootSpan.setAttribute("langfuse.metadata.domain", resolvedDomain);
                     rootSpan.setAttribute("conduit.domain", resolvedDomain);
                 }
-                // First-class tags: one per distinct domain + one per invoked agent.
-                List<String> tags = new ArrayList<>();
+                // First-class tags: segment(s) + one per distinct domain + one per invoked
+                // agent. Seeding with segmentTags() preserves the segment:* slicing chips set
+                // in handleChat (setAttribute REPLACES, so they must be re-included here).
+                List<String> tags = new ArrayList<>(segmentTags(jwtPrincipal));
                 domains.forEach(d -> tags.add("domain:" + d));
                 finalManifests.stream()
                         .map(AgentManifest::agentId)
@@ -822,6 +839,34 @@ public class ChatService {
                 .tag("outcome", outcome)
                 .register(meterRegistry)
                 .increment();
+    }
+
+    /**
+     * Adoption counter tagged by ROLE (not per-user — user-level cardinality would explode the
+     * metric). One increment per chat request; feeds the Insights "adoption by role" panel.
+     */
+    private void emitAdoption(Principal principal) {
+        String role = (principal != null && principal.roles() != null && !principal.roles().isEmpty())
+                ? principal.roles().get(0) : "anonymous";
+        Counter.builder("conduit.adoption")
+                .description("Chat requests by principal role")
+                .tag("role", role)
+                .register(meterRegistry)
+                .increment();
+    }
+
+    /**
+     * Segment slicing tags ({@code "segment:<name>"}) from the principal's per-segment
+     * classification map. Values come only from the verified JWT (World B — the gateway
+     * embeds no segment/domain literal). Empty for anonymous/segment-less principals.
+     */
+    private static List<String> segmentTags(Principal p) {
+        if (p == null || p.segments() == null || p.segments().isEmpty()) return List.of();
+        return p.segments().keySet().stream()
+                .filter(s -> s != null && !s.isBlank())
+                .map(s -> "segment:" + s)
+                .distinct()
+                .toList();
     }
 
     private static String newId() { return "chatcmpl-" + UUID.randomUUID().toString().replace("-", ""); }

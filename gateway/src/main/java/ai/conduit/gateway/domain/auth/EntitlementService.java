@@ -125,6 +125,9 @@ public class EntitlementService {
                     .filter(id -> !batch.isAllowed(id))
                     .collect(Collectors.toList());
             log.info("Agent access denied by PDP: principal={} denied={}", principal.id(), denied);
+            // Per-agent denial dimension (Insights "denials by agent"). agentId is a manifest-
+            // declared identifier read off the candidate list — no hardcoded domain literal.
+            denied.forEach(this::emitAgentDenial);
         }
         return allowed;
     }
@@ -229,6 +232,15 @@ public class EntitlementService {
             String  reason,
             String  source   // "cerbos" | "local-fallback"
     ) {}
+
+    /** Per-agent denial counter for the Insights governance board. Micrometer caches by key. */
+    private void emitAgentDenial(String agentId) {
+        Counter.builder("conduit.agent.denials")
+                .description("Agent invocations denied by the PDP, per agent")
+                .tag("agentId", agentId)
+                .register(meterRegistry)
+                .increment();
+    }
 
     /** Emits one authorization decision counter increment. Micrometer caches the Counter by key. */
     private void emitAuthzDecision(String decision, String resourceType, String source) {

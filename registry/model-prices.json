@@ -1,0 +1,33 @@
+{
+  "_comment": "Config-driven LLM token pricing for Conduit cost analytics (World B). This file is the SINGLE source of pricing truth. scripts/seed-langfuse-models.py registers each entry in Langfuse's model config so Langfuse auto-computes per-observation cost from token counts; the gateway insights module reads the same file to apply the `default` fallback rate to any model Langfuse did not price (flagged `estimated`). NO prices are hardcoded in gateway Java. Prices verified 2026-07-04.",
+  "unit": "TOKENS",
+  "default": {
+    "inputPerMillion": 0.50,
+    "outputPerMillion": 1.50,
+    "estimated": true
+  },
+  "models": {
+    "gpt-4o-mini": {
+      "inputPerMillion": 0.15,
+      "outputPerMillion": 0.60,
+      "tokenizer": "openai"
+    },
+    "gpt-4o": {
+      "inputPerMillion": 2.50,
+      "outputPerMillion": 10.00,
+      "tokenizer": "openai"
+    },
+    "glm-4.6": {
+      "inputPerMillion": 0.60,
+      "outputPerMillion": 2.20
+    },
+    "glm-4.5-flash": {
+      "inputPerMillion": 0.0,
+      "outputPerMillion": 0.0
+    },
+    "glm-4.7-flash": {
+      "inputPerMillion": 0.0,
+      "outputPerMillion": 0.0
+    }
+  }
+}

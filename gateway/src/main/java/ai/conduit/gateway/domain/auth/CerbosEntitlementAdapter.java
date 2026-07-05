@@ -161,6 +161,31 @@ public class CerbosEntitlementAdapter {
         }
     }
 
+    /**
+     * Generic single-resource permission check through the SAME Cerbos PDP path used for agents
+     * and relationships (one batched {@code /api/check/resources} call). Additive: it introduces
+     * no new decision for any existing resource kind — callers pass a fresh {@code kind}/{@code action}
+     * (e.g. the {@code insights}/{@code read} governance gate). <strong>Fail-closed</strong>: any
+     * PDP error denies.
+     *
+     * @return {@code true} iff Cerbos returns {@code EFFECT_ALLOW} for {@code action} on the resource.
+     */
+    public boolean isAllowed(Principal principal, String kind, String action, String resourceId) {
+        try {
+            String requestBody = buildResourceRequest(principal, kind, action, List.of(resourceId), Map.of());
+            String responseBody = post(requestBody);
+            boolean allowed = parseResponse(responseBody, action, List.of(resourceId))
+                    .getOrDefault(resourceId, false);
+            log.debug("Cerbos {} check: principal={} action={} id={} allowed={}",
+                    kind, principal.id(), action, resourceId, allowed);
+            return allowed;
+        } catch (Exception e) {
+            log.error("Cerbos {} check FAILED — denying (fail-closed) for principal={}: {}",
+                    kind, principal.id(), e.getMessage());
+            return false;
+        }
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private String post(String requestBody) {

@@ -112,8 +112,17 @@ public class SecurityConfig {
     @Value("${iam.oauth2.conduit-chat.redirect-uri:http://localhost:8099/api/auth/callback}")
     private String conduitChatRedirectUri;
 
-    @Value("${iam.oauth2.conduit-chat.post-logout-redirect-uri:http://localhost:8099/api/auth/login}")
+    @Value("${iam.oauth2.conduit-chat.post-logout-redirect-uri:http://localhost:8099/}")
     private String conduitChatPostLogoutRedirectUri;
+
+    @Value("${iam.oauth2.conduit-insights.client-id:conduit-insights}")
+    private String conduitInsightsClientId;
+
+    @Value("${iam.oauth2.conduit-insights.redirect-uri:http://localhost:5175/callback}")
+    private String conduitInsightsRedirectUri;
+
+    @Value("${iam.oauth2.conduit-insights.post-logout-redirect-uri:http://localhost:5175/}")
+    private String conduitInsightsPostLogoutRedirectUri;
 
     @Value("${iam.oauth2.admin-ui.client-id:admin-ui-client}")
     private String adminUiClientId;
@@ -314,6 +323,8 @@ public class SecurityConfig {
                 .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
                 .redirectUri(conduitChatRedirectUri)
                 .postLogoutRedirectUri(conduitChatPostLogoutRedirectUri)
+                .postLogoutRedirectUri("http://localhost:8099/")
+                .postLogoutRedirectUri("http://localhost:8099/api/auth/login")
                 .scope(OidcScopes.OPENID)
                 .scope(OidcScopes.PROFILE)
                 .scope(OidcScopes.EMAIL)
@@ -328,7 +339,32 @@ public class SecurityConfig {
                         .build())
                 .build();
 
-        return new InMemoryRegisteredClientRepository(gatewayClient, adminUiClient, librechatClient, conduitChatClient);
+        // Conduit Insights — public SPA (PKCE, no client secret); admin-only analytics. The SPA runs the
+        // OIDC authorization-code + PKCE flow itself and calls the gateway with the bearer token; the
+        // /v1/insights Cerbos gate performs the admin authorization. Separate app, no BFF.
+        RegisteredClient conduitInsightsClient = RegisteredClient.withId("conduit-insights-client-id")
+                .clientId(conduitInsightsClientId)
+                .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+                .redirectUri(conduitInsightsRedirectUri)
+                .postLogoutRedirectUri(conduitInsightsPostLogoutRedirectUri)
+                .scope(OidcScopes.OPENID)
+                .scope(OidcScopes.PROFILE)
+                .scope(OidcScopes.EMAIL)
+                .scope("offline_access")
+                .tokenSettings(TokenSettings.builder()
+                        .accessTokenTimeToLive(Duration.ofHours(2))
+                        .refreshTokenTimeToLive(Duration.ofDays(1))
+                        .reuseRefreshTokens(false)
+                        .build())
+                .clientSettings(ClientSettings.builder()
+                        .requireProofKey(true)
+                        .requireAuthorizationConsent(false)
+                        .build())
+                .build();
+
+        return new InMemoryRegisteredClientRepository(gatewayClient, adminUiClient, librechatClient, conduitChatClient, conduitInsightsClient);
     }
 
     // =========================================================

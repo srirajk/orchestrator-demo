@@ -133,6 +133,23 @@ conduit:
     # closed (default) = Cerbos unreachable → deny all (production safe)
     # local = Cerbos unreachable → fall back to JWT book claim (demo resilience)
     fail-mode: ${CONDUIT_CERBOS_FAIL_MODE:closed}
+  # ── Conduit Insights (native, admin-gated analytics API) ──────────────────────
+  # Aggregates Prometheus (ops) + Langfuse (cost/eval) behind /v1/insights/*.
+  # No hardcoded endpoints/keys — everything via env. In docker the gateway reaches
+  # Prometheus at prometheus:9090 and Langfuse at langfuse:3000 (internal port).
+  insights:
+    prometheus-url: ${CONDUIT_INSIGHTS_PROMETHEUS_URL:http://prometheus:9090}
+    langfuse-url: ${CONDUIT_INSIGHTS_LANGFUSE_URL:http://langfuse:3000}
+    langfuse-public-key: ${CONDUIT_INSIGHTS_LANGFUSE_PUBLIC_KEY:${LANGFUSE_PROJECT_PUBLIC_KEY:}}
+    langfuse-secret-key: ${CONDUIT_INSIGHTS_LANGFUSE_SECRET_KEY:${LANGFUSE_PROJECT_SECRET_KEY:}}
+    # VT fan-out discipline: dedicated bounded executor, deadline-bound board, per-query timeout,
+    # backpressure to the upstreams, and a short-TTL cache on the (slower) Langfuse side.
+    board-deadline-ms: ${CONDUIT_INSIGHTS_BOARD_DEADLINE_MS:4000}
+    per-query-timeout-ms: ${CONDUIT_INSIGHTS_PER_QUERY_TIMEOUT_MS:3000}
+    connect-timeout-ms: ${CONDUIT_INSIGHTS_CONNECT_TIMEOUT_MS:2000}
+    max-concurrent-queries: ${CONDUIT_INSIGHTS_MAX_CONCURRENT_QUERIES:8}
+    permit-wait-ms: ${CONDUIT_INSIGHTS_PERMIT_WAIT_MS:2000}
+    cache-ttl-seconds: ${CONDUIT_INSIGHTS_CACHE_TTL_SECONDS:20}
 
 logging:
   pattern:

@@ -178,6 +178,11 @@ services:
       # NOT baked into the image. Onboard a domain by dropping JSON here + restart.
       CONDUIT_REGISTRY_LOCATION: file:/registry/
       CONDUIT_ASSISTANT_DOMAIN_CONTEXT: ${CONDUIT_ASSISTANT_DOMAIN_CONTEXT:-an enterprise assistant for banking staff — covering client financial data, market research, and internal HR policies}
+      # ── Conduit Insights: metric sources (in-network URLs; keys from env) ──────
+      CONDUIT_INSIGHTS_PROMETHEUS_URL: http://prometheus:9090
+      CONDUIT_INSIGHTS_LANGFUSE_URL: http://langfuse:3000
+      CONDUIT_INSIGHTS_LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PROJECT_PUBLIC_KEY:-pk-lf-meridian-public}
+      CONDUIT_INSIGHTS_LANGFUSE_SECRET_KEY: ${LANGFUSE_PROJECT_SECRET_KEY:-sk-lf-meridian-secret}
     volumes:
       - ./registry:/registry:ro
     depends_on:
@@ -509,7 +514,9 @@ services:
       IAM_LIBRECHAT_CLIENT_ID: "meridian-librechat"
       IAM_LIBRECHAT_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-meridian-client-secret-dev}
       IAM_LIBRECHAT_REDIRECT_URI: ${IAM_LIBRECHAT_REDIRECT_URI:-http://localhost:3080/oauth/openid/callback}
-      IAM_CONDUIT_CHAT_POST_LOGOUT_REDIRECT_URI: ${IAM_CONDUIT_CHAT_POST_LOGOUT_REDIRECT_URI:-http://localhost:8099/api/auth/login}
+      IAM_CONDUIT_CHAT_POST_LOGOUT_REDIRECT_URI: ${IAM_CONDUIT_CHAT_POST_LOGOUT_REDIRECT_URI:-http://localhost:8099/}
+      IAM_CONDUIT_INSIGHTS_REDIRECT_URI: ${IAM_CONDUIT_INSIGHTS_REDIRECT_URI:-http://localhost:5175/callback}
+      IAM_CONDUIT_INSIGHTS_POST_LOGOUT_REDIRECT_URI: ${IAM_CONDUIT_INSIGHTS_POST_LOGOUT_REDIRECT_URI:-http://localhost:5175/}
       # Audience stamped on Axiom access tokens that are forwarded to the gateway.
       IAM_GATEWAY_AUDIENCE: ${IAM_GATEWAY_AUDIENCE:-conduit-gateway}
       # Persist the RSA signing key (+ its stable kid) to a named volume so a restart does not
@@ -580,7 +587,7 @@ services:
       OIDC_CLIENT_SECRET: ${CHAT_OIDC_CLIENT_SECRET:-conduit-chat-secret}
       # Must match EXACTLY the redirect-uri Axiom already has registered (never change Axiom).
       OIDC_REDIRECT_URI: ${CHAT_OIDC_REDIRECT_URI:-http://localhost:8099/api/auth/callback}
-      CHAT_POST_LOGOUT_REDIRECT_URI: ${CHAT_POST_LOGOUT_REDIRECT_URI:-http://localhost:8099/api/auth/login}
+      CHAT_POST_LOGOUT_REDIRECT_URI: ${CHAT_POST_LOGOUT_REDIRECT_URI:-http://localhost:8099/}
       # ── Session cookie ─────────────────────────────────────────────────────────
       # Session cookie must NOT be Secure over http (demo runs on http://localhost:8099).
       COOKIE_SECURE: ${CHAT_COOKIE_SECURE:-false}
@@ -619,6 +626,27 @@ services:
       timeout: 5s
       retries: 10
       start_period: 20s
+    restart: unless-stopped
+
+  # ── Conduit Insights — public PKCE SPA + same-origin nginx proxy ─────────────
+  conduit-insights:
+    build:
+      context: ./apps/insights/web
+      dockerfile: Dockerfile
+    container_name: conduit-insights
+    ports:
+      - "5175:80"
+    depends_on:
+      gateway:
+        condition: service_healthy
+      iam-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
 
   # ── Glass-box live decision trace panel ───────────────────────────────────────

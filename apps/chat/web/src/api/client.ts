@@ -2,16 +2,32 @@ function currentSpaPath(): string {
   return `${window.location.pathname}${window.location.search}${window.location.hash}` || '/'
 }
 
+export const AUTH_REQUIRED_EVENT = 'conduit:auth-required'
+
 export function redirectToLogin(): never {
   const returnTo = encodeURIComponent(currentSpaPath())
   window.location.assign(`/api/auth/login?returnTo=${returnTo}`)
   return new Promise<never>(() => {}) as never
 }
 
+export class UnauthorizedApiError extends Error {
+  status = 401
+
+  constructor(message = 'Authentication required') {
+    super(message)
+    this.name = 'UnauthorizedApiError'
+  }
+}
+
+function requireInteractiveSignIn(): never {
+  window.dispatchEvent(new CustomEvent(AUTH_REQUIRED_EVENT))
+  throw new UnauthorizedApiError()
+}
+
 /**
  * Generic fetch wrapper.
  * - Always includes credentials: 'include'
- * - On any 401 response: redirects to /api/auth/login and preserves the current SPA route.
+ * - On any 401 response: asks the SPA to show the branded sign-in landing.
  */
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const resp = await fetch(path, {
@@ -24,7 +40,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   })
 
   if (resp.status === 401) {
-    return redirectToLogin()
+    return requireInteractiveSignIn()
   }
 
   if (!resp.ok) {
@@ -56,7 +72,7 @@ export async function apiStream(path: string, init?: RequestInit): Promise<Respo
   })
 
   if (resp.status === 401) {
-    return redirectToLogin()
+    return requireInteractiveSignIn()
   }
 
   if (!resp.ok) {

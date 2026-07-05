@@ -162,6 +162,10 @@ export function Sidebar() {
     })
   }
 
+  function handleLogout() {
+    window.location.assign('/api/auth/logout')
+  }
+
   // Filter conversations by search query (title match, case-insensitive)
   const query = search.trim().toLowerCase()
   const filtered = query
@@ -282,13 +286,15 @@ export function Sidebar() {
           <p className="text-sm font-medium text-white truncate">{user.username}</p>
           <p className="text-xs text-slate-400 truncate">{user.email}</p>
         </div>
-        <a
-          href="/api/auth/logout"
+        <button
+          type="button"
+          onClick={handleLogout}
           className="shrink-0 p-1.5 rounded text-slate-500 hover:text-white transition-colors"
           title="Sign out"
+          aria-label="Sign out"
         >
           <LogOut size={14} />
-        </a>
+        </button>
       </div>
     </div>
   )

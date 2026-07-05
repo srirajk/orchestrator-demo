@@ -1,7 +1,9 @@
 package com.openwolf.iam.controller;
 
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 /**
  * Serves the Axiom-branded OIDC login page.
@@ -14,7 +16,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 public class LoginController {
 
     @GetMapping("/login")
-    public String loginPage() {
+    public String loginPage(@RequestParam(name = "error", required = false) String error, Model model) {
+        model.addAttribute("loginError", error != null);
         return "login";
     }
 }

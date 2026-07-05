@@ -4,6 +4,8 @@ import ai.conduit.gateway.orchestration.harness.AgentHarness;
 import ai.conduit.gateway.orchestration.model.NodeResult;
 import ai.conduit.gateway.orchestration.model.Plan;
 import ai.conduit.gateway.orchestration.model.PlanNode;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
@@ -34,14 +36,17 @@ public class FlatPlanExecutor {
 
     private final AgentHarness harness;
     private final Tracer tracer;
+    private final MeterRegistry meterRegistry;
     private final long overallDeadlineMs;
 
     public FlatPlanExecutor(
             AgentHarness harness,
             Tracer tracer,
+            MeterRegistry meterRegistry,
             @Value("${conduit.orchestration.fan-out-deadline-ms:60000}") long overallDeadlineMs) {
         this.harness = harness;
         this.tracer = tracer;
+        this.meterRegistry = meterRegistry;
         this.overallDeadlineMs = overallDeadlineMs;
     }
 
@@ -59,6 +64,14 @@ public class FlatPlanExecutor {
 
         log.info("FlatPlanExecutor: fanning out {} nodes in parallel (deadline={}ms)",
                 plan.nodes().size(), overallDeadlineMs);
+
+        // Resolver-SELECTION counter (distinct from agent_calls): each node in the plan is an
+        // agent the resolver picked for this request. agentId is manifest-declared (World B).
+        plan.nodes().forEach(n -> Counter.builder("conduit.resolver.selection")
+                .description("Agents selected by the resolver, per agent")
+                .tag("agentId", n.agent().agentId())
+                .register(meterRegistry)
+                .increment());
 
         // One virtual thread per node — no pool starvation under load.
         var exec = Executors.newVirtualThreadPerTaskExecutor();
