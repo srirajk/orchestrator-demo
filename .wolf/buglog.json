@@ -3845,5 +3845,28 @@
     ],
     "occurrences": 1,
     "last_seen": "2026-07-05T00:00:00Z"
+  },
+  {
+    "id": "bug-234",
+    "timestamp": "2026-07-05",
+    "error_message": "Multi-turn anaphor bound to an OLDER focal entity instead of the most-recently-named one. rm_jane: turn 5 'settlement status for Whitman' (focal \u2192 REL-00042), turn 6 'and their goals?' returned Calderon's goals (REL-00099) \u2014 confidently-wrong data.",
+    "file": "gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java",
+    "root_cause": "In deriveFocalReference() the path that accepts the LLM's extracted reference when it appears in ANY user message (userMessagesContain) ran BEFORE the anaphoric recency carry. On a bare-anaphor turn the LLM can latch onto an older entity it saw in history (Calderon); that stale grounded name was returned, so the pronoun binding was at the mercy of the LLM's non-deterministic pick rather than conversation-structure recency.",
+    "fix": "Reordered precedence and gated it generically: (1) explicit id in latest message; (2) a reference the user NAMES in this turn (LLM value shares a >=4-char word with the latest message \u2192 new naming supersedes older focus); (3) RECENCY carry for an anaphoric turn that names no new entity (focalIdByNameMatch then lastFocalSingleId = most-recently-named focal entity) placed BEFORE (4) the grounded-LLM-value fallback. Added sharesWord() helper. No domain literal \u2014 operates on manifest id_pattern + language-generic anaphora tokens + transcript structure. Behaves identically cross-domain (proven on insurance uw_sam: anaphor bound to just-named POL-77002, not older POL-77001, via coverage-gate trace). world-b-check CRITICAL 0 before/after.",
+    "tags": [
+      "gateway",
+      "multi-turn",
+      "anaphora",
+      "focal-entity",
+      "recency",
+      "world-b",
+      "intent-classifier",
+      "bug-233-followup"
+    ],
+    "related_bugs": [
+      "bug-233"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-07-05"
   }
 ]

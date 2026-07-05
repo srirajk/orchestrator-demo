@@ -440,12 +440,17 @@ public class IntentClassifier {
      *   <li>An identifier the user literally typed in the LATEST message (an {@code id_pattern}
      *       match) — the user stated it, so it is not a fabricated/recalled id. Deterministic
      *       backstop for a bare id-only follow-up the LLM drops (e.g. "and for REL-00099?").</li>
-     *   <li>The LLM's extracted reference when it appears verbatim in some USER message (latest
-     *       focal name the user just typed, or an earlier name the LLM correctly carried across a
-     *       back-reference). This keeps a genuine name and drops an id the LLM recalled from
-     *       assistant text (World-B invariant 6).</li>
-     *   <li>Else, if the latest message is a bare back-reference ("that", "them", …) with no valid
-     *       LLM reference, carry the last id the user typed earlier in the window.</li>
+     *   <li>A reference the user NAMES in the LATEST message (the model's value shares a distinctive
+     *       word with the current turn). Naming an entity NOW makes it the focal entity: it
+     *       supersedes any older one and wins focus for the next anaphor.</li>
+     *   <li>RECENCY: the latest message back-references an entity ("that", "them", "their", …)
+     *       without naming a new one. The focal entity is then the MOST-RECENTLY-NAMED entity in the
+     *       window — decided on conversation structure, NOT on the model's pick over the whole
+     *       history (which can latch onto a SUPERSEDED entity). This runs BEFORE the grounded-value
+     *       fallback so a pronoun can never bind to an older focus the model happened to re-mention.</li>
+     *   <li>Else the model's reference when it appears verbatim in some USER message (a non-anaphoric
+     *       follow-up whose named subject the model carried forward), dropping an id it merely
+     *       recalled from assistant text (World-B invariant 6).</li>
      *   <li>Else null → the deterministic coverage clarification fires downstream.</li>
      * </ol>
      * All inputs are manifest-declared ({@code id_pattern}, {@code extract_as}) or language-generic
@@ -455,6 +460,7 @@ public class IntentClassifier {
         String latest = latestUserMessage(messages);
         Pattern idp = (et.idPattern() != null && !et.idPattern().isBlank())
                 ? Pattern.compile(et.idPattern()) : null;
+        boolean grounded = llmValue != null && !llmValue.isBlank();
 
         // 1. Explicit identifier typed in the LATEST user message (user stated it — never fabricated).
         //    Deterministic backstop for a bare id-only follow-up the LLM drops ("and for REL-00099?").
@@ -462,37 +468,66 @@ public class IntentClassifier {
             Matcher m = idp.matcher(latest);
             if (m.find()) return m.group();
         }
-        // 2. The LLM's reference, kept ONLY when it appears verbatim in a USER message (World-B
-        //    invariant 6). This keeps a genuine reference the user typed — the focal name in the
-        //    latest turn ("Calderon Trust's holdings"), or the earlier name the LLM copied to
-        //    resolve a back-reference ("that portfolio" → "Whitman Family Office", which the user
-        //    typed earlier). It drops an identifier the LLM RECALLED from assistant text (the model
-        //    must never emit an id; a downstream resolver maps names to ids), so a lazily repeated
-        //    prior id cannot hijack a turn about a different entity.
-        if (llmValue != null && !llmValue.isBlank() && userMessagesContain(messages, llmValue)) {
+        // 2. A reference the user NAMES in THIS turn — the model's value shares a distinctive word
+        //    with the latest message ("Calderon Trust's holdings", "settlement for Whitman", "the
+        //    trust one"). Naming an entity now makes it the focal entity: it supersedes any older
+        //    one and wins the focus for the next anaphor. This is the "explicit name wins the focus"
+        //    half of the recency rule, evaluated at the naming turn itself.
+        if (grounded && sharesWord(latest, llmValue)) {
             return llmValue;
         }
-        if (llmValue != null && !llmValue.isBlank()) {
-            log.debug("Dropping ungrounded reference '{}' for field '{}' — absent from user-authored messages",
-                    llmValue, et.extractAs());
-        }
-        // 3. Focal recovery from the client-sent window (the model gave no user-grounded reference —
-        //    it emitted a recalled id, or null for a back-reference). Deterministic, id_pattern-based,
-        //    grounded entirely in the transcript; the coverage CHECK remains the access gate:
+        // 3. RECENCY carry: the latest message back-references an entity but NAMES no new one this
+        //    turn — either a bare anaphor ("and their goals?") or a pronoun the model resolved from
+        //    history to a possibly SUPERSEDED entity. Bind to the most-recently-named focal entity,
+        //    derived from conversation structure, and let it OVERRIDE the model's grounded pick. This
+        //    is the "a subsequent anaphor inherits the most-recent focal entity" half of the recency
+        //    rule; it must precede the grounded-value fallback (step 4) so a pronoun after an explicit
+        //    name can never bind to an OLDER focus the model happened to re-mention. Deterministic,
+        //    id_pattern-based, grounded entirely in the transcript; the coverage CHECK stays the gate:
         //    (a) NAMED subject — match the distinctive NAME tokens the transcript associates with each
         //        id (parsed from the "<Name> (<id>)" the system emitted earlier) against the latest
-        //        message. A hit means the user named that entity → carry its id. A message naming a
-        //        different entity matches nothing → clarify (never hijacked by a lazily repeated id).
-        //    (b) BARE back-reference ("that", "them", …) — carry the id of the most recent
-        //        single-entity turn (skips multi-id compare/clarification messages).
-        String named = focalIdByNameMatch(idp, messages, latest);
-        if (named != null) return named;
+        //        message. (Defensive; a bare pronoun matches nothing.)
+        //    (b) BARE back-reference — carry the id of the most recent single-entity turn (skips
+        //        multi-id compare/clarification messages) = the entity most recently in focus.
         if (isAnaphoric(latest)) {
+            String named = focalIdByNameMatch(idp, messages, latest);
+            if (named != null) return named;
             String carried = lastFocalSingleId(idp, messages);
             if (carried != null) return carried;
         }
-        // 4. Nothing safely grounded → deterministic coverage clarification downstream.
+        // 4. Otherwise keep the model's reference when it appears verbatim in a USER message (World-B
+        //    invariant 6): a non-anaphoric follow-up whose named subject the model carried forward. It
+        //    drops an identifier the model RECALLED from assistant text (the model must never emit an
+        //    id; a downstream resolver maps names to ids).
+        if (grounded && userMessagesContain(messages, llmValue)) {
+            return llmValue;
+        }
+        if (grounded) {
+            log.debug("Dropping ungrounded reference '{}' for field '{}' — absent from user-authored messages",
+                    llmValue, et.extractAs());
+        }
+        // 5. Last resort: name-match the latest message against the transcript's name→id associations.
+        String named = focalIdByNameMatch(idp, messages, latest);
+        if (named != null) return named;
+        // 6. Nothing safely grounded → deterministic coverage clarification downstream.
         return null;
+    }
+
+    /**
+     * True when the {@code reference} the model extracted shares a distinctive word (a token of
+     * length ≥ 4, matched case-insensitively on word boundaries) with the {@code latest} user
+     * message — i.e. the user NAMED that entity in the current turn, so the extraction is anchored in
+     * this turn's text rather than inferred from history. Length-gated to skip function words so a
+     * pronoun-only turn ("and their goals?") never counts as naming the model's picked entity.
+     * Language-generic — no domain knowledge.
+     */
+    private static boolean sharesWord(String latest, String reference) {
+        if (latest == null || latest.isBlank() || reference == null || reference.isBlank()) return false;
+        String latestLower = " " + latest.toLowerCase().replaceAll("[^a-z0-9]+", " ") + " ";
+        for (String tok : reference.toLowerCase().split("[^a-z0-9]+")) {
+            if (tok.length() >= 4 && latestLower.contains(" " + tok + " ")) return true;
+        }
+        return false;
     }
 
     /**

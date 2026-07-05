@@ -435,6 +435,7 @@
 - `eval_deepeval.py` — PartialHonestyMetric: configure_judge_model, measure, a_measure, is_successful + 6 more (~5444 tok)
 - `golden-prompts.json` (~3317 tok)
 - `multiturn-routing.json` — Multi-turn context-aware routing regression guard (Calderon keyword-less-follow-up fix); expected domain/outcome + must_not_route per turn. (~600 tok)
+- `multiturn-recency-insurance.json` — Cross-domain anaphor-recency regression guard (bug-234, uw_sam/insurance): establish policy A → switch B → re-name A → pronoun must bind to just-named A (POL-77002) not older B (POL-77001); asserted via coverage-gate entity in the decision trace. Proves the focal-recency fix is domain-generic. (~500 tok)
 - `langfuse_continuous.py` — check_grounding, check_partial_honesty, llm_judge (~7457 tok)
 - `langfuse_run_experiment.py` — Run a Langfuse experiment against the meridian-routing dataset. (~4132 tok)
 - `langfuse_seed_datasets.py` — Seed Langfuse datasets from eval/golden-prompts.json. (~3565 tok)
@@ -472,7 +473,7 @@
 
 ## gateway/src/main/java/ai/conduit/gateway/domain/intent/
 
-- `IntentClassifier.java` — Stage A: combined intent+entity LLM (manifest-compiled prompt, temperature 0). Focal-entity rules (explicit name in latest msg supersedes history; pronoun→last focal; emit typed NAME not a recalled id; named entity→FETCH not CLARIFY) + deterministic deriveFocalReference() [id in latest msg → user-grounded ref → focalIdByNameMatch (proper-noun tokens vs transcript "Name (ID)") → lastFocalSingleId anaphora carry]. Extracts entities for FETCH_DATA AND FOLLOW_UP (bias-to-fetch fallthrough). bug-233. (~6300 tok)
+- `IntentClassifier.java` — Stage A: combined intent+entity LLM (manifest-compiled prompt, temperature 0). Focal-entity rules (explicit name in latest msg supersedes history; pronoun→last focal; emit typed NAME not a recalled id; named entity→FETCH not CLARIFY) + deterministic deriveFocalReference() [id in latest msg → user-grounded ref → focalIdByNameMatch (proper-noun tokens vs transcript "Name (ID)") → lastFocalSingleId anaphora carry]. Extracts entities for FETCH_DATA AND FOLLOW_UP (bias-to-fetch fallthrough). bug-233. RECENCY (bug-234): deriveFocalReference() precedence reordered so an anaphoric turn that names no new entity binds to the MOST-RECENTLY-NAMED focal entity (recency carry) BEFORE the grounded-LLM-value fallback; a name shared with the latest message (sharesWord, ≥4 chars) counts as naming-this-turn and supersedes older focus. Fixes pronoun binding to a stale older entity. (~6500 tok)
 
 ## gateway/src/main/java/ai/conduit/gateway/synthesis/answer/
 
@@ -1198,6 +1199,7 @@
 - `smoke-ui.sh` — Tier-1 fast gate (invoked first by smoke.sh): 10 health URLs 200, CORS preflights per browser origin (chat→BFF :8099, admin→iam :5182→:8084), 4 personas mint JWT. No LLM/sleeps; exit=#failures. (~550 tok)
 - `verify-telemetry-e2e.sh` — ───────────────────────────────────────────────────────────────────────────── (~1151 tok)
 - `verify.sh` — Full verification script — runs after each phase to confirm acceptance criteria. (~713 tok)
+- `probe-recency-insurance.py` — Cross-domain anaphor-recency BFF driver (uw_sam via OIDC): 5-turn insurance conversation proving the bug-234 focal-recency fix is domain-generic; pairs with eval/multiturn-recency-insurance.json. (~350 tok)
 - `wait-for-healthy.sh` — Wait until all core docker-compose services report healthy, then exit 0. (~323 tok)
 - `world-b-check.sh` — ───────────────────────────────────────────────────────────────────────────── (~1272 tok)
 
