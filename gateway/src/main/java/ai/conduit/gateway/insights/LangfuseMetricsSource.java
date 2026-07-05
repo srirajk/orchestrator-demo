@@ -46,8 +46,15 @@ import java.util.concurrent.locks.ReentrantLock;
  * concurrent double-fetch is harmless (idempotent GET).
  *
  * <p>Non-throwing: any failure returns empty and the panel renders {@code unavailable}. Nothing
- * here is domain-specific (World B) — it reports cost/tokens/eval names exactly as Langfuse
- * stores them.
+ * here is domain-specific (World B) — it reports tokens/eval names exactly as Langfuse stores them.
+ *
+ * <p><strong>Cost is computed here, not read from Langfuse.</strong> Langfuse tracks per-model
+ * prompt/completion token counts regardless of whether its own model-pricing was seeded; this
+ * source multiplies those token facts by {@link ModelPricing} config rates
+ * ({@code registry/model-prices.json}) — {@code Σ (inputTokens × inputPerMillion + outputTokens ×
+ * outputPerMillion) / 1e6} per model. So cost is real even on a fresh Langfuse whose {@code
+ * totalCost} is 0 because the seed step never ran. Prices are never hardcoded in Java (World B);
+ * a model absent from the config is priced at the {@code default} rate and flagged {@code estimated}.
  */
 @Component
 public class LangfuseMetricsSource implements MetricsSource {
@@ -62,6 +69,7 @@ public class LangfuseMetricsSource implements MetricsSource {
     private final String chatTraceName;
     private final HttpClient http;
     private final ObjectMapper mapper;
+    private final ModelPricing pricing;
 
     private final ReentrantLock cacheLock = new ReentrantLock();
     private final Map<String, CacheEntry> cache = new ConcurrentHashMap<>();
@@ -70,6 +78,7 @@ public class LangfuseMetricsSource implements MetricsSource {
 
     public LangfuseMetricsSource(
             ObjectMapper mapper,
+            ModelPricing pricing,
             @Value("${conduit.insights.langfuse-url:http://langfuse:3000}") String baseUrl,
             @Value("${conduit.insights.langfuse-public-key:}") String publicKey,
             @Value("${conduit.insights.langfuse-secret-key:}") String secretKey,
@@ -81,6 +90,7 @@ public class LangfuseMetricsSource implements MetricsSource {
             // denominator (one chat turn = one "question"), excluding infra/eval/agent traces.
             @Value("${conduit.insights.chat-trace-name:chat-turn}") String chatTraceName) {
         this.mapper = mapper;
+        this.pricing = pricing;
         this.chatTraceName = chatTraceName;
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
         this.enabled = !publicKey.isBlank() && !secretKey.isBlank();
@@ -122,13 +132,27 @@ public class LangfuseMetricsSource implements MetricsSource {
         return OptionalDouble.of(total);
     }
 
-    /** Total model cost (USD) across the last {@code days} days. */
+    /**
+     * Total model cost (USD) across the last {@code days} days — computed from the per-model token
+     * usage the daily endpoint reports × {@link ModelPricing} config rates (NOT Langfuse's
+     * pre-computed {@code totalCost}, which is 0 when its model-pricing was never seeded).
+     */
     public OptionalDouble totalCost(int days) {
         JsonNode d = daily(days);
         if (d == null) return OptionalDouble.empty();
         double total = 0;
-        for (JsonNode day : d.path("data")) total += day.path("totalCost").asDouble(0);
+        for (JsonNode day : d.path("data")) {
+            for (JsonNode u : day.path("usage")) total += costOfUsage(u);
+        }
         return OptionalDouble.of(total);
+    }
+
+    /** Cost (USD) of one daily-endpoint usage row, from its model + input/output tokens × config. */
+    private double costOfUsage(JsonNode usage) {
+        String model = usage.path("model").asText(null);
+        double in  = usage.path("inputUsage").asDouble(0);
+        double out = usage.path("outputUsage").asDouble(0);
+        return pricing.cost(model, in, out);
     }
 
     /** Trace count across the last {@code days} days. */
@@ -140,13 +164,13 @@ public class LangfuseMetricsSource implements MetricsSource {
         return OptionalDouble.of(total);
     }
 
-    /** Cost per day (chronological) for the last {@code days} days. */
-    public List<Point> costByDay(int days) { return byDay(days, "totalCost", true); }
+    /** Cost per day (chronological) for the last {@code days} days — computed from tokens × config. */
+    public List<Point> costByDay(int days) { return byDay(days, true); }
 
     /** Token usage per day (chronological) for the last {@code days} days. */
-    public List<Point> tokensByDay(int days) { return byDay(days, null, false); }
+    public List<Point> tokensByDay(int days) { return byDay(days, false); }
 
-    private List<Point> byDay(int days, String field, boolean cost) {
+    private List<Point> byDay(int days, boolean cost) {
         List<Point> out = new ArrayList<>();
         JsonNode d = daily(days);
         if (d == null) return out;
@@ -157,12 +181,10 @@ public class LangfuseMetricsSource implements MetricsSource {
             JsonNode day = rows.get(i);
             long epoch = epochOf(day.path("date").asText(null));
             if (epoch < 0) continue;
-            double v;
-            if (cost) {
-                v = day.path(field).asDouble(0);
-            } else {
-                v = 0;
-                for (JsonNode u : day.path("usage")) v += u.path("totalUsage").asDouble(0);
+            double v = 0;
+            for (JsonNode u : day.path("usage")) {
+                // Cost is OUR computation (tokens × config), not Langfuse's zero-when-unseeded totalCost.
+                v += cost ? costOfUsage(u) : u.path("totalUsage").asDouble(0);
             }
             out.add(new Point(epoch, v));
         }
@@ -193,17 +215,40 @@ public class LangfuseMetricsSource implements MetricsSource {
     // dimension is a Langfuse-native field (providedModelName / userId / trace tags); nothing
     // here is domain-specific (World B). Non-throwing: any failure → empty list.
 
-    /** One cost/tokens/count row for a slice (model, user, or segment). */
-    public record CostSlice(String label, double costUsd, double tokens, long count) {}
+    /**
+     * One cost/tokens/count row for a slice (model, user, or segment). {@code costUsd} is computed
+     * here from token counts × {@link ModelPricing} config; {@code estimated} is true when any
+     * priced token in the slice used the config {@code default} fallback (model not in the config).
+     */
+    public record CostSlice(String label, double costUsd, double tokens, long count, boolean estimated) {}
 
-    /** Cost + tokens grouped by model name, over the last {@code days}. */
+    /**
+     * Cost + tokens grouped by model name, over the last {@code days}. Cost is
+     * {@code inputTokens × inputPerMillion + outputTokens × outputPerMillion) / 1e6} using the
+     * config rate for that exact model; a model absent from the config is flagged {@code estimated}.
+     */
     public List<CostSlice> costByModel(int days) {
-        return slicesByDimension("providedModelName", days);
+        ObjectNode q = baseQuery("observations", days);
+        costMetrics(q);
+        q.putArray("dimensions").add(dimension("providedModelName"));
+        JsonNode data = metricsGet(q);
+        List<CostSlice> out = new ArrayList<>();
+        if (data == null) return out;
+        for (JsonNode r : data.path("data")) {
+            String model = r.path("providedModelName").asText(null);
+            if (model == null || model.isBlank() || "null".equals(model)) continue; // skip non-LLM aggregate
+            double tokens = r.path("sum_totalTokens").asDouble(0);
+            out.add(new CostSlice(model, costOf(r, model), tokens,
+                    r.path("count_count").asLong(0), pricing.isEstimated(model)));
+        }
+        return out;
     }
 
     /** Cost + tokens grouped by principal ({@code user_id} on the trace), over the last {@code days}. */
     public List<CostSlice> costByUser(int days) {
-        return slicesByDimension("userId", days);
+        // Group by [principal × model] so each row can be priced at its model's config rate, then
+        // aggregate up to the principal — cost cannot be priced on a userId-only aggregate.
+        return aggregatedSlices("userId", days);
     }
 
     /**
@@ -216,7 +261,8 @@ public class LangfuseMetricsSource implements MetricsSource {
         for (String tag : distinctTags("segment:", days)) {
             ObjectNode q = baseQuery("observations", days);
             costMetrics(q);
-            q.putArray("dimensions");
+            // Group by model WITHIN the segment filter so each row is priced at its config rate.
+            q.putArray("dimensions").add(dimension("providedModelName"));
             ArrayNode filters = q.putArray("filters");
             ObjectNode f = filters.addObject();
             f.put("column", "tags");
@@ -224,15 +270,18 @@ public class LangfuseMetricsSource implements MetricsSource {
             f.put("type", "arrayOptions");
             f.putArray("value").add(tag);
             JsonNode data = metricsGet(q);
-            double cost = 0, tokens = 0; long count = 0;
+            double cost = 0, tokens = 0; long count = 0; boolean estimated = false;
             if (data != null) {
                 for (JsonNode r : data.path("data")) {
-                    cost   += r.path("sum_totalCost").asDouble(0);
-                    tokens += r.path("sum_totalTokens").asDouble(0);
+                    String model = r.path("providedModelName").asText(null);
+                    double tk = r.path("sum_totalTokens").asDouble(0);
+                    cost   += costOf(r, model);
+                    tokens += tk;
                     count  += r.path("count_count").asLong(0);
+                    if (tk > 0 && pricing.isEstimated(model)) estimated = true;
                 }
             }
-            out.add(new CostSlice(tag.substring("segment:".length()), cost, tokens, count));
+            out.add(new CostSlice(tag.substring("segment:".length()), cost, tokens, count, estimated));
         }
         return out;
     }
@@ -241,17 +290,21 @@ public class LangfuseMetricsSource implements MetricsSource {
     public CostSlice costTotals(int days) {
         ObjectNode q = baseQuery("observations", days);
         costMetrics(q);
-        q.putArray("dimensions");
+        // Group by model so total cost is Σ per-model (tokens × config rate).
+        q.putArray("dimensions").add(dimension("providedModelName"));
         JsonNode data = metricsGet(q);
-        double cost = 0, tokens = 0;
+        double cost = 0, tokens = 0; boolean estimated = false;
         if (data != null) {
             for (JsonNode r : data.path("data")) {
-                cost   += r.path("sum_totalCost").asDouble(0);
-                tokens += r.path("sum_totalTokens").asDouble(0);
+                String model = r.path("providedModelName").asText(null);
+                double tk = r.path("sum_totalTokens").asDouble(0);
+                cost   += costOf(r, model);
+                tokens += tk;
+                if (tk > 0 && pricing.isEstimated(model)) estimated = true;
             }
         }
         long questions = questionCount(days);
-        return new CostSlice("total", cost, tokens, questions);
+        return new CostSlice("total", cost, tokens, questions, estimated);
     }
 
     /** Chat-turn trace count over the window — the denominator for unit economics. */
@@ -272,22 +325,44 @@ public class LangfuseMetricsSource implements MetricsSource {
         return total;
     }
 
-    private List<CostSlice> slicesByDimension(String field, int days) {
+    /**
+     * Group observations by {@code field × model}, price each row at its model's config rate, then
+     * aggregate up to {@code field}. Needed because cost cannot be derived from a single-dimension
+     * (field-only) aggregate — the model is what carries the price. Insertion order of the first
+     * time a label appears is preserved.
+     */
+    private List<CostSlice> aggregatedSlices(String field, int days) {
         ObjectNode q = baseQuery("observations", days);
         costMetrics(q);
-        q.putArray("dimensions").add(dimension(field));
+        ArrayNode dims = q.putArray("dimensions");
+        dims.add(dimension(field));
+        dims.add(dimension("providedModelName"));
         JsonNode data = metricsGet(q);
-        List<CostSlice> out = new ArrayList<>();
-        if (data == null) return out;
-        for (JsonNode r : data.path("data")) {
-            String label = r.path(field).asText(null);
-            if (label == null || label.isBlank() || "null".equals(label)) continue; // skip the non-LLM aggregate row
-            out.add(new CostSlice(label,
-                    r.path("sum_totalCost").asDouble(0),
-                    r.path("sum_totalTokens").asDouble(0),
-                    r.path("count_count").asLong(0)));
+        // label -> [cost, tokens, count, estimatedFlag(0/1)]
+        Map<String, double[]> agg = new LinkedHashMap<>();
+        if (data != null) {
+            for (JsonNode r : data.path("data")) {
+                String label = r.path(field).asText(null);
+                if (label == null || label.isBlank() || "null".equals(label)) continue; // skip null-principal
+                String model = r.path("providedModelName").asText(null);
+                double tk = r.path("sum_totalTokens").asDouble(0);
+                double[] a = agg.computeIfAbsent(label, k -> new double[4]);
+                a[0] += costOf(r, model);
+                a[1] += tk;
+                a[2] += r.path("count_count").asLong(0);
+                if (tk > 0 && pricing.isEstimated(model)) a[3] = 1;
+            }
         }
+        List<CostSlice> out = new ArrayList<>();
+        agg.forEach((label, a) -> out.add(new CostSlice(label, a[0], a[1], (long) a[2], a[3] == 1)));
         return out;
+    }
+
+    /** Cost of one metrics row: config rate for {@code model} × its summed input/output tokens. */
+    private double costOf(JsonNode row, String model) {
+        double in  = row.path("sum_inputTokens").asDouble(0);
+        double out = row.path("sum_outputTokens").asDouble(0);
+        return pricing.cost(model, in, out);
     }
 
     /** Distinct trace tags starting with {@code prefix} in the window (e.g. {@code segment:*}). */
@@ -322,7 +397,11 @@ public class LangfuseMetricsSource implements MetricsSource {
 
     private void costMetrics(ObjectNode q) {
         ArrayNode metrics = q.putArray("metrics");
-        metrics.add(measure("totalCost", "sum"));
+        // Token FACTS Langfuse tracks per observation, split input/output so we can price each side
+        // ourselves. We deliberately do NOT request Langfuse's own `totalCost` — it is 0 on a
+        // fresh/unseeded Langfuse; cost is computed here from these tokens × config (ModelPricing).
+        metrics.add(measure("inputTokens", "sum"));
+        metrics.add(measure("outputTokens", "sum"));
         metrics.add(measure("totalTokens", "sum"));
         metrics.add(measure("count", "count"));
     }

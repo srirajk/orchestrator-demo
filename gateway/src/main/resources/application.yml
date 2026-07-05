@@ -150,6 +150,14 @@ conduit:
     max-concurrent-queries: ${CONDUIT_INSIGHTS_MAX_CONCURRENT_QUERIES:8}
     permit-wait-ms: ${CONDUIT_INSIGHTS_PERMIT_WAIT_MS:2000}
     cache-ttl-seconds: ${CONDUIT_INSIGHTS_CACHE_TTL_SECONDS:20}
+  # ── LLM token pricing (config-driven cost analytics) ──────────────────────────
+  # registry/model-prices.json is the SINGLE source of pricing truth. The insights module
+  # multiplies Langfuse's per-model token counts by these rates ITSELF, so cost is correct even
+  # when Langfuse's own model-pricing was never seeded. No prices are hardcoded in Java (World B).
+  # In docker the registry is mounted at /registry (CONDUIT_REGISTRY_LOCATION=file:/registry/).
+  pricing:
+    config-path: ${CONDUIT_PRICING_CONFIG_PATH:file:/registry/model-prices.json}
+    reload-check-ms: ${CONDUIT_PRICING_RELOAD_CHECK_MS:10000}
 
 logging:
   pattern:
