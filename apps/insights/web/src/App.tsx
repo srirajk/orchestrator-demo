@@ -141,7 +141,7 @@ function LandingPage() {
           <p>Use Axiom single sign-on to open authorized Conduit operations analytics.</p>
         </div>
         <button type="button" className="primary-button" onClick={() => void startSignIn()}>
-          Sign in with SSO
+          <span className="button-label">Sign in with SSO</span>
           <ArrowRight size={18} aria-hidden="true" />
         </button>
       </section>
@@ -199,7 +199,7 @@ function ErrorPage({ message }: { message: string }) {
           <p>{message}</p>
         </div>
         <button type="button" className="primary-button" onClick={() => void startSignIn()}>
-          Try SSO again
+          <span className="button-label">Try SSO again</span>
           <ArrowRight size={18} aria-hidden="true" />
         </button>
       </section>
