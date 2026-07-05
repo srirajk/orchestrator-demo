@@ -126,3 +126,17 @@ echo ""
 echo "  Book-of-business enforced by coverage services at runtime."
 echo "  REL-00188 (Okafor) is NOT in rm_jane coverage → denied by wealth-coverage."
 echo "  POL-88003 (Zenith) is NOT in uw_sam coverage  → denied by insurance-coverage."
+
+# ── Seed real demo conversations through the Chat BFF ────────────────────────────
+# Real OIDC login per user (no bearer bypass, no DB injection) → real Mongo conversations.
+# Idempotent (skips users who already have conversations) and non-fatal if the chat
+# stack isn't up yet, so it is safe to run every time the system comes up.
+if command -v python3 >/dev/null 2>&1; then
+  echo ""
+  echo "[seed-users] Seeding demo conversations via the Chat BFF..."
+  python3 "$(dirname "$0")/seed-conversations-via-bff.py" \
+    --bff-url "${CHAT_BFF_URL:-http://localhost:8099}" \
+    --iam-url "${IAM_URL:-http://localhost:8084}" \
+    --password "${SEED_PASSWORD:-Meridian@2024}" \
+    || echo "[seed-users] conversation seed skipped (chat stack not ready) — non-fatal"
+fi
