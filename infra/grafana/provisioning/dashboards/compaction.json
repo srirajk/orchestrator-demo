@@ -78,7 +78,7 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "histogram_quantile(0.95, rate(chat_compaction_context_messages_bucket[5m]))",
+          "expr": "rate(chat_compaction_context_messages_sum[5m]) / rate(chat_compaction_context_messages_count[5m])",
           "legendFormat": "p95 messages"
         }
       ],
@@ -142,16 +142,16 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "histogram_quantile(0.5, rate(chat_summary_generation_seconds_bucket[5m]))",
+          "expr": "rate(chat_summary_generation_seconds_sum[5m]) / rate(chat_summary_generation_seconds_count[5m])",
           "legendFormat": "p50 latency"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "histogram_quantile(0.95, rate(chat_summary_generation_seconds_bucket[5m]))",
+          "expr": "chat_summary_generation_seconds_max",
           "legendFormat": "p95 latency"
         }
       ],
-      "title": "Summary Generation Latency (p50 / p95)",
+      "title": "Summary Generation Latency (avg / max)",
       "type": "timeseries"
     },
     {
