@@ -1,0 +1,114 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conduit · Gateway vs Chatbot</title>
+<style>
+:root{
+  --bg:#0e0e12; --bg-panel:rgba(255,255,255,0.025); --panel-border:rgba(236,233,224,0.16);
+  --ink:#ece9e0; --ink-soft:rgba(236,233,224,0.82); --ink-muted:rgba(236,233,224,0.58); --ink-faint:rgba(236,233,224,0.38);
+  --hairline:rgba(236,233,224,0.16);
+  --yellow:#ffe600; --yellow-soft:rgba(255,230,0,0.12); --yellow-glow:rgba(255,230,0,0.35);
+  --card-bg:#faf9f5; --card-ink:#18181a; --card-sub:#6b6a63; --card-border:#d9d5c8; --card-sub-bg:rgba(0,0,0,0.04);
+  --hero-a:#242429; --hero-b:#141417; --bad:#ff6b6b; --good:#80ed99;
+  --font-mono:ui-monospace,'SF Mono','JetBrains Mono',Menlo,Consolas,monospace;
+  --font-serif:Georgia,'Iowan Old Style','Palatino Linotype',serif;
+  --font-sans:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-sans);}
+body{padding:clamp(28px,5vw,64px) clamp(16px,4vw,40px) 80px;}
+.wrap{max-width:1160px;margin:0 auto;}
+.eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:0.22em;text-transform:uppercase;color:var(--yellow);display:flex;align-items:center;gap:10px;margin-bottom:16px;}
+.eyebrow::before{content:'';width:7px;height:7px;background:var(--yellow);box-shadow:0 0 8px var(--yellow-glow);flex-shrink:0;}
+h1{font-family:var(--font-serif);font-weight:400;font-size:clamp(1.9rem,3.6vw,3.1rem);line-height:1.04;letter-spacing:-0.01em;margin:0 0 18px;text-wrap:balance;}
+h1 em{color:var(--yellow);font-style:italic;}
+.intro{font-family:var(--font-serif);font-style:italic;font-size:clamp(1.02rem,1.5vw,1.2rem);line-height:1.55;color:var(--ink-soft);max-width:76ch;margin:0 0 8px;}
+.stat-row{display:flex;flex-wrap:wrap;gap:8px 10px;margin:26px 0 36px;padding-top:22px;border-top:1px solid var(--hairline);}
+.stat{font-family:var(--font-mono);font-size:10.5px;letter-spacing:0.05em;color:var(--ink-muted);background:var(--bg-panel);border:1px solid var(--panel-border);border-radius:100px;padding:5px 12px;white-space:nowrap;}
+.stat strong{color:var(--ink);font-weight:700;}
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px;}
+.col{background:linear-gradient(var(--hero-a),var(--hero-b));border:1.6px solid var(--panel-border);border-radius:14px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.28);}
+.col.gateway{border:2.5px solid var(--yellow);box-shadow:0 0 34px var(--yellow-glow);}
+.col-title{font-family:var(--font-serif);font-size:1.42rem;font-weight:700;margin-bottom:5px;color:#fff;text-align:center;}
+.col-sub{font-family:var(--font-serif);font-style:italic;font-size:.83rem;color:rgba(255,255,255,.66);text-align:center;line-height:1.4;margin-bottom:18px;}
+.flow{display:flex;flex-direction:column;gap:8px;}
+.node{position:relative;background:rgba(255,255,255,.055);border:1px solid rgba(236,233,224,.22);border-radius:8px;padding:11px 12px 11px 36px;min-height:64px;}
+.node::before{position:absolute;left:12px;top:13px;font-family:var(--font-mono);font-weight:900;font-size:12px;}
+.chatbot .node::before{content:'?';color:var(--bad);}
+.gateway .node::before{content:'✓';color:var(--good);}
+.node strong{display:block;color:#fff;font-size:.86rem;margin-bottom:3px;}
+.node span{display:block;color:rgba(255,255,255,.62);font-size:.71rem;line-height:1.38;}
+.flow-arrow{text-align:center;color:var(--yellow);font-family:var(--font-mono);font-size:13px;line-height:1;}
+.label{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-faint);text-align:center;margin:28px 0 12px;}
+.matrix{display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:1px;background:var(--panel-border);border:1px solid var(--panel-border);border-radius:12px;overflow:hidden;}
+.mcell{background:rgba(255,255,255,.035);padding:13px 14px;color:var(--ink-muted);font-size:.78rem;line-height:1.42;}
+.mcell.head{font-family:var(--font-mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:900;color:var(--yellow);background:rgba(255,230,0,.08);}
+.mcell strong{display:block;color:var(--ink);font-size:.82rem;margin-bottom:2px;}
+.good{color:var(--good);}
+.bad{color:var(--bad);}
+.result-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px;}
+.result{background:var(--card-bg);border:1.4px solid var(--card-border);border-radius:9px;padding:14px;}
+.result .h{font-family:var(--font-serif);font-size:1rem;font-weight:700;color:var(--card-ink);margin-bottom:5px;}
+.result .s{font-size:.73rem;color:var(--card-sub);line-height:1.45;}
+.footer-note{font-family:var(--font-serif);font-style:italic;font-size:13px;color:var(--ink-soft);text-align:center;line-height:1.65;padding:22px 12px 0;border-top:1px dashed var(--hairline);margin-top:24px;max-width:900px;margin-left:auto;margin-right:auto;}
+.footer-note strong{color:var(--yellow);font-style:normal;font-weight:600;}
+@media(max-width:850px){.compare,.result-row{grid-template-columns:1fr;}.matrix{grid-template-columns:1fr;}.mcell.head:not(:first-child){display:none;}}
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">Conduit · gateway versus chatbot</div>
+  <h1>Same chat box. <em>Different architecture.</em></h1>
+  <p class="intro">This is the useful comparison: not “which model chats better,” but where decisions happen. A normal chatbot centers the model. Conduit centers a governed gateway, with the model only inside bounded steps.</p>
+
+  <div class="stat-row">
+    <span class="stat"><strong>chatbot</strong> model-centered path</span>
+    <span class="stat"><strong>conduit</strong> gateway-centered path</span>
+    <span class="stat"><strong>difference</strong> control, audit, authorization</span>
+  </div>
+
+  <div class="compare">
+    <div class="col chatbot">
+      <div class="col-title">Normal chatbot / ChatGPT-style app</div>
+      <div class="col-sub">The model is the center of interpretation, memory use, tool choice, and answer composition.</div>
+      <div class="flow">
+        <div class="node"><strong>User asks a question</strong><span>Conversation text is sent to the model, often with tools described in the prompt.</span></div>
+        <div class="flow-arrow">▼</div>
+        <div class="node"><strong>Model interprets intent</strong><span>The same reasoning step may decide what the user means and which tool to call.</span></div>
+        <div class="flow-arrow">▼</div>
+        <div class="node"><strong>Tool call happens</strong><span>Authorization and business rules are usually wrapped around individual tools.</span></div>
+        <div class="flow-arrow">▼</div>
+        <div class="node"><strong>Model writes answer</strong><span>Failure, missing data, or policy decisions may be hard to replay after the fact.</span></div>
+      </div>
+    </div>
+    <div class="col gateway">
+      <div class="col-title">Conduit Gateway</div>
+      <div class="col-sub">The gateway is the control plane. The model is used, but never owns identity, IDs, policy, or access.</div>
+      <div class="flow">
+        <div class="node"><strong>BFF sends request window</strong><span>Gateway receives a fresh, stateless turn plus verified identity.</span></div>
+        <div class="flow-arrow">▼</div>
+        <div class="node"><strong>Gateway classifies and resolves</strong><span>Model proposes references; code resolves canonical IDs and routes by manifests.</span></div>
+        <div class="flow-arrow">▼</div>
+        <div class="node"><strong>Gateway gates access</strong><span>JWT, Cerbos, classification, and coverage checks run before agents are called.</span></div>
+        <div class="flow-arrow">▼</div>
+        <div class="node"><strong>Gateway fans out and synthesizes</strong><span>Authorized agents return data; answer is grounded and every step is traced.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="label">Architecture differences</div>
+  <div class="matrix">
+    <div class="mcell head">Question</div><div class="mcell head">Normal chatbot</div><div class="mcell head">Conduit Gateway</div>
+    <div class="mcell"><strong>Who owns conversation memory?</strong></div><div class="mcell"><span class="bad">Model/app context</span>, often blended with tool instructions.</div><div class="mcell"><span class="good">BFF owns memory</span>; gateway re-reads the sent window each turn.</div>
+    <div class="mcell"><strong>Who creates record IDs?</strong></div><div class="mcell">The model may infer or pass user text into a tool.</div><div class="mcell">Deterministic resolver returns canonical IDs; model IDs are not trusted.</div>
+    <div class="mcell"><strong>Who decides access?</strong></div><div class="mcell">Often tool-level checks or app middleware.</div><div class="mcell">JWT + Cerbos + classification + coverage before agent calls.</div>
+    <div class="mcell"><strong>How are domains added?</strong></div><div class="mcell">Prompt/tool wiring and application changes.</div><div class="mcell">Domain and agent manifests plus external services.</div>
+    <div class="mcell"><strong>Can operators replay why?</strong></div><div class="mcell">Usually only logs or model transcript.</div><div class="mcell">Glass-box trace: intent, route, gates, agents, synthesis, completion.</div>
+  </div>
+
+  <div class="result-row">
+    <div class="result"><div class="h">Less model authority</div><div class="s">The model helps interpret and summarize, but cannot grant access, invent IDs, or silently choose policy.</div></div>
+    <div class="result"><div class="h">More control surface</div><div class="s">Manifests, policy, coverage, and trace events are explicit architecture, not prompt instructions.</div></div>
+    <div class="result"><div class="h">Enterprise shape</div><div class="s">The chat interface stays familiar while the backend behaves like a governed integration gateway.</div></div>
+  </div>
+
+  <div class="footer-note"><strong>The difference is not the chat UI.</strong> It is whether the model is the system, or the model is one bounded component inside a controlled gateway.</div>
+</div>

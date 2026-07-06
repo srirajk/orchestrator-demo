@@ -1,0 +1,125 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conduit · Gateway Internals</title>
+<style>
+:root{
+  --bg:#0e0e12; --bg-panel:rgba(255,255,255,0.025); --panel-border:rgba(236,233,224,0.16);
+  --ink:#ece9e0; --ink-soft:rgba(236,233,224,0.82); --ink-muted:rgba(236,233,224,0.58); --ink-faint:rgba(236,233,224,0.38);
+  --hairline:rgba(236,233,224,0.16);
+  --yellow:#ffe600; --yellow-soft:rgba(255,230,0,0.12); --yellow-glow:rgba(255,230,0,0.35);
+  --card-bg:#faf9f5; --card-ink:#18181a; --card-sub:#6b6a63; --card-border:#d9d5c8; --card-sub-bg:rgba(0,0,0,0.04);
+  --hero-a:#242429; --hero-b:#141417;
+  --font-mono:ui-monospace,'SF Mono','JetBrains Mono',Menlo,Consolas,monospace;
+  --font-serif:Georgia,'Iowan Old Style','Palatino Linotype',serif;
+  --font-sans:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-sans);}
+body{padding:clamp(28px,5vw,64px) clamp(16px,4vw,40px) 80px;}
+.wrap{max-width:1160px;margin:0 auto;}
+.eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:0.22em;text-transform:uppercase;color:var(--yellow);display:flex;align-items:center;gap:10px;margin-bottom:16px;}
+.eyebrow::before{content:'';width:7px;height:7px;background:var(--yellow);box-shadow:0 0 8px var(--yellow-glow);flex-shrink:0;}
+h1{font-family:var(--font-serif);font-weight:400;font-size:clamp(1.9rem,3.6vw,3.1rem);line-height:1.04;letter-spacing:-0.01em;margin:0 0 18px;text-wrap:balance;}
+h1 em{color:var(--yellow);font-style:italic;}
+.intro{font-family:var(--font-serif);font-style:italic;font-size:clamp(1.02rem,1.5vw,1.2rem);line-height:1.55;color:var(--ink-soft);max-width:76ch;margin:0 0 8px;}
+.stat-row{display:flex;flex-wrap:wrap;gap:8px 10px;margin:26px 0 36px;padding-top:22px;border-top:1px solid var(--hairline);}
+.stat{font-family:var(--font-mono);font-size:10.5px;letter-spacing:0.05em;color:var(--ink-muted);background:var(--bg-panel);border:1px solid var(--panel-border);border-radius:100px;padding:5px 12px;white-space:nowrap;}
+.stat strong{color:var(--ink);font-weight:700;}
+.label{font-family:var(--font-mono);font-size:10.5px;letter-spacing:0.18em;text-transform:uppercase;color:var(--ink-faint);text-align:center;margin:0 0 12px;}
+.label.accent{color:var(--yellow);font-weight:700;}
+.arrow{display:flex;justify-content:center;color:var(--yellow);font-family:var(--font-mono);font-size:16px;padding:2px 0;line-height:1;}
+.frame{background:linear-gradient(var(--hero-a),var(--hero-b));border:2.5px solid var(--yellow);border-radius:15px;box-shadow:0 0 34px var(--yellow-glow);padding:22px;margin-bottom:8px;}
+.gateway-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+.stage{background:rgba(255,255,255,0.055);border:1.2px solid rgba(255,230,0,0.45);border-radius:8px;padding:13px 14px;min-height:118px;}
+.stage .num{font-family:var(--font-mono);color:var(--yellow);font-weight:800;font-size:12px;margin-bottom:8px;}
+.stage .name{font-family:var(--font-serif);color:#fff;font-weight:700;font-size:1.02rem;line-height:1.15;}
+.stage .cap{font-size:.72rem;color:rgba(255,255,255,0.64);line-height:1.42;margin-top:6px;}
+.invariant{text-align:center;font-family:var(--font-serif);font-style:italic;font-size:.84rem;color:rgba(255,230,0,0.88);margin-top:18px;}
+.lane-row{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:16px;margin:16px 0 8px;}
+.panel{background:var(--bg-panel);border:1.4px solid var(--panel-border);border-radius:12px;padding:18px;}
+.panel.dark{background:linear-gradient(var(--hero-a),var(--hero-b));}
+.panel-title{font-family:var(--font-mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--yellow);font-weight:800;margin-bottom:12px;}
+.item{background:rgba(255,255,255,0.04);border:1px solid rgba(236,233,224,0.2);border-radius:7px;padding:10px 12px;margin-bottom:9px;}
+.item:last-child{margin-bottom:0;}
+.item .name{font-size:.8rem;font-weight:800;color:#fff;}
+.item .cap{font-size:.7rem;color:rgba(255,255,255,0.58);line-height:1.38;margin-top:3px;}
+.light-card{background:var(--card-bg);border:1.4px solid var(--card-border);border-radius:9px;box-shadow:0 3px 10px rgba(0,0,0,0.15);padding:15px 16px;}
+.light-card .h{font-family:var(--font-serif);font-size:1rem;font-weight:700;color:var(--card-ink);text-align:center;margin-bottom:5px;}
+.light-card .s{font-family:var(--font-serif);font-style:italic;font-size:.78rem;color:var(--card-sub);text-align:center;line-height:1.42;}
+.side-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:8px;}
+.rule-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px;}
+.rule{background:var(--card-bg);border:1.4px solid var(--card-border);border-radius:9px;padding:13px 14px;}
+.rule .h{font-family:var(--font-serif);font-weight:700;color:var(--card-ink);font-size:.98rem;margin-bottom:4px;}
+.rule .s{font-size:.72rem;color:var(--card-sub);line-height:1.42;}
+.footer-note{font-family:var(--font-serif);font-style:italic;font-size:13px;color:var(--ink-soft);text-align:center;line-height:1.65;padding:22px 12px 0;border-top:1px dashed var(--hairline);margin-top:24px;max-width:900px;margin-left:auto;margin-right:auto;}
+.footer-note strong{color:var(--yellow);font-style:normal;font-weight:600;}
+@media(max-width:850px){.gateway-grid,.lane-row,.side-grid,.rule-row{grid-template-columns:1fr;}}
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">Conduit · gateway internals</div>
+  <h1>Inside the gateway, <em>one turn at a time.</em></h1>
+  <p class="intro">This is only the gateway: what enters, what is derived, what is checked, what leaves, and which external control systems it consults. The gateway does not own conversation memory; it re-interprets the BFF window every turn.</p>
+
+  <div class="stat-row">
+    <span class="stat"><strong>stateless</strong> request path</span>
+    <span class="stat"><strong>manifest</strong> interpreted domains</span>
+    <span class="stat"><strong>deterministic</strong> resolve + auth gates</span>
+    <span class="stat"><strong>parallel</strong> agent dispatch</span>
+    <span class="stat"><strong>glass-box</strong> trace events</span>
+  </div>
+
+  <div class="label">Turn input</div>
+  <div class="side-grid">
+    <div class="light-card"><div class="h">OpenAI-shaped request</div><div class="s">messages[] from the BFF<br>plus stream options</div></div>
+    <div class="light-card"><div class="h">Verified JWT</div><div class="s">identity · tenant · segment<br>classification · coverage claims</div></div>
+    <div class="light-card"><div class="h">Conversation ID</div><div class="s">correlation only<br>not gateway memory</div></div>
+    <div class="light-card"><div class="h">Manifest registry</div><div class="s">entity rules · copy<br>agent capability metadata</div></div>
+  </div>
+
+  <div class="arrow">▼</div>
+  <div class="label accent">Gateway JVM · control path</div>
+  <div class="frame">
+    <div class="gateway-grid">
+      <div class="stage"><div class="num">01</div><div class="name">Ingress</div><div class="cap">Accept SSE request, verify JWT, establish request/conversation correlation and root trace.</div></div>
+      <div class="stage"><div class="num">02</div><div class="name">Intent + Focus</div><div class="cap">Classify latest user turn, derive subject/facet from the submitted window, bias uncertain cases toward fetch.</div></div>
+      <div class="stage"><div class="num">03</div><div class="name">Resolve</div><div class="cap">Turn user references into canonical resource IDs through deterministic resolver/coverage services.</div></div>
+      <div class="stage"><div class="num">04</div><div class="name">Route</div><div class="cap">Embed query and select manifest-declared agents from the vector index with confidence thresholds.</div></div>
+      <div class="stage"><div class="num">05</div><div class="name">Authorize</div><div class="cap">Apply structural gates, classification gates, and coverage checks before any agent call.</div></div>
+      <div class="stage"><div class="num">06</div><div class="name">Bind Inputs</div><div class="cap">Fill agent input schemas from resolved entities and literals. Missing required values drop the agent.</div></div>
+      <div class="stage"><div class="num">07</div><div class="name">Fan-out</div><div class="cap">Invoke HTTP and MCP agents in parallel with isolated timeouts and failure handling.</div></div>
+      <div class="stage"><div class="num">08</div><div class="name">Synthesize</div><div class="cap">Treat agent responses as untrusted data; summarize only what came back, then stream deltas.</div></div>
+    </div>
+    <div class="invariant">The LLM proposes references and language. Code resolves IDs, checks access, and decides whether the turn proceeds.</div>
+  </div>
+
+  <div class="arrow">▼</div>
+  <div class="lane-row">
+    <div class="panel dark">
+      <div class="panel-title">Control inputs</div>
+      <div class="item"><div class="name">Domain manifests</div><div class="cap">required context, entity types, clarification messages, denial copy</div></div>
+      <div class="item"><div class="name">Agent manifests</div><div class="cap">capabilities, protocols, input schemas, classifications</div></div>
+      <div class="item"><div class="name">Vector index</div><div class="cap">semantic capability selection from examples</div></div>
+    </div>
+    <div class="panel dark">
+      <div class="panel-title">Trust services</div>
+      <div class="item"><div class="name">JWKS / RS256</div><div class="cap">identity is re-verified on every request</div></div>
+      <div class="item"><div class="name">Cerbos PDP</div><div class="cap">segment and classification policy decisions</div></div>
+      <div class="item"><div class="name">Coverage service</div><div class="cap">principal-agnostic resolve, then book-of-business check</div></div>
+    </div>
+    <div class="panel dark">
+      <div class="panel-title">Runtime outputs</div>
+      <div class="item"><div class="name">Agent calls</div><div class="cap">authorized, schema-bound requests to HTTP/MCP systems</div></div>
+      <div class="item"><div class="name">SSE answer</div><div class="cap">OpenAI-shaped role/content deltas and [DONE]</div></div>
+      <div class="item"><div class="name">Trace events</div><div class="cap">intent, route, gate, agent, synthesis, completion</div></div>
+    </div>
+  </div>
+
+  <div class="rule-row">
+    <div class="rule"><div class="h">No gateway memory</div><div class="s">Conversation context is supplied by the BFF. The gateway re-derives focus per turn.</div></div>
+    <div class="rule"><div class="h">No model-owned authorization</div><div class="s">Chat text never grants access. JWT, policy, and coverage services do.</div></div>
+    <div class="rule"><div class="h">No fabricated identifiers</div><div class="s">The model cannot invent IDs because canonical IDs come only from deterministic resolve.</div></div>
+  </div>
+
+  <div class="footer-note"><strong>Gateway alone:</strong> a stateless, manifest-driven decisioning runtime between chat clients and specialist systems.</div>
+</div>

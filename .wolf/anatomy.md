@@ -1,20 +1,36 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-07-05T14:41:04.512Z
-> Files: 1021 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-07-06T00:39:33.448Z
+> Files: 1054 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/
 
 - `AUDIT-REQUIREMENT.md` — LATE ADD (Sriraj, before sleep) — wire into the LAST wave (G / audit) (~327 tok)
 - `audit.py` — query, subst, bare_metric (~1488 tok)
+- `bff-clarify-composer.py` — Clarify-composer acceptance probe. An under-specified ask (no entity named) deterministically (~638 tok)
+- `bff-clarify-probe.py` — Trigger a clarify (under-specified ask → extracted ∩ required = ∅) as two different users, (~491 tok)
+- `bff-clarify-resolve.py` — login, send, run (~474 tok)
+- `bff-edge-probes.py` — Edge-case batch: clarify round-trip, no-coverage persona, bare ID, malformed input, (~830 tok)
+- `bff-hardcases.py` — Hard-cases probe (rm_jane, one conversation): relative/ordinal references, correction turns, (~1114 tok)
+- `bff-insurance-recency.py` — Insurance cross-domain recency probe (uw_sam, one conversation). Mirrors the wealth turn-5/6 (~755 tok)
+- `bff-longconvo.py` — One long (~26-turn) rm_jane working session through the real BFF — stresses multi-turn (~1479 tok)
+- `bff-multiturn-intent.py` — Drive a REAL multi-turn conversation through the Conduit Chat BFF (real OIDC login, (~1021 tok)
+- `bff-oneshot.py` (~291 tok)
+- `bff-polish-probes.py` — Polish-pass probes: mixed in/out-of-segment ask (partial fulfilment + honest denial note) (~640 tok)
+- `CLARIFY-COMPOSER.md` — Clarification composer — manifest-declared clarify POLICY (run after the polish pass lands) (~582 tok)
 - `CODEBASE-HEALTH-REPORT.md` — Codebase Health Report — feat/conduit-chat @ a4f4fba (2026-07-04, overnight) (~1105 tok)
 - `conduit-dashboards.html` (~12666 tok)
 - `conduit-ops-plane.html` — Conduit Insights — Operations Plane (~13836 tok)
 - `dash_analyze.py` — Enumerate Grafana dashboards; run each panel's targets against its datasource (~1189 tok)
+- `decisioning-engineering.html` — Conduit — Engineering the Decisioning Layer (~5260 tok)
+- `dump_turn.py` (~184 tok)
 - `EVIDENCE.md` — Conduit Chat memory COMPACTION — end-to-end proof via REAL BFF OIDC session (~1364 tok)
 - `guardrail_e2e.py` — End-to-end gateway guardrail tests via /v1/chat/completions with real persona JWTs. (~1408 tok)
 - `guardrail_synth.py` — Replay the gateway's EXACT AnswerSynthesizer system prompt + DATA-block format (~1152 tok)
+- `parse_all.py` (~250 tok)
+- `parse_trace.py` (~289 tok)
 - `parse.py` (~243 tok)
+- `POLISH-PASS.md` — Gateway polish pass — run AFTER the recency fix lands + is verified (~530 tok)
 - `pr2-body.md` — Chat UI (~481 tok)
 - `pv.py` (~72 tok)
 - `pv2.py` (~62 tok)
@@ -25,6 +41,11 @@
 - `run_turns.sh` — Drives a multi-turn conversation through the REAL BFF OIDC session (cookie jar). (~676 tok)
 - `V2__seed_demo_data.sql` — ============================================================================ (~4215 tok)
 - `validate.sh` — Drives the 3 authz glass-box scenarios against the gateway and captures `gate` frames. (~581 tok)
+
+## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/3819a0a5-db46-43a1-8702-6f72db1172db/scratchpad/
+
+- `conduit-architecture.html` — Conduit · Solution Architecture (~4696 tok)
+- `conduit-pipeline.html` — Conduit · Gateway Pipeline (~6132 tok)
 
 ## ../../.claude/projects/-Users-srirajkadimisetty-projects-orchestrator-demo/memory/
 
@@ -58,7 +79,7 @@
 - `AUTHZ-SPEC.md` — Authorization Model — Spec & Non-Breaking Rollout Plan (~2828 tok)
 - `AXIOM-SCIM-ROADMAP.md` — Axiom Roadmap — SCIM provisioning + Capabilities view (PARKED, don't forget) (~1518 tok)
 - `CODEX-HANDOFF.md` — Handoff → Codex (validation & test) (~1176 tok)
-- `docker-compose.yml` — Docker Compose services (~10842 tok)
+- `docker-compose.yml` — Docker Compose services (~11156 tok)
 - `FINISHED.md` — FINISHED — auth fixes · per-segment Users screen · compaction · load test (~1444 tok)
 - `MORNING-REPORT.md` — Morning Report — ABAC model + glass-box + chat + eval/guardrails/audit (~1669 tok)
 - `package.json` — Node.js package manifest (~86 tok)
@@ -69,7 +90,7 @@
 
 ## ../orchestrator-chat/.wolf/
 
-- `anatomy.md` — anatomy.md (~17000 tok)
+- `anatomy.md` — anatomy.md (~18267 tok)
 - `buglog.json` — Declares annotation (~37379 tok)
 - `cerebrum.md` — Cerebrum (~8628 tok)
 
@@ -249,10 +270,16 @@
 
 - `App.tsx` — RANGE_OPTIONS (~15348 tok)
 
+## ../orchestrator-chat/docs/
+
+- `ROUTING-CONTEXT-FIX.md` — Plan — Context-aware agent routing (fix keyword-less misroute) (~1126 tok)
+
 ## ../orchestrator-chat/eval/
 
 - `cerbos_golden_dataset.json` (~8751 tok)
 - `eval_deepeval.py` — PartialHonestyMetric: configure_judge_model, measure, a_measure, is_successful + 5 more (~5840 tok)
+- `multiturn-recency-insurance.json` — Declares name (~995 tok)
+- `multiturn-routing.json` (~1568 tok)
 
 ## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/api/v1/chat/
 
@@ -272,7 +299,11 @@
 
 ## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/chat/
 
-- `ChatService.java` — Entry point from the controller — called on a virtual thread after the async boundary. (~14275 tok)
+- `ChatService.java` — How many recent user turns (including the current one) are concatenated into the routing (~20626 tok)
+
+## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/clarify/
+
+- `ClarificationComposer.java` — The 4th grounded LLM call site (alongside {@code IntentClassifier}, {@code EntityExtractor}, (~5178 tok)
 
 ## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/coverage/
 
@@ -280,11 +311,13 @@
 
 ## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/intent/
 
-- `IntentClassifier.java` — Stage A of the request pipeline: classifies the user's intent before routing. (~6153 tok)
+- `IntentClassifier.java` — Stage A of the request pipeline: classifies the user's intent before routing. (~9814 tok)
 
 ## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/manifest/
 
-- `DomainManifestStore.java` — Resolves ${VAR_NAME} placeholders in all Coverage URL fields using Spring Environment. (~3928 tok)
+- `DomainManifest.java` — Clarification style, defaulting to the safe deterministic template when unset. (~474 tok)
+- `DomainManifestStore.java` — Resolves ${VAR_NAME} placeholders in all Coverage URL fields using Spring Environment. (~4566 tok)
+- `EffectiveManifest.java` — True when this domain opts in to LLM-composed (natural) clarification wording. (~855 tok)
 
 ## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/infrastructure/identity/
 
@@ -345,17 +378,26 @@
 
 - `AgentRegistry.java` — Core registry service. (~1593 tok)
 
+## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/resolver/service/
+
+- `AgentResolver.java` — Resolver — Stage A + Stage B from the spec. (~3137 tok)
+
 ## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/synthesis/answer/
 
-- `AnswerSynthesizer.java` — Synthesizes a grounded, streamed answer from agent outputs using Z.AI GLM. (~8513 tok)
+- `AnswerSynthesizer.java` — Synthesizes a grounded, streamed answer from agent outputs using Z.AI GLM. (~9353 tok)
 
 ## ../orchestrator-chat/gateway/src/main/resources/
 
-- `application.yml` (~2589 tok)
+- `application.yml` (~3148 tok)
 
 ## ../orchestrator-chat/gateway/src/test/java/ai/conduit/gateway/domain/auth/
 
 - `AuthzFromMembershipTest.java` — Verifies JWT → Principal mapping and Cerbos-backed entitlement decisions. (~3831 tok)
+
+## ../orchestrator-chat/gateway/src/test/java/ai/conduit/gateway/domain/manifest/
+
+- `EffectiveManifestMergeTest.java` — Class: EffectiveManifestMergeTest (~1272 tok)
+- `EffectiveManifestTest.java` — Targeted unit tests for {@link EffectiveManifest#merge} covering the three (~906 tok)
 
 ## ../orchestrator-chat/gateway/src/test/java/ai/conduit/gateway/orchestration/harness/
 
@@ -535,15 +577,26 @@
 ## ../orchestrator-chat/registry/
 
 - `agent-manifest.schema.json` (~1829 tok)
+- `domain-manifest.schema.json` (~1255 tok)
 - `model-prices.json` (~325 tok)
 
 ## ../orchestrator-chat/registry/domains/
 
 - `hr.json` (~162 tok)
+- `insurance.json` (~299 tok)
+- `wealth-management.json` (~303 tok)
 
 ## ../orchestrator-chat/registry/domains/hr/
 
 - `hr-knowledge.json` (~150 tok)
+
+## ../orchestrator-chat/registry/domains/insurance/
+
+- `claims-servicing.json` (~704 tok)
+
+## ../orchestrator-chat/registry/domains/wealth-management/
+
+- `private-banking.json` (~804 tok)
 
 ## ../orchestrator-chat/registry/manifests/
 
@@ -572,6 +625,10 @@
 - `04-entitlements.spec.ts` — Phase 5 / M8 — Cerbos ABAC entitlements. (~1738 tok)
 - `07-multi-turn.spec.ts` — Multi-turn conversation tests. (~2446 tok)
 - `helpers.ts` — Obtain a real RS256 JWT from the iam-service (~1826 tok)
+
+## ../orchestrator-chat/tests/integration/
+
+- `test_gateway_coverage.py` — get_jwt, collect_sse_text, chat, test_6_gateway_health_check (~3725 tok)
 
 ## ../orchestrator-chat/tests/load/
 
