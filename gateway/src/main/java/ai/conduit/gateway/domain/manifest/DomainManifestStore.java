@@ -83,7 +83,8 @@ public class DomainManifestStore {
             return d; // nothing changed
         }
         DomainManifest.Coverage resolved = new DomainManifest.Coverage(discoverUrl, checkUrl, resolveUrl, c.cacheTtlSeconds());
-        return new DomainManifest(d.domainId(), d.displayName(), resolved, d.memoryCompaction());
+        return new DomainManifest(d.domainId(), d.displayName(), resolved, d.memoryCompaction(),
+                d.clarifyStyle(), d.clarifyTone());
     }
 
     private String resolveEnvVars(String template) {
@@ -305,6 +306,46 @@ public class DomainManifestStore {
             if (dm.get("default") != null) return dm.get("default");
         }
         return denialMessage(reasonCode);
+    }
+
+    /**
+     * A reference the gateway identified DETERMINISTICALLY from a typed identifier — the entity
+     * type whose manifest {@code id_pattern} matched, its owning (resource-scoped) sub-domain, and
+     * that sub-domain's parent-domain coverage. Everything needed to RESOLVE/CHECK the reference in
+     * the RIGHT domain without embedding routing.
+     */
+    public record IdentifiedReference(String id, EntityType entityType,
+                                      SubDomainManifest subDomain, DomainManifest.Coverage coverage) {}
+
+    /**
+     * Identifies a typed identifier in {@code text} to its owning sub-domain by manifest
+     * {@code id_pattern}. A bare id like {@code REL-00188} carries no domain vocabulary, so embedding
+     * routing scores it at noise level and can pick an unrelated domain — surfacing the WRONG
+     * domain's copy. But the id's pattern names its required-context entity type exactly, and that
+     * entity type's sub-domain is its domain. Scans only resource-scoped sub-domains' required,
+     * resolvable entity types with a coverage-backed parent domain, and returns the first match (the
+     * matched id + entity type + sub-domain + coverage), or empty. Manifest-driven — the gateway
+     * embeds no id prefix or domain literal.
+     */
+    public Optional<IdentifiedReference> identifyByIdPattern(String text) {
+        if (text == null || text.isBlank()) return Optional.empty();
+        for (SubDomainManifest sd : subDomains.values()) {
+            if (!sd.resourceScoped()) continue;
+            DomainManifest parent = sd.parentDomain() != null ? domains.get(sd.parentDomain()) : null;
+            if (parent == null || parent.coverage() == null) continue;
+            List<String> required = sd.requiredContext();
+            for (EntityType et : sd.entityTypes()) {
+                if (!et.isResolvable()) continue;
+                if (required == null || !required.contains(et.key())) continue;
+                String pat = et.idPattern();
+                if (pat == null || pat.isBlank()) continue;
+                Matcher m = Pattern.compile(pat).matcher(text);
+                if (m.find()) {
+                    return Optional.of(new IdentifiedReference(m.group(), et, sd, parent.coverage()));
+                }
+            }
+        }
+        return Optional.empty();
     }
 
     public Map<String, DomainManifest> allDomains() {

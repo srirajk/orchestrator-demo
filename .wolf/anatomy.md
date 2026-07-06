@@ -1082,6 +1082,8 @@
 - `Dockerfile` — Docker container definition (~86 tok)
 - `eval_deepeval.py` — PartialHonestyMetric: configure_judge_model, measure, a_measure, is_successful + 6 more (~5444 tok)
 - `golden-prompts.json` (~3317 tok)
+- `multiturn-routing.json` — Multi-turn context-aware routing regression guard (Calderon keyword-less-follow-up fix); expected domain/outcome + must_not_route per turn. (~600 tok)
+- `multiturn-recency-insurance.json` — Cross-domain anaphor-recency regression guard (bug-234, uw_sam/insurance): establish policy A → switch B → re-name A → pronoun must bind to just-named A (POL-77002) not older B (POL-77001); asserted via coverage-gate entity in the decision trace. Proves the focal-recency fix is domain-generic. (~500 tok)
 - `langfuse_continuous.py` — check_grounding, check_partial_honesty, llm_judge (~7457 tok)
 - `langfuse_run_experiment.py` — Run a Langfuse experiment against the meridian-routing dataset. (~4132 tok)
 - `langfuse_seed_datasets.py` — Seed Langfuse datasets from eval/golden-prompts.json. (~3565 tok)
@@ -1115,15 +1117,19 @@
 
 ## gateway/src/main/java/ai/conduit/gateway/domain/chat/
 
-- `ChatService.java` — Entry point from the controller — called on a virtual thread after the async boundary. (~15192 tok)
+- `ChatService.java` — Entry point from the controller — called on a virtual thread after the async boundary. Routes FETCH with bias-to-fetch (hasGroundedResolvableReference→resolveContextual entityKnown); FOLLOW_UP fallthrough to fetch when a grounded entity + confident route exist; routing-abstained FETCH degrades to grounded history synthesis when prior assistant data exists (hasPriorAssistantData). Deterministic identifier PRE-CHECK (identifyByIdPattern→resolve+CHECK→deny with the id's OWN domain copy before routing, bug-236); coverage else-branch named-entity backstop (resolveNamedReferenceBackstop/properNounPhrases: resolve typed proper-nouns principal-agnostically→CHECK→deny out-of-coverage NAMED entity instead of clarifying, bug-235); withheldDomains (structural-gate-pruned domains) threaded to the synthesizer for honest partial fulfillment (bug-237). Clarify copy aligned to capability (bug-239): buildDeterministicClarification lists candidates by NAME (+ id) with '- ' bullets (NO positional numbers) and invites "Reply with the <entityNoun> name or identifier" (entityNoun = manifest entity display, no hardcoded 'relationship ID'); buildClarificationQuestion hoists primaryResolvableEntity so the noun frames template + composed. No positional-index parsing anywhere — the resolver only honours name / manifest id_pattern. bug-233. (~16600 tok)
 
 ## gateway/src/main/java/ai/conduit/gateway/domain/intent/
 
-- `IntentClassifier.java` — Stage A of the request pipeline: classifies the user's intent before routing. (~5667 tok)
+- `IntentClassifier.java` — Stage A: combined intent+entity LLM (manifest-compiled prompt, temperature 0). Focal-entity rules (explicit name in latest msg supersedes history; pronoun→last focal; emit typed NAME not a recalled id; named entity→FETCH not CLARIFY) + deterministic deriveFocalReference() [id in latest msg → user-grounded ref → focalIdByNameMatch (proper-noun tokens vs transcript "Name (ID)") → lastFocalSingleId anaphora carry]. Extracts entities for FETCH_DATA AND FOLLOW_UP (bias-to-fetch fallthrough). bug-233. RECENCY (bug-234): deriveFocalReference() precedence reordered so an anaphoric turn that names no new entity binds to the MOST-RECENTLY-NAMED focal entity (recency carry) BEFORE the grounded-LLM-value fallback; a name shared with the latest message (sharesWord, ≥4 chars) counts as naming-this-turn and supersedes older focus. Fixes pronoun binding to a stale older entity. (~6500 tok)
+
+## gateway/src/main/java/ai/conduit/gateway/domain/clarify/
+
+- `ClarificationComposer.java` — The 4th grounded LLM call site (alongside IntentClassifier / EntityExtractor / AnswerSynthesizer). PHRASES a natural clarify question over a GROUNDED candidate set handed in as DELIMITED DATA; it never DECIDES to clarify (that stays deterministic in ChatService: extracted ∩ required = ∅) and never invents. Generic scaffold; entity noun + optional tone come from the manifest (World-B clean). compose() returns null (→ caller serves the deterministic template) when the LLM is unreachable OR validate() rejects: output blank / too long, contains any id_pattern token outside the candidate id set (core foreign-ID guard), or references no candidate. System prompt forbids positional numbers / 'reply with the number' — options are referred to by name + identifier only (bug-239); OPTIONS data list uses '- ' bullets not numbers. Non-streaming, single completion, own tight budget (config conduit.llm.clarification-composer.*, defaults inherit intent-classifier Z.AI/flash). (~2400 tok)
 
 ## gateway/src/main/java/ai/conduit/gateway/synthesis/answer/
 
-- `AnswerSynthesizer.java` — Synthesizes a grounded, streamed answer from agent outputs using Z.AI GLM. (~7401 tok)
+- `AnswerSynthesizer.java` — Synthesizes a grounded, streamed answer from agent outputs using Z.AI GLM. System prompt forbids cross-entity aggregation/roll-ups (compute guardrail) and renders WITHHELD sections (structural-gate-denied domains) so mixed in/out-of-access asks fulfill the accessible part + state the withheld part; synthesizeFromHistory prompt also forbids computing/aggregating (bug-237). (~7600 tok)
 
 ## gateway/src/main/java/ai/meridian/gateway/
 
@@ -1204,10 +1210,10 @@
 ## gateway/src/main/java/ai/meridian/gateway/domain/manifest/
 
 - `ClarificationSchema.java` — Class: ClarificationSchema (~112 tok)
-- `DomainManifest.java` — DomainManifest: Coverage, MemoryCompaction (~272 tok)
-- `DomainManifestStore.java` — Resolves ${VAR_NAME} placeholders in all Coverage URL fields using Spring Environment. (~3435 tok)
+- `DomainManifest.java` — DomainManifest: Coverage, MemoryCompaction + clarify_style/clarify_tone (clarification WORDING policy; clarifyStyleOrDefault()→"template"). (~330 tok)
+- `DomainManifestStore.java` — Resolves ${VAR_NAME} placeholders in all Coverage URL fields using Spring Environment. identifyByIdPattern(text)→IdentifiedReference: maps a typed id to its owning resource-scoped sub-domain + coverage via manifest id_pattern (bug-236, deterministic domain for a bare id). (~3700 tok)
 - `DomainPrerequisiteValidator.java` — Service: DomainPrerequisiteValidator (~439 tok)
-- `EffectiveManifest.java` — Returns true if this effective manifest declares any required-context entity. (~706 tok)
+- `EffectiveManifest.java` — Merged domain+sub-domain view. requiresContext()/primaryRequiredKey()/clarificationFor(); carries clarifyStyle/clarifyTone from the domain manifest with clarifyComposed() helper (drives ChatService.buildClarificationQuestion's template|composed switch). (~760 tok)
 - `EntityType.java` — A manifest-declared entity type. This is the load-bearing declaration that makes the (~528 tok)
 - `SubDomainManifest.java` — Normalise missing optional collections so callers never NPE. (~650 tok)
 
@@ -1294,7 +1300,7 @@
 
 ## gateway/src/main/java/ai/meridian/gateway/resolver/service/
 
-- `AgentResolver.java` — Resolver — Stage A + Stage B from the spec. (~1067 tok)
+- `AgentResolver.java` — Resolver — Stage A+B. resolve(prompt,domain) for /debug; resolveContextual(routingText[,entityKnown]) for chat: conversation-enriched embedding + confidence/margin abstain (decisive-score OR domain-margin); entityKnown=true (turn carries an explicit grounded resolvable ref) relaxes the abstain gate so a terse id/name follow-up inherits the conversation facet and routes (bias-to-fetch, bug-233); no rigid single-domain scope so cross-domain fan-out is preserved. (~1500 tok)
 
 ## gateway/src/main/java/ai/meridian/gateway/synthesis/answer/
 
@@ -1848,6 +1854,7 @@
 - `smoke.sh` — smoke.sh — full API/CLI smoke for Conduit. Run against a live stack (docker compose up). (~1581 tok)
 - `verify-telemetry-e2e.sh` — ───────────────────────────────────────────────────────────────────────────── (~1151 tok)
 - `verify.sh` — Full verification script — runs after each phase to confirm acceptance criteria. (~713 tok)
+- `probe-recency-insurance.py` — Cross-domain anaphor-recency BFF driver (uw_sam via OIDC): 5-turn insurance conversation proving the bug-234 focal-recency fix is domain-generic; pairs with eval/multiturn-recency-insurance.json. (~350 tok)
 - `wait-for-healthy.sh` — Wait until all core docker-compose services report healthy, then exit 0. (~323 tok)
 - `world-b-check.sh` — ───────────────────────────────────────────────────────────────────────────── (~1272 tok)
 

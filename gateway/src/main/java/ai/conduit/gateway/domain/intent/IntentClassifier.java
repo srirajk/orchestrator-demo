@@ -21,7 +21,10 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -72,16 +75,28 @@ public class IntentClassifier {
         }
         p.append("\n}\n\n");
 
-        p.append("Entity extraction rules (for FETCH_DATA only — null/empty for other intents):\n");
+        p.append("Entity extraction rules (populate whenever the latest message concerns a specific entity — ")
+         .append("for FETCH_DATA and FOLLOW_UP alike; null/empty for CHITCHAT):\n");
         for (EntityType et : entityTypes) {
             if (et.extractAs() == null) continue;
             p.append(extractionRule(et)).append("\n");
         }
-        p.append("- The client-sent conversation is the only memory. Extract entities only from USER messages.\n")
-         .append("- Latest explicit user mention wins. If the latest user message names an entity, extract that one.\n")
-         .append("- If the latest user message names no entity but asks for fresh data, use the most recent prior\n")
-         .append("  user-authored entity mention in the sent conversation. Never use assistant text for extraction.\n")
-         .append("- If no user-authored entity mention exists in the sent conversation, return null.\n");
+        p.append("- The sent conversation is the only memory. Extract entity references only from USER messages.\n")
+         .append("- FOCAL RULE: the entity the LATEST user message is about is the subject. If the latest\n")
+         .append("  user message states an entity (by name or by identifier), extract THAT one — it\n")
+         .append("  SUPERSEDES any entity discussed only in earlier turns. An entity the latest message\n")
+         .append("  states explicitly is never ambiguous.\n")
+         .append("- Emit the reference EXACTLY as the user wrote it in the latest message. If the user wrote a\n")
+         .append("  name, emit that name text; emit an identifier ONLY when the user themselves typed that\n")
+         .append("  identifier. NEVER substitute an identifier you saw earlier in the conversation for a name\n")
+         .append("  the user typed — mapping names to identifiers is a downstream resolver's job, not yours.\n")
+         .append("- If the latest user message refers to an entity only by a back-reference word (e.g. \"that\",\n")
+         .append("  \"them\", \"their\", \"it\", \"this\", \"those\") and states no new entity, resolve it to the\n")
+         .append("  most recent entity the USER named earlier and emit that entity EXACTLY as the user wrote it\n")
+         .append("  earlier (verbatim). Never use assistant text for extraction.\n")
+         .append("- If the latest user message states no entity and uses no such back-reference but asks for\n")
+         .append("  fresh data, use the most recent prior USER-authored entity mention.\n")
+         .append("- If no user-authored entity mention exists, return null.\n");
         p.append("- NEVER invent identifiers; copy verbatim from the user's words\n\n");
 
         // Generic guardrail — kept verbatim (domain-invariant).
@@ -97,16 +112,21 @@ public class IntentClassifier {
                 .anyMatch(et -> et.required() && et.isResolvable());
 
         p.append("Intent rules:\n");
-        p.append("- If the user names an entity the system can fetch data about → FETCH_DATA\n");
-        p.append("- If the latest message asks for fresh data about an entity previously named by the user → FETCH_DATA\n");
+        p.append("- If the LATEST user message explicitly states an entity the system can fetch data about — by ")
+         .append("name or by identifier — → FETCH_DATA. A request that states an entity is a data fetch, even ")
+         .append("if that entity was already discussed earlier and even if it asks about a specific facet of it.\n");
         p.append("- If the request is for general information, house views, research, policies, guidelines, or ")
-         .append("knowledge that does not require naming a specific client, account, or resource → FETCH_DATA\n");
-        p.append("- If a prior assistant turn has data and the user says \"explain\", \"what does X mean\", ")
-         .append("\"tell me more\", \"simplify\" → FOLLOW_UP\n");
+         .append("knowledge that does not require stating a specific entity or resource → FETCH_DATA\n");
+        p.append("- FOLLOW_UP when the latest message states NO entity of its own and its answer is fully ")
+         .append("contained in data already shown earlier — the user asks to \"explain\", \"what does X mean\", ")
+         .append("\"tell me more\", \"simplify\", \"recap\", or to compare/reformat values already presented, or ")
+         .append("refers to a prior entity only by a back-reference word (\"that\", \"them\", \"their\", \"it\"). ")
+         .append("A follow-up may still need fresh data — extract its focal entity so it can be fetched.\n");
         if (hasRequiredResolvable) {
-            p.append("- If the request clearly needs a specific resolvable entity (a named client, account, or ")
-             .append("resource with a unique identifier) to answer, but no such entity is mentioned in ")
-             .append("user-authored turns → CLARIFY\n");
+            p.append("- CLARIFY ONLY when the request needs a specific resolvable entity to answer AND the latest ")
+             .append("user message neither states such an entity (by name or identifier) nor back-references one ")
+             .append("named earlier by the user. If the latest message states or back-references an entity, it is ")
+             .append("NOT ambiguous → FETCH_DATA, never CLARIFY.\n");
         }
         p.append("- Greetings, \"how are you\", \"thanks\" → CHITCHAT\n");
         return p.toString();
@@ -143,7 +163,9 @@ public class IntentClassifier {
                 : "";
         return "- " + et.extractAs() + ": the " + label + " name OR ID EXACTLY as stated by the user."
                 + patternHint + " Copy verbatim — do NOT normalize, expand, or look up the name."
-                + " Use null if none is mentioned.";
+                + " If the user wrote a NAME, output that name text; do NOT output an identifier code"
+                + " you recall from an earlier answer — outputting a remembered identifier for a"
+                + " user-typed name is forbidden. Use null if none is mentioned.";
     }
 
     private final ObjectMapper mapper;
@@ -159,6 +181,14 @@ public class IntentClassifier {
     private final int requestTimeoutSeconds;
     private final DomainManifestStore manifestStore;
     private final String domainContext;
+    /**
+     * Language-generic back-reference (anaphor) tokens used by the stateless focal-entity carry:
+     * a latest message that only pronoun-refers to an entity ("that", "them", …) inherits the last
+     * focal reference from the client-sent window. These are function words, not domain knowledge
+     * (World-B clean); configurable so the set is tunable without a rebuild (CLAUDE.md §5).
+     */
+    private final List<String> anaphoraTokens;
+    private final double temperature;
 
     public IntentClassifier(
             ObjectMapper mapper,
@@ -169,6 +199,8 @@ public class IntentClassifier {
             @Value("${conduit.llm.intent-classifier.api-key:}") String apiKey,
             @Value("${conduit.llm.intent-classifier.model:glm-4.5-flash}") String model,
             @Value("${conduit.assistant.domain-context:an enterprise data assistant for relationship managers}") String domainContext,
+            @Value("${conduit.chat.anaphora-tokens:that,them,they,their,theirs,it,its,this,these,those,one}") String anaphoraTokens,
+            @Value("${conduit.llm.intent-classifier.temperature:0.0}") double temperature,
             // Intent classification runs SYNCHRONOUSLY before any SSE byte, so it gets its OWN
             // budget, independent of the conduit.llm.* budget used by the (slower, streamed)
             // synthesizer. The shared 3-retry × 25s + backoff budget could burn ~81s here; this
@@ -181,6 +213,10 @@ public class IntentClassifier {
         this.mapper = mapper;
         this.manifestStore = manifestStore;
         this.domainContext = domainContext;
+        this.anaphoraTokens = Arrays.stream(anaphoraTokens.split(","))
+                .map(String::trim).map(String::toLowerCase)
+                .filter(s -> !s.isBlank()).distinct().toList();
+        this.temperature = temperature;
         this.baseUrl = baseUrl;
         this.apiKey = apiKey;
         this.model = model;
@@ -246,6 +282,11 @@ public class IntentClassifier {
         String requestBody = mapper.writeValueAsString(mapper.createObjectNode()
                 .put("model", model)
                 .put("stream", false)
+                // Deterministic decode: classification + entity extraction are structured tasks, not
+                // creative generation. Pinning the temperature makes the intent AND the focal-entity
+                // extraction consistent turn-to-turn (a keyword-less/name-only follow-up must not
+                // flake between fetching and clarifying). Configurable (CLAUDE.md §5).
+                .put("temperature", temperature)
                 .<com.fasterxml.jackson.databind.node.ObjectNode>set("response_format",
                         mapper.createObjectNode().put("type", "json_object"))
                 .set("messages", mapper.createArrayNode()
@@ -321,11 +362,12 @@ public class IntentClassifier {
             intent = Intent.FETCH_DATA;
         }
 
-        // Extract entity fields included in the same response (FETCH_DATA only). Both the JSON
-        // keys (entity_type.extract_as) and the kinds/defaults come from the manifest — no
-        // hardcoded field names or defaults here.
+        // Extract entity fields included in the same response for FETCH_DATA and FOLLOW_UP (the
+        // latter so a follow-up needing fresh data can carry its focal entity into the bias-to-fetch
+        // fallthrough). Both the JSON keys (entity_type.extract_as) and the kinds/defaults come from
+        // the manifest — no hardcoded field names or defaults here.
         EntityBag entities = null;
-        if (intent == Intent.FETCH_DATA) {
+        if (intent == Intent.FETCH_DATA || intent == Intent.FOLLOW_UP) {
             java.util.Map<String, String> references = new java.util.LinkedHashMap<>();
             java.util.Map<String, List<String>> lists = new java.util.LinkedHashMap<>();
             for (EntityType et : entityTypes) {
@@ -346,16 +388,16 @@ public class IntentClassifier {
                     lists.put(field, vals);
                 } else {
                     String val = nullableText(parsed, field);
-                    if (val == null && et.defaultValue() != null && !et.defaultValue().isBlank()) {
+                    if (et.isResolvable()) {
+                        // Deterministic focal-reference derivation (World-B: the LLM never produces
+                        // an id; a downstream resolver maps names to ids). Grounds the reference in
+                        // the client-sent window — an id the user literally typed in the LATEST
+                        // message, else the LLM's focal reference that the user actually typed
+                        // (latest or a back-referenced earlier turn) — never a recalled/fabricated id.
+                        val = deriveFocalReference(et, messages, val);
+                    } else if ((val == null || val.isBlank())
+                            && et.defaultValue() != null && !et.defaultValue().isBlank()) {
                         val = et.defaultValue();
-                    }
-                    // Deterministic anti-carryover guard (World-B: the LLM never produces an id
-                    // or expands a name). Resolvable references must be present in USER-authored
-                    // messages in the client-sent context; assistant echoes are ignored.
-                    if (val != null && et.isResolvable() && !userMessagesContain(messages, val)) {
-                        log.debug("Dropping carried reference '{}' for field '{}' — absent from user-authored messages",
-                                val, field);
-                        val = null;
                     }
                     if (val != null && !val.isBlank()) references.put(field, val);
                 }
@@ -389,6 +431,166 @@ public class IntentClassifier {
                 .map(Message::content)
                 .filter(c -> c != null && !c.isBlank())
                 .anyMatch(c -> c.toLowerCase().contains(needle));
+    }
+
+    /**
+     * Derives the focal reference for a resolvable entity deterministically from the client-sent
+     * window (stateless — no server-side memory; re-computed every turn). Precedence:
+     * <ol>
+     *   <li>An identifier the user literally typed in the LATEST message (an {@code id_pattern}
+     *       match) — the user stated it, so it is not a fabricated/recalled id. Deterministic
+     *       backstop for a bare id-only follow-up the LLM drops (e.g. "and for REL-00099?").</li>
+     *   <li>A reference the user NAMES in the LATEST message (the model's value shares a distinctive
+     *       word with the current turn). Naming an entity NOW makes it the focal entity: it
+     *       supersedes any older one and wins focus for the next anaphor.</li>
+     *   <li>RECENCY: the latest message back-references an entity ("that", "them", "their", …)
+     *       without naming a new one. The focal entity is then the MOST-RECENTLY-NAMED entity in the
+     *       window — decided on conversation structure, NOT on the model's pick over the whole
+     *       history (which can latch onto a SUPERSEDED entity). This runs BEFORE the grounded-value
+     *       fallback so a pronoun can never bind to an older focus the model happened to re-mention.</li>
+     *   <li>Else the model's reference when it appears verbatim in some USER message (a non-anaphoric
+     *       follow-up whose named subject the model carried forward), dropping an id it merely
+     *       recalled from assistant text (World-B invariant 6).</li>
+     *   <li>Else null → the deterministic coverage clarification fires downstream.</li>
+     * </ol>
+     * All inputs are manifest-declared ({@code id_pattern}, {@code extract_as}) or language-generic
+     * (anaphora tokens) — no domain knowledge in the gateway.
+     */
+    private String deriveFocalReference(EntityType et, List<Message> messages, String llmValue) {
+        String latest = latestUserMessage(messages);
+        Pattern idp = (et.idPattern() != null && !et.idPattern().isBlank())
+                ? Pattern.compile(et.idPattern()) : null;
+        boolean grounded = llmValue != null && !llmValue.isBlank();
+
+        // 1. Explicit identifier typed in the LATEST user message (user stated it — never fabricated).
+        //    Deterministic backstop for a bare id-only follow-up the LLM drops ("and for REL-00099?").
+        if (idp != null && !latest.isBlank()) {
+            Matcher m = idp.matcher(latest);
+            if (m.find()) return m.group();
+        }
+        // 2. A reference the user NAMES in THIS turn — the model's value shares a distinctive word
+        //    with the latest message ("Calderon Trust's holdings", "settlement for Whitman", "the
+        //    trust one"). Naming an entity now makes it the focal entity: it supersedes any older
+        //    one and wins the focus for the next anaphor. This is the "explicit name wins the focus"
+        //    half of the recency rule, evaluated at the naming turn itself.
+        if (grounded && sharesWord(latest, llmValue)) {
+            return llmValue;
+        }
+        // 3. RECENCY carry: the latest message back-references an entity but NAMES no new one this
+        //    turn — either a bare anaphor ("and their goals?") or a pronoun the model resolved from
+        //    history to a possibly SUPERSEDED entity. Bind to the most-recently-named focal entity,
+        //    derived from conversation structure, and let it OVERRIDE the model's grounded pick. This
+        //    is the "a subsequent anaphor inherits the most-recent focal entity" half of the recency
+        //    rule; it must precede the grounded-value fallback (step 4) so a pronoun after an explicit
+        //    name can never bind to an OLDER focus the model happened to re-mention. Deterministic,
+        //    id_pattern-based, grounded entirely in the transcript; the coverage CHECK stays the gate:
+        //    (a) NAMED subject — match the distinctive NAME tokens the transcript associates with each
+        //        id (parsed from the "<Name> (<id>)" the system emitted earlier) against the latest
+        //        message. (Defensive; a bare pronoun matches nothing.)
+        //    (b) BARE back-reference — carry the id of the most recent single-entity turn (skips
+        //        multi-id compare/clarification messages) = the entity most recently in focus.
+        if (isAnaphoric(latest)) {
+            String named = focalIdByNameMatch(idp, messages, latest);
+            if (named != null) return named;
+            String carried = lastFocalSingleId(idp, messages);
+            if (carried != null) return carried;
+        }
+        // 4. Otherwise keep the model's reference when it appears verbatim in a USER message (World-B
+        //    invariant 6): a non-anaphoric follow-up whose named subject the model carried forward. It
+        //    drops an identifier the model RECALLED from assistant text (the model must never emit an
+        //    id; a downstream resolver maps names to ids).
+        if (grounded && userMessagesContain(messages, llmValue)) {
+            return llmValue;
+        }
+        if (grounded) {
+            log.debug("Dropping ungrounded reference '{}' for field '{}' — absent from user-authored messages",
+                    llmValue, et.extractAs());
+        }
+        // 5. Last resort: name-match the latest message against the transcript's name→id associations.
+        String named = focalIdByNameMatch(idp, messages, latest);
+        if (named != null) return named;
+        // 6. Nothing safely grounded → deterministic coverage clarification downstream.
+        return null;
+    }
+
+    /**
+     * True when the {@code reference} the model extracted shares a distinctive word (a token of
+     * length ≥ 4, matched case-insensitively on word boundaries) with the {@code latest} user
+     * message — i.e. the user NAMED that entity in the current turn, so the extraction is anchored in
+     * this turn's text rather than inferred from history. Length-gated to skip function words so a
+     * pronoun-only turn ("and their goals?") never counts as naming the model's picked entity.
+     * Language-generic — no domain knowledge.
+     */
+    private static boolean sharesWord(String latest, String reference) {
+        if (latest == null || latest.isBlank() || reference == null || reference.isBlank()) return false;
+        String latestLower = " " + latest.toLowerCase().replaceAll("[^a-z0-9]+", " ") + " ";
+        for (String tok : reference.toLowerCase().split("[^a-z0-9]+")) {
+            if (tok.length() >= 4 && latestLower.contains(" " + tok + " ")) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Matches the LATEST message's tokens against the NAME tokens the transcript associates with
+     * each id. For every id occurrence in the window, the capitalized words (length ≥ 4)
+     * immediately preceding it — i.e. the entity name in the "&lt;Name&gt; (&lt;id&gt;)" the system
+     * rendered earlier — are its name tokens. Returns the id whose name tokens the latest message
+     * mentions (case-insensitive), or null. Distinctive-name matching only, so generic facet words
+     * ("holdings", "cash") cannot cross-match a different entity.
+     */
+    private String focalIdByNameMatch(Pattern idp, List<Message> messages, String latest) {
+        if (idp == null || messages == null || latest == null || latest.isBlank()) return null;
+        String latestLower = " " + latest.toLowerCase().replaceAll("[^a-z0-9]+", " ") + " ";
+        String bestId = null;
+        int bestScore = 0;
+        // Newest-first so a more recent association wins ties.
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            String content = messages.get(i).content();
+            if (content == null || content.isBlank()) continue;
+            Matcher m = idp.matcher(content);
+            while (m.find()) {
+                String id = m.group();
+                int start = Math.max(0, m.start() - 48);
+                String before = content.substring(start, m.start());
+                int score = 0;
+                for (Matcher w = CAP_WORD.matcher(before); w.find(); ) {
+                    String tok = w.group().toLowerCase();
+                    if (latestLower.contains(" " + tok + " ")) score++;
+                }
+                if (score > bestScore) { bestScore = score; bestId = id; }
+            }
+        }
+        return bestScore > 0 ? bestId : null;
+    }
+
+    /** Capitalized words of length ≥ 4 — a cheap proper-noun (entity name) heuristic. */
+    private static final Pattern CAP_WORD = Pattern.compile("\\b[A-Z][A-Za-z]{3,}\\b");
+
+    /**
+     * The id of the most recent single-entity turn in the window: the newest message that contains
+     * exactly ONE distinct id (skips multi-id compare answers and clarification lists), or null.
+     * Used to carry focus across a bare back-reference.
+     */
+    private String lastFocalSingleId(Pattern idp, List<Message> messages) {
+        if (idp == null || messages == null) return null;
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            String content = messages.get(i).content();
+            if (content == null || content.isBlank()) continue;
+            java.util.LinkedHashSet<String> ids = new java.util.LinkedHashSet<>();
+            for (Matcher m = idp.matcher(content); m.find(); ) ids.add(m.group());
+            if (ids.size() == 1) return ids.iterator().next();
+        }
+        return null;
+    }
+
+    /** True when the text back-references an entity via a configured anaphor token. */
+    private boolean isAnaphoric(String text) {
+        if (text == null || text.isBlank() || anaphoraTokens.isEmpty()) return false;
+        String norm = " " + text.toLowerCase().replaceAll("[^a-z0-9]+", " ").trim() + " ";
+        for (String tok : anaphoraTokens) {
+            if (norm.contains(" " + tok + " ")) return true;
+        }
+        return false;
     }
 
     /** The most recent user message text (the extraction target), or "" if none. */

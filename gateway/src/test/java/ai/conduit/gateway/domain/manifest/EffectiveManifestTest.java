@@ -28,7 +28,7 @@ class EffectiveManifestTest {
                 "wealth-management", "Wealth Management", coverage,
                 new DomainManifest.MemoryCompaction(
                         List.of("relationship_id", "client_name"),
-                        List.of("raw_agent_outputs")));
+                        List.of("raw_agent_outputs")), null, null);
         var sub = new SubDomainManifest(
                 "private-banking", "Private Banking", "wealth-management",
                 List.of("relationship_id"), true,
@@ -50,7 +50,7 @@ class EffectiveManifestTest {
     @Test
     @DisplayName("merge with resource_scoped=false: resourceScoped is false")
     void merge_resourceScopedFalse_notResourceScoped() {
-        var domain = new DomainManifest("asset-servicing", "Asset Servicing", null, null);
+        var domain = new DomainManifest("asset-servicing", "Asset Servicing", null, null, null, null);
         var sub = new SubDomainManifest(
                 "nav", "NAV", "asset-servicing",
                 List.of(), false, Map.of(), List.of("acme.servicing.nav"));

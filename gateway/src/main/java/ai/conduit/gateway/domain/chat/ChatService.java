@@ -2,6 +2,7 @@ package ai.conduit.gateway.domain.chat;
 
 import ai.conduit.gateway.api.v1.chat.dto.ChatRequest;
 import ai.conduit.gateway.api.v1.chat.dto.Message;
+import ai.conduit.gateway.domain.clarify.ClarificationComposer;
 import ai.conduit.gateway.domain.auth.EntitlementService;
 import ai.conduit.gateway.domain.auth.EntitlementService.EntitlementResult;
 import ai.conduit.gateway.domain.auth.Principal;
@@ -63,6 +64,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
 import java.util.stream.Collectors;
 
 @Service
@@ -70,6 +72,15 @@ public class ChatService {
 
     private static final Logger log = LoggerFactory.getLogger(ChatService.class);
     static final String MODEL_ID = "conduit-assistant";
+
+    /**
+     * How many recent user turns (including the current one) are concatenated into the routing
+     * query so a keyword-less follow-up inherits the conversation's domain vocabulary. Bounded so a
+     * long conversation cannot drift the routed domain; recent turns dominate. Configuration, not a
+     * constant (CLAUDE.md §5) — tunable without a rebuild.
+     */
+    @org.springframework.beans.factory.annotation.Value("${conduit.chat.routing-context-turns:4}")
+    private int routingContextTurns;
 
     private static final List<String> TITLE_TRIGGERS = List.of(
             "generate a concise", "generate a short", "provide a title",
@@ -86,6 +97,7 @@ public class ChatService {
     private final TraceEventPublisher      tracePublisher;
     private final CoverageClient           coverageClient;
     private final DomainManifestStore      manifestStore;
+    private final ai.conduit.gateway.domain.clarify.ClarificationComposer clarificationComposer;
     private final Tracer                   tracer;
     private final MeterRegistry meterRegistry;
     private final Counter intentFetchCounter;
@@ -103,6 +115,7 @@ public class ChatService {
                        TraceEventPublisher tracePublisher,
                        CoverageClient coverageClient,
                        DomainManifestStore manifestStore,
+                       ai.conduit.gateway.domain.clarify.ClarificationComposer clarificationComposer,
                        Tracer tracer,
                        MeterRegistry meterRegistry) {
         this.mapper              = mapper;
@@ -115,6 +128,7 @@ public class ChatService {
         this.tracePublisher      = tracePublisher;
         this.coverageClient      = coverageClient;
         this.manifestStore       = manifestStore;
+        this.clarificationComposer = clarificationComposer;
         this.tracer              = tracer;
         this.meterRegistry         = meterRegistry;
         this.intentFetchCounter    = Counter.builder("chat.intent").tag("type","FETCH_DATA").register(meterRegistry);
@@ -235,17 +249,24 @@ public class ChatService {
             switch (intentResult.intent()) {
                 case FETCH_DATA -> handleFetchData(request, emitter, latestPrompt,
                         conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan,
-                        intentResult.extractedEntities(), streamId);
+                        intentResult.extractedEntities(), streamId, true);
                 case FOLLOW_UP  -> handleFollowUp(request, emitter, latestPrompt,
-                        conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan, streamId);
+                        conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan,
+                        intentResult.extractedEntities(), streamId);
                 // CLARIFY is routed through the SAME deterministic coverage path as FETCH_DATA
                 // (hard-rule e): the LLM never decides clarification. The coverage
                 // discover/intersect/`required ∩ resolved = ∅` check inside handleFetchData
-                // produces the proper numbered clarification from the RM's book — not a bare,
+                // produces the proper grounded clarification from the RM's book — not a bare,
                 // LLM-judged manifest message.
+                //
+                // carryContext=false: a CLARIFY turn is, by the classifier's own determination, a
+                // terse under-specified ask ("Calderon Trust?") with no actionable request. We route
+                // it on the bare message only — NOT enriched with prior-turn domain vocabulary — so
+                // it cannot inherit a confident domain from history and be answered; it stays a
+                // clarification. Enriching it would collapse the FETCH_DATA/CLARIFY distinction.
                 case CLARIFY    -> handleFetchData(request, emitter, latestPrompt,
                         conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan,
-                        intentResult.extractedEntities(), streamId);
+                        intentResult.extractedEntities(), streamId, false);
                 case CHITCHAT   -> handleChitchat(request, emitter, conversationId, requestId, requestStart, streamId);
             }
 
@@ -268,7 +289,8 @@ public class ChatService {
                                   String userId,
                                   Principal jwtPrincipal,
                                   String requestId, long requestStart, Span rootSpan,
-                                  EntityBag preExtracted, String streamId) throws Exception {
+                                  EntityBag preExtracted, String streamId,
+                                  boolean carryContext) throws Exception {
         Span span = tracer.spanBuilder("chat.fetch_data").startSpan();
         // coverageRelId is set by the coverage pipeline before synthesis.
         String coverageRelId = null;
@@ -284,7 +306,66 @@ public class ChatService {
         // union's first key. They are plain locals (captured by no lambda) so reassignment is safe.
         EntityType coverageEntity = coverageEntityType();
         try {
-            ResolverResult resolved = resolver.resolve(latestPrompt);
+            // ── DETERMINISTIC IDENTIFIER PRE-CHECK ───────────────────────────────────
+            // A bare identifier ("REL-00188?") carries no domain vocabulary, so embedding routing
+            // scores it at noise level and can pick an unrelated domain — surfacing the WRONG
+            // domain's copy ("which policy?" for a wealth id). But the id's manifest id_pattern names
+            // its entity type — and hence its domain — exactly. When such an id RESOLVES
+            // (principal-agnostically, World-B rule f) and the caller is NOT entitled, deny with THAT
+            // domain's own copy, deterministically, before routing. Only a resolved-then-denied
+            // verdict short-circuits; not-found (fake id), ambiguous, or allowed all fall through to
+            // the normal pipeline unchanged. Manifest-driven (id_pattern + resolve_type + coverage) —
+            // no id prefix or domain literal in the gateway.
+            java.util.Optional<ai.conduit.gateway.domain.manifest.DomainManifestStore.IdentifiedReference>
+                    idRef = manifestStore.identifyByIdPattern(latestPrompt);
+            if (idRef.isPresent() && idRef.get().coverage() != null) {
+                var ir = idRef.get();
+                Principal p0 = (jwtPrincipal != null) ? jwtPrincipal : Principal.anonymous();
+                String t0 = jwtPrincipal != null ? jwtPrincipal.tenantId() : "default";
+                String sub0 = ir.subDomain().subDomainId();
+                try {
+                    CoverageResolveResult rr = coverageClient.resolve(
+                        ir.id(), ir.entityType().resolveType(), t0, ir.coverage());
+                    if (rr.resolved() && rr.id() != null) {
+                        CoverageCheckResult check = coverageClient.check(p0.id(), t0, rr.id(), ir.coverage());
+                        if (!check.allowed()) {
+                            emitRequestOutcome("DENIED");
+                            tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
+                                GateData.deny(GateData.GATE_COVERAGE,
+                                    rr.id() + " not in " + p0.id() + "'s book", sub0)));
+                            tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
+                                new CheckDeniedData("coverage", rr.id(), p0.id(), check.reason(), "coverage")));
+                            streamTextAndComplete(emitter, mapDenialReason(check.reason(), sub0), streamId);
+                            tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
+                                new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                            return;
+                        }
+                    }
+                } catch (CoverageClient.CoverageUnavailableException e) {
+                    // Fail open to the normal pipeline — it re-attempts coverage and fails closed there.
+                    log.warn("Identifier pre-check coverage unavailable ({}), falling through", e.getMessage());
+                }
+            }
+
+            // ── CONTEXT-AWARE ROUTING ────────────────────────────────────────────────
+            // Route on conversation-enriched text (recent user turns) rather than the bare last
+            // message. Enrichment lets the resolver's confidence/margin gate derive the query's
+            // domain from the conversation's established vocabulary and abstain on a lone
+            // out-of-domain hit. This fixes keyword-less follow-ups
+            // ("summarize for Calderon Trust (REL-00099)?") that otherwise scored in the
+            // cross-domain noise band and were misrouted. For CLARIFY turns (carryContext=false)
+            // we route on the bare message so a terse under-specified ask cannot inherit a
+            // confident domain from history and be answered. No domain literal here — the domain
+            // decision comes from the winning agent manifest's own domain field in the resolver.
+            String routingText = carryContext ? buildRoutingQuery(request) : latestPrompt;
+            // FACET CARRY / BIAS-TO-FETCH: when the current turn already carries an explicit grounded
+            // subject (an id the user typed, or a focal name the deterministic derivation resolved),
+            // the turn is fully specified — only which agents/facet is muddy. Tell the resolver not
+            // to abstain on a low top-vs-noise margin so a terse follow-up ("and for REL-00099?")
+            // inherits the conversation's facet vocabulary and routes, instead of stranding on a
+            // margin tie. Only on the FETCH path (carryContext); CLARIFY turns keep the abstain gate.
+            boolean entityKnown = carryContext && hasGroundedResolvableReference(preExtracted, latestPrompt);
+            ResolverResult resolved = resolver.resolveContextual(routingText, entityKnown);
 
             List<AgentsResolvedData.AgentRef> selectedRefs = resolved.selected().stream()
                     .map(c -> new AgentsResolvedData.AgentRef(
@@ -298,6 +379,21 @@ public class ChatService {
                     new AgentsResolvedData(selectedRefs, skippedRefs)));
 
             if (resolved.fallback() || resolved.selected().isEmpty()) {
+                // BIAS-TO-FETCH / graceful degrade: routing abstained (a vague or aggregate ask
+                // with no confident single route — e.g. "compare cash across both clients",
+                // "total value across my book"). On the context-carrying FETCH path, if the
+                // conversation already holds relevant data, answer from that context instead of
+                // punting — the grounded history synthesis compares/aggregates what was shown and
+                // asks for detail only if it genuinely cannot. CLARIFY-intent turns (carryContext
+                // false) keep the deterministic clarification so a bare under-specified ask still
+                // clarifies (bug-232 behaviour preserved).
+                if (carryContext && hasPriorAssistantData(request)) {
+                    answerSynthesizer.synthesizeFromHistory(request.messages(), latestPrompt, emitter, streamId);
+                    emitRequestOutcome("ANSWERED");
+                    tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
+                            new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                    return;
+                }
                 emitRequestOutcome("FAILED");
                 streamTextAndComplete(emitter, msg("needs_more_detail",
                         "I wasn't sure which services to consult. Please add more detail about what you need."), streamId);
@@ -346,6 +442,18 @@ public class ChatService {
                         allowedManifests.size(), manifests.size(), principal.id());
             }
             final List<AgentManifest> finalManifests = allowedManifests;
+
+            // Domains the request referenced but the structural entitlement gate pruned (outside the
+            // caller's access). When the SAME ask mixed an accessible and an inaccessible domain
+            // (e.g. wealth + insurance), the accessible part is still fulfilled below — these labels
+            // are handed to the synthesizer so it states the withheld part honestly instead of
+            // dropping it silently. Labels come from the pruned manifests' own domain() — World-B clean.
+            final List<String> withheldDomains = manifests.stream()
+                    .filter(m -> allowedManifests.stream().noneMatch(a -> a.agentId().equals(m.agentId())))
+                    .map(AgentManifest::domain)
+                    .filter(d -> d != null && !d.isBlank())
+                    .distinct()
+                    .collect(Collectors.toList());
 
             // ── Domain + agent tags on the root span ──────────────────────────────
             // First-class Langfuse filter chips (domain:*, agent:*) plus cost-by-domain
@@ -467,7 +575,7 @@ public class ChatService {
                                         .filter(c -> discovered.stream()
                                             .anyMatch(d -> d.id().equals(c.id())))
                                         .collect(Collectors.toList());
-                                String question = buildClarificationQuestion(em, filtered, discovered);
+                                String question = buildClarificationQuestion(em, filtered, discovered, request);
                                 emitRequestOutcome("CLARIFIED");
                                 streamTextAndComplete(emitter, question, streamId);
                                 tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
@@ -487,6 +595,43 @@ public class ChatService {
                             }
 
                         } else {
+                            // No LLM-extracted reference. Before falling back to a book clarification,
+                            // try to resolve any proper-noun the user typed in the LATEST message — the
+                            // extractor can drop a freshly-named entity under heavy conversational load,
+                            // so an out-of-coverage NAMED entity ("the Okafor account") would otherwise
+                            // clarify with the caller's OWN clients rather than deny. Resolution is
+                            // principal-agnostic (World-B rule f); a name that resolves to ONE entity is
+                            // fully specified, so we run the coverage CHECK on it (honest deny if out of
+                            // book). Only a UNIQUE resolution takes this path — a genuinely ambiguous or
+                            // unresolvable name still falls through to the clarification below.
+                            String backstopId = resolveNamedReferenceBackstop(
+                                latestPrompt, coverageEntity, tenantId, coverage);
+                            if (backstopId != null) {
+                                coverageRelId = backstopId;
+                                CoverageCheckResult check = coverageClient.check(
+                                    principalId, tenantId, coverageRelId, coverage);
+                                if (!check.allowed()) {
+                                    emitRequestOutcome("DENIED");
+                                    tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
+                                        GateData.deny(GateData.GATE_COVERAGE,
+                                            coverageRelId + " not in " + principalId + "'s book",
+                                            resourceScopedAgent.agentId())));
+                                    tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
+                                        new CheckDeniedData("coverage", coverageRelId, principalId,
+                                            check.reason(), "coverage")));
+                                    streamTextAndComplete(emitter,
+                                        mapDenialReason(check.reason(), em.subDomainId()), streamId);
+                                    tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
+                                        new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                                    return;
+                                }
+                                // Covered — emit the passing gate frame and fall through to synthesis
+                                // (coverageRelId is injected into the entity bag below).
+                                tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
+                                    GateData.allow(GateData.GATE_COVERAGE,
+                                        coverageRelId + " in " + principalId + "'s book",
+                                        resourceScopedAgent.agentId())));
+                            } else {
                             // No user-authored reference in the sent conversation. Deterministic
                             // CLARIFY: do not guess or auto-select a covered resource.
                             List<CoverageResource> discovered = coverageClient.discover(
@@ -508,12 +653,13 @@ public class ChatService {
                                 return;
                             }
 
-                            String question = buildClarificationQuestion(em, List.of(), discovered);
+                            String question = buildClarificationQuestion(em, List.of(), discovered, request);
                             emitRequestOutcome("CLARIFIED");
                             streamTextAndComplete(emitter, question, streamId);
                             tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                                 new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
                             return;
+                            }
                         }
 
                     } catch (CoverageClient.CoverageUnavailableException e) {
@@ -617,7 +763,7 @@ public class ChatService {
             tracePublisher.publish(TraceEvent.of("synthesis_start", requestId, conversationId,
                     new SynthesisStartData(results.size(), (int) okCount)));
 
-            answerSynthesizer.synthesize(results, latestPrompt, request.messages(), emitter, streamId);
+            answerSynthesizer.synthesize(results, latestPrompt, request.messages(), emitter, streamId, withheldDomains);
             emitRequestOutcome("ANSWERED");
 
             tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
@@ -631,7 +777,25 @@ public class ChatService {
                                  String userId,
                                  Principal jwtPrincipal,
                                  String requestId, long requestStart, Span rootSpan,
-                                 String streamId) throws Exception {
+                                 EntityBag preExtracted, String streamId) throws Exception {
+        // ── BIAS-TO-FETCH FALLTHROUGH ────────────────────────────────────────────
+        // A follow-up whose needed data is not already in context ("what's the performance on that
+        // portfolio?" when only holdings were shown) must fetch it, not answer "no info" from
+        // memory. When the turn carries a single grounded resolvable entity (a name/id the focal
+        // derivation resolved, or an id typed in the message) AND the conversation routes
+        // confidently to agents, serve it through the fetch pipeline. If either is missing it is a
+        // genuine context-answerable follow-up (explain / recap / aggregate) → synthesize from
+        // history. The probe uses entityKnown=true so a terse fresh-data follow-up is not stranded
+        // by the margin abstain; the coverage CHECK remains the access gate.
+        if (preExtracted != null && hasGroundedResolvableReference(preExtracted, latestPrompt)) {
+            ResolverResult probe = resolver.resolveContextual(buildRoutingQuery(request), true);
+            if (!probe.fallback() && !probe.selected().isEmpty()) {
+                log.info("FOLLOW_UP → fetch fallthrough (grounded entity + confident route) requestId={}", requestId);
+                handleFetchData(request, emitter, latestPrompt, conversationId, userId, jwtPrincipal,
+                        requestId, requestStart, rootSpan, preExtracted, streamId, true);
+                return;
+            }
+        }
         Span span = tracer.spanBuilder("chat.follow_up").startSpan();
         try {
             answerSynthesizer.synthesizeFromHistory(request.messages(), latestPrompt, emitter, streamId);
@@ -677,17 +841,29 @@ public class ChatService {
     }
 
     /**
-     * Builds a clarification question presenting the RM with a numbered list of
-     * client relationships to choose from.
+     * Builds the clarification question over a grounded candidate set. The clarify DECISION is
+     * already made deterministically upstream ({@code extracted ∩ required = ∅}); this only produces
+     * the WORDING. Two manifest-declared styles:
      *
-     * @param em         the effective manifest (provides the question template from clarification schema)
+     * <ul>
+     *   <li><b>template</b> (default, safe): the deterministic candidate list (by name + identifier,
+     *       no positional numbers), inviting a reply by name or identifier.</li>
+     *   <li><b>composed</b> (opt-in via {@code clarify_style}): the {@link ClarificationComposer}
+     *       phrases a natural question over the SAME grounded candidates. Its output is validated to
+     *       introduce no identifier outside the candidate set; on any rejection or composer failure
+     *       we fall back to the exact deterministic template. Worst case equals today's behaviour.</li>
+     * </ul>
+     *
+     * @param em         the effective manifest (question template, clarify style/tone, id_pattern)
      * @param candidates disambiguation candidates already narrowed to the RM's book (may be empty
      *                   — falls back to the full discovered list)
      * @param discovered full discovered list for this RM
+     * @param request    the chat request, for recent conversation context (phrasing only)
      */
     private String buildClarificationQuestion(EffectiveManifest em,
                                                List<CoverageResolveResult.ResolveCandidate> candidates,
-                                               List<CoverageResource> discovered) {
+                                               List<CoverageResource> discovered,
+                                               ChatRequest request) {
         ai.conduit.gateway.domain.manifest.ClarificationSchema cs =
                 em.clarificationFor(em.primaryRequiredKey());
         String questionText = (cs != null && cs.question() != null && !cs.question().isBlank())
@@ -709,14 +885,76 @@ public class ChatService {
             options = discovered;
         }
 
+        // The entity noun + id_pattern come from the routed sub-domain's manifest (World-B: no domain
+        // literal here). The noun frames both the deterministic invitation and the composed prompt.
+        EntityType primary = primaryResolvableEntity(em);
+        String entityNoun = primary != null ? primary.display() : null;
+        String idPattern  = primary != null ? primary.idPattern() : null;
+
+        // The deterministic template is BOTH the default style AND the fallback for the composed
+        // style — computed first so it is always available unchanged.
+        String template = buildDeterministicClarification(questionText, options, entityNoun);
+
+        if (!em.clarifyComposed()) {
+            return template; // default, auditable, deterministic
+        }
+
+        // Composed style: phrase a natural question over the SAME grounded candidates. Candidates are
+        // handed to the composer as DELIMITED DATA; validation rejects any foreign identifier → fall
+        // back to the template.
+        List<ClarificationComposer.Candidate> composerCandidates = options.stream()
+                .map(r -> new ClarificationComposer.Candidate(r.id(), r.label()))
+                .collect(Collectors.toList());
+
+        String composed = clarificationComposer.compose(
+                questionText, entityNoun, composerCandidates, idPattern,
+                recentUserContext(request), em.clarifyTone());
+        return composed != null ? composed : template;
+    }
+
+    /**
+     * The deterministic clarification string — the default style and the composed fallback. Candidates
+     * are listed by NAME (+ identifier), never numbered, and the invitation asks for the name or
+     * identifier — matching what the resolve path can actually honour (there is no positional-number
+     * selection). The entity noun ({@code entityNoun}) is the manifest-declared display for the missing
+     * slot; when absent the invitation stays generic. No domain copy is hardcoded here (World-B).
+     */
+    private String buildDeterministicClarification(String questionText, List<CoverageResource> options,
+                                                   String entityNoun) {
         StringBuilder sb = new StringBuilder(questionText).append("\n");
-        int i = 1;
         for (CoverageResource r : options) {
-            sb.append(i++).append(". ").append(r.label())
+            sb.append("- ").append(r.label())
               .append(" (").append(r.id()).append(")").append("\n");
         }
-        sb.append("\nReply with the number or relationship ID.");
+        String noun = (entityNoun != null && !entityNoun.isBlank()) ? entityNoun.strip() + " " : "";
+        sb.append("\nReply with the ").append(noun).append("name or identifier.");
         return sb.toString();
+    }
+
+    /** The routed sub-domain's primary required RESOLVABLE entity type, or null (manifest-driven). */
+    private EntityType primaryResolvableEntity(EffectiveManifest em) {
+        String key = em.primaryRequiredKey();
+        if (key == null) return null;
+        return manifestStore.entityTypesFor(em.subDomainId()).stream()
+                .filter(et -> key.equals(et.key()) && et.isResolvable())
+                .findFirst()
+                .orElse(null);
+    }
+
+    /** Recent USER turns (newest last) as phrasing context for the composer — never a fact source. */
+    private String recentUserContext(ChatRequest request) {
+        if (request == null || request.messages() == null) return null;
+        int window = Math.max(1, routingContextTurns);
+        List<String> turns = new ArrayList<>();
+        for (int i = request.messages().size() - 1; i >= 0 && turns.size() < window; i--) {
+            Message m = request.messages().get(i);
+            if ("user".equalsIgnoreCase(m.role()) && m.content() != null && !m.content().isBlank()) {
+                turns.add(m.content().trim());
+            }
+        }
+        if (turns.isEmpty()) return null;
+        java.util.Collections.reverse(turns);
+        return String.join("\n", turns);
     }
 
     // ── Private utilities ─────────────────────────────────────────────────────
@@ -728,6 +966,67 @@ public class ChatService {
             if ("user".equals(m.role()) && m.content() != null) return m.content();
         }
         return "";
+    }
+
+    /**
+     * Builds the routing query by concatenating the most recent user turns (bounded by
+     * {@code routingContextTurns}, current turn last) so a keyword-less follow-up inherits the
+     * conversation's established domain vocabulary. This is the "carried topic" the resolver uses to
+     * derive the query's domain (plan §2). Only USER turns are included — assistant answers would
+     * inject their own vocabulary and skew the embedding. No domain knowledge here: it is raw
+     * conversation text. Falls back to the latest user message when there is only one turn.
+     */
+    private String buildRoutingQuery(ChatRequest request) {
+        String latest = extractLatestUserMessage(request);
+        if (request.messages() == null || request.messages().isEmpty()) return latest;
+        int window = Math.max(1, routingContextTurns);
+        List<String> userTurns = new ArrayList<>();
+        for (int i = request.messages().size() - 1; i >= 0 && userTurns.size() < window; i--) {
+            Message m = request.messages().get(i);
+            if ("user".equals(m.role()) && m.content() != null && !m.content().isBlank()) {
+                userTurns.add(m.content().trim());
+            }
+        }
+        if (userTurns.size() <= 1) return latest;
+        java.util.Collections.reverse(userTurns);  // oldest → newest (current turn last)
+        return String.join("\n", userTurns);
+    }
+
+    /**
+     * True when the turn carries an explicit, grounded resolvable entity reference — either a
+     * reference the deterministic focal derivation already placed in {@code preExtracted}, or an
+     * identifier the user literally typed in the latest message (matched against each resolvable
+     * entity type's manifest {@code id_pattern}). Drives the resolver's bias-to-fetch relaxation.
+     * Manifest-driven (entity types + id_pattern) — no domain literal or ID prefix in the gateway.
+     */
+    /**
+     * True when the client-sent window contains prior assistant content to answer from — used to
+     * decide whether a routing-abstained turn can degrade gracefully to grounded history synthesis
+     * rather than punting. Purely structural (role + non-blank content); no domain knowledge.
+     */
+    private boolean hasPriorAssistantData(ChatRequest request) {
+        if (request.messages() == null) return false;
+        return request.messages().stream()
+                .anyMatch(m -> "assistant".equalsIgnoreCase(m.role())
+                        && m.content() != null && !m.content().isBlank());
+    }
+
+    private boolean hasGroundedResolvableReference(EntityBag preExtracted, String latestPrompt) {
+        List<EntityType> resolvables = manifestStore.entityTypes().stream()
+                .filter(EntityType::isResolvable)
+                .collect(Collectors.toList());
+        for (EntityType et : resolvables) {
+            if (preExtracted != null && et.extractAs() != null
+                    && preExtracted.reference(et.extractAs()) != null) {
+                return true;
+            }
+            String pattern = et.idPattern();
+            if (pattern != null && !pattern.isBlank() && latestPrompt != null
+                    && java.util.regex.Pattern.compile(pattern).matcher(latestPrompt).find()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -783,6 +1082,56 @@ public class ChatService {
             case CLARIFY    -> intentClarifyCounter.increment();
             case CHITCHAT   -> intentChitchatCounter.increment();
         }
+    }
+
+    /**
+     * Deterministic named-entity backstop for the coverage pipeline. The LLM extractor can drop a
+     * freshly-named entity under heavy conversational load; this recovers it WITHOUT the model, by
+     * pulling the proper-noun phrases the user typed in the latest message and resolving each against
+     * the routed sub-domain's coverage service, principal-agnostically (World-B rule f). Returns the
+     * canonical id when EXACTLY ONE phrase resolves UNAMBIGUOUSLY, else null — no phrase resolves, or
+     * resolution is ambiguous, so the caller falls back to a proper clarification (never a guess).
+     * Language-generic (capitalized-word heuristic) + manifest-driven (resolve_type + coverage) — no
+     * domain names or id prefixes in the gateway.
+     */
+    private String resolveNamedReferenceBackstop(String latestPrompt, EntityType coverageEntity,
+                                                 String tenantId, DomainManifest.Coverage coverage) {
+        if (coverageEntity == null || coverage == null || latestPrompt == null || latestPrompt.isBlank()) {
+            return null;
+        }
+        String found = null;
+        for (String phrase : properNounPhrases(latestPrompt)) {
+            try {
+                CoverageResolveResult r = coverageClient.resolve(
+                    phrase, coverageEntity.resolveType(), tenantId, coverage);
+                if (r.resolved() && r.id() != null) {
+                    if (found != null && !found.equals(r.id())) return null; // two distinct → ambiguous
+                    found = r.id();
+                } else if (r.isAmbiguous()) {
+                    return null; // a single phrase is itself ambiguous → clarify, do not guess
+                }
+            } catch (CoverageClient.CoverageUnavailableException e) {
+                return null; // fail closed → fall back to the deterministic clarification
+            }
+        }
+        return found;
+    }
+
+    /** Capitalized proper-noun token (length ≥ 3) — a cheap entity-name heuristic (language-generic). */
+    private static final java.util.regex.Pattern PROPER_NOUN =
+            java.util.regex.Pattern.compile("[A-Z][A-Za-z]{2,}(?:\\s+[A-Z][A-Za-z]{2,})*");
+
+    /**
+     * Maximal runs of consecutive capitalized words in {@code text} — candidate entity names to try
+     * resolving (e.g. "the Okafor account" → ["Okafor"], "Whitman Family Office" → ["Whitman Family
+     * Office"]). Language-generic; carries no domain knowledge.
+     */
+    private static List<String> properNounPhrases(String text) {
+        List<String> out = new ArrayList<>();
+        if (text == null || text.isBlank()) return out;
+        Matcher m = PROPER_NOUN.matcher(text);
+        while (m.find()) out.add(m.group());
+        return out;
     }
 
     /** Sends text tokens as SSE deltas and calls {@code emitter.complete()}. Terminates the stream. */

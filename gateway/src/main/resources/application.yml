@@ -66,6 +66,15 @@ conduit:
     confidence-floor: 0.30       # absolute cosine similarity floor
     relative-floor-factor: 0.65  # dynamic floor = max(absolute, topScore * factor); prunes long-tail matches
     top-k: 10
+    # Min gap between the leading candidate and the best OTHER-domain candidate for the leader's
+    # domain to be trusted as the query's scope (context-aware chat routing). Below this the query
+    # is in the cross-domain noise band → abstain to a deterministic clarification. Margin-based
+    # (not a raw absolute cutoff) so a lone low-confidence out-of-domain hit is never trusted.
+    domain-margin: 0.05
+  chat:
+    # Recent user turns (incl. current) concatenated into the routing query so keyword-less
+    # follow-ups inherit the conversation's domain vocabulary. Bounded to limit domain drift.
+    routing-context-turns: 4
     # Domain-neutral entity-resolution endpoint (legacy fallback resolver; the live World-B path
     # resolves via CoverageClient using the manifest's coverage.resolve_url). No domain literal.
     entity-resolve-url: ${CONDUIT_RESOLVER_ENTITY_RESOLVE_URL:http://mock-crm:8085/entities/resolve}
@@ -90,6 +99,21 @@ conduit:
       base-url: ${CONDUIT_LLM_ENTITY_EXTRACTOR_BASE_URL:https://api.z.ai/api/paas/v4}
       api-key: ${CONDUIT_LLM_ENTITY_EXTRACTOR_API_KEY:${ZAI_API_KEY:}}
       model: ${CONDUIT_LLM_ENTITY_EXTRACTOR_MODEL:glm-4.5-flash}
+    # ── Clarification Composer (natural clarify wording — opt-in per domain) ───
+    # Phrases a clarifying question over the GROUNDED candidate set when a domain sets
+    # clarify_style: composed. Never decides to clarify; output is validated (no foreign IDs) and
+    # falls back to the deterministic template on any rejection/failure. Defaults inherit the
+    # intent-classifier's fast/cheap flash model + key.
+    clarification-composer:
+      base-url: ${CONDUIT_LLM_CLARIFICATION_COMPOSER_BASE_URL:${CONDUIT_LLM_INTENT_CLASSIFIER_BASE_URL:https://api.z.ai/api/paas/v4}}
+      api-key: ${CONDUIT_LLM_CLARIFICATION_COMPOSER_API_KEY:${CONDUIT_LLM_INTENT_CLASSIFIER_API_KEY:${ZAI_API_KEY:}}}
+      model: ${CONDUIT_LLM_CLARIFICATION_COMPOSER_MODEL:${CONDUIT_LLM_INTENT_CLASSIFIER_MODEL:glm-4.5-flash}}
+      temperature: ${CONDUIT_LLM_CLARIFICATION_COMPOSER_TEMPERATURE:0.4}
+      max-output-chars: ${CONDUIT_LLM_CLARIFICATION_COMPOSER_MAX_OUTPUT_CHARS:1200}
+      max-retries: ${CONDUIT_LLM_CLARIFICATION_COMPOSER_MAX_RETRIES:1}
+      retry-initial-delay-ms: ${CONDUIT_LLM_CLARIFICATION_COMPOSER_RETRY_INITIAL_DELAY_MS:200}
+      retry-backoff-multiplier: ${CONDUIT_LLM_CLARIFICATION_COMPOSER_RETRY_BACKOFF_MULTIPLIER:2}
+      request-timeout-seconds: ${CONDUIT_LLM_CLARIFICATION_COMPOSER_REQUEST_TIMEOUT_SECONDS:8}
     # ── Answer Synthesizer (grounded streaming answer) ────────────────────────
     synthesizer:
       base-url: ${CONDUIT_LLM_SYNTHESIZER_BASE_URL:https://api.z.ai/api/paas/v4}

@@ -13,6 +13,7 @@ Run:
 """
 
 import json
+import re
 import time
 import uuid
 import pytest
@@ -319,3 +320,55 @@ def test_5_asset_servicing_no_coverage_check():
         f"Asset-servicing question was incorrectly denied via coverage check: {repr(text)}"
     )
     assert len(text) > 5, f"Response is suspiciously short for a settlement query: {repr(text)}"
+
+
+# ── Clarification composer — eval fixture ───────────────────────────────────────
+#
+# The clarify STYLE is a per-domain manifest policy (clarify_style: template | composed). The
+# DECISION to clarify stays deterministic in gateway code; the composer only affects WORDING and
+# is validated to introduce NO identifier outside the grounded candidate set — else it falls back
+# to the deterministic template. These fixtures pin the invariant that keeps "natural" from
+# becoming "unpredictable": a clarify over >=2 grounded candidates references ONLY the caller's
+# own book, whatever the style. Generic across domains — proven on wealth AND insurance.
+
+_ID_TOKEN = re.compile(r"\b[A-Z]{2,}-\d+\b")
+
+
+def _assert_grounded_clarify(text: str, allowed_ids: set[str], entity_word: str):
+    """A clarify must be a question over the caller's book and cite no foreign identifier."""
+    lower = text.lower()
+    assert len(text) > 5, f"Clarify suspiciously short: {repr(text)}"
+    assert ("?" in text) or ("which" in lower) or (entity_word in lower), (
+        f"Expected a clarifying question, got: {repr(text)}"
+    )
+    mentioned = set(_ID_TOKEN.findall(text))
+    foreign = mentioned - allowed_ids
+    assert not foreign, (
+        f"Clarify introduced identifier(s) outside the caller's grounded book {allowed_ids}: "
+        f"{foreign} — composer/validation must never fabricate. Full text: {repr(text)}"
+    )
+    assert mentioned, (
+        f"Clarify cited no grounded identifier from the book {allowed_ids}: {repr(text)}"
+    )
+
+
+def test_9_clarify_composed_grounded_wealth():
+    """
+    rm_jane asks an under-specified question with no client named -> deterministic clarify over her
+    book (>=2 grounded candidates). Whatever the wording style, it must reference ONLY REL-00042 /
+    REL-00099 and invent no other relationship ID.
+    """
+    jwt = get_jwt("rm_jane")  # covers Whitman (REL-00042) + Calderon Trust (REL-00099)
+    text, _ = chat([{"role": "user", "content": "What are the current holdings?"}], jwt)
+    _assert_grounded_clarify(text, {"REL-00042", "REL-00099"}, "client")
+
+
+def test_10_clarify_composed_grounded_insurance():
+    """
+    Cross-domain proof: same composer, different manifest. uw_sam asks an under-specified insurance
+    question with no policy named -> clarify over his book. Must reference ONLY POL-77001 / POL-77002
+    and use the insurance entity noun ('policy'), never wealth copy.
+    """
+    jwt = get_jwt("uw_sam")  # covers Aurora Mfg (POL-77002) + Continental Freight (POL-77001)
+    text, _ = chat([{"role": "user", "content": "Pull up the policy details"}], jwt)
+    _assert_grounded_clarify(text, {"POL-77001", "POL-77002"}, "policy")

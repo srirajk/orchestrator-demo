@@ -38,6 +38,8 @@
 
   "denial_messages": {
     "not-covered": "That policy is not in your book of business.",
+    "not-in-book": "That policy is not in your book of business.",
+    "unknown-resource": "That policy is not in your book of business.",
     "coverage-transferred": "Servicing for that policy has been transferred to another underwriter.",
     "policy-closed": "That policy is no longer active.",
     "default": "Access denied for this policy."
