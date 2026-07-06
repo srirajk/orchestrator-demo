@@ -256,7 +256,7 @@ public class ChatService {
                 // CLARIFY is routed through the SAME deterministic coverage path as FETCH_DATA
                 // (hard-rule e): the LLM never decides clarification. The coverage
                 // discover/intersect/`required ∩ resolved = ∅` check inside handleFetchData
-                // produces the proper numbered clarification from the RM's book — not a bare,
+                // produces the proper grounded clarification from the RM's book — not a bare,
                 // LLM-judged manifest message.
                 //
                 // carryContext=false: a CLARIFY turn is, by the classifier's own determination, a
@@ -846,7 +846,8 @@ public class ChatService {
      * the WORDING. Two manifest-declared styles:
      *
      * <ul>
-     *   <li><b>template</b> (default, safe): the byte-for-byte deterministic numbered list.</li>
+     *   <li><b>template</b> (default, safe): the deterministic candidate list (by name + identifier,
+     *       no positional numbers), inviting a reply by name or identifier.</li>
      *   <li><b>composed</b> (opt-in via {@code clarify_style}): the {@link ClarificationComposer}
      *       phrases a natural question over the SAME grounded candidates. Its output is validated to
      *       introduce no identifier outside the candidate set; on any rejection or composer failure
@@ -884,21 +885,23 @@ public class ChatService {
             options = discovered;
         }
 
-        // The deterministic template is BOTH the default style AND the fallback for the composed
-        // style — computed first so it is always available unchanged.
-        String template = buildDeterministicClarification(questionText, options);
-
-        if (!em.clarifyComposed()) {
-            return template; // default, auditable, byte-for-byte deterministic
-        }
-
-        // Composed style: phrase a natural question over the SAME grounded candidates. The entity
-        // noun + id_pattern come from the routed sub-domain's manifest (World-B: no domain literal
-        // here). Candidates are handed to the composer as DELIMITED DATA; validation rejects any
-        // foreign identifier → fall back to the template.
+        // The entity noun + id_pattern come from the routed sub-domain's manifest (World-B: no domain
+        // literal here). The noun frames both the deterministic invitation and the composed prompt.
         EntityType primary = primaryResolvableEntity(em);
         String entityNoun = primary != null ? primary.display() : null;
         String idPattern  = primary != null ? primary.idPattern() : null;
+
+        // The deterministic template is BOTH the default style AND the fallback for the composed
+        // style — computed first so it is always available unchanged.
+        String template = buildDeterministicClarification(questionText, options, entityNoun);
+
+        if (!em.clarifyComposed()) {
+            return template; // default, auditable, deterministic
+        }
+
+        // Composed style: phrase a natural question over the SAME grounded candidates. Candidates are
+        // handed to the composer as DELIMITED DATA; validation rejects any foreign identifier → fall
+        // back to the template.
         List<ClarificationComposer.Candidate> composerCandidates = options.stream()
                 .map(r -> new ClarificationComposer.Candidate(r.id(), r.label()))
                 .collect(Collectors.toList());
@@ -909,15 +912,22 @@ public class ChatService {
         return composed != null ? composed : template;
     }
 
-    /** Today's exact deterministic clarification string — the default style and the composed fallback. */
-    private String buildDeterministicClarification(String questionText, List<CoverageResource> options) {
+    /**
+     * The deterministic clarification string — the default style and the composed fallback. Candidates
+     * are listed by NAME (+ identifier), never numbered, and the invitation asks for the name or
+     * identifier — matching what the resolve path can actually honour (there is no positional-number
+     * selection). The entity noun ({@code entityNoun}) is the manifest-declared display for the missing
+     * slot; when absent the invitation stays generic. No domain copy is hardcoded here (World-B).
+     */
+    private String buildDeterministicClarification(String questionText, List<CoverageResource> options,
+                                                   String entityNoun) {
         StringBuilder sb = new StringBuilder(questionText).append("\n");
-        int i = 1;
         for (CoverageResource r : options) {
-            sb.append(i++).append(". ").append(r.label())
+            sb.append("- ").append(r.label())
               .append(" (").append(r.id()).append(")").append("\n");
         }
-        sb.append("\nReply with the number or relationship ID.");
+        String noun = (entityNoun != null && !entityNoun.isBlank()) ? entityNoun.strip() + " " : "";
+        sb.append("\nReply with the ").append(noun).append("name or identifier.");
         return sb.toString();
     }
 
