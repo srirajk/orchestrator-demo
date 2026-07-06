@@ -3994,5 +3994,24 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-07-06"
+  },
+  {
+    "id": "bug-241",
+    "timestamp": "2026-07-06",
+    "error_message": "Langfuse dashboard widgets on the OBSERVATIONS view rendered 'Query needs attention / Internal Server Error'; server log: ClickHouse 'Unknown table expression identifier events_core' on dashboard.executeQuery.",
+    "file": "scripts/seed-data/langfuse-dashboard.sql",
+    "root_cause": "The unstable widget-create API defaults minVersion=2. In this Langfuse v3 deployment, min_version=2 makes dashboard.executeQuery compile the OBSERVATIONS view against the v2/v4 'events_core'/'events_observations' ClickHouse tables, which do not exist here (v2 metrics is a v4 write-mode feature). Only the v1 view (table 'observations') is backed by real tables.",
+    "fix": "Wrote the widget rows directly to Postgres with min_version=1 for all six widgets so dashboard.executeQuery uses the v1 view declarations (observations / scores_numeric / traces) that this v3 deployment actually has. Verified every widget renders populated via a headless Playwright screenshot.",
+    "tags": [
+      "langfuse",
+      "dashboard",
+      "clickhouse",
+      "events_core",
+      "min_version",
+      "observability"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-06"
   }
 ]

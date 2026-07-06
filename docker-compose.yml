@@ -963,6 +963,29 @@ services:
     command: ["sh", "/scripts/seed-datasets.sh"]
     restart: "no"
 
+  # Seed the "Conduit — LLM Quality & Cost" Langfuse dashboard (6 widgets). The public API
+  # can create widgets but not place them on a grid, so the widgets + dashboard row are
+  # written directly into Langfuse Postgres. In-network, env-only, no host dependency; the
+  # SQL is idempotent so this survives `down -v` → up. Reuses the postgres image for psql.
+  seed-langfuse-dashboard:
+    image: postgres:16-alpine
+    container_name: conduit-seed-langfuse-dashboard
+    depends_on:
+      langfuse-db:
+        condition: service_healthy
+      langfuse:
+        condition: service_started
+    volumes:
+      - ./scripts:/scripts:ro
+    environment:
+      LANGFUSE_DB_HOST: langfuse-db
+      LANGFUSE_DB_PORT: "5432"
+      LANGFUSE_DB_USER: ${LANGFUSE_DB_USER:-langfuse}
+      LANGFUSE_DB_PASSWORD: ${LANGFUSE_DB_PASSWORD:-langfuse}
+      LANGFUSE_DB_NAME: langfuse
+    command: ["sh", "/scripts/seed-langfuse-dashboard.sh"]
+    restart: "no"
+
   # ── k6 load test — Phase 7 only (scale profile) ───────────────────────────────
 
   k6:

@@ -1192,6 +1192,7 @@
 - `run-integration-tests.sh` (~354 tok)
 - `scenario-perf.py` — class: check_summary, mint_token, chat, resolve + 4 more (~14188 tok)
 - `seed-datasets.sh` — seed-datasets.sh — boot provisioner step: seed the Langfuse golden datasets (~353 tok)
+- `seed-langfuse-dashboard.sh` — Idempotently seeds the "Conduit — LLM Quality & Cost" Langfuse dashboard by applying seed-data/langfuse-dashboard.sql to Langfuse Postgres. Env-driven (LANGFUSE_DB_*); uses psql if present else `docker exec conduit-langfuse-db psql`. Wired into seed-users.sh + a compose one-shot service. (~500 tok)
 - `seed-demo.py` — mint_token, chat, chat_multi, wait_for_gateway + 1 more (~2771 tok)
 - `seed-demo.sh` — Meridian Gateway — Phoenix/Tempo demo seed (~176 tok)
 - `seed-users.sh` — seed-users.sh — Idempotently seed demo principals into Redis. (~1048 tok)
@@ -1215,6 +1216,7 @@
 
 - `principals.json` — 3 demo principals (rm_jane, rm_carlos, rm_guest) matching PrincipalStore hash schema: id, roles/book/segments/domains/adminDomains as JSON arrays, clearance as int string (~200 tok)
 - `principals.json` (~266 tok)
+- `langfuse-dashboard.sql` — Idempotent SQL that seeds the "Conduit — LLM Quality & Cost" Langfuse dashboard: 6 dashboard_widgets rows (cost-by-model, eval-scores, trace-volume, latency p50/p95, token-usage, score-histogram) + 1 dashboards row with the 12-col grid `definition`. Resolves project_id/owner by sub-query; all widgets min_version=1 (v1 views — v2 hits the v4-only events_core table). (~900 tok)
 
 ## test-results/
 

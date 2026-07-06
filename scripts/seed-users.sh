@@ -171,3 +171,13 @@ if command -v python3 >/dev/null 2>&1; then
     --password "${SEED_PASSWORD:-Meridian@2024}" \
     || echo "[seed-users] conversation seed skipped (chat stack not ready) — non-fatal"
 fi
+
+# ── Seed the Langfuse "Conduit — LLM Quality & Cost" dashboard ───────────────────
+# Writes the 6 widgets + dashboard grid straight into Langfuse Postgres (the public API
+# can create widgets but not place them). Idempotent and non-fatal. On the host this falls
+# back to `docker exec conduit-langfuse-db psql`; in-network it uses psql directly.
+echo ""
+echo "[seed-users] Seeding Langfuse dashboard (Conduit — LLM Quality & Cost)..."
+LANGFUSE_DB_HOST="${LANGFUSE_DB_HOST:-langfuse-db}" \
+  sh "$(dirname "$0")/seed-langfuse-dashboard.sh" \
+  || echo "[seed-users] Langfuse dashboard seed skipped — non-fatal"
