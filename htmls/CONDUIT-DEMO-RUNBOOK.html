@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conduit — Live Demo Runbook</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-soft: #f6f7f9;
+    --bg-sunk: #eef0f3;
+    --fg: #1a1d21;
+    --fg-soft: #4a5057;
+    --fg-faint: #767c85;
+    --rule: #e2e5ea;
+    --rule-strong: #cdd2da;
+    --accent: #2f5fd6;
+    --accent-soft: #eaf0ff;
+
+    --say-bg: #e9f8f0;
+    --say-border: #57bd8e;
+    --say-fg: #12503a;
+    --say-label: #1a7a56;
+
+    --see-bg: #eef3ff;
+    --see-border: #7d9ff0;
+    --see-fg: #1c3670;
+    --see-label: #3157c4;
+
+    --wow-bg: #fff4e0;
+    --wow-border: #eab254;
+    --wow-fg: #6a4508;
+
+    --prompt-bg: #1d2127;
+    --prompt-fg: #f2f5fa;
+    --prompt-accent: #ffd479;
+
+    --chip-bg: #eef0f3;
+    --chip-fg: #4a5057;
+    --shadow: 0 1px 3px rgba(0,0,0,.08), 0 6px 20px rgba(0,0,0,.04);
+    --maxw: 940px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161a; --bg-soft: #1b1e24; --bg-sunk: #23272e;
+      --fg: #e7eaef; --fg-soft: #b3bac4; --fg-faint: #838b96;
+      --rule: #2a2f37; --rule-strong: #3a414b;
+      --accent: #7aa2ff; --accent-soft: #1e2740;
+      --say-bg: #10251c; --say-border: #2f7a58; --say-fg: #a6e9c9; --say-label: #6fd9a6;
+      --see-bg: #141d34; --see-border: #3a5aa8; --see-fg: #aec4f5; --see-label: #86a6f2;
+      --wow-bg: #2a2110; --wow-border: #7a5f22; --wow-fg: #f2d99a;
+      --prompt-bg: #0d0f13; --prompt-fg: #f2f5fa; --prompt-accent: #ffce6b;
+      --chip-bg: #23272e; --chip-fg: #b3bac4;
+      --shadow: 0 1px 3px rgba(0,0,0,.4), 0 6px 20px rgba(0,0,0,.25);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 36px 40px 120px; }
+
+  .kicker { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); font-weight: 800; margin-bottom: 8px; }
+  h1 { font-size: 34px; line-height: 1.12; margin: 0 0 8px; letter-spacing: -.01em; }
+  .subtitle { color: var(--fg-soft); font-size: 18px; margin: 0 0 18px; }
+
+  .runbar {
+    display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 6px;
+  }
+  .runbar .pill {
+    background: var(--bg-soft); border: 1px solid var(--rule-strong); border-radius: 999px;
+    padding: 6px 14px; font-size: 13px; font-weight: 600; color: var(--fg-soft);
+  }
+  .runbar .pill b { color: var(--fg); }
+
+  h2 {
+    font-size: 15px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent);
+    margin: 46px 0 4px; padding-top: 14px; border-top: 2px solid var(--rule-strong);
+  }
+  h2.act { font-size: 22px; letter-spacing: -.01em; text-transform: none; color: var(--fg); }
+  h2.act .tag { display:block; font-size: 12.5px; letter-spacing:.08em; text-transform:uppercase; color: var(--accent); font-weight: 800; margin-bottom: 2px; }
+  h2.act .who { color: var(--accent); }
+  h3 { font-size: 17px; margin: 26px 0 6px; }
+  p { margin: 9px 0; }
+  a { color: var(--accent); }
+  code {
+    background: var(--bg-sunk); color: var(--fg); padding: 1px 6px; border-radius: 5px;
+    font-family: "SF Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13.5px;
+  }
+
+  /* ---- Character cards ---- */
+  .cast { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 18px 0; }
+  .persona {
+    border: 1px solid var(--rule-strong); border-radius: 12px; padding: 16px 18px; background: var(--bg-soft);
+  }
+  .persona h4 { margin: 0 0 4px; font-size: 17px; }
+  .persona .role { color: var(--fg-faint); font-size: 13px; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; margin-bottom: 8px; }
+  .persona ul { margin: 6px 0 0; padding-left: 1.1em; font-size: 14px; }
+  .persona .yes { color: var(--say-label); font-weight: 700; }
+  .persona .no  { color: #c0392b; font-weight: 700; }
+  @media (prefers-color-scheme: dark) { .persona .no { color: #ff9b9b; } }
+
+  /* ---- Checklist ---- */
+  .checklist { list-style: none; padding: 0; margin: 14px 0; }
+  .checklist li {
+    position: relative; padding: 9px 12px 9px 40px; border: 1px solid var(--rule);
+    border-radius: 9px; margin: 8px 0; background: var(--bg-soft); font-size: 14.5px;
+  }
+  .checklist li::before {
+    content: ""; position: absolute; left: 12px; top: 11px; width: 16px; height: 16px;
+    border: 2px solid var(--rule-strong); border-radius: 4px;
+  }
+
+  /* ---- Step cards ---- */
+  .step {
+    border: 1px solid var(--rule); border-left: 4px solid var(--accent); border-radius: 12px;
+    padding: 16px 18px; margin: 16px 0; background: var(--bg); box-shadow: var(--shadow);
+  }
+  .step.wow { border-left-color: var(--wow-border); }
+  .step-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+  .step-n {
+    flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #fff;
+    font-weight: 800; font-size: 14px; display: flex; align-items: center; justify-content: center;
+    align-self: flex-start; margin-top: 2px;
+  }
+  .step.wow .step-n { background: var(--wow-border); color: #3a2705; }
+  .step-title { font-weight: 700; font-size: 16.5px; }
+  .wowtag {
+    display: inline-block; background: var(--wow-bg); color: var(--wow-fg); border: 1px solid var(--wow-border);
+    border-radius: 999px; font-size: 11.5px; font-weight: 800; letter-spacing: .04em; padding: 1px 9px; margin-left: 4px;
+    text-transform: uppercase;
+  }
+
+  /* ---- Prompt block ---- */
+  .prompt {
+    position: relative; background: var(--prompt-bg); color: var(--prompt-fg);
+    border-radius: 10px; padding: 16px 90px 16px 18px; margin: 12px 0;
+    font-family: "SF Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 16px; line-height: 1.5; letter-spacing: .1px;
+  }
+  .prompt::before {
+    content: "TYPE / PASTE"; position: absolute; top: 8px; left: 18px;
+    font-size: 9.5px; letter-spacing: .14em; color: var(--prompt-accent); font-weight: 800; font-family: sans-serif;
+  }
+  .prompt .txt { display: block; margin-top: 12px; }
+  .copy {
+    position: absolute; top: 12px; right: 12px; background: rgba(255,255,255,.1); color: #fff;
+    border: 1px solid rgba(255,255,255,.25); border-radius: 6px; padding: 4px 10px; font-size: 12px;
+    font-family: sans-serif; cursor: pointer; font-weight: 600;
+  }
+  .copy:hover { background: rgba(255,255,255,.2); }
+  .copy.done { background: var(--say-border); border-color: var(--say-border); }
+
+  /* ---- SAY THIS ---- */
+  .say {
+    background: var(--say-bg); border: 1px solid var(--say-border); border-radius: 10px;
+    padding: 12px 16px; margin: 12px 0; color: var(--say-fg); font-size: 15.5px; line-height: 1.5;
+  }
+  .say::before {
+    content: "🗣  SAY THIS"; display: block; font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+    font-weight: 800; color: var(--say-label); margin-bottom: 5px; font-family: sans-serif;
+  }
+  .say strong { color: var(--say-fg); }
+
+  /* ---- THEY SEE ---- */
+  .see {
+    background: var(--see-bg); border: 1px solid var(--see-border); border-radius: 10px;
+    padding: 11px 16px; margin: 12px 0; color: var(--see-fg); font-size: 14.5px; line-height: 1.5;
+  }
+  .see::before {
+    content: "👁  THEY SEE"; display: block; font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+    font-weight: 800; color: var(--see-label); margin-bottom: 5px; font-family: sans-serif;
+  }
+  .see strong { color: var(--see-fg); }
+
+  /* ---- Note / warning ---- */
+  .note { border-left: 3px solid var(--rule-strong); padding: 6px 0 6px 16px; margin: 14px 0; color: var(--fg-soft); font-size: 14.5px; }
+  .warn {
+    background: var(--wow-bg); border: 1px solid var(--wow-border); border-radius: 10px; color: var(--wow-fg);
+    padding: 12px 16px; margin: 14px 0; font-size: 14.5px;
+  }
+  .warn b { color: var(--wow-fg); }
+
+  .chip { display: inline-block; background: var(--chip-bg); color: var(--chip-fg); font-size: 12px; padding: 2px 9px; border-radius: 999px; margin: 2px 3px 2px 0; white-space: nowrap; }
+  .mono { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
+
+  pre {
+    background: var(--prompt-bg); color: var(--prompt-fg); border-radius: 10px; padding: 14px 16px;
+    overflow-x: auto; font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 13px;
+    line-height: 1.5; margin: 12px 0; box-shadow: var(--shadow);
+  }
+  pre .accent { color: var(--prompt-accent); }
+
+  hr { border: 0; border-top: 1px solid var(--rule); margin: 34px 0; }
+
+  @media (max-width: 720px) {
+    .wrap { padding: 24px 18px 80px; }
+    .cast { grid-template-columns: 1fr; }
+    .prompt { font-size: 15px; padding-right: 18px; padding-top: 30px; }
+    .copy { top: 6px; }
+  }
+
+  @media print {
+    body { font-size: 11pt; color: #000; background: #fff; }
+    .wrap { max-width: 100%; padding: 0 10px; }
+    .copy { display: none; }
+    .prompt { background: #f0f0f0 !important; color: #111 !important; box-shadow: none; border: 1px solid #bbb; }
+    .prompt::before { color: #8a5a00 !important; }
+    pre { background: #f0f0f0 !important; color:#111 !important; box-shadow:none; border:1px solid #bbb; }
+    .step, .say, .see, .warn, .persona, .checklist li { break-inside: avoid; box-shadow: none; }
+    h2.act { break-before: auto; break-after: avoid; }
+    a { color: #000; text-decoration: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="kicker">Presenter's copy · run it live</p>
+  <h1>Conduit — Live Demo Runbook</h1>
+  <p class="subtitle">A two-character, multi-turn script. Read the <span style="color:var(--say-label);font-weight:700">🗣 SAY THIS</span> line out loud, paste the prompt, watch the <span style="color:var(--see-label);font-weight:700">👁 THEY SEE</span> land. Follow the ⭐ moments — those are the ones they remember.</p>
+
+  <div class="runbar">
+    <span class="pill">⏱ <b>~8–10 min</b> total</span>
+    <span class="pill">👤 <b>2 characters</b> · rm_jane → uw_sam</span>
+    <span class="pill">🎬 <b>3 acts</b> + optional showstoppers</span>
+    <span class="pill">⭐ <b>7 wow-moments</b></span>
+  </div>
+
+  <div class="say">
+    <p>Opening line as you share your screen: <strong>"I'm going to ask this thing questions the way a banker actually talks — in plain English, one follow-up after another — and you'll watch it reason in real time in the panel on the right. Nothing is scripted; I'm typing live."</strong></p>
+  </div>
+
+  <!-- ============ THE PLAN ============ -->
+  <h2>The plan — what you're proving in ~8 minutes</h2>
+  <p class="subtitle" style="margin-top:-4px">Before the clicks: the story you're telling, so you steer it instead of just reading it.</p>
+
+  <div class="note">
+    <p><strong>The thesis</strong> (say it however feels natural): <em>"This isn't a chatbot bolted onto a bank. It's a gateway that understands the conversation, routes each question to the right specialist system, enforces exactly what each person is allowed to see, and shows its work — and it does all of that without one line of code that knows anything about wealth or insurance."</em></p>
+  </div>
+
+  <p>Everything you do lands one of <strong>three proofs</strong>, in order:</p>
+  <p><strong>1 · It follows the conversation like a person.</strong> <span class="tag">Act 1</span> Follow-ups — "their performance?", "now Calderon", "compare them" — just work, with no re-typing the client each time. This is the part that makes people lean in.</p>
+  <p><strong>2 · The same engine runs any business line — with zero domain code.</strong> <span class="tag">Act 2</span> Log in as an insurance underwriter and it behaves identically. Onboarding insurance was a manifest + a data service, not a release. That's the moat: anyone can build a chatbot; this is a manifest interpreter.</p>
+  <p><strong>3 · You can trust it, and it stays in control.</strong> <span class="tag">Acts 1 &amp; 3 · closer</span> It never invents a number or an account (grounded answers only); each person sees only their own book ("Okafor → not in your coverage"); and if a backend agent dies mid-answer, it degrades honestly instead of failing. Every decision is visible in the glass-box, and every answer is costed.</p>
+
+  <div class="note">
+    <p><strong>Why two characters:</strong> <span class="who">rm_jane</span> (wealth) shows the <em>depth</em> — the conversational reasoning. <span class="who">uw_sam</span> (insurance) shows the <em>breadth</em> — same gateway, new business line, no code. The switch between them <em>is</em> the point: watch how little changes on our side.</p>
+  </div>
+
+  <!-- ============ CAST ============ -->
+  <h2>The two characters</h2>
+  <div class="cast">
+    <div class="persona">
+      <h4>rm_jane <span class="chip">wealth + servicing</span></h4>
+      <div class="role">Wealth Relationship Manager</div>
+      <ul>
+        <li><span class="yes">✓ Covers</span> Whitman Family Office <span class="mono">(REL-00042)</span></li>
+        <li><span class="yes">✓ Covers</span> Calderon Trust <span class="mono">(REL-00099)</span></li>
+        <li><span class="no">✗ Not in book</span> Okafor <span class="mono">(REL-00188)</span></li>
+      </ul>
+      <p style="font-size:13px;line-height:1.5;margin-top:8px;opacity:.85"><strong>Who she is:</strong> a Wealth Relationship Manager — she manages a book of private-banking clients. <strong>What she does in the chat:</strong> works that book in plain English — asks for a client's holdings, then follows up ("their performance?", "their cash?", "any pending settlements?"), and switches between Whitman and Calderon <em>by name</em>. She's the <strong>"depth"</strong> character: everything you show about the system <em>understanding a conversation</em> happens as her.</p>
+    </div>
+    <div class="persona">
+      <h4>uw_sam <span class="chip">insurance</span></h4>
+      <div class="role">Insurance Underwriter</div>
+      <ul>
+        <li><span class="yes">✓ Covers</span> Aurora Mfg Property <span class="mono">(POL-77002)</span></li>
+        <li><span class="yes">✓ Covers</span> Continental Freight Liability <span class="mono">(POL-77001)</span></li>
+        <li><span class="no">✗ Not in book</span> Zenith</li>
+      </ul>
+      <p style="font-size:13px;line-height:1.5;margin-top:8px;opacity:.85"><strong>Who he is:</strong> an Insurance Underwriter — a completely different business line. <strong>What he does in the chat:</strong> the same kind of conversation, on insurance — asks about a policy and its claim status. He's the <strong>"breadth"</strong> character: he proves the same gateway runs insurance with zero new code.</p>
+    </div>
+  </div>
+  <p class="note"><strong>Login for both:</strong><br>
+  password <code>Meridian@2024</code><br>
+  Chat UI at <a href="http://localhost:8099">http://localhost:8099</a> (SSO via Axiom / OIDC)<br>
+  Insights admin view at <a href="http://localhost:5175">http://localhost:5175</a> — log in as <code>insights_admin</code> / <code>Meridian@2024</code>.<br>
+  Axiom admin console (Policies &amp; Users) at <a href="http://localhost:5182">http://localhost:5182</a> — log in as <code>admin</code> / <code>Meridian@2024</code> (its own username/password form — platform-admin only, not the banker SSO).<br>
+  Grafana at <a href="http://localhost:3000">http://localhost:3000</a> — <code>admin</code> / <code>changeme</code>.<br>
+  Langfuse at <a href="http://localhost:3030">http://localhost:3030</a> — <code>admin@meridian.bank</code> / <code>changeme</code>.</p>
+
+  <!-- ============ PRE-FLIGHT ============ -->
+  <h2>Pre-flight checklist — do this before the room joins</h2>
+  <ul class="checklist">
+    <li><strong>Bring the stack up.</strong> From <code>orchestrator-chat</code>: <code>docker compose -p orchestrator-demo up -d --build</code></li>
+    <li><strong>Seed the users.</strong> <code>bash scripts/seed-users.sh</code> (creates rm_jane, uw_sam, and their coverage books).</li>
+    <li><strong>Smoke it.</strong> Open <a href="http://localhost:8099">localhost:8099</a>, confirm the Axiom login page renders and a chat sends one round-trip.</li>
+    <li><strong>Two browser tabs open:</strong> Tab 1 = Chat UI (<code>:8099</code>), Tab 2 = Insights admin (<code>:5175</code>) — keep Insights parked until the closer.</li>
+    <li><strong>Log in as rm_jane</strong> in Tab 1. Land on a fresh, empty chat.</li>
+    <li><strong>(Optional showstopper)</strong> Have a terminal ready in <code>orchestrator-chat</code> for the Act 1c agent-kill.</li>
+    <li><strong>Point out the glass-box before you type anything</strong> (see below).</li>
+  </ul>
+
+  <div class="say">
+    <p>Point at the right-hand panel: <strong>"Keep your eye on this 'Decision trace' panel on the right. It's the flight recorder — every step the system takes to answer is shown live: what it understood, which specialist agents it called, who was allowed to answer. Answers you can audit, not a black box."</strong></p>
+  </div>
+
+  <hr>
+
+  <!-- ============ ACT 1 ============ -->
+  <h2 class="act"><span class="tag">Act 1 · the star</span>The conversation intelligence — <span class="who">rm_jane</span></h2>
+  <p>The whole point of Act 1: it holds a <strong>conversation</strong>. "Their", "and their", "compare to Whitman's" — it tracks the subject the way a person would, and the entitlement wall is always on underneath.</p>
+
+  <!-- Step 1 -->
+  <div class="step">
+    <div class="step-head"><span class="step-n">1</span><span class="step-title">Establish the subject — Whitman holdings</span></div>
+    <div class="prompt"><button class="copy">Copy</button><span class="txt">Give me a summary of the Whitman Family Office holdings</span></div>
+    <div class="see"><strong>Holdings render</strong> — positions and allocation. The trace shows the pipeline resolving Whitman, a <code>FETCH_DATA</code> intent, and the wealth + servicing agents lighting up.</div>
+    <div class="say">"Plain-English question. Watch the panel — it figured out I mean the Whitman <em>relationship</em>, checked it's in my book, and fanned out to the right specialists. That's the baseline. Now let's just… talk to it."</div>
+  </div>
+
+  <!-- Step 2 -->
+  <div class="step wow">
+    <div class="step-head"><span class="step-n">2</span><span class="step-title">Follow-up with a pronoun — "their" performance <span class="wowtag">⭐ wow</span></span></div>
+    <div class="prompt"><button class="copy">Copy</button><span class="txt">What's their performance this quarter?</span></div>
+    <div class="see"><strong>Performance for Whitman</strong> — no client named. The trace shows Whitman still the focal entity; it calls the performance agent.</div>
+    <div class="say">"I never said Whitman that time — I said <em>their</em>. It kept the subject. This is the difference between a real assistant and a search box."</div>
+  </div>
+
+  <!-- Step 3 -->
+  <div class="step">
+    <div class="step-head"><span class="step-n">3</span><span class="step-title">Cross-domain inside one question — cash</span></div>
+    <div class="prompt"><button class="copy">Copy</button><span class="txt">And their cash position?</span></div>
+    <div class="see"><strong>Cash position</strong> — answered by a <em>servicing</em> agent, seamlessly, inside a wealth conversation. Trace shows the servicing cash-management agent.</div>
+    <div class="say">"Cash lives in a different back-office system — Asset Servicing, over a different protocol entirely. She didn't switch tools; the gateway crossed the boundary for her."</div>
+  </div>
+
+  <!-- Step 4 -->
+  <div class="step">
+    <div class="step-head"><span class="step-n">4</span><span class="step-title">Another servicing hop — settlements</span></div>
+    <div class="prompt"><button class="copy">Copy</button><span class="txt">Any pending settlements for them?</span></div>
+    <div class="see"><strong>Pending / failed settlements</strong> for Whitman, from the servicing settlement agent.</div>
+    <div class="say">"Still Whitman. Still one conversation. It's stitching wealth and operations into a single thread of thought."</div>
+  </div>
+
+  <!-- Step 5 -->
+  <div class="step wow">
+    <div class="step-head"><span class="step-n">5</span><span class="step-title">Switch entity by name — Calderon <span class="wowtag">⭐ wow</span></span></div>
+    <div class="prompt"><button class="copy">Copy</button><span class="txt">Now pull up Calderon Trust's holdings</span></div>
+    <div class="see"><strong>Calderon's holdings</strong> — the focal entity flips cleanly to Calderon. No "which client did you mean?" interruption.</div>
+    <div class="say">"I switched clients by name mid-conversation and it just moved. Older systems would stop and ask 'which client?' — this one understood the intent and switched the subject."</div>
+  </div>
+
+  <!-- Step 6 -->
+  <div class="step wow">
+    <div class="step-head"><span class="step-n">6</span><span class="step-title">Recency + cross-entity compare <span class="wowtag">⭐ wow</span></span></div>
+    <div class="prompt"><button class="copy">Copy</button><span class="txt">How does their performance compare to Whitman's?</span></div>
+    <div class="see"><strong>Calderon vs Whitman performance.</strong> "Their" now binds to Calderon (most recent subject); Whitman is named explicitly. It holds <em>both</em> entities.</div>
+    <div class="say">"Now 'their' means Calderon — because Calderon is who we're talking about now — and I named Whitman for the comparison. It's tracking the most recent subject <em>and</em> a second named one. That's genuine conversational memory."</div>
+  </div>
+
+  <!-- Step 7 -->
+  <div class="step wow">
+    <div class="step-head"><span class="step-n">7</span><span class="step-title">The entitlement wall — Okafor <span class="wowtag">⭐ wow</span></span></div>
+    <div class="prompt"><button class="copy">Copy</button><span class="txt">Show me the Okafor account holdings</span></div>
+    <div class="see"><strong>"That client is not in your coverage."</strong> No data. Okafor is a <em>real</em> client in the system — just not in rm_jane's book. Trace shows the coverage CHECK denying access.</div>
+    <div class="say">"Okafor is a real account here — it exists. But it's not in <em>her</em> book, so she gets a clean, honest wall and zero data. This isn't the model being polite; it's a hard entitlement check. Every answer you saw was gated the same way — you just didn't notice because she's allowed to see those."</div>
+  </div>
+
+  <!-- ============ ACT 1b ============ -->
+  <h2 class="act"><span class="tag">Act 1b · the honest question</span>The natural clarification — <span class="who">rm_jane</span>, fresh chat</h2>
+  <div class="warn"><b>⚠ Must be shown from a NEW chat.</b> Start a fresh conversation first (new chat button) so there is <b>no established subject</b>. Mid-conversation, Whitman is already the topic and it will correctly just answer Whitman — which wouldn't show the clarify.</div>
+
+  <div class="step wow">
+    <div class="step-head"><span class="step-n">1</span><span class="step-title">Ask with no subject — it asks back <span class="wowtag">⭐ wow</span></span></div>
+    <div class="prompt"><button class="copy">Copy</button><span class="txt">can you summarize the account for me?</span></div>
+    <div class="see"><strong>A natural clarifying question:</strong> "Whitman Family Office or Calderon Trust?" — it names her actual two clients, warmly, and waits.</div>
+    <div class="say">"From a clean start there's no 'the account' yet — so instead of guessing, it asks, and it asks with <em>my</em> two clients by name. Here's the important part: it only asks when there's genuinely no subject. Mid-conversation, where we'd been talking about Whitman, it just answers Whitman. It clarifies when it should and never when it shouldn't."</div>
+  </div>
+  <p class="note">The decision to clarify is deterministic gateway logic (no established entity to work with), not the model hedging. The <em>wording</em> is composed to sound human; the <em>decision</em> is machine-made.</p>
+
+  <!-- ============ ACT 1c ============ -->
+  <h2 class="act"><span class="tag">Act 1c · optional showstopper</span>Resilience under failure — <span class="who">rm_jane</span></h2>
+  <div class="warn"><b>⚠ Needs a helper / second terminal.</b> This one is optional but it lands hard. You ask a broad multi-part question; a helper kills one agent mid-flight so the room sees the answer <b>degrade honestly</b> instead of erroring out.</div>
+
+  <div class="step wow">
+    <div class="step-head"><span class="step-n">1</span><span class="step-title">Kill an agent, ask the full picture <span class="wowtag">⭐ wow</span></span></div>
+    <p><strong>Helper, in the terminal — run this a beat before you send the prompt:</strong></p>
+    <pre><span class="accent">$</span> docker stop conduit-wealth-http</pre>
+    <div class="prompt"><button class="copy">Copy</button><span class="txt">give me the full picture on Whitman — holdings, performance, cash, settlements</span></div>
+    <div class="see"><strong>A partial answer.</strong> Cash and settlements come back from the surviving <em>servicing</em> agents; the reply explicitly states <strong>holdings and performance are unavailable (FAILED)</strong>. Trace shows the wealth-http agents failed, siblings succeeded, and synthesis proceeded from survivors.</div>
+    <div class="say">"I just had a system fail mid-question — the wealth data source is down. Watch: it doesn't crash and it doesn't fake it. It answers from what survived and tells me plainly what's missing. In a bank, an honest partial answer beats a spinner or a lie every time."</div>
+    <p style="margin-top:12px"><strong>Helper — bring it back:</strong></p>
+    <pre><span class="accent">$</span> docker start conduit-wealth-http</pre>
+  </div>
+
+  <hr>
+
+  <!-- ============ ACT 2 ============ -->
+  <h2 class="act"><span class="tag">Act 2 · the moat</span>The World-B reveal — <span class="who">uw_sam</span></h2>
+  <div class="warn"><b>Reset between characters:</b> log rm_jane out fully (so the Axiom SSO session ends), then log in as <b>uw_sam</b> / <code>Meridian@2024</code>. Fresh chat.</div>
+  <p>Same gateway. Same conversation intelligence. Completely different business line — and <strong>zero insurance code was written to make it work.</strong></p>
+
+  <!-- Step 1 -->
+  <div class="step">
+    <div class="step-head"><span class="step-n">1</span><span class="step-title">Insurance policy details</span></div>
+    <div class="prompt"><button class="copy">Copy</button><span class="txt">Give me the details on the Aurora Mfg Property policy</span></div>
+    <div class="see"><strong>Policy record</strong> — line of business, premium, coverage limit, deductible, status, effective date. Trace resolves Aurora to <span class="mono">POL-77002</span> and calls the insurance policy agent.</div>
+    <div class="say">"Different person, different division. Same plain-English front door. This is an underwriter now, asking about a commercial policy."</div>
+  </div>
+
+  <!-- Step 2 -->
+  <div class="step wow">
+    <div class="step-head"><span class="step-n">2</span><span class="step-title">Follow-up on the claim <span class="wowtag">⭐ wow</span></span></div>
+    <div class="prompt"><button class="copy">Copy</button><span class="txt">What's the claim status?</span></div>
+    <div class="see"><strong>Claim status</strong> for that policy — amount, status, incident date, adjuster. The <em>same</em> follow-up intelligence, now over the insurance claim agent.</div>
+    <div class="say">"Same trick as the wealth demo — a bare follow-up, and it knows I mean this policy's claims. Identical conversation engine, brand-new domain."</div>
+  </div>
+
+  <!-- Step 3 -->
+  <div class="step wow">
+    <div class="step-head"><span class="step-n">3</span><span class="step-title">Recency in insurance <span class="wowtag">⭐ wow</span></span></div>
+    <div class="prompt"><button class="copy">Copy</button><span class="txt">and their coverage limits?</span></div>
+    <div class="see"><strong>Coverage limits</strong> for the Aurora policy — "their" binds to the policy in context.</div>
+    <div class="say" style="border-width:2px">"Here's the whole story. <strong>This is the exact same gateway rm_jane just used.</strong> We wrote <strong>zero lines of insurance code</strong> to stand this up. Onboarding an entire insurance business line was a configuration file plus a coverage service — no software release. A new division is <strong>config, not code.</strong> That's the moat."</div>
+  </div>
+
+  <hr>
+
+  <!-- ============ ACT 3 ============ -->
+  <h2 class="act"><span class="tag">Act 3 · optional, powerful</span>The cross-domain wall — back to <span class="who">rm_jane</span></h2>
+  <div class="warn"><b>Reset again:</b> log uw_sam out, log back in as rm_jane. This one proves the gateway is domain-blind but entitlements are ironclad.</div>
+
+  <div class="step wow">
+    <div class="step-head"><span class="step-n">1</span><span class="step-title">Ask across a domain you don't own <span class="wowtag">⭐ wow</span></span></div>
+    <div class="prompt"><button class="copy">Copy</button><span class="txt">show me the insurance claims for the Whitman account</span></div>
+    <div class="see"><strong>No insurance data.</strong> rm_jane is wealth + servicing, not insurance — it declines honestly and says why.</div>
+    <div class="say">"She asked for insurance. She's a wealth manager. The gateway itself has zero domain knowledge — but the entitlements are ironclad: each person sees only their book <em>and</em> their domain. Open architecture, closed access. Both at once."</div>
+  </div>
+
+  <hr>
+
+  <!-- ============ CLOSER ============ -->
+  <h2 class="act"><span class="tag">Closer</span>The glass-box, costed — <span class="who">Insights (admin)</span></h2>
+  <div class="step">
+    <div class="step-head"><span class="step-n">→</span><span class="step-title">Switch to Tab 2 — Insights at <span class="mono">localhost:5175</span></span></div>
+    <div class="see"><strong>The ops plane:</strong> cost boards, the dashboards, and any conversation's full decision trace — the same glass-box, retained and auditable.</div>
+    <div class="say">"Everything you just watched — every routing choice, every entitlement check, every agent call — is captured here, per conversation, and <strong>costed</strong>. So the answer to 'how do I know it's right, and what does it cost me?' is: you can open any conversation and see the entire chain of reasoning and its price. Fully traceable, fully accountable."</div>
+  </div>
+
+  <hr>
+
+  <!-- ============ FALLBACK / NOTES ============ -->
+  <h2>If a step doesn't land — fallback moves</h2>
+  <div class="warn">
+    <p><b>Terse one-word turns can vary.</b> A bare "and cash?" occasionally routes softly. If a step doesn't land, <b>rephrase with the explicit name + verb</b> — e.g. "show me the cash position for Whitman." The system is built to err toward <b>fetching</b> or a <b>clean clarify</b> — it never returns a confidently wrong answer, so a re-ask is always safe.</p>
+  </div>
+  <ul>
+    <li><strong>Clarify didn't fire in Act 1b?</strong> You weren't in a fresh chat. Open a new conversation and re-send — clarify only triggers with no established subject.</li>
+    <li><strong>An entity switch got sticky?</strong> Name the client explicitly ("Calderon Trust holdings") to force the focal entity.</li>
+    <li><strong>Resilience partial looked like a full failure?</strong> Confirm only <code>conduit-wealth-http</code> was stopped (servicing must stay up to answer), then <code>docker start</code> it before moving on.</li>
+    <li><strong>Wrong persona's data?</strong> You didn't fully log out between characters — end the Axiom session (full logout), then log in fresh.</li>
+  </ul>
+
+  <h2>Reset between characters</h2>
+  <p>Always <strong>log out fully</strong> when switching people — this ends the Axiom SSO session, not just the chat. A half-logout can carry the previous identity and muddy the entitlement story, which is the one thing you can't afford to fumble in this demo.</p>
+
+  <hr>
+  <p class="note" style="text-align:center"><strong>Total runtime ≈ 8–10 minutes.</strong> Act 1 is the star; Acts 1c and 3 are optional showstoppers — drop them if you're tight on time, keep them if the room is technical. Everything here was verified working today.</p>
+
+</div>
+
+<script>
+  document.querySelectorAll('.copy').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var txt = btn.parentElement.querySelector('.txt').innerText.trim();
+      navigator.clipboard.writeText(txt).then(function(){
+        var old = btn.textContent;
+        btn.textContent = 'Copied ✓'; btn.classList.add('done');
+        setTimeout(function(){ btn.textContent = old; btn.classList.remove('done'); }, 1400);
+      });
+    });
+  });
+</script>
+</body>
+</html>

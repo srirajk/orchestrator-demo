@@ -1575,3 +1575,76 @@
 | 22:03 | Session end: 150 writes across 39 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 87 reads | ~205923 tok |
 | 22:09 | Edited ../orchestrator-chat/scripts/seed-users.sh | expanded (+6 lines) | ~299 |
 | 22:13 | Session end: 151 writes across 39 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 87 reads | ~206244 tok |
+| 22:14 | Session end: 151 writes across 39 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 87 reads | ~206244 tok |
+| 22:18 | Session end: 151 writes across 39 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 87 reads | ~206244 tok |
+| 07:14 | Session end: 151 writes across 39 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 87 reads | ~206244 tok |
+| 07:16 | Edited conduit-ui-tests/CONDUIT-CLIENT-BRIEFING.html | expanded (+129 lines) | ~3528 |
+| 07:16 | Edited conduit-ui-tests/CONDUIT-CLIENT-BRIEFING.html | expanded (+8 lines) | ~102 |
+| 07:16 | Edited conduit-ui-tests/CONDUIT-CLIENT-BRIEFING.html | expanded (+9 lines) | ~239 |
+| 07:19 | Created conduit-ui-tests/CONDUIT-DEMO-RUNBOOK.html | — | ~7829 |
+| 07:20 | Agent Catalog section added to client briefing (13 agents/4 domains) + new demo runbook | conduit-ui-tests/CONDUIT-CLIENT-BRIEFING.html, CONDUIT-DEMO-RUNBOOK.html | done | ~18k |
+| 07:23 | Session end: 155 writes across 40 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 88 reads | ~237952 tok |
+| 07:32 | Session end: 155 writes across 40 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 88 reads | ~237952 tok |
+| 08:23 | Session end: 155 writes across 40 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 88 reads | ~237952 tok |
+| 08:24 | Created ../orchestrator-chat/infra/seeder/Dockerfile | — | ~276 |
+| 08:25 | Edited ../orchestrator-chat/scripts/seed-users.sh | modified env() | ~735 |
+| 08:27 | Session end: 157 writes across 41 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 89 reads | ~239034 tok |
+| 08:32 | Session end: 157 writes across 41 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 89 reads | ~239034 tok |
+| 08:33 | Created ../orchestrator-chat/infra/seeder/Dockerfile | — | ~284 |
+| 08:35 | Created ../orchestrator-chat/scripts/seed-demo-container.sh | — | ~958 |
+| 08:35 | Edited ../orchestrator-chat/infra/seeder/Dockerfile | 3→4 lines | ~88 |
+| 08:35 | Edited ../orchestrator-chat/infra/seeder/Dockerfile | 5→5 lines | ~60 |
+| 08:35 | Edited ../orchestrator-chat/docker-compose.yml | modified dependency() | ~448 |
+| 08:38 | Session end: 162 writes across 42 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 93 reads | ~241149 tok |
+| 08:40 | Session end: 162 writes across 42 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 93 reads | ~241149 tok |
+| 08:40 | Edited ../orchestrator-chat/scripts/seed-conversations-via-bff.py | 8→8 lines | ~45 |
+| 08:40 | Edited ../orchestrator-chat/scripts/seed-conversations-via-bff.py | modified _follow_rewriting_callback() | ~797 |
+| 08:42 | Created ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/verify_chat.py | — | ~226 |
+| 08:43 | Edited ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/verify_chat.py | modified splitlines() | ~138 |
+| 08:45 | Session end: 166 writes across 44 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 95 reads | ~242355 tok |
+| 08:47 | Session end: 166 writes across 44 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 101 reads | ~242355 tok |
+| 08:48 | Edited htmls/CONDUIT-CLIENT-BRIEFING.html | inline fix | ~100 |
+| 08:48 | Edited htmls/CONDUIT-CLIENT-BRIEFING.html | 2→3 lines | ~52 |
+| 08:48 | Edited htmls/CONDUIT-CLIENT-BRIEFING.html | expanded (+24 lines) | ~1647 |
+| 08:49 | Edited htmls/CONDUIT-CLIENT-BRIEFING.html | expanded (+8 lines) | ~287 |
+| 08:49 | Edited htmls/CONDUIT-DEMO-RUNBOOK.html | 1→4 lines | ~76 |
+| 08:49 | Edited htmls/CONDUIT-CLIENT-BRIEFING.html | inline fix | ~45 |
+| 08:49 | Edited htmls/CONDUIT-CLIENT-BRIEFING.html | inline fix | ~37 |
+| 08:49 | Edited htmls/CONDUIT-CLIENT-BRIEFING.html | inline fix | ~36 |
+| 08:49 | Edited htmls/CONDUIT-CLIENT-BRIEFING.html | inline fix | ~36 |
+| 08:49 | Edited htmls/CONDUIT-CLIENT-BRIEFING.html | inline fix | ~41 |
+| 08:49 | Edited htmls/CONDUIT-CLIENT-BRIEFING.html | inline fix | ~42 |
+| 08:49 | Edited htmls/CONDUIT-CLIENT-BRIEFING.html | inline fix | ~35 |
+| 08:49 | Edited htmls/CONDUIT-CLIENT-BRIEFING.html | inline fix | ~38 |
+| 08:49 | Edited htmls/CONDUIT-CLIENT-BRIEFING.html | inline fix | ~32 |
+| 08:49 | Edited htmls/CONDUIT-CLIENT-BRIEFING.html | inline fix | ~29 |
+| 08:49 | Edited htmls/CONDUIT-CLIENT-BRIEFING.html | inline fix | ~43 |
+| 08:49 | Edited htmls/CONDUIT-CLIENT-BRIEFING.html | inline fix | ~46 |
+| 08:50 | Edited htmls/CONDUIT-CLIENT-BRIEFING.html | inline fix | ~54 |
+| 08:53 | Session end: 184 writes across 44 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 101 reads | ~245219 tok |
+| 08:59 | Edited htmls/CONDUIT-DEMO-RUNBOOK.html | inline fix | ~42 |
+| 09:00 | Session end: 185 writes across 44 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 101 reads | ~253097 tok |
+| 09:03 | Session end: 185 writes across 44 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 101 reads | ~253097 tok |
+| 09:07 | Edited ../orchestrator-chat/apps/admin/src/pages/Users.tsx | inline fix | ~25 |
+| 09:07 | Edited ../orchestrator-chat/apps/admin/src/pages/Users.tsx | "Choose a segment and a cl" → "Choose a segment and a da" | ~20 |
+| 09:07 | Edited ../orchestrator-chat/apps/admin/src/pages/Users.tsx | "Choose a clearance tier" → "Choose a data-classificat" | ~16 |
+| 09:08 | Edited ../orchestrator-chat/apps/admin/src/pages/Users.tsx | inline fix | ~31 |
+| 09:08 | Edited ../orchestrator-chat/apps/admin/src/pages/Users.tsx | inline fix | ~21 |
+| 09:08 | Edited ../orchestrator-chat/apps/admin/src/pages/Users.tsx | "Clearance tier for row ${" → "Data-classification tier " | ~26 |
+| 09:08 | Edited ../orchestrator-chat/apps/admin/src/pages/Users.tsx | inline fix | ~23 |
+| 09:09 | Edited ../orchestrator-chat/apps/admin/src/pages/Users.tsx | inline fix | ~32 |
+| 09:09 | Edited ../orchestrator-chat/apps/admin/src/pages/Policies.tsx | inline fix | ~30 |
+| 09:10 | Session end: 194 writes across 46 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 103 reads | ~253321 tok |
+| 09:28 | Session end: 194 writes across 46 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 103 reads | ~253321 tok |
+| 09:32 | Edited htmls/CONDUIT-DEMO-RUNBOOK.html | expanded (+17 lines) | ~591 |
+| 09:33 | Session end: 195 writes across 46 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 103 reads | ~253972 tok |
+| 09:37 | Session end: 195 writes across 46 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 103 reads | ~253972 tok |
+| 10:35 | Edited htmls/CONDUIT-DEMO-RUNBOOK.html | 1→2 lines | ~108 |
+| 10:35 | Edited htmls/CONDUIT-DEMO-RUNBOOK.html | 3→4 lines | ~187 |
+| 10:35 | Edited htmls/CONDUIT-DEMO-RUNBOOK.html | 3→4 lines | ~133 |
+| 10:36 | Session end: 198 writes across 46 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 103 reads | ~255001 tok |
+| 10:41 | Session end: 198 writes across 46 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 103 reads | ~255001 tok |
+| 10:48 | Session end: 198 writes across 46 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 103 reads | ~255001 tok |
+| 10:53 | Edited htmls/CONDUIT-DEMO-RUNBOOK.html | 1→3 lines | ~134 |
+| 10:53 | Session end: 199 writes across 46 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 103 reads | ~255145 tok |
+| 10:56 | Session end: 199 writes across 46 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 103 reads | ~255145 tok |

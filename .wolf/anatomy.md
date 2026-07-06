@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-07-06T02:09:05.693Z
-> Files: 1061 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-07-06T14:53:16.372Z
+> Files: 1067 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/
 
@@ -41,6 +41,7 @@
 - `run_turns.sh` — Drives a multi-turn conversation through the REAL BFF OIDC session (cookie jar). (~676 tok)
 - `V2__seed_demo_data.sql` — ============================================================================ (~4215 tok)
 - `validate.sh` — Drives the 3 authz glass-box scenarios against the gateway and captures `gate` frames. (~581 tok)
+- `verify_chat.py` (~338 tok)
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/3819a0a5-db46-43a1-8702-6f72db1172db/scratchpad/
 
@@ -79,7 +80,7 @@
 - `AUTHZ-SPEC.md` — Authorization Model — Spec & Non-Breaking Rollout Plan (~2828 tok)
 - `AXIOM-SCIM-ROADMAP.md` — Axiom Roadmap — SCIM provisioning + Capabilities view (PARKED, don't forget) (~1518 tok)
 - `CODEX-HANDOFF.md` — Handoff → Codex (validation & test) (~1176 tok)
-- `docker-compose.yml` — Docker Compose services (~11156 tok)
+- `docker-compose.yml` — Docker Compose services (~11560 tok)
 - `FINISHED.md` — FINISHED — auth fixes · per-segment Users screen · compaction · load test (~1444 tok)
 - `MORNING-REPORT.md` — Morning Report — ABAC model + glass-box + chat + eval/guardrails/audit (~1669 tok)
 - `package.json` — Node.js package manifest (~86 tok)
@@ -118,10 +119,10 @@
 
 - `AuditLog.tsx` — ACTION_COLORS (~4400 tok)
 - `Dashboard.tsx` — STAT_TONES (~2618 tok)
-- `Policies.tsx` — ACTIONS_MAP (~4075 tok)
+- `Policies.tsx` — ACTIONS_MAP (~4078 tok)
 - `Roles.tsx` — EMPTY — renders table, modal (~3386 tok)
 - `Teams.tsx` — EMPTY — renders modal (~4434 tok)
-- `Users.tsx` — A single "segment @ clearance-tier" pairing in the form. (~9005 tok)
+- `Users.tsx` — A single "segment @ clearance-tier" pairing in the form. (~9028 tok)
 
 ## ../orchestrator-chat/apps/chat/
 
@@ -467,6 +468,10 @@
 
 - `compaction.json` (~2518 tok)
 
+## ../orchestrator-chat/infra/seeder/
+
+- `Dockerfile` — Docker container definition (~308 tok)
+
 ## ../orchestrator-chat/mock-agents/hr-policy/
 
 - `__init__.py` (~0 tok)
@@ -607,10 +612,11 @@
 ## ../orchestrator-chat/scripts/
 
 - `e2e-matrix.sh` — e2e-matrix.sh — full ABAC variation matrix through the running gateway/chat path. (~1065 tok)
-- `seed-conversations-via-bff.py` — Seed REAL Conduit Chat conversations through the BFF, via the real OIDC login flow. (~1655 tok)
+- `seed-conversations-via-bff.py` — Seed REAL Conduit Chat conversations through the BFF, via the real OIDC login flow. (~2161 tok)
+- `seed-demo-container.sh` — seed-demo-container.sh — Seed the Conduit demo over the Docker network with NO host (~958 tok)
 - `seed-demo-conversations.py` — mint_token, chat, main (~2922 tok)
 - `seed-langfuse-models.py` — main (~1661 tok)
-- `seed-users.sh` — seed-users.sh — Idempotently seed demo principals into Redis. (~1621 tok)
+- `seed-users.sh` — seed-users.sh — Idempotently seed demo principals into Redis. (~1783 tok)
 - `smoke-ui.sh` — smoke-ui.sh — Tier-1 fast gate. No LLM calls, no sleeps: catches integration breakage (~934 tok)
 - `smoke.sh` — smoke.sh — full API/CLI smoke for Conduit. Run against a live stack (docker compose up). (~1998 tok)
 
@@ -946,7 +952,8 @@
 - `CODEX-STEP2B-LOGOUT-FIX.md` — Codex Brief — STEP 2b: Fix logout (real single-sign-out + land on Conduit SSO page) (~827 tok)
 - `CODEX-STEP3C-POLISH.md` — Codex Brief — STEP 3c: Insights boards polish (layout + timeframe + nav + wording) (~778 tok)
 - `CODEX-UI-TEST-PLAN.md` — Codex UI Test Plan — Grafana · Langfuse · Chat UI · Insights UI (~1790 tok)
-- `CONDUIT-CLIENT-BRIEFING.html` — Conduit — Client Briefing (Owner's Study Copy) (~19175 tok)
+- `CONDUIT-CLIENT-BRIEFING.html` — Conduit — Client Briefing (Owner's Study Copy) (~22968 tok)
+- `CONDUIT-DEMO-RUNBOOK.html` — Conduit — Live Demo Runbook (~7829 tok)
 - `INSIGHTS-SPEC.md` — Conduit Insights — Build Spec (native, governed analytics) (~1123 tok)
 - `INSIGHTS-UPGRADES.md` — Conduit Insights — Upgrades & Roadmap (living doc — APPEND, never delete) (~1045 tok)
 - `INSIGHTS-WORDING.md` — Conduit Insights — Wording & Terminology (CANONICAL — use everywhere) (~611 tok)
@@ -1386,6 +1393,11 @@
 - `Dockerfile` — Docker container definition (~29 tok)
 - `index.html` — Meridian Glass-Box — Live Decision Trace (~6092 tok)
 - `nginx.conf` — Nginx configuration (~86 tok)
+
+## htmls/
+
+- `CONDUIT-CLIENT-BRIEFING.html` — Conduit — Client Briefing (Owner's Study Copy) (~24919 tok)
+- `CONDUIT-DEMO-RUNBOOK.html` — Conduit — Live Demo Runbook (~8820 tok)
 
 ## iam-service/
 
