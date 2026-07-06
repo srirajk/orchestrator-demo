@@ -160,6 +160,17 @@ public class AnswerSynthesizer {
     public void synthesize(List<NodeResult> results, String originalPrompt,
                            List<Message> history, SseEmitter emitter, String completionIdOverride,
                            List<String> withheldDomains) {
+        synthesize(results, originalPrompt, history, emitter, completionIdOverride, withheldDomains, -1L);
+    }
+
+    /**
+     * @param requestStartMillis epoch-millis when the chat request entered the gateway, used to
+     *                           record request-level TTFT (conduit_time_to_first_token_seconds) at
+     *                           the first content delta. Pass {@code -1} to skip the recording.
+     */
+    public void synthesize(List<NodeResult> results, String originalPrompt,
+                           List<Message> history, SseEmitter emitter, String completionIdOverride,
+                           List<String> withheldDomains, long requestStartMillis) {
         String completionId = completionIdOverride != null
                 ? completionIdOverride
                 : "chatcmpl-" + UUID.randomUUID().toString().replace("-", "");
@@ -193,7 +204,7 @@ public class AnswerSynthesizer {
             // Stream the LLM response; accumulate text for grounding check and span output.
             StringBuilder synthesizedText = new StringBuilder();
             long[] tokenCounts = new long[3]; // [prompt, completion, total]
-            streamFromLlm(requestBody, emitter, completionId, created, synthesizedText, showReasoning, tokenCounts);
+            streamFromLlm(requestBody, emitter, completionId, created, synthesizedText, showReasoning, tokenCounts, requestStartMillis);
 
             // Set output and token count on span after streaming completes.
             String output = synthesizedText.toString();
@@ -325,6 +336,13 @@ public class AnswerSynthesizer {
 
     public void synthesizeFromHistory(List<Message> history, String latestPrompt,
                                       SseEmitter emitter, String completionIdOverride) {
+        synthesizeFromHistory(history, latestPrompt, emitter, completionIdOverride, -1L);
+    }
+
+    /** @param requestStartMillis see {@link #synthesize}; records request-level TTFT, or -1 to skip. */
+    public void synthesizeFromHistory(List<Message> history, String latestPrompt,
+                                      SseEmitter emitter, String completionIdOverride,
+                                      long requestStartMillis) {
         String completionId = completionIdOverride != null
                 ? completionIdOverride
                 : "chatcmpl-" + UUID.randomUUID().toString().replace("-", "");
@@ -367,7 +385,7 @@ public class AnswerSynthesizer {
 
             StringBuilder synthesizedText = new StringBuilder();
             streamFromLlm(requestBody, emitter, completionId, created, synthesizedText,
-                    showReasoning, new long[3]);
+                    showReasoning, new long[3], requestStartMillis);
             // Mirror the answer to trace-level output (see synthesize() for rationale).
             String histOutput = synthesizedText.toString();
             if (histOutput.length() > 2000) histOutput = histOutput.substring(0, 2000) + "…";
@@ -410,7 +428,8 @@ public class AnswerSynthesizer {
             long created,
             StringBuilder synthesizedText,
             boolean emitReasoning,
-            long[] tokenCounts) throws Exception {
+            long[] tokenCounts,
+            long requestStartMillis) throws Exception {
 
         // TTFT clock: wall time from issuing the generation request to the first answer token.
         final long ttftStart = System.currentTimeMillis();
@@ -509,12 +528,25 @@ public class AnswerSynthesizer {
                 // ── Answer content ─────────────────────────────────────────────
                 if (chunk.content != null && !chunk.content.isEmpty()) {
                     if (!ttftRecorded) {
+                        long now = System.currentTimeMillis();
                         // Record TTFT once, on the first answer token (Insights "TTFT p95" panel).
                         Timer.builder("conduit.ttft")
                                 .description("Time to first answer token from the synthesizer")
                                 .publishPercentileHistogram()
                                 .register(meterRegistry)
-                                .record(System.currentTimeMillis() - ttftStart, java.util.concurrent.TimeUnit.MILLISECONDS);
+                                .record(now - ttftStart, java.util.concurrent.TimeUnit.MILLISECONDS);
+                        // Request-level TTFT: wall time from the chat request entering the gateway to
+                        // the first streamed content delta. Prometheus renders this Timer as
+                        // conduit_time_to_first_token_seconds{_count,_sum,_bucket}. Percentile
+                        // histogram enabled so p50/p95 are computable via histogram_quantile.
+                        // Domain-agnostic: no domain/client/entity data on the metric (World B).
+                        if (requestStartMillis > 0) {
+                            Timer.builder("conduit.time.to.first.token")
+                                    .description("Time from chat request start to first streamed content delta")
+                                    .publishPercentileHistogram()
+                                    .register(meterRegistry)
+                                    .record(now - requestStartMillis, java.util.concurrent.TimeUnit.MILLISECONDS);
+                        }
                         ttftRecorded = true;
                     }
                     if (firstContent && reasoningEmitted) {

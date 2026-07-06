@@ -4,7 +4,7 @@
   "annotations": {
     "list": []
   },
-  "description": "Conduit AI Gateway \u2014 enter a Conversation ID (or Relationship ID) to inspect the full distributed trace: intent, agent fan-out, latency, auth decisions",
+  "description": "Conduit AI Gateway \u2014 paste a Conversation ID to inspect the full distributed trace: intent, agent fan-out, latency, auth decisions",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -20,22 +20,11 @@
     "list": [
       {
         "current": {
-          "value": "REL-00042"
-        },
-        "description": "Relationship ID (REL-XXXXX) or Trace ID to look up",
-        "hide": 0,
-        "label": "Relationship / Trace ID",
-        "name": "entity_id",
-        "query": "REL-00042",
-        "type": "textbox"
-      },
-      {
-        "current": {
           "selected": true,
           "text": "",
           "value": ""
         },
-        "description": "Conversation ID emitted by the gateway as MDC key convId and W3C Baggage \u2014 paste a convId to filter Loki logs to a single conversation across all Conduit services",
+        "description": "Conversation ID emitted by the gateway on the root span as span.conversation.id and in logs as MDC key convId / W3C Baggage \u2014 paste a convId to key both the Tempo trace search and the Loki logs to a single conversation across all Conduit services",
         "hide": 0,
         "label": "Conversation ID",
         "name": "convId",
@@ -70,7 +59,7 @@
         "y": 0
       },
       "id": 1,
-      "title": "Trace Search \u2014 enter Relationship ID above",
+      "title": "Trace by conversation \u2014 paste a conversation ID",
       "type": "row"
     },
     {
@@ -97,7 +86,7 @@
           },
           "limit": 20,
           "queryType": "traceql",
-          "query": "{span.entity.relationship_id = \"$entity_id\" || resource.service.name = \"conduit-gateway\"}",
+          "query": "{ span.conversation.id = \"$convId\" }",
           "tableType": "traces",
           "refId": "A"
         }
@@ -306,7 +295,7 @@
       },
       "id": 31,
       "options": {
-        "content": "## Conversation Trace Explorer\n\n1. **Enter a Relationship ID** (e.g. `REL-00042`) in the **Relationship / Trace ID** variable at the top.\n2. The **Trace Search** panel shows all gateway traces that touched that relationship \u2014 click any row to open the full span waterfall.\n3. The **span waterfall** shows: intent classify \u2192 entity extract \u2192 Cerbos ABAC \u2192 agent fan-out (HTTP + MCP in parallel) \u2192 answer synthesis.\n4. To look up a specific trace by ID, paste the trace ID directly in the variable box.\n5. The **Agent Latency** and **Intent/Auth** panels show aggregate signals for the selected time window.\n\n**Key span names to look for:**\n- `chat.handle` \u2014 root gateway span (total E2E time)\n- `intent.classify` \u2014 LLM routing decision\n- `entity.extract` \u2014 entity extraction (relationship ID resolution)\n- `cerbos.check` \u2014 ABAC entitlement check\n- `agent.*` \u2014 per-agent calls with `agent.id`, `agent.protocol`, `agent.model` attributes",
+        "content": "## Conversation Trace Explorer\n\n1. **Paste a Conversation ID** into the **Conversation ID** variable at the top (the gateway sets it on the root span as `span.conversation.id` and in logs as `convId`).\n2. The **Trace Search** panel shows every gateway trace for that conversation \u2014 click any row to open the full span waterfall.\n3. The **span waterfall** shows: intent classify \u2192 entity extract \u2192 Cerbos ABAC \u2192 agent fan-out (HTTP + MCP in parallel) \u2192 answer synthesis.\n4. The **Agent Latency** and **Intent/Auth** panels show aggregate signals for the selected time window.\n5. The **Conversation Logs** rows below key the same convId across every `conduit-*` service via Loki.\n\n**Key span names to look for:**\n- `chat.handle` \u2014 root gateway span (total E2E time, carries `conversation.id`)\n- `intent.classify` \u2014 LLM routing decision\n- `entity.extract` \u2014 entity extraction / identifier resolution\n- `cerbos.check` \u2014 ABAC entitlement check\n- `agent.*` \u2014 per-agent calls with `agent.id`, `agent.protocol`, `agent.model` attributes",
         "mode": "markdown"
       },
       "title": "How to use",

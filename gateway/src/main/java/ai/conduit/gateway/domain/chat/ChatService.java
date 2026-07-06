@@ -182,6 +182,10 @@ public class ChatService {
 
         // ── Span attributes: visible on this span in Phoenix / Tempo ────────────
         rootSpan.setAttribute("session.id", conversationId);
+        // conversation.id: keys the root/request span on the CONVERSATION (not the client),
+        // so Tempo can be searched by { span.conversation.id = "<convId>" } — this is what the
+        // Conversation-Trace board's trace panel queries. Domain-agnostic (an opaque id, World B).
+        rootSpan.setAttribute("conversation.id", conversationId);
         rootSpan.setAttribute("user.id", userId != null ? userId : "anonymous");
         rootSpan.setAttribute("conduit.request.id", requestId);
 
@@ -388,7 +392,7 @@ public class ChatService {
                 // false) keep the deterministic clarification so a bare under-specified ask still
                 // clarifies (bug-232 behaviour preserved).
                 if (carryContext && hasPriorAssistantData(request)) {
-                    answerSynthesizer.synthesizeFromHistory(request.messages(), latestPrompt, emitter, streamId);
+                    answerSynthesizer.synthesizeFromHistory(request.messages(), latestPrompt, emitter, streamId, requestStart);
                     emitRequestOutcome("ANSWERED");
                     tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                             new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
@@ -763,7 +767,16 @@ public class ChatService {
             tracePublisher.publish(TraceEvent.of("synthesis_start", requestId, conversationId,
                     new SynthesisStartData(results.size(), (int) okCount)));
 
-            answerSynthesizer.synthesize(results, latestPrompt, request.messages(), emitter, streamId, withheldDomains);
+            // Graceful-degradation signal: this request is about to SYNTHESIZE an answer, but not
+            // every dispatched agent succeeded (0 < successCount < dispatched). A failed sibling
+            // never cancels the fan-out (hard-rule d) — we harvest survivors and answer from what
+            // came back. Count that partial-answer case so the Platform board can show a
+            // degradation rate. Domain-agnostic: a pure count, no agent/domain identity.
+            if (okCount > 0 && okCount < results.size()) {
+                emitRequestPartial();
+            }
+
+            answerSynthesizer.synthesize(results, latestPrompt, request.messages(), emitter, streamId, withheldDomains, requestStart);
             emitRequestOutcome("ANSWERED");
 
             tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
@@ -798,7 +811,7 @@ public class ChatService {
         }
         Span span = tracer.spanBuilder("chat.follow_up").startSpan();
         try {
-            answerSynthesizer.synthesizeFromHistory(request.messages(), latestPrompt, emitter, streamId);
+            answerSynthesizer.synthesizeFromHistory(request.messages(), latestPrompt, emitter, streamId, requestStart);
             emitRequestOutcome("ANSWERED");
             tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                     new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
@@ -807,7 +820,7 @@ public class ChatService {
 
     private void handleChitchat(ChatRequest request, SseEmitter emitter,
                                  String conversationId, String requestId, long requestStart, String streamId) throws Exception {
-        answerSynthesizer.synthesizeFromHistory(request.messages(), extractLatestUserMessage(request), emitter, streamId);
+        answerSynthesizer.synthesizeFromHistory(request.messages(), extractLatestUserMessage(request), emitter, streamId, requestStart);
         emitRequestOutcome("ANSWERED");
         tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                 new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
@@ -1186,6 +1199,19 @@ public class ChatService {
         Counter.builder("conduit.request.outcome")
                 .description("Request resolution outcome")
                 .tag("outcome", outcome)
+                .register(meterRegistry)
+                .increment();
+    }
+
+    /**
+     * Increments the graceful-degradation counter (Prometheus: conduit_request_partial_total) —
+     * a request that synthesized an answer from a partial fan-out (some dispatched agents failed
+     * but at least one succeeded). Complements conduit_request_outcome_total (which still counts
+     * this request as ANSWERED). Domain-agnostic: a pure count with no agent/domain identity.
+     */
+    private void emitRequestPartial() {
+        Counter.builder("conduit.request.partial")
+                .description("Requests answered from a partial fan-out (a dispatched agent failed)")
                 .register(meterRegistry)
                 .increment();
     }
