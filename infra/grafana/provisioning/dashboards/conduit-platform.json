@@ -47,8 +47,8 @@
     {
       "id": 2,
       "type": "gauge",
-      "title": "Answer-success rate",
-      "description": "Share of requests that returned a grounded answer (ANSWERED / all outcomes, 1h). Good \u2265 99%.",
+      "title": "Request success rate",
+      "description": "Share of requests handled correctly (ANSWERED + deliberate CLARIFIED/DENIED) over all outcomes, 1h. Clarifying an ambiguous ask and denying out-of-coverage access are correct behaviors, not failures \u2014 only genuinely FAILED/errored requests lower this. Good ~100%.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -93,7 +93,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "100 * sum(increase(conduit_request_outcome_total{outcome=\"ANSWERED\"}[1h])) / clamp_min(sum(increase(conduit_request_outcome_total[1h])),1)",
+          "expr": "100 * sum(increase(conduit_request_outcome_total{outcome=~\"ANSWERED|CLARIFIED|DENIED\"}[1h])) / clamp_min(sum(increase(conduit_request_outcome_total[1h])),1)",
           "legendFormat": "success",
           "instant": true,
           "refId": "A"
@@ -949,8 +949,8 @@
     {
       "id": 21,
       "type": "gauge",
-      "title": "Answer-success rate",
-      "description": "ANSWERED share of all outcomes (1h). Good \u2265 99%.",
+      "title": "Request success rate",
+      "description": "Share of requests handled correctly (ANSWERED + deliberate CLARIFIED/DENIED) over all outcomes, 1h. Clarifying an ambiguous ask and denying out-of-coverage access are correct behaviors, not failures \u2014 only genuinely FAILED/errored requests lower this. Good ~100%.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -995,7 +995,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "100 * sum(increase(conduit_request_outcome_total{outcome=\"ANSWERED\"}[1h])) / clamp_min(sum(increase(conduit_request_outcome_total[1h])),1)",
+          "expr": "100 * sum(increase(conduit_request_outcome_total{outcome=~\"ANSWERED|CLARIFIED|DENIED\"}[1h])) / clamp_min(sum(increase(conduit_request_outcome_total[1h])),1)",
           "legendFormat": "success",
           "instant": true,
           "refId": "A"

@@ -343,7 +343,7 @@
       "id": 9,
       "type": "stat",
       "title": "Summary-attached guardrail",
-      "description": "Fraction of compacted turns that actually carried a summary (1h). RED at 0 = silent compaction breakage \u2014 the context summary stopped attaching.",
+      "description": "Fraction of turns that carried a compaction summary over a generous 6h window. This is a GUARDRAIL, not a target: any nonzero value is GREEN/healthy, because only long conversations need a summary and most turns are short. Only a sustained EXACTLY 0 (no summary attached anywhere in 6h of use) reads red \u2014 the silent-compaction-breakage signal.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -368,12 +368,8 @@
                 "value": null
               },
               {
-                "color": "yellow",
-                "value": 0.5
-              },
-              {
                 "color": "green",
-                "value": 0.99
+                "value": 0.0001
               }
             ]
           }
@@ -386,7 +382,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(increase(chat_compaction_summary_attached_total{attached=\"true\"}[1h])) / clamp_min(sum(increase(chat_compaction_summary_attached_total[1h])),1)",
+          "expr": "sum(increase(chat_compaction_summary_attached_total{attached=\"true\"}[6h])) / clamp_min(sum(increase(chat_compaction_summary_attached_total[6h])),1)",
           "legendFormat": "attached",
           "instant": true,
           "refId": "A"
@@ -876,21 +872,21 @@
       "type": "text",
       "title": "",
       "gridPos": {
-        "h": 2,
+        "h": 3,
         "w": 24,
         "x": 0,
         "y": 49
       },
       "options": {
         "mode": "markdown",
-        "content": "_Gateway and BFF are real Prometheus scrape targets. Redis, Cerbos, IAM, the coverage service and the LLM are not scraped, so these tiles use a recent-success proxy \u2014 hover any tile for exactly what it measures._"
+        "content": "_Gateway and BFF are real Prometheus scrape targets, so DOWN (red) is a true alarm. Redis, Cerbos, IAM, the coverage service and the LLM are not scraped \u2014 these tiles use a reliable activity signal over a generous 6h window and read grey \"no signal\" (never red) if the stack has simply been idle. Agents reflect live circuit-breaker state. Hover any tile for exactly what it measures._"
       }
     },
     {
       "id": 22,
       "type": "stat",
       "title": "Gateway",
-      "description": "Prometheus scrape target \u2014 gateway /actuator/prometheus is up.",
+      "description": "Prometheus scrape target \u2014 gateway /actuator/prometheus is up. DOWN here is a real alarm.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -899,7 +895,7 @@
         "h": 5,
         "w": 3,
         "x": 0,
-        "y": 51
+        "y": 52
       },
       "fieldConfig": {
         "defaults": {
@@ -966,7 +962,7 @@
       "id": 23,
       "type": "stat",
       "title": "Chat BFF",
-      "description": "Prometheus scrape target \u2014 the LibreChat BFF is up.",
+      "description": "Prometheus scrape target \u2014 the LibreChat BFF is up. DOWN here is a real alarm.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -975,7 +971,7 @@
         "h": 5,
         "w": 3,
         "x": 3,
-        "y": 51
+        "y": 52
       },
       "fieldConfig": {
         "defaults": {
@@ -1042,7 +1038,7 @@
       "id": 24,
       "type": "stat",
       "title": "Cerbos",
-      "description": "Proxy: successful gateway\u2192Cerbos calls in the last 15m (Cerbos is not a Prometheus scrape target).",
+      "description": "Reachability proxy: gateway\u2192Cerbos ABAC calls completed in the last 6h (Cerbos is not a scrape target). Greys to \"no signal\" if idle.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1051,7 +1047,7 @@
         "h": 5,
         "w": 3,
         "x": 6,
-        "y": 51
+        "y": 52
       },
       "fieldConfig": {
         "defaults": {
@@ -1063,7 +1059,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "#8e8e8e",
                 "value": null
               },
               {
@@ -1081,8 +1077,8 @@
                   "color": "green"
                 },
                 "0": {
-                  "text": "DOWN",
-                  "color": "red"
+                  "text": "no signal",
+                  "color": "#8e8e8e"
                 }
               }
             }
@@ -1096,7 +1092,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_max(sum(increase(http_client_requests_seconds_count{client_name=\"cerbos\",outcome=\"SUCCESS\"}[15m])),1) or vector(0)",
+          "expr": "clamp_max(sum(increase(http_client_requests_seconds_count{client_name=\"cerbos\"}[6h])),1)",
           "legendFormat": "Cerbos",
           "instant": true,
           "refId": "A"
@@ -1118,7 +1114,7 @@
       "id": 25,
       "type": "stat",
       "title": "Coverage svc",
-      "description": "Proxy: successful gateway\u2192coverage-service calls in the last 15m (book-of-business lookups).",
+      "description": "Reachability proxy: gateway\u2192coverage-service (book-of-business) calls completed in the last 6h. Greys to \"no signal\" if idle.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1127,7 +1123,7 @@
         "h": 5,
         "w": 3,
         "x": 9,
-        "y": 51
+        "y": 52
       },
       "fieldConfig": {
         "defaults": {
@@ -1139,7 +1135,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "#8e8e8e",
                 "value": null
               },
               {
@@ -1157,8 +1153,8 @@
                   "color": "green"
                 },
                 "0": {
-                  "text": "DOWN",
-                  "color": "red"
+                  "text": "no signal",
+                  "color": "#8e8e8e"
                 }
               }
             }
@@ -1172,7 +1168,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_max(sum(increase(http_client_requests_seconds_count{client_name=\"wealth-coverage\",outcome=\"SUCCESS\"}[15m])),1) or vector(0)",
+          "expr": "clamp_max(sum(increase(http_client_requests_seconds_count{client_name=\"wealth-coverage\"}[6h])),1)",
           "legendFormat": "Coverage svc",
           "instant": true,
           "refId": "A"
@@ -1194,7 +1190,7 @@
       "id": 26,
       "type": "stat",
       "title": "Redis",
-      "description": "Proxy: Redis (Lettuce) commands completing in the last 15m.",
+      "description": "Reachability proxy: Redis (Lettuce) commands completing in the last 6h. Greys to \"no signal\" if idle.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1203,7 +1199,7 @@
         "h": 5,
         "w": 3,
         "x": 12,
-        "y": 51
+        "y": 52
       },
       "fieldConfig": {
         "defaults": {
@@ -1215,7 +1211,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "#8e8e8e",
                 "value": null
               },
               {
@@ -1233,8 +1229,8 @@
                   "color": "green"
                 },
                 "0": {
-                  "text": "DOWN",
-                  "color": "red"
+                  "text": "no signal",
+                  "color": "#8e8e8e"
                 }
               }
             }
@@ -1248,7 +1244,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_max(sum(increase(lettuce_command_completion_seconds_count[15m])),1) or vector(0)",
+          "expr": "clamp_max(sum(increase(lettuce_command_completion_seconds_count[6h])),1)",
           "legendFormat": "Redis",
           "instant": true,
           "refId": "A"
@@ -1270,7 +1266,7 @@
       "id": 27,
       "type": "stat",
       "title": "LLM",
-      "description": "Proxy: answer tokens streamed in the last 15m (the synthesizer LLM is responding).",
+      "description": "Reachability proxy: answer tokens streamed in the last 6h (the synthesizer LLM is responding). Greys to \"no signal\" if idle.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1279,7 +1275,7 @@
         "h": 5,
         "w": 3,
         "x": 15,
-        "y": 51
+        "y": 52
       },
       "fieldConfig": {
         "defaults": {
@@ -1291,7 +1287,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "#8e8e8e",
                 "value": null
               },
               {
@@ -1309,8 +1305,8 @@
                   "color": "green"
                 },
                 "0": {
-                  "text": "DOWN",
-                  "color": "red"
+                  "text": "no signal",
+                  "color": "#8e8e8e"
                 }
               }
             }
@@ -1324,7 +1320,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_max(sum(increase(conduit_ttft_seconds_count[15m])),1) or vector(0)",
+          "expr": "clamp_max(sum(increase(conduit_time_to_first_token_seconds_count[6h])),1)",
           "legendFormat": "LLM",
           "instant": true,
           "refId": "A"
@@ -1346,7 +1342,7 @@
       "id": 28,
       "type": "stat",
       "title": "IAM (JWT)",
-      "description": "Proxy: authenticated principals resolved to ALLOW in 30m \u2014 IAM JWKS is reachable.",
+      "description": "Reachability proxy: JWT bearer tokens verified through the Spring Security filter chain in the last 6h \u2014 IAM JWKS is reachable. Greys to \"no signal\" if idle.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1355,7 +1351,7 @@
         "h": 5,
         "w": 3,
         "x": 18,
-        "y": 51
+        "y": 52
       },
       "fieldConfig": {
         "defaults": {
@@ -1367,7 +1363,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "#8e8e8e",
                 "value": null
               },
               {
@@ -1385,8 +1381,8 @@
                   "color": "green"
                 },
                 "0": {
-                  "text": "DOWN",
-                  "color": "red"
+                  "text": "no signal",
+                  "color": "#8e8e8e"
                 }
               }
             }
@@ -1400,7 +1396,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "clamp_max(sum(increase(conduit_authz_decisions_total{decision=\"ALLOW\"}[30m])),1) or vector(0)",
+          "expr": "clamp_max(sum(increase(spring_security_filterchains_authentication_bearer_after_total[6h])),1)",
           "legendFormat": "IAM (JWT)",
           "instant": true,
           "refId": "A"
@@ -1422,7 +1418,7 @@
       "id": 29,
       "type": "stat",
       "title": "Agents",
-      "description": "1 when every agent circuit breaker is closed; 0 when any is tripped.",
+      "description": "1 when every agent circuit breaker is closed; 0 (red) when any is tripped \u2014 a real degradation alarm.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1431,7 +1427,7 @@
         "h": 5,
         "w": 3,
         "x": 21,
-        "y": 51
+        "y": 52
       },
       "fieldConfig": {
         "defaults": {
