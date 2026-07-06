@@ -911,6 +911,40 @@ services:
     command: ["bash", "/scripts/seed-users.sh"]
     restart: "no"
 
+  # Dedicated demo seeder — does EXACTLY two things over the Docker network with NO host
+  # dependency (no docker exec, no docker socket, no host python):
+  #   1. Register Langfuse model prices  (BEFORE any traffic — Langfuse prices at ingestion)
+  #   2. Seed real demo conversations via the Chat BFF (real OIDC login, real Mongo IDs)
+  # It does NOT touch Redis principals — that stays the separate `seed-users` service above.
+  seeder:
+    build:
+      context: ./infra/seeder
+      dockerfile: Dockerfile
+    container_name: conduit-seeder
+    volumes:
+      - ./scripts:/scripts:ro
+      - ./registry:/registry:ro
+    environment:
+      # Internal (in-network) URLs — never localhost.
+      LANGFUSE_URL: http://langfuse:3000
+      CHAT_BFF_URL: http://conduit-chat:8095
+      IAM_URL: http://iam-service:8084
+      # Same Langfuse key defaults every other service uses.
+      LANGFUSE_PROJECT_PUBLIC_KEY: ${LANGFUSE_PROJECT_PUBLIC_KEY:-pk-lf-meridian-public}
+      LANGFUSE_PROJECT_SECRET_KEY: ${LANGFUSE_PROJECT_SECRET_KEY:-sk-lf-meridian-secret}
+      SEED_PASSWORD: ${SEED_PASSWORD:-Meridian@2024}
+    depends_on:
+      gateway:
+        condition: service_healthy
+      conduit-chat:
+        condition: service_healthy
+      iam-service:
+        condition: service_healthy
+      langfuse:
+        condition: service_started
+    command: ["bash", "/scripts/seed-demo-container.sh"]
+    restart: "no"
+
   # Seed the Langfuse golden datasets (conduit-routing, conduit-synthesis). Retries until
   # Langfuse + its self-seeded project are ready; the seeder itself is idempotent.
   seed-datasets:
