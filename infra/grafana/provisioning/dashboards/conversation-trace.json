@@ -9,7 +9,20 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": null,
-  "links": [],
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": false,
+      "tags": [],
+      "targetBlank": true,
+      "title": "🔍 Open this conversation in Langfuse",
+      "tooltip": "Same convId — jump to every trace, prompt, token, cost & eval score for this conversation in Langfuse",
+      "type": "link",
+      "url": "http://localhost:3030/project/meridian-gateway/sessions/${convId}"
+    }
+  ],
   "refresh": "30s",
   "schemaVersion": 39,
   "tags": [
