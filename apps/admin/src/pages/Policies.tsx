@@ -194,7 +194,7 @@ export function Policies() {
             <div className="border border-slate-200 rounded-lg p-3 space-y-3">
               <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Conditions (optional)</p>
               <div className="flex items-center gap-3">
-                <label className="text-sm text-slate-700 w-28 shrink-0">Min. clearance</label>
+                <label className="text-sm text-slate-700 w-28 shrink-0">Min. data classification</label>
                 <input type="range" min={0} max={5} value={intent.conditions.clearance_min ?? 0}
                   onChange={e => setIntent(i => ({ ...i, conditions: { ...i.conditions, clearance_min: Number(e.target.value) || undefined } }))}
                   className="flex-1 accent-axiom-700" />

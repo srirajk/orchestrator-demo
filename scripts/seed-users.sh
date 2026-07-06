@@ -128,28 +128,38 @@ echo "  REL-00188 (Okafor) is NOT in rm_jane coverage → denied by wealth-cover
 echo "  POL-88003 (Zenith) is NOT in uw_sam coverage  → denied by insurance-coverage."
 
 # ── Register Langfuse model prices (so Langfuse's OWN cost view is populated) ─────
-# Langfuse prices at INGESTION time, so this MUST run before any traffic. Keys come from
-# the running gateway container (holds CONDUIT_INSIGHTS_LANGFUSE_*). Non-fatal.
+# Langfuse prices at INGESTION time, so this MUST run BEFORE any traffic. Keys are read
+# purely from env (the seeder container is given the same defaults as every other service):
+#   LANGFUSE_PROJECT_PUBLIC_KEY / LANGFUSE_PROJECT_SECRET_KEY  (preferred), or
+#   CONDUIT_INSIGHTS_LANGFUSE_PUBLIC_KEY / _SECRET_KEY         (fallback).
+# NO docker exec, NO host dependency — this runs entirely in-container over the Docker network.
+# Non-fatal per step (safe to re-run).
 if command -v python3 >/dev/null 2>&1; then
   _LF_URL="${LANGFUSE_URL:-http://localhost:3030}"
+  _LF_PUB="${LANGFUSE_PROJECT_PUBLIC_KEY:-${CONDUIT_INSIGHTS_LANGFUSE_PUBLIC_KEY:-}}"
+  _LF_SEC="${LANGFUSE_PROJECT_SECRET_KEY:-${CONDUIT_INSIGHTS_LANGFUSE_SECRET_KEY:-}}"
   # Langfuse prices at INGESTION, so it must be UP before we register prices (and before
   # any traffic). On a cold boot Langfuse takes a while — wait for it, else the seed skips
   # and cost stays $0. Up to ~2 min, then proceed (non-fatal).
   echo ""
   echo "[seed-users] Waiting for Langfuse to be ready (prices must register before traffic)..."
   for _i in $(seq 1 40); do curl -sf "$_LF_URL/api/public/health" >/dev/null 2>&1 && break; sleep 3; done
-  _LF_PUB="${LANGFUSE_PROJECT_PUBLIC_KEY:-$(docker exec conduit-gateway printenv CONDUIT_INSIGHTS_LANGFUSE_PUBLIC_KEY 2>/dev/null)}"
-  _LF_SEC="${LANGFUSE_PROJECT_SECRET_KEY:-$(docker exec conduit-gateway printenv CONDUIT_INSIGHTS_LANGFUSE_SECRET_KEY 2>/dev/null)}"
   echo "[seed-users] Registering Langfuse model prices (fresh traffic will be costed)..."
+  # Prefer the mounted registry copy (/registry/model-prices.json) so the config is found
+  # regardless of where this script lives in the container.
+  _PRICE_CONFIG="/registry/model-prices.json"
+  [ -f "$_PRICE_CONFIG" ] || _PRICE_CONFIG="$(dirname "$0")/../registry/model-prices.json"
   python3 "$(dirname "$0")/seed-langfuse-models.py" \
     --langfuse-url "$_LF_URL" \
     --public-key "$_LF_PUB" \
     --secret-key "$_LF_SEC" \
+    --config "$_PRICE_CONFIG" \
     || echo "[seed-users] Langfuse price seed skipped — non-fatal"
 fi
 
 # ── Seed real demo conversations through the Chat BFF ────────────────────────────
 # Real OIDC login per user (no bearer bypass, no DB injection) → real Mongo conversations.
+# Uses the INTERNAL service URLs from env (CHAT_BFF_URL / IAM_URL), never localhost.
 # Idempotent (skips users who already have conversations) and non-fatal if the chat
 # stack isn't up yet, so it is safe to run every time the system comes up.
 if command -v python3 >/dev/null 2>&1; then

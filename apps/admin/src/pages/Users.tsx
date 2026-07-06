@@ -37,7 +37,7 @@ const EMPTY: UserForm = {
   team: '',
 }
 
-const TABLE_COLUMNS = ['User', 'Roles', 'Segments & clearance', 'Team', '']
+const TABLE_COLUMNS = ['User', 'Roles', 'Segments & data classification', 'Team', '']
 
 /** Colour a clearance chip by its schema rank (higher rank = more sensitive). */
 function tierColor(rank: number | undefined): BadgeColor {
@@ -68,7 +68,7 @@ function validateSegments(rows: SegmentRow[]): SegmentValidation {
   const seen = new Set<string>()
   rows.forEach((row, i) => {
     if (!row.segment && !row.tier) {
-      rowErrors[i] = 'Choose a segment and a clearance tier'
+      rowErrors[i] = 'Choose a segment and a data-classification tier'
       return
     }
     if (!row.segment) {
@@ -76,7 +76,7 @@ function validateSegments(rows: SegmentRow[]): SegmentValidation {
       return
     }
     if (!row.tier) {
-      rowErrors[i] = 'Choose a clearance tier'
+      rowErrors[i] = 'Choose a data-classification tier'
       return
     }
     if (seen.has(row.segment)) {
@@ -557,7 +557,7 @@ export function Users() {
           {/* Segments & clearance — per-segment row editor */}
           <div className="flex flex-col gap-2">
             <div className="flex items-baseline justify-between">
-              <label className="text-sm font-medium text-ink-700">Segments &amp; clearance</label>
+              <label className="text-sm font-medium text-ink-700">Segments &amp; data classification</label>
               <span className="text-xs text-ink-500">Data tier held per business segment</span>
             </div>
 
@@ -570,7 +570,7 @@ export function Users() {
               <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 p-3" role="alert">
                 <AlertCircle size={16} className="shrink-0 text-red-700" />
                 <p className="flex-1 text-xs font-medium text-red-900">
-                  Couldn’t load segment or clearance options.
+                  Couldn’t load segment or data-classification options.
                 </p>
                 <Button
                   size="sm"
@@ -612,13 +612,13 @@ export function Users() {
                             </div>
                             <div className="flex-1">
                               <select
-                                aria-label={`Clearance tier for row ${i + 1}`}
+                                aria-label={`Data-classification tier for row ${i + 1}`}
                                 aria-invalid={Boolean(rowError)}
                                 value={row.tier}
                                 onChange={(e) => setRow(i, { tier: e.target.value })}
                                 className={selectClass(Boolean(rowError))}
                               >
-                                <option value="">Clearance…</option>
+                                <option value="">Data classification…</option>
                                 {classifications.map((c) => (
                                   <option key={c.name} value={c.name}>{c.name}</option>
                                 ))}
@@ -739,7 +739,7 @@ export function Users() {
                 </div>
               </div>
               <div className="bg-slate-50 rounded-lg p-4">
-                <p className="text-xs font-medium text-slate-500 mb-2">SEGMENTS &amp; CLEARANCE</p>
+                <p className="text-xs font-medium text-slate-500 mb-2">SEGMENTS &amp; DATA CLASSIFICATION</p>
                 {Object.entries(detailUser.segments ?? {}).length > 0 ? (
                   <div className="flex flex-col gap-1.5">
                     {Object.entries(detailUser.segments).map(([seg, tier]) => (

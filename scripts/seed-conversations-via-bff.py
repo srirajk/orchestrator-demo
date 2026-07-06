@@ -23,7 +23,7 @@ import argparse
 import re
 import sys
 import time
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import requests
 
@@ -54,6 +54,31 @@ def _wait_ready(url: str, timeout: int = 120) -> bool:
     return False
 
 
+def _follow_rewriting_callback(s: requests.Session, resp: requests.Response,
+                               bff: str, max_hops: int = 12) -> requests.Response:
+    """Follow a redirect chain manually, rewriting the OIDC callback hop.
+
+    Axiom's registered redirect_uri is the PUBLIC BFF address (e.g. http://localhost:8099/
+    api/auth/callback) — the host-published port that only the browser on the host can
+    reach. From inside the seeder container over the Docker network that host is
+    unreachable, so any hop whose path is the BFF callback is rewritten to the INTERNAL
+    BFF base ($CHAT_BFF_URL, e.g. http://conduit-chat:8095). This is host-only rewriting:
+    the code/state query is preserved and the same session cookie (set on the BFF host
+    during /api/auth/login) is replayed, so Spring Security's state check passes and the
+    token exchange still uses the stored redirect_uri. Axiom is never changed.
+    """
+    bff_parts = urlsplit(bff)
+    while max_hops > 0 and resp.is_redirect:
+        max_hops -= 1
+        nxt = urljoin(resp.url, resp.headers["Location"])
+        parts = urlsplit(nxt)
+        if parts.path.startswith("/api/auth/callback"):
+            nxt = urlunsplit((bff_parts.scheme, bff_parts.netloc,
+                              parts.path, parts.query, parts.fragment))
+        resp = s.get(nxt, allow_redirects=False, timeout=20)
+    return resp
+
+
 def login(bff: str, user: str, password: str) -> requests.Session:
     """Run the real OIDC login and return a Session holding the BFF session cookie."""
     s = requests.Session()
@@ -65,11 +90,16 @@ def login(bff: str, user: str, password: str) -> requests.Session:
     if not m:
         raise RuntimeError("could not find the CSRF token on the login form")
     login_action = urljoin(r.url, "/login")
-    s.post(
+    # Do NOT auto-follow: the final hop targets the public redirect_uri (localhost:8099),
+    # which is unreachable from the container. Walk the chain and rewrite the callback hop
+    # to the internal BFF so the code/state lands back on the BFF over the Docker network.
+    resp = s.post(
         login_action,
         data={"username": user, "password": password, "_csrf": m.group(1)},
         timeout=20,
+        allow_redirects=False,
     )
+    _follow_rewriting_callback(s, resp, bff)
     # verify the session was actually established
     check = s.get(f"{bff}/api/conversations", timeout=20)
     if check.status_code != 200:
