@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-07-06T00:39:33.448Z
-> Files: 1054 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-07-06T02:09:05.693Z
+> Files: 1061 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/
 
@@ -22,7 +22,7 @@
 - `conduit-dashboards.html` (~12666 tok)
 - `conduit-ops-plane.html` — Conduit Insights — Operations Plane (~13836 tok)
 - `dash_analyze.py` — Enumerate Grafana dashboards; run each panel's targets against its datasource (~1189 tok)
-- `decisioning-engineering.html` — Conduit — Engineering the Decisioning Layer (~5260 tok)
+- `decisioning-engineering.html` — Conduit — Engineering the Decisioning Layer (~5364 tok)
 - `dump_turn.py` (~184 tok)
 - `EVIDENCE.md` — Conduit Chat memory COMPACTION — end-to-end proof via REAL BFF OIDC session (~1364 tok)
 - `guardrail_e2e.py` — End-to-end gateway guardrail tests via /v1/chat/completions with real persona JWTs. (~1408 tok)
@@ -610,6 +610,7 @@
 - `seed-conversations-via-bff.py` — Seed REAL Conduit Chat conversations through the BFF, via the real OIDC login flow. (~1655 tok)
 - `seed-demo-conversations.py` — mint_token, chat, main (~2922 tok)
 - `seed-langfuse-models.py` — main (~1661 tok)
+- `seed-users.sh` — seed-users.sh — Idempotently seed demo principals into Redis. (~1621 tok)
 - `smoke-ui.sh` — smoke-ui.sh — Tier-1 fast gate. No LLM calls, no sleeps: catches integration breakage (~934 tok)
 - `smoke.sh` — smoke.sh — full API/CLI smoke for Conduit. Run against a live stack (docker compose up). (~1998 tok)
 
@@ -944,6 +945,8 @@
 - `CODEX-STEP2-CONDUIT-SSO-ENTRY.md` — Codex Brief — STEP 2: Conduit Chat "Sign in with SSO" entry page (~905 tok)
 - `CODEX-STEP2B-LOGOUT-FIX.md` — Codex Brief — STEP 2b: Fix logout (real single-sign-out + land on Conduit SSO page) (~827 tok)
 - `CODEX-STEP3C-POLISH.md` — Codex Brief — STEP 3c: Insights boards polish (layout + timeframe + nav + wording) (~778 tok)
+- `CODEX-UI-TEST-PLAN.md` — Codex UI Test Plan — Grafana · Langfuse · Chat UI · Insights UI (~1790 tok)
+- `CONDUIT-CLIENT-BRIEFING.html` — Conduit — Client Briefing (Owner's Study Copy) (~19175 tok)
 - `INSIGHTS-SPEC.md` — Conduit Insights — Build Spec (native, governed analytics) (~1123 tok)
 - `INSIGHTS-UPGRADES.md` — Conduit Insights — Upgrades & Roadmap (living doc — APPEND, never delete) (~1045 tok)
 - `INSIGHTS-WORDING.md` — Conduit Insights — Wording & Terminology (CANONICAL — use everywhere) (~611 tok)
@@ -1082,11 +1085,11 @@
 - `Dockerfile` — Docker container definition (~86 tok)
 - `eval_deepeval.py` — PartialHonestyMetric: configure_judge_model, measure, a_measure, is_successful + 6 more (~5444 tok)
 - `golden-prompts.json` (~3317 tok)
-- `multiturn-routing.json` — Multi-turn context-aware routing regression guard (Calderon keyword-less-follow-up fix); expected domain/outcome + must_not_route per turn. (~600 tok)
-- `multiturn-recency-insurance.json` — Cross-domain anaphor-recency regression guard (bug-234, uw_sam/insurance): establish policy A → switch B → re-name A → pronoun must bind to just-named A (POL-77002) not older B (POL-77001); asserted via coverage-gate entity in the decision trace. Proves the focal-recency fix is domain-generic. (~500 tok)
 - `langfuse_continuous.py` — check_grounding, check_partial_honesty, llm_judge (~7457 tok)
 - `langfuse_run_experiment.py` — Run a Langfuse experiment against the meridian-routing dataset. (~4132 tok)
 - `langfuse_seed_datasets.py` — Seed Langfuse datasets from eval/golden-prompts.json. (~3565 tok)
+- `multiturn-recency-insurance.json` — Cross-domain anaphor-recency regression guard (bug-234, uw_sam/insurance): establish policy A → switch B → re-name A → pronoun must bind to just-named A (POL-77002) not older B (POL-77001); asserted via coverage-gate entity in the decision trace. Proves the focal-recency fix is domain-generic. (~500 tok)
+- `multiturn-routing.json` — Multi-turn context-aware routing regression guard (Calderon keyword-less-follow-up fix); expected domain/outcome + must_not_route per turn. (~600 tok)
 - `requirements.txt` — Python dependencies (~41 tok)
 
 ## eval/prompts/
@@ -1119,13 +1122,13 @@
 
 - `ChatService.java` — Entry point from the controller — called on a virtual thread after the async boundary. Routes FETCH with bias-to-fetch (hasGroundedResolvableReference→resolveContextual entityKnown); FOLLOW_UP fallthrough to fetch when a grounded entity + confident route exist; routing-abstained FETCH degrades to grounded history synthesis when prior assistant data exists (hasPriorAssistantData). Deterministic identifier PRE-CHECK (identifyByIdPattern→resolve+CHECK→deny with the id's OWN domain copy before routing, bug-236); coverage else-branch named-entity backstop (resolveNamedReferenceBackstop/properNounPhrases: resolve typed proper-nouns principal-agnostically→CHECK→deny out-of-coverage NAMED entity instead of clarifying, bug-235); withheldDomains (structural-gate-pruned domains) threaded to the synthesizer for honest partial fulfillment (bug-237). Clarify copy aligned to capability (bug-239): buildDeterministicClarification lists candidates by NAME (+ id) with '- ' bullets (NO positional numbers) and invites "Reply with the <entityNoun> name or identifier" (entityNoun = manifest entity display, no hardcoded 'relationship ID'); buildClarificationQuestion hoists primaryResolvableEntity so the noun frames template + composed. No positional-index parsing anywhere — the resolver only honours name / manifest id_pattern. bug-233. (~16600 tok)
 
-## gateway/src/main/java/ai/conduit/gateway/domain/intent/
-
-- `IntentClassifier.java` — Stage A: combined intent+entity LLM (manifest-compiled prompt, temperature 0). Focal-entity rules (explicit name in latest msg supersedes history; pronoun→last focal; emit typed NAME not a recalled id; named entity→FETCH not CLARIFY) + deterministic deriveFocalReference() [id in latest msg → user-grounded ref → focalIdByNameMatch (proper-noun tokens vs transcript "Name (ID)") → lastFocalSingleId anaphora carry]. Extracts entities for FETCH_DATA AND FOLLOW_UP (bias-to-fetch fallthrough). bug-233. RECENCY (bug-234): deriveFocalReference() precedence reordered so an anaphoric turn that names no new entity binds to the MOST-RECENTLY-NAMED focal entity (recency carry) BEFORE the grounded-LLM-value fallback; a name shared with the latest message (sharesWord, ≥4 chars) counts as naming-this-turn and supersedes older focus. Fixes pronoun binding to a stale older entity. (~6500 tok)
-
 ## gateway/src/main/java/ai/conduit/gateway/domain/clarify/
 
 - `ClarificationComposer.java` — The 4th grounded LLM call site (alongside IntentClassifier / EntityExtractor / AnswerSynthesizer). PHRASES a natural clarify question over a GROUNDED candidate set handed in as DELIMITED DATA; it never DECIDES to clarify (that stays deterministic in ChatService: extracted ∩ required = ∅) and never invents. Generic scaffold; entity noun + optional tone come from the manifest (World-B clean). compose() returns null (→ caller serves the deterministic template) when the LLM is unreachable OR validate() rejects: output blank / too long, contains any id_pattern token outside the candidate id set (core foreign-ID guard), or references no candidate. System prompt forbids positional numbers / 'reply with the number' — options are referred to by name + identifier only (bug-239); OPTIONS data list uses '- ' bullets not numbers. Non-streaming, single completion, own tight budget (config conduit.llm.clarification-composer.*, defaults inherit intent-classifier Z.AI/flash). (~2400 tok)
+
+## gateway/src/main/java/ai/conduit/gateway/domain/intent/
+
+- `IntentClassifier.java` — Stage A: combined intent+entity LLM (manifest-compiled prompt, temperature 0). Focal-entity rules (explicit name in latest msg supersedes history; pronoun→last focal; emit typed NAME not a recalled id; named entity→FETCH not CLARIFY) + deterministic deriveFocalReference() [id in latest msg → user-grounded ref → focalIdByNameMatch (proper-noun tokens vs transcript "Name (ID)") → lastFocalSingleId anaphora carry]. Extracts entities for FETCH_DATA AND FOLLOW_UP (bias-to-fetch fallthrough). bug-233. RECENCY (bug-234): deriveFocalReference() precedence reordered so an anaphoric turn that names no new entity binds to the MOST-RECENTLY-NAMED focal entity (recency carry) BEFORE the grounded-LLM-value fallback; a name shared with the latest message (sharesWord, ≥4 chars) counts as naming-this-turn and supersedes older focus. Fixes pronoun binding to a stale older entity. (~6500 tok)
 
 ## gateway/src/main/java/ai/conduit/gateway/synthesis/answer/
 
@@ -1842,6 +1845,7 @@
 - `eval-gate.sh` — Eval release gate — seeds Langfuse datasets, then runs the DeepEval routing (~753 tok)
 - `eval-routing.py` — mint_admin_token, load_prompts, resolve, f1 + 1 more (~1675 tok)
 - `integration-test.sh` — Curl-based integration tests against the running gateway. (~1352 tok)
+- `probe-recency-insurance.py` — Cross-domain anaphor-recency BFF driver (uw_sam via OIDC): 5-turn insurance conversation proving the bug-234 focal-recency fix is domain-generic; pairs with eval/multiturn-recency-insurance.json. (~350 tok)
 - `requirements-eval.txt` — Meridian eval dependencies (not runtime — install on dev/CI machine) (~33 tok)
 - `run-integration-tests.sh` (~354 tok)
 - `scenario-perf.py` — class: check_summary, mint_token, chat, resolve + 4 more (~14188 tok)
@@ -1854,7 +1858,6 @@
 - `smoke.sh` — smoke.sh — full API/CLI smoke for Conduit. Run against a live stack (docker compose up). (~1581 tok)
 - `verify-telemetry-e2e.sh` — ───────────────────────────────────────────────────────────────────────────── (~1151 tok)
 - `verify.sh` — Full verification script — runs after each phase to confirm acceptance criteria. (~713 tok)
-- `probe-recency-insurance.py` — Cross-domain anaphor-recency BFF driver (uw_sam via OIDC): 5-turn insurance conversation proving the bug-234 focal-recency fix is domain-generic; pairs with eval/multiturn-recency-insurance.json. (~350 tok)
 - `wait-for-healthy.sh` — Wait until all core docker-compose services report healthy, then exit 0. (~323 tok)
 - `world-b-check.sh` — ───────────────────────────────────────────────────────────────────────────── (~1272 tok)
 

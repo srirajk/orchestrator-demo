@@ -1,0 +1,74 @@
+[
+  {
+    "title": "Conduit — Agent Health",
+    "uid": "conduit-agent-health",
+    "url": "http://127.0.0.1:3000/d/conduit-agent-health/conduit-e28094-agent-health?orgId=1&from=now-30m&to=now&timezone=browser&var-convId=6a4b00a400a4b26093cd00e4&var-agentId=$__all&refresh=10s",
+    "screenshot": "/Users/srirajkadimisetty/projects/orchestrator-demo/conduit-ui-tests/results/2026-07-05-ui-pass/grafana-conduit-agent-health.png",
+    "noData": 0,
+    "errors": [],
+    "text": "Skip to main content\nSearch or jump to...\n⌘+k\nHome\nDashboards\nConduit — Agent Health\nShare\nEdit\nAgent\nAll\nLast 30 minutes\nRefresh\n10s\nFleet Overview\nHealthy Agents (CB CLOSED)\nHealthy Agents\n11\nAgents OPEN (Circuit Tripped)\nTripped Breakers\n0\nFleet Error Rate — Per Agent (5m rate)\nacme.wealth.goal_planning\nLast *: 0%\nacme.wealth.holdings\nLast *: 0%\nacme.wealth.performance\nLast *: 0%\nAgent Latency Distribution Heatmap (All Selected Agents)\n0.0000898\n0.0702\nPer-Agent Detail — acme.insurance.claim_status\n(7 panels)\nPer-Agent Detail — acme.insurance.policy_details\n(7 panels)\nPer-Agent Detail — acme.servicing.cash_management\n(7 panels)\nPer-Agent Detail — acme.servicing.corporate_actions\n(7 panels)\nPer-Agent Detail — acme.servicing.custody_positions\n(7 panels)\nResilience Story — Circuit Breakers, Bulkhead Pressure and Protocol Comparison\nCircuit Breaker State History (0=CLOSED · 1=HALF_OPEN · 2=OPEN)\nacme.insurance.claim_status\nacme.insurance.policy_details\nacme.servicing.cash_management\nacme.servicing.corporate_actions\nacme.servicing.custody_positions\nacme.servicing.settlement_status\nacme.wealth.goal_planning\nacme.wealth.holdings\nacme.wealth.market_research\nacme.wealth.performance\nacme.wealth.risk_profile\nBulkhead Pressure — Executing (solid) vs Queued (dashed)\nexecuting — acme.insurance.claim_status\nLast *: 0\nexecuting — acme.insurance.policy_details\nLast *: 0\nexecuting — acme.servicing.cash_management\nLast *: 0\nexecuting — acme.servicing.corporate_actions\nLast *: 0\nexecuting — acme.servicing.custody_positions\nLast *: 0\nexecuting — acme.servicing.settlement_status\nLast *: 0\nexecuting — acme.wealth.goal_planning\nLast *: 0\nexecuting — acme.wealth.holdings\nLast *: 0\nexecuting — acme.wealth.market_research\nLast *: 0\nexecuting — acme.wealth.performance\nLast *: 0\nexecuting — acme.wealth.risk_profile\nLast *: 0\nqueued — acme.insurance.claim_status\nLast *: 0\nqueued — acme.insurance.policy_details\nLast *: 0\nqueued — acme.servicing.cash_management\nLast *: 0\nqueued — acme.servicing.corporate_actions\nLast *: 0\nqueued — acme.servicing.custody_positions\nLast *: 0\nqueued — acme.servicing.settlement_status\nLast *: 0\nqueued — acme.wealth.goal_planning\nLast *: 0\nqueued — acme.wealth.holdings\nLast *: 0\nqueued — acme.wealth.market_research\nLast *: 0\nqueued — acme.wealth.performance\nLast *: 0\nqueued — acme.wealth.risk_profile\nLast *: 0\nProtocol Latency Comparison — HTTP vs MCP (avg ms)\nNo numeric fields found"
+  },
+  {
+    "title": "Conduit — Business Overview",
+    "uid": "conduit-business",
+    "url": "http://127.0.0.1:3000/d/conduit-business/conduit-e28094-business-overview?orgId=1&from=now-30m&to=now&timezone=browser&var-convId=6a4b00a400a4b26093cd00e4&refresh=30s",
+    "screenshot": "/Users/srirajkadimisetty/projects/orchestrator-demo/conduit-ui-tests/results/2026-07-05-ui-pass/grafana-conduit-business.png",
+    "noData": 0,
+    "errors": [],
+    "text": "Skip to main content\nSearch or jump to...\n⌘+k\nHome\nDashboards\nConduit — Business Overview\nShare\nEdit\nLast 30 minutes\nRefresh\n30s\n📊 Today’s Activity\nTotal Queries Today\n67\nQueries This Hour\n67\nActive Conversations\n1\nMedian Response Time\n6 s\n🤔 What Bankers Are Asking\nIntent Breakdown (Last Hour)\n\tValue\tPercent\n\nFETCH_DATA\n\t0.0173\t85%\n\nCHITCHAT\n\t0.00167\t8%\n\nFOLLOW_UP\n\t0.00111\t5%\n\nCLARIFY\n\t0.000279\t1%\nCapability Demand — Calls per Agent (Last Hour)\nacme.insurance.claim_status\n1.07\nacme.insurance.policy_details\n1.07\nacme.servicing.cash_management\n35.2\nacme.servicing.corporate_actions\n6.04\nacme.servicing.custody_positions\n6.04\nacme.servicing.settlement_status\n34.2\nacme.wealth.goal_planning\n28.2\nacme.wealth.holdings\n35.2\nacme.wealth.market_research\n13.1\nacme.wealth.performance\n33.2\nacme.wealth.risk_profile\n5.04\nQuery Volume Trend (Last 24h)\nName\tMean\tMax\n\nCHITCHAT\n\t0.00269 req/s\t0.0101 req/s\n\nCLARIFY\n\t0.000349 req/s\t0.00170 req/s\n\nFETCH_DATA\n\t0.0256 req/s\t0.0861 req/s\n\nFOLLOW_UP\n\t0.00175 req/s\t0.00675 req/s\n🔐 Access Control\nAuthorization Allow Rate\n94.7%\nCerbos PDP Coverage\n100.0%\nAllow vs. Deny (Last Hour)\n\tValue\tPercent\n\nALLOW\n\t0.0906\t95%\n\nDENY\n\t0.00503\t5%"
+  },
+  {
+    "title": "Conduit Chat — Memory / Compaction",
+    "uid": "conduit-chat-compaction",
+    "url": "http://127.0.0.1:3000/d/conduit-chat-compaction/conduit-chat-e28094-memory-compaction?orgId=1&from=now-30m&to=now&timezone=browser&var-convId=6a4b00a400a4b26093cd00e4&var-DS_PROMETHEUS=prometheus&refresh=10s",
+    "screenshot": "/Users/srirajkadimisetty/projects/orchestrator-demo/conduit-ui-tests/results/2026-07-05-ui-pass/grafana-conduit-chat-compaction.png",
+    "noData": 0,
+    "errors": [],
+    "text": "Skip to main content\nSearch or jump to...\n⌘+k\nHome\nDashboards\nConduit Chat — Memory / Compaction\nShare\nEdit\nLast 30 minutes\nRefresh\n10s\nMemory / Compaction\nSummary-Attached Ratio (GUARDRAIL — 0 = silent breakage)\nsummary attached ratio\nContext Window Size (messages / turn)\nmean messages\np95 messages\nTokens Saved by Compaction\nmean full transcript tokens\nmean context tokens sent\nSummary Generation Latency (avg / max)\np50 latency\np95 latency\nSummary Generation Error Rate\nsummary errors / sec\nSummary Attached Rate — raw counter (ZERO on top line = silent broken compaction)\nturns with summary attached (rate)\nturns without summary (rate)"
+  },
+  {
+    "title": "Conduit — Live Demo View",
+    "uid": "conduit-demo",
+    "url": "http://127.0.0.1:3000/d/conduit-demo/conduit-e28094-live-demo-view?orgId=1&from=now-30m&to=now&timezone=browser&var-convId=6a4b00a400a4b26093cd00e4&refresh=5s",
+    "screenshot": "/Users/srirajkadimisetty/projects/orchestrator-demo/conduit-ui-tests/results/2026-07-05-ui-pass/grafana-conduit-demo.png",
+    "noData": 0,
+    "errors": [],
+    "text": "Skip to main content\nSearch or jump to...\n⌘+k\nHome\nDashboards\nConduit — Live Demo View\nShare\nEdit\nLast 30 minutes\nRefresh\n5s\nLive Request Flow\nRequests / sec\n0 req/s\nAvg E2E Latency\n2.66 s\nMax E2E Latency\n0 s\nActive Streams\n1\nRegistered Agents\nagents\n8\nagents\n5\nRouting Confidence\nChat request rate\nName\tMean\tMax\n\nreq/s\n\t0.0187 req/s\t0.156 req/s\nE2E latency\nName\tMean\tMax\n\navg\n\t10.6 s\t29.5 s\n\nmax\n\t6.94 s\t29.5 s\nIntent Routing\nIntent distribution (last 5 min)\n\tValue\tPercent\n\nFETCH_DATA\n\t3.16\t100%\n\nCHITCHAT\n\t0\t0%\n\nCLARIFY\n\t0\t0%\n\nFOLLOW_UP\n\t0\t0%\nResolver latency\nName\tMean\tMax\n\navg resolve time\n\t23.8 ms\t39.7 ms\n\nmax\n\t17.0 ms\t60.3 ms\n\navg classify time\n\t2.67 s\t5.46 s\nResolver fallbacks\nName\tTotal\n\nconfidence\n\t0"
+  },
+  {
+    "title": "Conduit Gateway",
+    "uid": "conduit-gateway-perf",
+    "url": "http://127.0.0.1:3000/d/conduit-gateway-perf/conduit-gateway?orgId=1&from=now-30m&to=now&timezone=browser&var-convId=6a4b00a400a4b26093cd00e4&var-DS_PROMETHEUS=prometheus&refresh=5s",
+    "screenshot": "/Users/srirajkadimisetty/projects/orchestrator-demo/conduit-ui-tests/results/2026-07-05-ui-pass/grafana-conduit-gateway-perf.png",
+    "noData": 0,
+    "errors": [],
+    "text": "Skip to main content\nSearch or jump to...\n⌘+k\nHome\nDashboards\nConduit Gateway\nShare\nEdit\nLast 30 minutes\nRefresh\n5s\nRequest throughput\nChat requests / sec\nreq/s\nE2E latency (chat completions)\navg E2E latency\nmax E2E latency\nIntents (last 5 min)\nCHITCHAT\n0\nCLARIFY\n0\nFETCH_DATA\n3.16\nFOLLOW_UP\n0\nIntent classifier latency\nIntent classify duration\navg classify latency\nmax classify latency\nClassify latency now\navg (2m)\n2.61 s\nmax\n0 s\nJVM & active requests\nJVM heap\nheap used\nheap used\nheap used\nheap used\nheap used\nheap used\nheap max\nheap max\nheap max\nheap max\nheap max\nheap max\nJVM threads (virtual)\nlive threads\nlive threads\ndaemon threads\ndaemon threads\nActive concurrent streams\nactive chat streams"
+  },
+  {
+    "title": "Conduit — Conversation Trace Explorer",
+    "uid": "conduit-trace",
+    "url": "http://127.0.0.1:3000/d/conduit-trace/conduit-e28094-conversation-trace-explorer?orgId=1&from=now-30m&to=now&timezone=browser&var-convId=6a4b00a400a4b26093cd00e4&var-entity_id=REL-00042&refresh=30s",
+    "screenshot": "/Users/srirajkadimisetty/projects/orchestrator-demo/conduit-ui-tests/results/2026-07-05-ui-pass/grafana-conduit-trace.png",
+    "noData": 2,
+    "errors": [],
+    "text": "Skip to main content\nSearch or jump to...\n⌘+k\nHome\nDashboards\nConduit — Conversation Trace Explorer\nShare\nEdit\nRelationship / Trace ID\nConversation ID\nLast 30 minutes\nRefresh\n30s\nTrace Search — enter Relationship ID above\nTraces — click a row to drill into the full span waterfall\n\nNo data found in response\n\nAgent Latency — calls in the last 3 hours\nAgent Outbound Call Latency p95\ncerbos /api/check/resources p95\ninsurance-coverage /coverage/uw_sam/resources/POL-77002 p95\ninsurance-coverage /entities/resolve p95\nwealth-coverage /coverage/multi_rm_fischer/resources/REL-00188 p95\nwealth-coverage /coverage/rm_guest p95\nwealth-coverage /coverage/rm_guest/resources/REL-00042 p95\nwealth-coverage /coverage/rm_jane p95\nwealth-coverage /coverage/rm_jane/resources/REL-00042 p95\nwealth-coverage /coverage/rm_jane/resources/REL-00099 p95\nwealth-coverage /coverage/rm_jane/resources/REL-00188 p95\nwealth-coverage /entities/resolve p95\nAgent Error Rate (last 5m)\nNo data"
+  },
+  {
+    "title": "Conduit Gateway — Performance",
+    "uid": "conduit-perf",
+    "url": "http://127.0.0.1:3000/d/conduit-perf/conduit-gateway-e28094-performance?orgId=1&from=now-30m&to=now&timezone=browser&var-convId=6a4b00a400a4b26093cd00e4&var-rate_window=5m&refresh=10s",
+    "screenshot": "/Users/srirajkadimisetty/projects/orchestrator-demo/conduit-ui-tests/results/2026-07-05-ui-pass/grafana-conduit-perf.png",
+    "noData": 0,
+    "errors": [],
+    "text": "Skip to main content\nSearch or jump to...\n⌘+k\nHome\nDashboards\nConduit Gateway — Performance\nShare\nEdit\nRate Window\n5m\nLast 30 minutes\nRefresh\n10s\nThroughput & Errors\nChat Completions — Request Rate\nsuccess\nChat Completions — Latency (p50 / p95 / p99)\np50\np95\np99\nIntent Classification\nIntent Distribution — by Type\nCHITCHAT\nCLARIFY\nFETCH_DATA\nFOLLOW_UP\nIntent Classify Latency (p50 / p95)\nclassify p50\nclassify p95"
+  },
+  {
+    "title": "Conduit — Resource Usage",
+    "uid": "conduit-resources",
+    "url": "http://127.0.0.1:3000/d/conduit-resources/conduit-e28094-resource-usage?orgId=1&from=now-30m&to=now&timezone=browser&var-convId=6a4b00a400a4b26093cd00e4&var-rate_window=5m&var-container=$__all&refresh=10s",
+    "screenshot": "/Users/srirajkadimisetty/projects/orchestrator-demo/conduit-ui-tests/results/2026-07-05-ui-pass/grafana-conduit-resources.png",
+    "noData": 0,
+    "errors": [],
+    "text": "Skip to main content\nSearch or jump to...\n⌘+k\nHome\nDashboards\nConduit — Resource Usage\nShare\nEdit\nRate Window\n5m\nContainer\nAll\nLast 30 minutes\nRefresh\n10s\nContainer CPU\nCPU Usage % (per container core-seconds)\nName\tMean\tMax\n\nValue\n\t94.6%\t128%\nContainer Memory\nMemory Usage (RSS + cache)\nName\tMean\tMax\n\nValue\n\t66.9 GiB\t68.6 GiB"
+  }
+]

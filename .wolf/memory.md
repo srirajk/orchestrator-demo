@@ -1544,3 +1544,34 @@
 | 23:15 | Clarification composer — manifest-declared clarify STYLE policy (template default | composed opt-in). New 4th grounded LLM call site ClarificationComposer PHRASES a natural clarify over the GROUNDED candidate set (never decides to clarify — that stays deterministic; never invents). Manifest fields clarify_style/clarify_tone on DomainManifest→EffectiveManifest; ChatService.buildClarificationQuestion switches on em.clarifyComposed(), deterministic template extracted to buildDeterministicClarification() (byte-for-byte unchanged, = default AND fallback). VALIDATION: reject composer output with any id_pattern token outside the candidate set, or that references no candidate, or on LLM failure → template. Proven live: wealth rm_jane {REL-00042,REL-00099} + insurance uw_sam {POL-77001,POL-77002} composed (natural, grounded, entity-noun from manifest); fallback (unreachable composer) → exact template, no crash. bug-238 (compose triple-nested api-key default → 401). Eval fixtures tests 9/10; all 10 integration + hardcases + longconvo pass; world-b CRITICAL 0 before+after; gateway rebuilt+healthy. | gateway: domain/clarify/ClarificationComposer.java (new), domain/chat/ChatService.java, domain/manifest/{DomainManifest,EffectiveManifest,DomainManifestStore}.java, application.yml; registry/domains/{wealth-management,insurance}.json, domain-manifest.schema.json; docker-compose.yml; tests/integration/test_gateway_coverage.py | done | ~140k |
 
 | 20:30 | Clarify copy aligned to capability (bug-239): clarify promised a positional-number reply the resolver never honours (bare '2' re-clarified; only name/ID resolve). Option A — one interaction model. buildDeterministicClarification: candidates by NAME (+ id) with '- ' bullets, NO positional numbers; invite "Reply with the <entityNoun> name or identifier" where entityNoun = manifest entity display (dropped hardcoded 'relationship ID', World-B). buildClarificationQuestion hoists primaryResolvableEntity so the noun frames template too. ClarificationComposer system prompt forbids positional numbers / 'reply with the number' and its OPTIONS data list switched numbers→bullets. No index-parsing added; resolve/validate/fallback unchanged. Verified live template+composed on wealth (rm_jane: "client relationship") + insurance (uw_sam: "insurance policy"); name AND ID both still resolve both domains; hardcases + longconvo no regression; world-b CRITICAL 0 before+after; gateway rebuilt+healthy. | gateway: domain/chat/ChatService.java, domain/clarify/ClarificationComposer.java | done | ~70k |
+| 20:53 | Edited ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/decisioning-engineering.html | 2→2 lines | ~142 |
+| 20:53 | Edited ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/decisioning-engineering.html | 3→3 lines | ~200 |
+| 20:53 | Edited ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/decisioning-engineering.html | 2→2 lines | ~69 |
+| 20:53 | Session end: 137 writes across 36 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 84 reads | ~181559 tok |
+| 20:55 | Session end: 137 writes across 36 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 84 reads | ~181559 tok |
+| 20:58 | Session end: 137 writes across 36 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 84 reads | ~181559 tok |
+| 21:06 | Created conduit-ui-tests/CODEX-UI-TEST-PLAN.md | — | ~1910 |
+| 21:06 | Session end: 138 writes across 37 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 84 reads | ~183605 tok |
+| 21:13 | Session end: 138 writes across 37 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 84 reads | ~183605 tok |
+| 21:15 | Session end: 138 writes across 37 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 84 reads | ~183605 tok |
+| 21:17 | Session end: 138 writes across 37 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 84 reads | ~183605 tok |
+| 21:18 | Created conduit-ui-tests/CONDUIT-CLIENT-BRIEFING.html | — | ~14754 |
+| 21:20 | Edited conduit-ui-tests/CONDUIT-CLIENT-BRIEFING.html | modified fields() | ~3690 |
+| 21:20 | Edited conduit-ui-tests/CONDUIT-CLIENT-BRIEFING.html | 4 → 5 | ~26 |
+| 21:20 | Edited conduit-ui-tests/CONDUIT-CLIENT-BRIEFING.html | 5 → 6 | ~23 |
+| 21:20 | Edited conduit-ui-tests/CONDUIT-CLIENT-BRIEFING.html | 6 → 7 | ~25 |
+| 21:20 | Edited conduit-ui-tests/CONDUIT-CLIENT-BRIEFING.html | 7 → 8 | ~27 |
+| 21:21 | Edited conduit-ui-tests/CONDUIT-CLIENT-BRIEFING.html | expanded (+8 lines) | ~111 |
+| 21:21 | Edited conduit-ui-tests/CONDUIT-CLIENT-BRIEFING.html | 2→5 lines | ~367 |
+| 21:21 | Edited conduit-ui-tests/CONDUIT-CLIENT-BRIEFING.html | expanded (+9 lines) | ~349 |
+| 21:21 | Edited conduit-ui-tests/CONDUIT-CLIENT-BRIEFING.html | 1→2 lines | ~110 |
+| 21:21 | Edited conduit-ui-tests/CONDUIT-CLIENT-BRIEFING.html | 1→2 lines | ~83 |
+| 21:24 | Session end: 149 writes across 38 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 86 reads | ~204565 tok |
+| 21:43 | Session end: 149 writes across 38 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 86 reads | ~204565 tok |
+| 21:46 | Session end: 149 writes across 38 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 86 reads | ~204565 tok |
+| 21:48 | Session end: 149 writes across 38 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 86 reads | ~204565 tok |
+| 21:54 | Session end: 149 writes across 38 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 86 reads | ~204565 tok |
+| 21:59 | Edited ../orchestrator-chat/scripts/seed-users.sh | expanded (+15 lines) | ~289 |
+| 22:03 | Session end: 150 writes across 39 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 87 reads | ~205923 tok |
+| 22:09 | Edited ../orchestrator-chat/scripts/seed-users.sh | expanded (+6 lines) | ~299 |
+| 22:13 | Session end: 151 writes across 39 files (multiturn-routing.json, AgentResolver.java, ChatService.java, conduit-architecture.html, anatomy.md) | 87 reads | ~206244 tok |
