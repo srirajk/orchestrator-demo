@@ -32,20 +32,20 @@
       {
         "current": {
           "selected": true,
-          "text": "6a4a553c48f0b7c0980ff8c3",
-          "value": "6a4a553c48f0b7c0980ff8c3"
+          "text": "",
+          "value": ""
         },
         "description": "Conversation ID emitted by the gateway as MDC key convId and W3C Baggage \u2014 paste a convId to filter Loki logs to a single conversation across all Conduit services",
         "hide": 0,
         "label": "Conversation ID",
         "name": "convId",
-        "query": "6a4a553c48f0b7c0980ff8c3",
+        "query": "",
         "type": "textbox",
         "options": [
           {
             "selected": true,
-            "text": "6a4a553c48f0b7c0980ff8c3",
-            "value": "6a4a553c48f0b7c0980ff8c3"
+            "text": "",
+            "value": ""
           }
         ]
       }
