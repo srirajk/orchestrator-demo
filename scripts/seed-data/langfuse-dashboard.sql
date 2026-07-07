@@ -103,17 +103,23 @@ SELECT 'conduit-w-tokens', now(), now(), owner_id, owner_id, project_id,
        'AREA_TIME_SERIES', '{"type":"AREA_TIME_SERIES"}'::jsonb, 1
 FROM _ctx;
 
--- 6) Score distribution  (histogram of all numeric eval scores)
+-- 6) Grounding score distribution  (histogram of the grounding / faithfulness eval)
+--    Scoped to ONE evaluator on purpose: pooling four semantically different judges
+--    (grounding / relevance / safety / partial_honesty) into a single histogram mixes
+--    incommensurable scales and hides which judge is weak. Grounding is the flagship
+--    faithfulness / anti-hallucination guard for the gateway, so its shape (how tightly
+--    answers cluster near 1.0, and the low-score tail) is the trust signal worth its own
+--    widget. The per-evaluator AVERAGES over time are already the "Eval scores" line.
 INSERT INTO dashboard_widgets
   (id, created_at, updated_at, created_by, updated_by, project_id, name, description,
    view, dimensions, metrics, filters, chart_type, chart_config, min_version)
 SELECT 'conduit-w-scorehist', now(), now(), owner_id, owner_id, project_id,
-       'Score distribution',
-       'Distribution of numeric eval scores across all evaluators (0–1).',
+       'Grounding score distribution',
+       'Distribution of the grounding (faithfulness) eval score, 0–1 — how tightly answers stay grounded in agent data. Higher and tighter-to-1 is better; the left tail is ungrounded answers.',
        'SCORES_NUMERIC',
        '[]'::jsonb,
        '[{"agg":"histogram","measure":"value"}]'::jsonb,
-       '[]'::jsonb,
+       '[{"type":"string","value":"grounding","column":"name","operator":"="}]'::jsonb,
        'HISTOGRAM', '{"type":"HISTOGRAM","bins":10}'::jsonb, 1
 FROM _ctx;
 
