@@ -4,6 +4,8 @@ import {
   sendMessage,
   newConversation,
   waitForReply,
+  assistantBubbles,
+  tracePanel,
   getJwt,
   GATEWAY_URL,
 } from './helpers';
@@ -21,7 +23,7 @@ test.describe('Multi-turn conversation', () => {
 
   // ── UI path: full login → two-turn conversation ───────────────────────────
 
-  test('second turn in LibreChat retains client context', async ({ page }) => {
+  test('second turn in Conduit Chat retains client context', async ({ page }) => {
     test.setTimeout(480_000);  // 8 min: login + 2 LLM turns, can be slow under full-suite load
     await registerOrLogin(page);
     await newConversation(page);
@@ -39,11 +41,15 @@ test.describe('Multi-turn conversation', () => {
       'What is the current risk profile for this client?',
     );
 
-    // The second reply must be non-trivial and must NOT be a "which client?" clarification
+    // Two assistant bubbles now exist (one per turn), and the second reply must be a
+    // non-trivial, context-carrying answer — NOT a "which client?" re-clarification.
+    expect(await assistantBubbles(page).count()).toBeGreaterThanOrEqual(2);
     expect(secondReply.length).toBeGreaterThan(30);
     const lower = secondReply.toLowerCase();
     const isClarify = lower.includes('which client') || lower.includes('please specify');
     expect(isClarify).toBe(false);
+    // The follow-up still authorized against the same client (context preserved).
+    await expect(tracePanel(page).getByText(/Intent:/i)).toBeVisible();
   });
 
   test('three-turn conversation — data then follow-up then comparison', async ({ page }) => {
@@ -77,13 +83,16 @@ test.describe('Multi-turn conversation', () => {
 
     // Start a brand-new conversation — prior context must NOT carry over
     await newConversation(page);
-    const reply = await sendMessage(page, 'What was the last client we discussed?');
+    await sendMessage(page, 'What was the last client we discussed?');
 
-    // In a fresh conversation the gateway has no client-sent context about Whitman
-    const lower = reply.toLowerCase();
-    // Accept: "no prior conversation", "I don't have context", clarifying question, or chitchat
-    // Reject: mentioning Whitman specific data from the *previous* conversation
-    const leakedWhitman = lower.includes('whitman') && lower.includes('holdings');
+    // In a fresh conversation the gateway has no client-sent context about Whitman.
+    // Scope the leak check to the ANSWER BUBBLE only — the whole-page text would include the
+    // sidebar, which legitimately lists the previous conversation's title ("Show holdings for
+    // Whitman…"); that title is not a context leak into the answer.
+    const answer = (await assistantBubbles(page).last().innerText()).toLowerCase();
+    // Accept: "no prior conversation", "I don't have context", clarifying question, or chitchat.
+    // Reject: the answer itself reproducing Whitman holdings from the *previous* conversation.
+    const leakedWhitman = answer.includes('whitman') && answer.includes('holdings');
     expect(leakedWhitman).toBe(false);
   });
 

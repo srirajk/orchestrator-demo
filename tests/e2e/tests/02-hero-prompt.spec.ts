@@ -1,31 +1,46 @@
 import { test, expect } from '@playwright/test';
-import { registerOrLogin, sendMessage, newConversation, HERO_PROMPT, GATEWAY_URL } from './helpers';
+import {
+  registerOrLogin,
+  sendMessage,
+  newConversation,
+  assistantBubbles,
+  tracePanel,
+  HERO_PROMPT,
+  GATEWAY_URL,
+} from './helpers';
 
 /**
- * Phase 4 / M6-M7 — End-to-end hero prompt.
- * The hero prompt must fan out across HTTP + MCP agents and return a grounded,
- * synthesised answer containing data actually returned by the mock agents.
+ * Phase 4 / M6-M7 — End-to-end hero prompt through the Conduit Chat SPA (:8099).
+ * The hero prompt must fan out across HTTP + MCP agents and return a grounded, synthesised
+ * answer in the chat pane, with the built-in glass-box Decision-trace panel populated live.
  */
 test.describe('Hero prompt', () => {
 
-  test('streams an answer through the LibreChat UI', async ({ page }) => {
+  test('streams a grounded answer in the Conduit Chat pane with a live Decision trace', async ({ page }) => {
     await registerOrLogin(page);
     await newConversation(page);
 
     const reply = await sendMessage(page, HERO_PROMPT);
 
-    // Must have a non-empty reply
+    // The answer renders as an assistant bubble in the chat pane.
+    await expect(assistantBubbles(page).last()).toBeVisible();
+    expect((await assistantBubbles(page).last().innerText()).length).toBeGreaterThan(50);
     expect(reply.length).toBeGreaterThan(50);
+
+    // The glass-box Decision trace populates: intent classification + agent resolution.
+    const trace = tracePanel(page);
+    await expect(trace.getByText(/Intent:/i)).toBeVisible();
+    await expect(trace.getByText(/Resolved \d+ Agent/i).first()).toBeVisible();
   });
 
-  test('reply contains grounded facts from wealth agents', async ({ page }) => {
+  test('reply contains grounded facts and the trace shows segment + classification gates', async ({ page }) => {
     await registerOrLogin(page);
     await newConversation(page);
 
     const reply = await sendMessage(page, HERO_PROMPT);
 
-    // The wealth holdings agent returns Whitman Family Office data; the answer must mention it
-    // (checking case-insensitively for core grounding signals from canned data)
+    // The wealth/servicing agents return Whitman Family Office data; the answer must be grounded
+    // in facts actually returned by the mock agents (case-insensitive).
     const lower = reply.toLowerCase();
     const hasGrounding = (
       lower.includes('whitman')            ||    // entity name
@@ -36,6 +51,11 @@ test.describe('Hero prompt', () => {
       lower.includes('corporate')               // corporate actions MCP tool
     );
     expect(hasGrounding).toBe(true);
+
+    // The glass-box shows the authorization gates that admitted the fan-out.
+    const trace = tracePanel(page);
+    await expect(trace.getByText(/Segment Passed/i).first()).toBeVisible();
+    await expect(trace.getByText(/Classification Passed/i).first()).toBeVisible();
   });
 
   test('gateway /v1/models returns model list', async ({ request }) => {

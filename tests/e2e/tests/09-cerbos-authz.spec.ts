@@ -87,27 +87,27 @@ async function iamRequest(token: string, method: string, path: string, body?: un
 
 // ── Principals used across tests ───────────────────────────────────────────
 
+// Current agent-policy contract: `segments` is a MAP  segment -> the data-classification tier
+// the principal holds IN that segment (membership = key present; ceiling = its value). This
+// replaced the old flat segment array + numeric clearance. chat_user is the runtime front-door
+// role (relationship_manager kept as a policy alias). No book attr — Cerbos is structural only;
+// book-of-business is the domain coverage service's job.
 const RM_JANE: Principal = {
   id: 'rm_jane',
-  roles: ['relationship_manager'],
+  roles: ['chat_user'],
   attr: {
     tenant_id: 'default',
-    clearance: 2,
-    segments: ['wealth'],
-    // No book attribute — Cerbos enforces structural (role-based) access only.
-    // Book-of-business enforcement is handled by the domain coverage service.
+    segments: { wealth: 'confidential-pii' },   // full wealth tier; not a servicing member
     admin_domains: [],
   },
 }
 
 const JUNIOR_RM: Principal = {
   id: 'junior_rm',
-  roles: ['relationship_manager'],
+  roles: ['chat_user'],
   attr: {
     tenant_id: 'default',
-    clearance: 1,         // internal — below confidential (rank 2)
-    segments: ['wealth'],
-    // No book attribute — coverage service handles book-of-business.
+    segments: { wealth: 'internal' },           // lowest tier — below confidential
     admin_domains: [],
   },
 }
@@ -138,12 +138,15 @@ const POLICY_APPROVER: Principal = {
 
 // ── Agent resources ────────────────────────────────────────────────────────
 
+// Resource contract: the policy gates on access_mode ("read"/"write"), the agent's domain
+// (mapped to a segment inside policy config), data_classification, and audience.
 const PORTFOLIO_ANALYTICS = {
   kind: 'agent',
   id: 'portfolio-analytics',
   attr: {
     domain: 'wealth-management',
-    is_mutating: false,
+    access_mode: 'read',
+    audience: 'segment',
     data_classification: 'confidential',
     tenant_id: 'default',
   },
@@ -154,7 +157,8 @@ const SETTLEMENT_AGENT = {
   id: 'settlement-status',
   attr: {
     domain: 'asset-servicing',
-    is_mutating: false,
+    access_mode: 'read',
+    audience: 'segment',
     data_classification: 'confidential',
     tenant_id: 'default',
   },
@@ -165,7 +169,8 @@ const TRADE_EXECUTION_AGENT = {
   id: 'trade-execution',
   attr: {
     domain: 'wealth-management',
-    is_mutating: true,
+    access_mode: 'write',        // mutating — Phase 1 chat_user is read-only, so this DENIES
+    audience: 'segment',
     data_classification: 'restricted',
     tenant_id: 'default',
   },
@@ -208,7 +213,8 @@ test.describe('Agent resource authz (Cerbos PDP)', () => {
       id: 'nav-lookup',
       attr: {
         domain: 'wealth-management',
-        is_mutating: false,
+        access_mode: 'read',
+        audience: 'segment',
         data_classification: 'internal',
         tenant_id: 'default',
       },
