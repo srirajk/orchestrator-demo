@@ -360,7 +360,7 @@ function InsightsPlane({ initialBoard, session }: { initialBoard: Board; session
           <AnswerQualityView boards={boards} cost={cost} onNavigate={setActiveView} />
         </section>
         <section className={clsx('view', activeView === 'us' && 'on')}>
-          <UserView cost={cost} boards={boards} onNavigate={setActiveView} />
+          <UserView cost={cost} boards={boards} />
         </section>
         <section className={clsx('view', activeView === 'iv' && 'on')}>
           <InvestigateView trace={trace} loading={traceLoading} error={traceError} onLoadTrace={loadTrace} />
@@ -506,7 +506,6 @@ function TrustView({ boards }: { boards: Record<number, Board> }) {
         <KpiCard label="Authz decisions" panel={decisions} detail="segment · class · coverage" />
         <KpiCard label="Denied" value={denied ? compactNumber(denied.value) : collecting()} detail={denied ? 'live deny count' : 'decision mix'} />
         <KpiCard label="Allow rate" panel={allowRate} />
-        <KpiCard label="Fabricated IDs" value={collecting()} detail="no live endpoint" />
       </div>
       <div className="grid grid-gap-top">
         <PanelShell className="col6" title="Denials by gate" caption="Where the three-gate ABAC stopped a request">
@@ -534,14 +533,12 @@ function TrustView({ boards }: { boards: Record<number, Board> }) {
 function AgentsView({ boards, onNavigate }: { boards: Record<number, Board>; onNavigate: (view: ViewId) => void }) {
   const agents = boards[4]
   const reliability = boards[5]
-  const traceBoard = boards[6]
   const traffic = boards[2]
   const fleetRows = tableRows(panel(agents, 'agent_calls_table')?.rows)
   const latency = labeledRows(panel(agents, 'latency_by_agent')?.rows)
   const selection = labeledRows(panel(agents, 'selection_by_agent')?.rows)
   const intent = labeledRows(panel(traffic, 'intent_mix')?.rows)
   const breakerRows = tableRows(panel(reliability, 'breaker_states')?.rows)
-  const stageRows = labeledRows(panel(traceBoard, 'trace_waterfall')?.rows)
   const slowest = topRow(latency)
 
   return (
@@ -557,7 +554,7 @@ function AgentsView({ boards, onNavigate }: { boards: Record<number, Board>; onN
         <SystemNotice tone="nom" tag="All nominal" message="No agent-fleet telemetry for this range." />
       )}
       <div className="grid">
-        <PanelShell className="col7" title="Agent fleet" caption="Calls · success · p95 · current range">
+        <PanelShell className="col12" title="Agent fleet" caption="Calls · success · p95 · current range">
           {fleetRows.length > 0 ? (
             <div className="feed">
               {fleetRows.slice(0, 6).map((row, index) => (
@@ -567,9 +564,6 @@ function AgentsView({ boards, onNavigate }: { boards: Record<number, Board>; onN
           ) : (
             <EmptyState>No agent-outcome rows for this range.</EmptyState>
           )}
-        </PanelShell>
-        <PanelShell className="col5" title="Latency by stage" caption="Where the time goes · gateway trace waterfall">
-          <Bars rows={stageRows} unit="ms" empty="Stage latency has no samples yet." />
         </PanelShell>
         <PanelShell className="col7" title="Runtime & resilience" badge="↗ Grafana">
           <div className="runs">
@@ -715,11 +709,9 @@ function AnswerQualityView({
 function UserView({
   boards,
   cost,
-  onNavigate,
 }: {
   boards: Record<number, Board>
   cost: CostSummary | null
-  onNavigate: (view: ViewId) => void
 }) {
   const users = cost?.byUser ?? []
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null)
@@ -763,18 +755,6 @@ function UserView({
         <KpiCard label="Avg grounding" value={formatScore(scoreFor(qualityScores, 'grounding'))} detail={qualityScores.length ? 'global score only' : 'no user endpoint'} />
       </div>
       <div className="grid">
-        <PanelShell className="col7" title="Their conversations" badge="via conversation-store adapter" caption="Click any to replay how it was decided">
-          <button type="button" className="out empty-out" onClick={() => onNavigate('iv')}>
-            <span className="sc mid">--</span>
-            <span className="oq">
-              <span className="t">Per-user conversation list is waiting on a conversation-store endpoint.</span>
-            </span>
-            <span className="arw">replay →</span>
-          </button>
-        </PanelShell>
-        <PanelShell className="col5" title="Entitlement decisions" caption="What this principal may reach · by domain">
-          <EmptyState>Per-principal entitlement history endpoint is not available yet.</EmptyState>
-        </PanelShell>
         <PanelShell className="col7" title="Continuous eval — this user" badge="◐ Near real-time" caption="Every answer sampled + scored by the independent evaluator">
           {qualityScores.length > 0 ? (
             <div className="scores">
