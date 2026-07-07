@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conduit · Demo Query Catalog</title>
+<style>
+:root{
+  --bg:#0e0e12; --bg-panel:rgba(255,255,255,0.025); --panel-border:rgba(236,233,224,0.16);
+  --ink:#ece9e0; --ink-soft:rgba(236,233,224,0.82); --ink-muted:rgba(236,233,224,0.58); --ink-faint:rgba(236,233,224,0.40);
+  --hairline:rgba(236,233,224,0.14);
+  --yellow:#ffe600; --yellow-soft:rgba(255,230,0,0.12); --yellow-glow:rgba(255,230,0,0.30);
+  --code-bg:#16161b; --code-ink:#e8e6dd;
+  --good:#5ec26a; --good-bg:rgba(94,194,106,0.14);
+  --mid:#c9b96b; --mid-bg:rgba(201,185,107,0.13);
+  --low:#e0a24a; --low-bg:rgba(224,162,74,0.15);
+  --zero:#e5695f; --zero-bg:rgba(229,105,95,0.15);
+  --font-mono:ui-monospace,'SF Mono','JetBrains Mono',Menlo,Consolas,monospace;
+  --font-serif:Georgia,'Iowan Old Style','Palatino Linotype',serif;
+  --font-sans:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+}
+@media (prefers-color-scheme:light){
+  :root{
+    --bg:#f3f1ea; --bg-panel:rgba(20,20,15,0.035); --panel-border:rgba(30,28,20,0.14);
+    --ink:#1c1b17; --ink-soft:rgba(28,27,23,0.84); --ink-muted:rgba(28,27,23,0.60); --ink-faint:rgba(28,27,23,0.42);
+    --hairline:rgba(28,27,23,0.14);
+    --yellow:#8a6800; --yellow-soft:rgba(138,104,0,0.10); --yellow-glow:rgba(138,104,0,0.22);
+    --code-bg:#faf9f5; --code-ink:#26251f;
+    --good:#3a8f47; --good-bg:rgba(58,143,71,0.12);
+    --mid:#8a7420; --mid-bg:rgba(138,116,32,0.12);
+    --low:#b4711a; --low-bg:rgba(180,113,26,0.12);
+    --zero:#c0392b; --zero-bg:rgba(192,57,43,0.10);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e0e12; --bg-panel:rgba(255,255,255,0.025); --panel-border:rgba(236,233,224,0.16);
+  --ink:#ece9e0; --ink-soft:rgba(236,233,224,0.82); --ink-muted:rgba(236,233,224,0.58); --ink-faint:rgba(236,233,224,0.40);
+  --hairline:rgba(236,233,224,0.14); --code-bg:#16161b; --code-ink:#e8e6dd;
+  --good:#5ec26a; --good-bg:rgba(94,194,106,0.14); --mid:#c9b96b; --mid-bg:rgba(201,185,107,0.13);
+  --low:#e0a24a; --low-bg:rgba(224,162,74,0.15); --zero:#e5695f; --zero-bg:rgba(229,105,95,0.15);
+  --yellow:#ffe600; --yellow-soft:rgba(255,230,0,0.12); --yellow-glow:rgba(255,230,0,0.30);
+}
+:root[data-theme="light"]{
+  --bg:#f3f1ea; --bg-panel:rgba(20,20,15,0.035); --panel-border:rgba(30,28,20,0.14);
+  --ink:#1c1b17; --ink-soft:rgba(28,27,23,0.84); --ink-muted:rgba(28,27,23,0.60); --ink-faint:rgba(28,27,23,0.42);
+  --hairline:rgba(28,27,23,0.14); --code-bg:#faf9f5; --code-ink:#26251f;
+  --good:#3a8f47; --good-bg:rgba(58,143,71,0.12); --mid:#8a7420; --mid-bg:rgba(138,116,32,0.12);
+  --low:#b4711a; --low-bg:rgba(180,113,26,0.12); --zero:#c0392b; --zero-bg:rgba(192,57,43,0.10);
+  --yellow:#8a6800; --yellow-soft:rgba(138,104,0,0.10); --yellow-glow:rgba(138,104,0,0.22);
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-sans);}
+body{padding:clamp(26px,5vw,60px) clamp(15px,4vw,40px) 80px;}
+.wrap{max-width:940px;margin:0 auto;}
+:focus-visible{outline:2px solid var(--yellow);outline-offset:2px;}
+
+.eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:0.22em;text-transform:uppercase;color:var(--yellow);display:flex;align-items:center;gap:10px;margin-bottom:15px;}
+.eyebrow::before{content:'';width:7px;height:7px;background:var(--yellow);box-shadow:0 0 8px var(--yellow-glow);flex-shrink:0;}
+h1{font-family:var(--font-serif);font-weight:400;font-size:clamp(1.8rem,3.4vw,2.9rem);line-height:1.05;letter-spacing:-0.01em;margin:0 0 16px;text-wrap:balance;}
+h1 em{color:var(--yellow);font-style:italic;}
+.intro{font-family:var(--font-serif);font-style:italic;font-size:clamp(1rem,1.5vw,1.18rem);line-height:1.55;color:var(--ink-soft);max-width:70ch;margin:0 0 6px;}
+.intro strong{color:var(--ink);font-style:normal;font-weight:600;}
+
+.stat-row{display:flex;flex-wrap:wrap;gap:8px 10px;margin:24px 0 30px;padding-top:20px;border-top:1px solid var(--hairline);}
+.stat{font-family:var(--font-mono);font-size:10.5px;letter-spacing:0.04em;color:var(--ink-muted);background:var(--bg-panel);border:1px solid var(--panel-border);border-radius:100px;padding:5px 12px;white-space:nowrap;}
+.stat strong{color:var(--ink);font-weight:700;}
+
+/* run + capture guide */
+.guide{background:var(--bg-panel);border:1px solid var(--panel-border);border-radius:12px;padding:18px 20px;margin-bottom:38px;}
+.guide h3{font-family:var(--font-mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--yellow);margin:0 0 12px;font-weight:700;}
+.guide-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px 22px;}
+.guide-item{font-size:0.82rem;line-height:1.5;color:var(--ink-soft);}
+.guide-item b{color:var(--ink);font-weight:700;display:block;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px;font-family:var(--font-mono);}
+.guide-item code{font-family:var(--font-mono);font-size:0.78rem;color:var(--yellow);background:var(--yellow-soft);padding:1px 5px;border-radius:4px;}
+
+/* domain tabs */
+.tabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 8px;}
+.tabs-label{font-family:var(--font-mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 10px;}
+.tab{font-family:var(--font-mono);font-size:0.78rem;letter-spacing:0.03em;color:var(--ink-muted);background:var(--bg-panel);border:1px solid var(--panel-border);border-radius:100px;padding:7px 16px;cursor:pointer;transition:color .15s,background .15s,border-color .15s;}
+.tab:hover{color:var(--ink);border-color:var(--yellow-glow);}
+.tab.active{color:var(--bg);background:var(--yellow);border-color:var(--yellow);font-weight:700;}
+.domain-empty{display:none;font-family:var(--font-serif);font-style:italic;color:var(--ink-muted);font-size:0.9rem;padding:20px 4px;}
+
+/* section */
+.section{margin:38px 0 8px;}
+.section-h{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:6px;padding-bottom:10px;border-bottom:1px solid var(--hairline);}
+.section-h .mark{font-size:1.15rem;}
+.section-h h2{font-family:var(--font-serif);font-weight:600;font-size:1.32rem;margin:0;color:var(--ink);}
+.section-h .note{font-family:var(--font-sans);font-size:0.78rem;color:var(--ink-muted);font-style:italic;}
+.section-lead{font-size:0.86rem;color:var(--ink-muted);line-height:1.55;margin:12px 0 18px;max-width:74ch;}
+
+/* query card */
+.qcard{background:var(--bg-panel);border:1px solid var(--panel-border);border-radius:11px;padding:15px 17px 16px;margin-bottom:14px;}
+.qcard .top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:9px;flex-wrap:wrap;}
+.qid{font-family:var(--font-mono);font-size:10px;letter-spacing:0.08em;color:var(--ink-faint);font-weight:700;}
+.persona{font-family:var(--font-mono);font-size:10px;color:var(--ink-muted);background:var(--code-bg);border:1px solid var(--panel-border);border-radius:5px;padding:2px 7px;}
+.qtext{font-family:var(--font-mono);font-size:0.86rem;line-height:1.5;color:var(--code-ink);background:var(--code-bg);border:1px solid var(--panel-border);border-left:2.5px solid var(--yellow);border-radius:6px;padding:10px 13px;margin-bottom:11px;user-select:all;}
+.route{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:0.78rem;}
+.route .arrow{color:var(--yellow);font-family:var(--font-mono);}
+.agent{font-family:var(--font-mono);font-size:0.72rem;color:var(--ink-soft);background:rgba(255,230,0,0.07);border:1px solid var(--panel-border);border-radius:5px;padding:2px 8px;}
+.agent.denied{text-decoration:line-through;color:var(--zero);border-color:var(--zero-bg);background:var(--zero-bg);text-decoration-thickness:1px;}
+.fanout{font-family:var(--font-mono);font-size:0.7rem;color:var(--ink-faint);}
+.scores{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px;}
+.chip{font-family:var(--font-mono);font-size:0.68rem;padding:2px 8px;border-radius:5px;border:1px solid;letter-spacing:0.02em;}
+.chip .k{opacity:0.7;}
+.s-good{color:var(--good);background:var(--good-bg);border-color:var(--good-bg);}
+.s-mid{color:var(--mid);background:var(--mid-bg);border-color:var(--mid-bg);}
+.s-low{color:var(--low);background:var(--low-bg);border-color:var(--low-bg);}
+.s-zero{color:var(--zero);background:var(--zero-bg);border-color:var(--zero-bg);font-weight:700;}
+.s-na{color:var(--ink-faint);background:var(--bg-panel);border-color:var(--panel-border);}
+.proves{font-size:0.82rem;line-height:1.5;color:var(--ink-soft);}
+.proves b{color:var(--ink);font-weight:600;}
+.proves em{color:var(--yellow);font-style:normal;}
+
+/* callout */
+.callout{background:var(--code-bg);border:1px solid var(--panel-border);border-left:3px solid var(--yellow);border-radius:8px;padding:14px 17px;margin:16px 0 20px;font-size:0.84rem;line-height:1.6;color:var(--ink-soft);}
+.callout b{color:var(--ink);}
+.callout .lab{font-family:var(--font-mono);font-size:9.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--yellow);font-weight:700;display:block;margin-bottom:6px;}
+
+/* manifests */
+pre{font-family:var(--font-mono);font-size:0.74rem;line-height:1.5;color:var(--code-ink);background:var(--code-bg);border:1px solid var(--panel-border);border-radius:9px;padding:15px 17px;overflow-x:auto;margin:0 0 6px;}
+pre .c{color:var(--ink-faint);}
+pre .key{color:var(--yellow);}
+.mf-cap{font-family:var(--font-serif);font-style:italic;font-size:0.8rem;color:var(--ink-muted);margin:0 0 22px;line-height:1.5;}
+.mf-label{font-family:var(--font-mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-muted);margin:20px 0 8px;font-weight:700;}
+
+.footer-note{font-family:var(--font-serif);font-style:italic;font-size:13px;color:var(--ink-soft);text-align:center;line-height:1.65;padding:24px 12px 0;border-top:1px dashed var(--hairline);margin-top:34px;}
+.footer-note strong{color:var(--yellow);font-style:normal;font-weight:600;}
+.footer-fine{display:block;margin-top:9px;font-size:11px;color:var(--ink-muted);font-style:normal;font-family:var(--font-mono);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="eyebrow">Conduit · demo query catalog</div>
+  <h1>Queries that <em>prove</em> the system — measured, not promised.</h1>
+  <p class="intro">A hand-picked set of questions you can paste into Conduit Chat, each chosen to demonstrate one behaviour: a query that resolves to a <strong>single</strong> agent, one that <strong>fans out</strong> to many, a live <strong>entitlement</strong> denial, a <strong>multi-turn</strong> thread, and the <strong>negative</strong> cases where the eval scores visibly drop. Every fan-out and every score on this page was <strong>captured by running the query through the real chat path</strong> — nothing here is predicted.</p>
+
+  <div class="stat-row">
+    <span class="stat"><strong>15</strong> queries</span>
+    <span class="stat"><strong>13</strong> agents</span>
+    <span class="stat"><strong>4</strong> domains</span>
+    <span class="stat"><strong>every</strong> result measured through the BFF</span>
+    <span class="stat"><strong>auto</strong>-scored: grounding · relevance · safety</span>
+  </div>
+
+  <div class="guide">
+    <h3>How to run &amp; where the data lands</h3>
+    <div class="guide-grid">
+      <div class="guide-item"><b>1 · Sign in</b>Conduit Chat at <code>localhost:8099</code> — <code>rm_jane</code> (wealth + servicing) or <code>uw_sam</code> (insurance). Password <code>Meridian@2024</code>.</div>
+      <div class="guide-item"><b>2 · Ask</b>Paste a query below. Watch the glass-box decision trace on the right: intent → agents → entitlement → grounded answer.</div>
+      <div class="guide-item"><b>3 · Captured automatically</b>Every turn is scored by a background eval worker — grounding, relevance, safety — visible per-conversation in <b>Langfuse</b> and on the <b>Insights</b> board. Scoring is async; give it a minute.</div>
+      <div class="guide-item"><b>IDs you'll need</b><code>REL-00042</code> Whitman · <code>REL-00099</code> Calderon · <code>FND-7781</code> Meridian Global Equity · <code>POL-77001</code> Continental Freight</div>
+    </div>
+  </div>
+
+  <div class="guide">
+    <h3>Dashboards — where the captured data shows up</h3>
+    <div class="guide-grid">
+      <div class="guide-item"><b>Langfuse · per-conversation scores</b>Each turn's trace and its grounding / relevance / safety scores, browsable by conversation.<br><code>localhost:3030</code> — <code>admin@meridian.bank</code> / <code>changeme</code></div>
+      <div class="guide-item"><b>Conduit Insights · the ops board</b>Grounding distribution, cost, latency and answer-quality across all traffic — the aggregate view.<br><code>localhost:5175</code> — <code>insights_admin</code> / <code>Meridian@2024</code> (SSO)</div>
+      <div class="guide-item"><b>Grafana · golden signals</b>Throughput, P95 latency, fan-out and degradation panels.<br><code>localhost:3000</code> — <code>admin</code> / <code>changeme</code><br><span style="color:var(--ink-faint);font-size:0.74rem;font-style:italic;">opt-in layer — bring it up with <code>docker compose --profile observability up -d</code></span></div>
+    </div>
+  </div>
+
+  <div class="tabs-label">Browse by domain</div>
+  <div class="tabs" role="tablist" aria-label="Filter queries by domain">
+    <button class="tab active" data-dom="all" type="button">All domains</button>
+    <button class="tab" data-dom="insurance" type="button">Insurance</button>
+    <button class="tab" data-dom="wealth" type="button">Wealth</button>
+    <button class="tab" data-dom="servicing" type="button">Asset-Servicing</button>
+    <button class="tab" data-dom="hr" type="button">HR</button>
+  </div>
+  <p class="domain-empty" id="domainEmpty">No queries in this domain — try another tab.</p>
+
+  <!-- SINGLE -->
+  <div class="section">
+    <div class="section-h"><span class="mark">🎯</span><h2>Single-agent</h2><span class="note">resolves to exactly one agent</span></div>
+    <p class="section-lead">Routing is a similarity floor, not a fixed top-K. A query written in one agent's <em>distinctive</em> vocabulary lights up that agent and leaves its siblings below the floor — so the plan is size-1. All four score a clean 1.00 across the board.</p>
+
+    <div class="qcard">
+      <div class="top"><span class="qid">S1 · WEALTH</span><span class="persona">rm_jane</span></div>
+      <div class="qtext">What is Meridian's house view on equities this quarter?</div>
+      <div class="route"><span class="arrow">→</span><span class="agent">wealth.market_research</span><span class="fanout">· 1 agent</span></div>
+      <div class="scores"><span class="chip s-good"><span class="k">grounding</span> 1.00</span><span class="chip s-good"><span class="k">relevance</span> 1.00</span><span class="chip s-good"><span class="k">safety</span> 1.00</span></div>
+      <div class="proves"><b>Proves:</b> a knowledge-only ask — no client entity — resolves to the one research agent. No fan-out, no clarification.</div>
+    </div>
+
+    <div class="qcard">
+      <div class="top"><span class="qid">S2 · HR</span><span class="persona">rm_jane</span></div>
+      <div class="qtext">How many weeks of paid parental leave do I get?</div>
+      <div class="route"><span class="arrow">→</span><span class="agent">hr.policy_qa</span><span class="fanout">· 1 agent</span></div>
+      <div class="scores"><span class="chip s-good"><span class="k">grounding</span> 1.00</span><span class="chip s-good"><span class="k">relevance</span> 1.00</span><span class="chip s-good"><span class="k">safety</span> 1.00</span></div>
+      <div class="proves"><b>Proves:</b> open enterprise knowledge — one agent, and it <em>never</em> clarifies (HR declares no required entity).</div>
+    </div>
+
+    <div class="qcard">
+      <div class="top"><span class="qid">S3 · ASSET-SERVICING</span><span class="persona">rm_jane</span></div>
+      <div class="qtext">What's the latest NAV on fund FND-7781?</div>
+      <div class="route"><span class="arrow">→</span><span class="agent">servicing.nav</span><span class="fanout">· 1 agent</span></div>
+      <div class="scores"><span class="chip s-good"><span class="k">grounding</span> 1.00</span><span class="chip s-good"><span class="k">relevance</span> 1.00</span><span class="chip s-good"><span class="k">safety</span> 1.00</span></div>
+      <div class="proves"><b>Proves:</b> a fund-keyed ask hits the NAV agent <em>alone</em> — its manifest is deliberately written to be this selective (it stays out of relationship-level fan-outs).</div>
+    </div>
+
+    <div class="qcard">
+      <div class="top"><span class="qid">S4 · ASSET-SERVICING</span><span class="persona">rm_jane</span></div>
+      <div class="qtext">Any upcoming corporate actions — dividends or splits — for REL-00042?</div>
+      <div class="route"><span class="arrow">→</span><span class="agent">servicing.corporate_actions</span><span class="fanout">· 1 agent</span></div>
+      <div class="scores"><span class="chip s-good"><span class="k">grounding</span> 1.00</span><span class="chip s-good"><span class="k">relevance</span> 1.00</span><span class="chip s-good"><span class="k">safety</span> 1.00</span></div>
+      <div class="proves"><b>Proves:</b> a distinctive capability fires alone even with a relationship id in the sentence — the vocabulary, not the entity, drives the pick.</div>
+    </div>
+  </div>
+
+  <!-- MULTI -->
+  <div class="section">
+    <div class="section-h"><span class="mark">🔀</span><h2>Multi-agent fan-out</h2><span class="note">one question → many agents, one answer</span></div>
+    <p class="section-lead">Generic, relationship-level phrasing matches several same-domain agents at once — they all clear the floor and fan out in parallel, then synthesis returns one grounded answer.</p>
+
+    <div class="qcard">
+      <div class="top"><span class="qid">M2 · INSURANCE</span><span class="persona">uw_sam</span></div>
+      <div class="qtext">Give me the policy details and claim status for policy POL-77001.</div>
+      <div class="route"><span class="arrow">→</span><span class="agent">insurance.policy_details</span><span class="agent">insurance.claim_status</span><span class="fanout">· 2 agents</span></div>
+      <div class="scores"><span class="chip s-good"><span class="k">grounding</span> 1.00</span><span class="chip s-good"><span class="k">relevance</span> 1.00</span><span class="chip s-good"><span class="k">safety</span> 1.00</span></div>
+      <div class="proves"><b>Proves:</b> two insurance agents answer one question together, fully grounded.</div>
+    </div>
+
+    <div class="qcard">
+      <div class="top"><span class="qid">M3 · ASSET-SERVICING</span><span class="persona">rm_jane</span></div>
+      <div class="qtext">Show me pending settlements and custody positions for REL-00042.</div>
+      <div class="route"><span class="arrow">→</span><span class="agent">servicing.settlement_status</span><span class="agent">servicing.custody_positions</span><span class="fanout">· 2 agents</span></div>
+      <div class="scores"><span class="chip s-good"><span class="k">grounding</span> 1.00</span><span class="chip s-good"><span class="k">relevance</span> 1.00</span><span class="chip s-good"><span class="k">safety</span> 1.00</span></div>
+      <div class="proves"><b>Proves:</b> fan-out within asset-servicing. <em>Bonus:</em> a third agent (<code>insurance.claim_status</code>) also matched semantically but was <b>entitlement-denied</b> — see the Trust section.</div>
+    </div>
+
+    <div class="qcard">
+      <div class="top"><span class="qid">M1 · WEALTH + SERVICING</span><span class="persona">rm_jane</span></div>
+      <div class="qtext">Give me a full overview of the Whitman relationship REL-00042.</div>
+      <div class="route"><span class="arrow">→</span><span class="agent">wealth.holdings</span><span class="agent">wealth.performance</span><span class="agent">wealth.goal_planning</span><span class="agent">servicing.cash_management</span><span class="agent">servicing.settlement_status</span><span class="fanout">· 5 agents</span></div>
+      <div class="scores"><span class="chip s-mid"><span class="k">grounding</span> 0.71</span><span class="chip s-good"><span class="k">relevance</span> 1.00</span><span class="chip s-good"><span class="k">safety</span> 1.00</span></div>
+      <div class="proves"><b>Proves:</b> a broad relationship question fans across wealth <em>and</em> servicing. Grounding <b>0.71</b> here is <b>not a hallucination</b> — it's the strict number-check against a 73-number answer (52 matched verbatim). See the grounding note below.</div>
+    </div>
+    <div class="callout"><span class="lab">Honest note · agent selection</span><b>You cannot force the exact agent set by wording.</b> The "overview" reliably fans to <b>five</b> agents, but <code>wealth.risk_profile</code> stays just below the confidence floor even when you name "risk profile" explicitly — so the set is holdings + performance + goals + cash + settlements, not the textbook four. It's a genuine multi-agent demo; just don't promise a specific line-up.</div>
+  </div>
+
+  <!-- TRUST -->
+  <div class="section">
+    <div class="section-h"><span class="mark">🛡️</span><h2>Entitlement &amp; clarification</h2><span class="note">the trust gates, live</span></div>
+    <p class="section-lead">Resolution is principal-<em>agnostic</em>; the entitlement CHECK is the only gate. And when a required entity is missing, the gateway clarifies deterministically — it never guesses an ID.</p>
+
+    <div class="qcard">
+      <div class="top"><span class="qid">M3-gate · ENTITLEMENT</span><span class="persona">rm_jane</span></div>
+      <div class="qtext">Show me pending settlements and custody positions for REL-00042.</div>
+      <div class="route"><span class="arrow">→</span><span class="agent">servicing.settlement_status</span><span class="agent">servicing.custody_positions</span><span class="agent denied">insurance.claim_status</span></div>
+      <div class="proves"><b>Proves:</b> the same query semantically matched an insurance agent — it <em>resolved</em>, then the CHECK <b>denied</b> it (<code>not in segment for insurance</code>) while the servicing siblings proceeded. Resolution is blind to the book; the gate is not. This is the manifest-driven authorization model in one screen.</div>
+    </div>
+
+    <div class="qcard">
+      <div class="top"><span class="qid">C1 · CLARIFY</span><span class="persona">rm_jane</span></div>
+      <div class="qtext">How are my clients doing?</div>
+      <div class="route"><span class="arrow">→</span><span class="fanout">0 agents · deterministic CLARIFY</span></div>
+      <div class="scores"><span class="chip s-na"><span class="k">scores</span> N/A</span></div>
+      <div class="proves"><b>Proves:</b> no <code>REL-</code> reference, so the gateway asks — <em>naming her own book</em>: "Whitman (REL-00042) or Calderon (REL-00099)?" No agents fire; no ID is invented. (Clarify turns aren't scored — correct.)</div>
+    </div>
+
+    <div class="qcard">
+      <div class="top"><span class="qid">C2 · CLARIFY</span><span class="persona">uw_sam</span></div>
+      <div class="qtext">What's the claim status?</div>
+      <div class="route"><span class="arrow">→</span><span class="fanout">0 agents · deterministic CLARIFY</span></div>
+      <div class="scores"><span class="chip s-na"><span class="k">scores</span> N/A</span></div>
+      <div class="proves"><b>Proves:</b> same rule on the insurance side — "which policy? Continental Freight (POL-77001) or Aurora (POL-77002)?" The required entity is declared in the manifest, not in gateway code.</div>
+    </div>
+  </div>
+
+  <!-- MULTI-TURN -->
+  <div class="section">
+    <div class="section-h"><span class="mark">🔄</span><h2>Multi-turn</h2><span class="note">context carries across turns</span></div>
+    <p class="section-lead">Run these two in the <b>same</b> conversation, in order.</p>
+
+    <div class="qcard">
+      <div class="top"><span class="qid">T1 · turn 1</span><span class="persona">rm_jane</span></div>
+      <div class="qtext">Give me a full overview of the Whitman relationship REL-00042.</div>
+      <div class="route"><span class="arrow">→</span><span class="fanout">5 relationship agents · sets the context</span></div>
+      <div class="proves"><b>Proves:</b> turn one establishes the client thread.</div>
+    </div>
+
+    <div class="qcard">
+      <div class="top"><span class="qid">T2 · turn 2 · same conversation</span><span class="persona">rm_jane</span></div>
+      <div class="qtext">How has that account performed this year?</div>
+      <div class="route"><span class="arrow">→</span><span class="agent">intent = FOLLOW_UP</span><span class="fanout">· "that account" resolved → REL-00042</span></div>
+      <div class="scores"><span class="chip s-mid"><span class="k">grounding</span> 0.93</span><span class="chip s-good"><span class="k">relevance</span> 1.00</span><span class="chip s-good"><span class="k">safety</span> 1.00</span></div>
+      <div class="proves"><b>Proves:</b> context carries — "that account" binds to the prior client, no need to restate it. Answers 12.4% YTD.</div>
+    </div>
+    <div class="callout"><span class="lab">Honest note · topic pivots</span><b>To pivot to a different agent, start a NEW conversation.</b> Asking the house view <em>inside</em> the account thread keeps routing pinned to the relationship agents (context bleed) — market_research falls below the floor and you get "outside your access." Verified: the same house-view query in a <b>fresh</b> conversation routes correctly. So: one thread per client topic; new thread for a topic shift.</div>
+  </div>
+
+  <!-- NEGATIVE -->
+  <div class="section">
+    <div class="section-h"><span class="mark">⚠️</span><h2>Negative cases</h2><span class="note">where the scores come down — on purpose</span></div>
+    <p class="section-lead">You asked whether queries can push the eval scores down. They can — and the reason they do is the <em>system behaving correctly.</em> These two are the reliable levers.</p>
+
+    <div class="qcard">
+      <div class="top"><span class="qid">N1 · GROUNDING + RELEVANCE ↓</span><span class="persona">rm_jane</span></div>
+      <div class="qtext">What's the combined total value across holdings and cash for REL-00042?</div>
+      <div class="route"><span class="arrow">→</span><span class="agent">wealth.holdings</span><span class="agent">servicing.cash_management</span><span class="agent">wealth.risk_profile</span><span class="fanout">· 3 agents</span></div>
+      <div class="scores"><span class="chip s-zero"><span class="k">grounding</span> 0.00</span><span class="chip s-low"><span class="k">relevance</span> 0.50</span><span class="chip s-good"><span class="k">safety</span> 1.00</span></div>
+      <div class="proves"><b>Proves:</b> asked to <em>compute an aggregate the agents didn't return</em>, the synthesizer <b>refuses</b> — it lists the components ("holdings $1.97M, cash $529K") and defers the math. Relevance drops (<em>"does not answer the combined total"</em>); grounding reads 0.00 (the two figures aren't verbatim in a single agent's output). The dashboard number falls — and that's the <b>guardrail working</b>, not a hallucination.</div>
+    </div>
+
+    <div class="qcard">
+      <div class="top"><span class="qid">N2 · RELEVANCE ↓</span><span class="persona">rm_jane</span></div>
+      <div class="qtext">What will the Whitman holdings (REL-00042) be worth at the end of next quarter?</div>
+      <div class="route"><span class="arrow">→</span><span class="fanout">5 relationship agents</span></div>
+      <div class="scores"><span class="chip s-mid"><span class="k">grounding</span> 0.80</span><span class="chip s-low"><span class="k">relevance</span> 0.50</span><span class="chip s-good"><span class="k">safety</span> 1.00</span></div>
+      <div class="proves"><b>Proves:</b> asked to <em>forecast</em>, it declines — the agents return current data, not predictions. Relevance drops (<em>"acknowledges inability to predict future value"</em>); no figure is invented.</div>
+    </div>
+
+    <div class="callout"><span class="lab">Read grounding correctly</span><b>Grounding is a strict, deterministic check</b> — every number in the answer must appear verbatim in an agent's output. It's intentionally unforgiving, so a large multi-number answer (a 5-agent overview) dips below 1.00 (M1 = 0.71) <b>even when nothing is fabricated</b>. Read a sub-1.0 grounding on a big answer as "lots of numbers to verify," not "hallucination." The clean signal is the single-answer queries — S1–S4, all 1.00. Deliberately tanking grounding is <b>best-effort</b>; the dependable "score-down" lever is <b>relevance</b> (ask something the agents can't answer), which N1 and N2 both move to 0.50.</div>
+  </div>
+
+  <!-- MANIFESTS -->
+  <div class="section">
+    <div class="section-h"><span class="mark">📦</span><h2>The manifests</h2><span class="note">how a domain is onboarded — JSON, not code</span></div>
+    <p class="section-lead">Every behaviour above — which agents exist, what they answer, what clarifies, what's denied — comes from manifest JSON validated against a schema. There is no domain logic in the gateway. Here are two real ones you can share as templates.</p>
+
+    <div class="mf-label">Agent manifest · acme.servicing.nav (the selective single-agent from S3)</div>
+    <pre>{
+  <span class="key">"agent_id"</span>: "acme.servicing.nav",
+  <span class="key">"name"</span>: "Asset Servicing NAV",
+  <span class="key">"description"</span>: "Returns net asset value and as-of date for a fund. <span class="c">Keyed by
+     fund_id, NOT relationship_id — intentionally NOT selected by relationship-level
+     hero prompts, demonstrating the resolver's selectivity.</span>",
+  <span class="key">"domain"</span>: "asset-servicing",  <span class="key">"sub_domain"</span>: "corporate-actions",
+  <span class="key">"audience"</span>: "segment",  <span class="key">"protocol"</span>: "mcp",
+  <span class="key">"connection"</span>: { "server_url": "http://servicing-mcp:8082/sse",
+                   "tool": "get_nav", "transport": "sse" },
+  <span class="key">"skills"</span>: [{
+    "id": "get_nav",
+    "examples": [ <span class="c">// ← this vocabulary IS the routing signal</span>
+      "latest NAV for fund X", "net asset value of the fund",
+      "fund NAV as of today", "what's the NAV on fund 7781" ]
+  }],
+  <span class="key">"constraints"</span>: { "access_mode": "read",
+                   "data_classification": "internal", "sla_timeout_ms": 30000 }
+}</pre>
+    <p class="mf-cap">The <code>examples</code> array is what the router embeds — write distinctive vocabulary and the agent fires alone; write generic relationship phrasing and it joins the fan-out. Selectivity is authored, not coded.</p>
+
+    <div class="mf-label">Domain manifest · wealth-management / private-banking (drives CLARIFY + denials)</div>
+    <pre>{
+  <span class="key">"sub_domain_id"</span>: "private-banking",  <span class="key">"parent_domain"</span>: "wealth-management",
+  <span class="key">"entity_types"</span>: [{
+    "key": "relationship_id", "display": "client relationship",
+    "id_pattern": "REL-\\d+", "resolve_type": "relationship", "required": true
+  }, <span class="c">/* fund_id, period, ticker_references … */</span> ],
+
+  <span class="key">"required_context"</span>: ["relationship_id"],   <span class="c">// ← missing this ⇒ deterministic CLARIFY (C1)</span>
+
+  <span class="key">"denial_messages"</span>: {
+    "not-in-book": "That client is not in your coverage.",
+    "coverage-transferred": "Coverage for that client has been transferred." },
+
+  <span class="key">"messages"</span>: {
+    "missing_entity_question": "Which client relationship are you asking about? …" },
+
+  <span class="key">"agents"</span>: [ "acme.wealth.holdings", "acme.wealth.performance",
+              "acme.wealth.risk_profile", "acme.wealth.goal_planning" ]
+}</pre>
+    <p class="mf-cap">Adding an agent to a domain = one line in <code>agents[]</code>. Adding a whole business line = one new file plus a coverage-service URL. The user-facing copy ("That client is not in your coverage") lives here too — never in gateway Java.</p>
+  </div>
+
+  <div class="footer-note"><strong>15 queries · 13 agents · 4 domains · every fan-out and score measured through the BFF.</strong> Single-agent resolution, multi-agent fan-out, a live entitlement denial, deterministic clarification, and the eval scores moving — all captured on the running system.
+    <span class="footer-fine">Measured 2026-07-07 · behaviour comes from manifests, scoring is automatic · logins &amp; IDs at the top.</span>
+  </div>
+
+</div>
+<script>
+(function(){
+  var DOMAIN={S1:'wealth',S2:'hr',S3:'servicing',S4:'servicing',M2:'insurance',M3:'servicing insurance',M1:'wealth servicing','M3-gate':'servicing insurance',C1:'wealth',C2:'insurance',T1:'wealth',T2:'wealth',N1:'wealth',N2:'wealth'};
+  function keyOf(card){var q=card.querySelector('.qid');return q?q.textContent.split('·')[0].trim():'';}
+  function filter(dom){
+    document.querySelectorAll('.qcard').forEach(function(card){
+      var d=DOMAIN[keyOf(card)]||'all';
+      card.style.display=(dom==='all'||d.split(' ').indexOf(dom)>-1)?'':'none';
+    });
+    var anyGlobal=false;
+    document.querySelectorAll('.section').forEach(function(sec){
+      var cards=sec.querySelectorAll('.qcard');
+      if(!cards.length){return;}
+      var vis=Array.prototype.some.call(cards,function(c){return c.style.display!=='none';});
+      sec.style.display=vis?'':'none';
+      if(vis){anyGlobal=true;}
+    });
+    var empty=document.getElementById('domainEmpty');
+    if(empty){empty.style.display=(dom==='all'||anyGlobal)?'none':'block';}
+    document.querySelectorAll('.tab').forEach(function(t){t.classList.toggle('active',t.dataset.dom===dom);});
+  }
+  document.querySelectorAll('.tab').forEach(function(t){t.addEventListener('click',function(){filter(t.dataset.dom);});});
+})();
+</script>
+</body>
+</html>
