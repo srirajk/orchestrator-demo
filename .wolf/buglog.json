@@ -4013,5 +4013,29 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-07-06"
+  },
+  {
+    "id": "bug-242",
+    "timestamp": "2026-07-07T03:05:00.000Z",
+    "error_message": "Continuous eval-worker (conduit-eval-continuous) logged 'No traces found' and produced 0 scores for chat-turn traces; Langfuse trace.output was empty (len 0) for every chat-turn trace though trace.input was populated.",
+    "file": "gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java, gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java",
+    "root_cause": "AnswerSynthesizer set langfuse.trace.output via Span.current().setAttribute(...) inside synthesize()/synthesizeFromHistory(), assuming Span.current() was the root chat.handle span. By synthesis time the active OTel context is not guaranteed to be the root (the agent fan-out can detach it / llm.synthesize orphaned), so the trace-level output never landed on the root span. ChatService sets langfuse.trace.input directly on the rootSpan reference (works), but output was left to Span.current() (didn't). The eval filter requires a non-empty trace output, so all chat-turn traces were skipped \u2192 0 scores.",
+    "fix": "Made synthesize()/synthesizeFromHistory() (all overloads) RETURN the accumulated answer String; removed the unreliable Span.current().setAttribute('langfuse.trace.output',\u2026). ChatService now mirrors the returned answer onto the ROOT chat.handle span via a new setTraceOutput(rootSpan, answer) helper (blank skipped) at every answer path (FETCH synthesize, FETCH\u2192history degrade, follow-up, chitchat); threaded rootSpan into handleChitchat. Verified: fresh rm_jane chat-turn trace now has trace.output len 474; eval iteration scored it grounding/relevance/safety/partial_honesty=1.00; ClickHouse scores count went 0\u21924. world-b CRITICAL 0 before/after.",
+    "tags": [
+      "telemetry",
+      "langfuse",
+      "otel",
+      "trace-output",
+      "eval",
+      "continuous-eval",
+      "span",
+      "synthesis",
+      "world-b"
+    ],
+    "related_bugs": [
+      "bug-237"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-07-07T03:05:00.000Z"
   }
 ]

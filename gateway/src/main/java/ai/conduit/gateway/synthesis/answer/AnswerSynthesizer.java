@@ -140,14 +140,14 @@ public class AnswerSynthesizer {
      *
      * <p>Never throws — errors are logged and the emitter is completed with a fallback.
      */
-    public void synthesize(List<NodeResult> results, String originalPrompt,
+    public String synthesize(List<NodeResult> results, String originalPrompt,
                            List<Message> history, SseEmitter emitter) {
-        synthesize(results, originalPrompt, history, emitter, null, List.of());
+        return synthesize(results, originalPrompt, history, emitter, null, List.of());
     }
 
-    public void synthesize(List<NodeResult> results, String originalPrompt,
+    public String synthesize(List<NodeResult> results, String originalPrompt,
                            List<Message> history, SseEmitter emitter, String completionIdOverride) {
-        synthesize(results, originalPrompt, history, emitter, completionIdOverride, List.of());
+        return synthesize(results, originalPrompt, history, emitter, completionIdOverride, List.of());
     }
 
     /**
@@ -157,10 +157,10 @@ public class AnswerSynthesizer {
      *                        and honestly states what was withheld. Domain labels come from the
      *                        agent manifests — the gateway holds no domain literal (World B).
      */
-    public void synthesize(List<NodeResult> results, String originalPrompt,
+    public String synthesize(List<NodeResult> results, String originalPrompt,
                            List<Message> history, SseEmitter emitter, String completionIdOverride,
                            List<String> withheldDomains) {
-        synthesize(results, originalPrompt, history, emitter, completionIdOverride, withheldDomains, -1L);
+        return synthesize(results, originalPrompt, history, emitter, completionIdOverride, withheldDomains, -1L);
     }
 
     /**
@@ -168,7 +168,7 @@ public class AnswerSynthesizer {
      *                           record request-level TTFT (conduit_time_to_first_token_seconds) at
      *                           the first content delta. Pass {@code -1} to skip the recording.
      */
-    public void synthesize(List<NodeResult> results, String originalPrompt,
+    public String synthesize(List<NodeResult> results, String originalPrompt,
                            List<Message> history, SseEmitter emitter, String completionIdOverride,
                            List<String> withheldDomains, long requestStartMillis) {
         String completionId = completionIdOverride != null
@@ -211,11 +211,6 @@ public class AnswerSynthesizer {
             if (output.length() > 2000) output = output.substring(0, 2000) + "…";
             llmSpan.setAttribute("llm.output_messages.0.message.role", "assistant");
             llmSpan.setAttribute("llm.output_messages.0.message.content", output);
-            // Mirror the synthesized answer to the trace-level output. Without this Langfuse
-            // shows Output: undefined and the continuous relevance judge scores an empty
-            // answer (0.00). Span.current() is the root chat.handle span (made current via
-            // baggageScope in ChatService); llmSpan is never made current.
-            Span.current().setAttribute("langfuse.trace.output", output);
             if (tokenCounts[2] > 0) {
                 llmSpan.setAttribute("llm.token_count.prompt", tokenCounts[0]);
                 llmSpan.setAttribute("llm.token_count.completion", tokenCounts[1]);
@@ -231,6 +226,13 @@ public class AnswerSynthesizer {
 
             // Post-synthesis numeric grounding check (diagnostic only).
             checkNumericGrounding(synthesizedText.toString(), results);
+
+            // Return the synthesized answer so the caller (ChatService) can mirror it onto the
+            // ROOT chat.handle span as langfuse.trace.output. Setting it here on Span.current()
+            // was unreliable — by synthesis time the active span is not guaranteed to be the root
+            // (the fan-out can detach the context), so the trace-level output never landed and the
+            // continuous eval scored an empty answer. The root span carries it deterministically now.
+            return output;
 
         } catch (Exception e) {
             log.error("AnswerSynthesizer failed: {}", e.getMessage(), e);
@@ -251,6 +253,7 @@ public class AnswerSynthesizer {
                     try { emitter.completeWithError(e); } catch (Exception ignored) {}
                 }
             }
+            return "";
         }
     }
 
@@ -329,18 +332,18 @@ public class AnswerSynthesizer {
      *   <li>{@code CHITCHAT} direct answers</li>
      * </ul>
      */
-    public void synthesizeFromHistory(List<Message> history, String latestPrompt,
+    public String synthesizeFromHistory(List<Message> history, String latestPrompt,
                                       SseEmitter emitter) {
-        synthesizeFromHistory(history, latestPrompt, emitter, null);
+        return synthesizeFromHistory(history, latestPrompt, emitter, null);
     }
 
-    public void synthesizeFromHistory(List<Message> history, String latestPrompt,
+    public String synthesizeFromHistory(List<Message> history, String latestPrompt,
                                       SseEmitter emitter, String completionIdOverride) {
-        synthesizeFromHistory(history, latestPrompt, emitter, completionIdOverride, -1L);
+        return synthesizeFromHistory(history, latestPrompt, emitter, completionIdOverride, -1L);
     }
 
     /** @param requestStartMillis see {@link #synthesize}; records request-level TTFT, or -1 to skip. */
-    public void synthesizeFromHistory(List<Message> history, String latestPrompt,
+    public String synthesizeFromHistory(List<Message> history, String latestPrompt,
                                       SseEmitter emitter, String completionIdOverride,
                                       long requestStartMillis) {
         String completionId = completionIdOverride != null
@@ -386,13 +389,14 @@ public class AnswerSynthesizer {
             StringBuilder synthesizedText = new StringBuilder();
             streamFromLlm(requestBody, emitter, completionId, created, synthesizedText,
                     showReasoning, new long[3], requestStartMillis);
-            // Mirror the answer to trace-level output (see synthesize() for rationale).
+            // Returned to the caller (ChatService) to mirror onto the ROOT chat.handle span as
+            // langfuse.trace.output — see synthesize() for why Span.current() here is unreliable.
             String histOutput = synthesizedText.toString();
             if (histOutput.length() > 2000) histOutput = histOutput.substring(0, 2000) + "…";
-            Span.current().setAttribute("langfuse.trace.output", histOutput);
             emitter.send(SseEmitter.event().data(stopDelta(completionId, created, mapper)));
             emitter.send(SseEmitter.event().data(" [DONE]"));
             emitter.complete();
+            return histOutput;
 
         } catch (Exception e) {
             log.error("synthesizeFromHistory failed: {}", e.getMessage(), e);
@@ -407,6 +411,7 @@ public class AnswerSynthesizer {
             } catch (Exception inner) {
                 try { emitter.completeWithError(e); } catch (Exception ignored) {}
             }
+            return "";
         }
     }
 
