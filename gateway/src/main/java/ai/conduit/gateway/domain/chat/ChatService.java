@@ -271,7 +271,7 @@ public class ChatService {
                 case CLARIFY    -> handleFetchData(request, emitter, latestPrompt,
                         conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan,
                         intentResult.extractedEntities(), streamId, false);
-                case CHITCHAT   -> handleChitchat(request, emitter, conversationId, requestId, requestStart, streamId);
+                case CHITCHAT   -> handleChitchat(request, emitter, conversationId, requestId, requestStart, streamId, rootSpan);
             }
 
         } catch (Exception e) {
@@ -392,7 +392,8 @@ public class ChatService {
                 // false) keep the deterministic clarification so a bare under-specified ask still
                 // clarifies (bug-232 behaviour preserved).
                 if (carryContext && hasPriorAssistantData(request)) {
-                    answerSynthesizer.synthesizeFromHistory(request.messages(), latestPrompt, emitter, streamId, requestStart);
+                    String answer = answerSynthesizer.synthesizeFromHistory(request.messages(), latestPrompt, emitter, streamId, requestStart);
+                    setTraceOutput(rootSpan, answer);
                     emitRequestOutcome("ANSWERED");
                     tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                             new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
@@ -776,7 +777,8 @@ public class ChatService {
                 emitRequestPartial();
             }
 
-            answerSynthesizer.synthesize(results, latestPrompt, request.messages(), emitter, streamId, withheldDomains, requestStart);
+            String answer = answerSynthesizer.synthesize(results, latestPrompt, request.messages(), emitter, streamId, withheldDomains, requestStart);
+            setTraceOutput(rootSpan, answer);
             emitRequestOutcome("ANSWERED");
 
             tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
@@ -811,7 +813,8 @@ public class ChatService {
         }
         Span span = tracer.spanBuilder("chat.follow_up").startSpan();
         try {
-            answerSynthesizer.synthesizeFromHistory(request.messages(), latestPrompt, emitter, streamId, requestStart);
+            String answer = answerSynthesizer.synthesizeFromHistory(request.messages(), latestPrompt, emitter, streamId, requestStart);
+            setTraceOutput(rootSpan, answer);
             emitRequestOutcome("ANSWERED");
             tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                     new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
@@ -819,11 +822,26 @@ public class ChatService {
     }
 
     private void handleChitchat(ChatRequest request, SseEmitter emitter,
-                                 String conversationId, String requestId, long requestStart, String streamId) throws Exception {
-        answerSynthesizer.synthesizeFromHistory(request.messages(), extractLatestUserMessage(request), emitter, streamId, requestStart);
+                                 String conversationId, String requestId, long requestStart, String streamId,
+                                 Span rootSpan) throws Exception {
+        String answer = answerSynthesizer.synthesizeFromHistory(request.messages(), extractLatestUserMessage(request), emitter, streamId, requestStart);
+        setTraceOutput(rootSpan, answer);
         emitRequestOutcome("ANSWERED");
         tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                 new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+    }
+
+    /**
+     * Mirror the final synthesized answer onto the ROOT {@code chat.handle} span as
+     * {@code langfuse.trace.output}. Langfuse's OTLP ingestion reads the trace-level output from
+     * this attribute on the root span; without it the continuous eval judges score an empty answer
+     * and the Langfuse UI shows a blank response. Domain-agnostic — the value is the opaque answer
+     * text (World B). Blank output (LLM error path) is skipped so it never overwrites a real answer.
+     */
+    private void setTraceOutput(Span rootSpan, String answer) {
+        if (rootSpan != null && answer != null && !answer.isBlank()) {
+            rootSpan.setAttribute("langfuse.trace.output", answer);
+        }
     }
 
     // ── Coverage helper methods ────────────────────────────────────────────────

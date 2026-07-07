@@ -967,7 +967,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(conduit_agent_calls_total{status!=\"OK\"}[5m]) / rate(conduit_agent_calls_total[5m]) * 100",
+          "expr": "100 * (sum by (agentId) (rate(conduit_agent_calls_total{status!=\"OK\"}[$__range])) or (sum by (agentId) (rate(conduit_agent_calls_total[$__range])) * 0)) / clamp_min(sum by (agentId) (rate(conduit_agent_calls_total[$__range])), 1e-9)",
           "format": "table",
           "instant": true,
           "legendFormat": "",
@@ -978,7 +978,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, rate(conduit_agent_latency_seconds_bucket[5m])) * 1000",
+          "expr": "histogram_quantile(0.95, sum by (agentId, le) (rate(conduit_agent_latency_seconds_bucket[$__range]))) * 1000",
           "format": "table",
           "instant": true,
           "legendFormat": "",
@@ -1233,7 +1233,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(conduit_request_outcome_total{outcome=\"ANSWERED\"}[1h])) / (sum(rate(conduit_request_outcome_total{outcome=\"ANSWERED\"}[1h])) + sum(rate(conduit_request_outcome_total{outcome=\"FAILED\"}[1h])) + sum(rate(conduit_request_outcome_total{outcome=\"ERROR\"}[1h]))) * 100",
+          "expr": "100 * sum(increase(conduit_request_outcome_total{outcome=\"ANSWERED\"}[$__range])) / sum(increase(conduit_request_outcome_total{outcome=~\"ANSWERED|FAILED\"}[$__range]))",
           "legendFormat": "success rate"
         }
       ]

@@ -4013,5 +4013,76 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-07-06"
+  },
+  {
+    "id": "bug-242",
+    "timestamp": "2026-07-07T03:05:00.000Z",
+    "error_message": "Continuous eval-worker (conduit-eval-continuous) logged 'No traces found' and produced 0 scores for chat-turn traces; Langfuse trace.output was empty (len 0) for every chat-turn trace though trace.input was populated.",
+    "file": "gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java, gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java",
+    "root_cause": "AnswerSynthesizer set langfuse.trace.output via Span.current().setAttribute(...) inside synthesize()/synthesizeFromHistory(), assuming Span.current() was the root chat.handle span. By synthesis time the active OTel context is not guaranteed to be the root (the agent fan-out can detach it / llm.synthesize orphaned), so the trace-level output never landed on the root span. ChatService sets langfuse.trace.input directly on the rootSpan reference (works), but output was left to Span.current() (didn't). The eval filter requires a non-empty trace output, so all chat-turn traces were skipped \u2192 0 scores.",
+    "fix": "Made synthesize()/synthesizeFromHistory() (all overloads) RETURN the accumulated answer String; removed the unreliable Span.current().setAttribute('langfuse.trace.output',\u2026). ChatService now mirrors the returned answer onto the ROOT chat.handle span via a new setTraceOutput(rootSpan, answer) helper (blank skipped) at every answer path (FETCH synthesize, FETCH\u2192history degrade, follow-up, chitchat); threaded rootSpan into handleChitchat. Verified: fresh rm_jane chat-turn trace now has trace.output len 474; eval iteration scored it grounding/relevance/safety/partial_honesty=1.00; ClickHouse scores count went 0\u21924. world-b CRITICAL 0 before/after.",
+    "tags": [
+      "telemetry",
+      "langfuse",
+      "otel",
+      "trace-output",
+      "eval",
+      "continuous-eval",
+      "span",
+      "synthesis",
+      "world-b"
+    ],
+    "related_bugs": [
+      "bug-237"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-07-07T03:05:00.000Z"
+  },
+  {
+    "id": "bug-243",
+    "timestamp": "2026-07-07T04:10:00.000Z",
+    "error_message": "Three Conduit Insights panels showed hardcoded 'not available yet' EmptyState (Grounding distribution, Grounding by model, Memory compaction) despite the backing data existing.",
+    "file": "gateway/src/main/java/ai/conduit/gateway/insights/BoardCatalog.java",
+    "root_cause": "The panels were never added to BoardCatalog board 7 and the UI had hardcoded EmptyState blocks instead of chart components bound to panel data. Grounding-by-model also needed a score->model join because Langfuse writes the grounding score at trace level (observationId null), so the model must be looked up from the trace's GENERATION observation.",
+    "fix": "Added grounding_distribution (scores->10-bin histogram), grounding_by_model (LangfuseMetricsSource.groundingByModel joins score.traceId to model via modelByTrace over GENERATION observations), and compaction (Prometheus chat_compaction_* counters, no gateway->BFF call) to board 7. UI: replaced the 3 EmptyStates with ScoreHistogram, Bars(unit=score) and CompactionStat, graceful fallback on unavailable. Grounding score name is config (conduit.insights.grounding-score-name). Gotcha: compaction tokensSaved = full-context tokens = 0 and attached% = 0 in current data because no summary has been attached yet (attached=false for all 18) \u2014 that is real telemetry, not a bug; panel renders 0 honestly.",
+    "tags": [
+      "insights",
+      "langfuse",
+      "prometheus",
+      "grounding",
+      "compaction",
+      "world-b",
+      "ui",
+      "react"
+    ],
+    "related_bugs": [
+      "bug-242"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-07-07T04:10:00.000Z"
+  },
+  {
+    "id": "bug-244",
+    "timestamp": "2026-07-07T13:20:00Z",
+    "error_message": "Insights Overview 'P95 LATENCY' KPI reads 0ms; Grafana Business Overview 'Agent Status' table p95 ms and Error % columns show NaN; Grafana Agent Health 'Protocol Latency Comparison \u2014 HTTP vs MCP' panel shows 'No numeric fields found' \u2014 despite latency data existing.",
+    "file": "gateway/src/main/java/ai/conduit/gateway/insights/BoardCatalog.java, infra/grafana/provisioning/dashboards/business-overview.json, infra/grafana/provisioning/dashboards/agent-health.json",
+    "root_cause": "1) Insights fanout_avg_ms panel (feeds the 'p95 latency' KPI) divided by clamp_min(sum(rate(count)),1); with a sub-1/s call rate the denominator was pinned to the floor of 1, collapsing ~4.5s to ~1.6ms (~0ms). The working latency_by_agent query used floor 0.0001. 2) Grafana Agent Status p95 used histogram_quantile(0.95, rate(bucket[5m])) and Error% used rate(...[5m])/rate(...[5m]); the 5m window had no traffic (demo traffic older than 5m) -> empty buckets -> histogram_quantile=NaN and 0/0=NaN. Error% also lacked sum-by-agentId aggregation (status-label mismatch on the division). 3) Protocol Latency barchart used a range query + timeSeriesTable transform, which yields a sparkline 'Trend' field, not a scalar numeric the barchart can plot -> 'No numeric fields found' (the 5m window was empty too).",
+    "fix": "1) Repointed fanout_avg_ms panel to a genuine p95: histogram_quantile(0.95, sum(rate(conduit_agent_latency_seconds_bucket[w])) by (le)) * 1000 (kept panel id for the web contract, title -> 'P95 latency'). Now returns ~8.7s. 2) Grafana p95 (refId D): histogram_quantile(0.95, sum by (agentId, le) (rate(conduit_agent_latency_seconds_bucket[$__range]))) * 1000. Error% (refId C): 100 * (sum by (agentId)(rate(calls{status!=OK}[$__range])) or (sum by (agentId)(rate(calls[$__range]))*0)) / clamp_min(sum by (agentId)(rate(calls[$__range])),1e-9) \u2014 $__range follows the dashboard window, or-zero yields 0.0% instead of blank. 3) Protocol panel: made the query instant+table (range=false) and swapped timeSeriesTable for an organize transform hiding Time, so the barchart gets protocol (category) + numeric Value; renders http 2.40s vs mcp 6.70s.",
+    "tags": [
+      "insights",
+      "grafana",
+      "prometheus",
+      "promql",
+      "histogram_quantile",
+      "p95",
+      "latency",
+      "clamp_min",
+      "NaN",
+      "metrics",
+      "world-b"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-07T13:20:00Z"
   }
 ]

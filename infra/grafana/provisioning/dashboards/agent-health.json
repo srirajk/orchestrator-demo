@@ -672,7 +672,10 @@
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "sum(rate(conduit_agent_latency_seconds_sum{agentId=~\"$agentId\"}[5m])) by (protocol) / clamp_min(sum(rate(conduit_agent_latency_seconds_count{agentId=~\"$agentId\"}[5m])) by (protocol), 0.001) * 1000",
+          "expr": "sum(rate(conduit_agent_latency_seconds_sum{agentId=~\"$agentId\"}[$__range])) by (protocol) / clamp_min(sum(rate(conduit_agent_latency_seconds_count{agentId=~\"$agentId\"}[$__range])) by (protocol), 0.001) * 1000",
+          "format": "table",
+          "instant": true,
+          "range": false,
           "legendFormat": "{{protocol}}",
           "refId": "A"
         }
@@ -680,8 +683,12 @@
       "title": "Protocol Latency Comparison — HTTP vs MCP (avg ms)",
       "transformations": [
         {
-          "id": "timeSeriesTable",
-          "options": {}
+          "id": "organize",
+          "options": {
+            "excludeByName": {"Time": true},
+            "indexByName": {},
+            "renameByName": {"Value": "avg latency (ms)"}
+          }
         }
       ],
       "type": "barchart"

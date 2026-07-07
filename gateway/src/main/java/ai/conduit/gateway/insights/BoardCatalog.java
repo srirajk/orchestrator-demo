@@ -6,6 +6,8 @@ import ai.conduit.gateway.insights.model.Point;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalDouble;
@@ -69,9 +71,15 @@ public class BoardCatalog {
                       + " / clamp_min(sum(increase(conduit_request_outcome_total[" + w + "])),1) * 100"),
                 statDelta(range, "agent_calls_24h", "Agent calls (24h)", "count",
                         "sum(increase(conduit_agent_calls_total[" + w + "]))"),
-                stat("fanout_avg_ms", "Avg fan-out", "ms",
-                        "sum(rate(conduit_fanout_duration_seconds_sum[" + w + "]))"
-                      + " / clamp_min(sum(rate(conduit_fanout_duration_seconds_count[" + w + "])),1) * 1000"),
+                // Pipeline p95 latency. Feeds the Overview "p95 latency" KPI (panel id retained
+                // for the web contract). Computed off the agent-latency histogram so it is a real
+                // p95, not an average: histogram_quantile needs `le` buckets spanning the observed
+                // latencies, which conduit_agent_latency_seconds_bucket provides. The prior query
+                // divided by clamp_min(rate(count),1); with a sub-1/s call rate the denominator was
+                // pinned to the floor, collapsing the value toward 0 ms.
+                stat("fanout_avg_ms", "P95 latency", "ms",
+                        "histogram_quantile(0.95,"
+                      + " sum(rate(conduit_agent_latency_seconds_bucket[" + w + "])) by (le)) * 1000"),
                 area("request_volume", "Request volume", "req/s",
                         "sum(rate(conduit_request_outcome_total[" + RATE_WIN + "]))"),
                 donut("outcome_mix", "Outcome mix", "count",
@@ -200,9 +208,15 @@ public class BoardCatalog {
         );
     }
 
-    // ── Board 7 — Cost & Quality (Langfuse) ──────────────────────────────────────
+    // ── Board 7 — Cost & Quality (Langfuse + compaction telemetry) ───────────────
+    // Score page size for the grounding panels (infrastructure constant, not domain knowledge).
+    private static final int SCORE_PAGE = 100;
+    // Grounding distribution buckets: SCORE_BINS equal bins over the [0,1] score range.
+    private static final int SCORE_BINS = 10;
+
     private List<PanelSpec> boardCostQuality(Range range) {
         int days = range.langfuseDays();
+        String w = range.promWindow();
         return List.of(
                 langfuse("total_cost", "Model cost (30d)", "USD", "stat",
                         s -> asStat("total_cost", "Model cost (30d)", "USD", s.langfuse().totalCost(days))),
@@ -215,8 +229,78 @@ public class BoardCatalog {
                 langfuse("tokens_by_day", "Token usage over time", "count", "area",
                         s -> asSeries("tokens_by_day", "Token usage over time", "area", "count", s.langfuse().tokensByDay(days))),
                 langfuse("eval_scores", "Eval scores", "score", "bars",
-                        s -> asCategorical("eval_scores", "Eval scores", "bars", "score", s.langfuse().evalScores(50)))
+                        s -> asCategorical("eval_scores", "Eval scores", "bars", "score", s.langfuse().evalScores(50))),
+                // Grounding distribution: bucket the raw grounding scores into SCORE_BINS bins over
+                // [0,1] and render as a histogram (bars). Empty scores → unavailable.
+                langfuse("grounding_distribution", "Grounding distribution", "count", "bars",
+                        s -> asCategorical("grounding_distribution", "Grounding distribution", "bars", "count",
+                                histogram(s.langfuse().groundingScores(SCORE_PAGE), SCORE_BINS))),
+                // Grounding by model: avg grounding score per generating model (procurement view).
+                langfuse("grounding_by_model", "Grounding by model", "score", "bars",
+                        s -> asCategorical("grounding_by_model", "Grounding by model", "bars", "score",
+                                s.langfuse().groundingByModel(SCORE_PAGE))),
+                // Memory compaction: summary-attached ratio + tokens saved, read from the BFF's
+                // compaction counters as scraped into Prometheus (never a gateway→BFF call). These
+                // are cumulative lifetime totals (range-invariant, like the reliability gauges).
+                langfuse("compaction", "Memory compaction", "count", "table",
+                        s -> compaction(s))
         );
+    }
+
+    /** Build the compaction panel from the BFF's Prometheus counters; empty → unavailable. */
+    private Panel compaction(Sources s) {
+        OptionalDouble events        = s.prom().scalar("sum(chat_compaction_context_messages_count)");
+        OptionalDouble attachedTotal = s.prom().scalar("sum(chat_compaction_summary_attached_total)");
+        OptionalDouble attachedTrue  = s.prom().scalar("sum(chat_compaction_summary_attached_total{attached=\"true\"})");
+        OptionalDouble ctxMsgSum     = s.prom().scalar("sum(chat_compaction_context_messages_sum)");
+        OptionalDouble fullTokens    = s.prom().scalar("sum(chat_compaction_tokens_sum{kind=\"full\"})");
+        OptionalDouble ctxTokens     = s.prom().scalar("sum(chat_compaction_tokens_sum{kind=\"context\"})");
+
+        // No compaction telemetry at all → graceful empty state (never a fabricated figure).
+        if (events.isEmpty() && attachedTotal.isEmpty()) {
+            return Panel.unavailable("compaction", "Memory compaction", "table", "count");
+        }
+        double evts   = events.orElse(0);
+        double total  = attachedTotal.orElse(0);
+        double attPct = total > 0 ? attachedTrue.orElse(0) / total * 100.0 : 0.0;
+        double saved  = Math.max(0, fullTokens.orElse(0) - ctxTokens.orElse(0));
+        double avgMsg = evts > 0 ? ctxMsgSum.orElse(0) / evts : 0.0;
+
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("events", round1(evts));
+        row.put("attachedPct", round1(attPct));
+        row.put("tokensSaved", round1(saved));
+        row.put("avgMessages", round1(avgMsg));
+        return Panel.table("compaction", "Memory compaction", "table", "count", List.of(row));
+    }
+
+    /**
+     * Bucket raw scores in [0,1] into {@code bins} equal-width bins, returning one
+     * {@link LabeledValue} per bin ({@code label} = the bin's range, {@code value} = its count).
+     * Every bin is emitted (including empty ones) so the histogram keeps its full 0→1 x-axis.
+     * An empty input yields an empty list → the panel degrades to {@code unavailable}.
+     */
+    private static List<LabeledValue> histogram(List<Double> values, int bins) {
+        if (values == null || values.isEmpty()) return List.of();
+        int[] counts = new int[bins];
+        for (double v : values) {
+            double clamped = Math.max(0.0, Math.min(1.0, v));
+            int idx = (int) (clamped * bins);
+            if (idx >= bins) idx = bins - 1;   // 1.0 falls into the top bin
+            counts[idx]++;
+        }
+        List<LabeledValue> out = new ArrayList<>(bins);
+        for (int i = 0; i < bins; i++) {
+            double lo = (double) i / bins;
+            double hi = (double) (i + 1) / bins;
+            String label = String.format("%.1f–%.1f", lo, hi);
+            out.add(new LabeledValue(label, counts[i]));
+        }
+        return out;
+    }
+
+    private static double round1(double v) {
+        return Math.round(v * 10.0) / 10.0;
     }
 
     // ── PanelSpec builders (Prometheus) ──────────────────────────────────────────

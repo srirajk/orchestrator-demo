@@ -322,7 +322,7 @@ svg {
 }
 
 .trust-strip {
-  grid-template-columns: 1fr 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
 }
 
 .user-strip {
@@ -920,6 +920,14 @@ svg {
   flex: 1;
   border-radius: 4px 4px 0 0;
   background: linear-gradient(180deg, var(--blue), rgba(91, 155, 240, 0.22));
+}
+
+.hist-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  color: var(--faint);
+  font-size: 10.5px;
 }
 
 .pcts {

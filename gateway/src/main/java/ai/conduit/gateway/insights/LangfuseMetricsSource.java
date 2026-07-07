@@ -67,6 +67,7 @@ public class LangfuseMetricsSource implements MetricsSource {
     private final Duration perQueryTimeout;
     private final long ttlMillis;
     private final String chatTraceName;
+    private final String groundingScoreName;
     private final HttpClient http;
     private final ObjectMapper mapper;
     private final ModelPricing pricing;
@@ -88,10 +89,14 @@ public class LangfuseMetricsSource implements MetricsSource {
             // The Langfuse trace name the gateway assigns to a chat turn (ChatService sets
             // langfuse.trace.name). Config, not a domain literal — it's the unit-economics
             // denominator (one chat turn = one "question"), excluding infra/eval/agent traces.
-            @Value("${conduit.insights.chat-trace-name:chat-turn}") String chatTraceName) {
+            @Value("${conduit.insights.chat-trace-name:chat-turn}") String chatTraceName,
+            // The Langfuse score name the independent evaluator writes for answer-grounding.
+            // Config, not a domain literal — it names an eval metric, not a business concept.
+            @Value("${conduit.insights.grounding-score-name:grounding}") String groundingScoreName) {
         this.mapper = mapper;
         this.pricing = pricing;
         this.chatTraceName = chatTraceName;
+        this.groundingScoreName = groundingScoreName;
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
         this.enabled = !publicKey.isBlank() && !secretKey.isBlank();
         this.authHeader = "Basic " + Base64.getEncoder()
@@ -207,6 +212,82 @@ public class LangfuseMetricsSource implements MetricsSource {
         List<LabeledValue> out = new ArrayList<>();
         agg.forEach((name, a) -> { if (a[1] > 0) out.add(new LabeledValue(name, a[0] / a[1])); });
         return out;
+    }
+
+    // ── Grounding score distribution + by-model breakdown ───────────────────────
+    // The grounding score is the answer-grounding eval the independent judge writes per chat
+    // turn. Its NAME is config ({@code grounding-score-name}); nothing here embeds a domain
+    // concept. Both methods read the raw scores page and shape in-code; empty → empty list,
+    // which the catalog renders as {@code unavailable} (never a fabricated bar).
+
+    /**
+     * Raw values of the configured grounding score across the most recent {@code limit} scores —
+     * the input the catalog buckets into a distribution histogram. Only numeric values count.
+     */
+    public List<Double> groundingScores(int limit) {
+        if (!enabled || groundingScoreName.isBlank()) return List.of();
+        JsonNode j = cachedGet("/api/public/scores?limit=" + limit);
+        if (j == null) return List.of();
+        List<Double> out = new ArrayList<>();
+        for (JsonNode s : j.path("data")) {
+            if (!groundingScoreName.equals(s.path("name").asText())) continue;
+            if (!s.path("value").isNumber()) continue;
+            out.add(s.path("value").asDouble());
+        }
+        return out;
+    }
+
+    /**
+     * Average grounding score grouped by the model that generated the answer — a real procurement
+     * question ("is one model less trustworthy?"). The score is written at the trace level, so we
+     * join each grounding score's {@code traceId} to that trace's generation model via a
+     * {@code traceId → model} map built from the recent generation observations. A score whose
+     * trace has no known generation model is skipped (never bucketed under a fabricated model).
+     * Model names are read straight off Langfuse (World B) — never hardcoded here.
+     */
+    public List<LabeledValue> groundingByModel(int limit) {
+        if (!enabled || groundingScoreName.isBlank()) return List.of();
+        JsonNode scores = cachedGet("/api/public/scores?limit=" + limit);
+        if (scores == null) return List.of();
+        Map<String, String> modelByTrace = modelByTrace(limit);
+        Map<String, double[]> agg = new LinkedHashMap<>(); // model -> [sum, count]
+        for (JsonNode s : scores.path("data")) {
+            if (!groundingScoreName.equals(s.path("name").asText())) continue;
+            if (!s.path("value").isNumber()) continue;
+            String model = modelByTrace.get(s.path("traceId").asText(""));
+            if (model == null || model.isBlank()) continue;
+            double[] a = agg.computeIfAbsent(model, k -> new double[2]);
+            a[0] += s.path("value").asDouble(0);
+            a[1] += 1;
+        }
+        List<LabeledValue> out = new ArrayList<>();
+        agg.forEach((model, a) -> { if (a[1] > 0) out.add(new LabeledValue(model, a[0] / a[1])); });
+        return out;
+    }
+
+    /**
+     * {@code traceId → model name} of that trace's (first) generation observation, over the most
+     * recent {@code limit} generations. Prefers Langfuse's {@code providedModelName}, falling back
+     * to the resolved {@code model}. Non-throwing: any failure → empty map.
+     */
+    private Map<String, String> modelByTrace(int limit) {
+        Map<String, String> map = new LinkedHashMap<>();
+        if (!enabled) return map;
+        JsonNode j = cachedGet("/api/public/observations?type=GENERATION&limit=" + limit);
+        if (j == null) return map;
+        for (JsonNode o : j.path("data")) {
+            String trace = o.path("traceId").asText(null);
+            if (trace == null || trace.isBlank()) continue;
+            String model = firstNonBlank(o.path("providedModelName").asText(null), o.path("model").asText(null));
+            if (model != null) map.putIfAbsent(trace, model);
+        }
+        return map;
+    }
+
+    private static String firstNonBlank(String a, String b) {
+        if (a != null && !a.isBlank() && !"null".equals(a)) return a;
+        if (b != null && !b.isBlank() && !"null".equals(b)) return b;
+        return null;
     }
 
     // ── Cost/token slicing via the Langfuse custom-metrics API ──────────────────
