@@ -71,9 +71,15 @@ public class BoardCatalog {
                       + " / clamp_min(sum(increase(conduit_request_outcome_total[" + w + "])),1) * 100"),
                 statDelta(range, "agent_calls_24h", "Agent calls (24h)", "count",
                         "sum(increase(conduit_agent_calls_total[" + w + "]))"),
-                stat("fanout_avg_ms", "Avg fan-out", "ms",
-                        "sum(rate(conduit_fanout_duration_seconds_sum[" + w + "]))"
-                      + " / clamp_min(sum(rate(conduit_fanout_duration_seconds_count[" + w + "])),1) * 1000"),
+                // Pipeline p95 latency. Feeds the Overview "p95 latency" KPI (panel id retained
+                // for the web contract). Computed off the agent-latency histogram so it is a real
+                // p95, not an average: histogram_quantile needs `le` buckets spanning the observed
+                // latencies, which conduit_agent_latency_seconds_bucket provides. The prior query
+                // divided by clamp_min(rate(count),1); with a sub-1/s call rate the denominator was
+                // pinned to the floor, collapsing the value toward 0 ms.
+                stat("fanout_avg_ms", "P95 latency", "ms",
+                        "histogram_quantile(0.95,"
+                      + " sum(rate(conduit_agent_latency_seconds_bucket[" + w + "])) by (le)) * 1000"),
                 area("request_volume", "Request volume", "req/s",
                         "sum(rate(conduit_request_outcome_total[" + RATE_WIN + "]))"),
                 donut("outcome_mix", "Outcome mix", "count",
