@@ -1,5 +1,13 @@
 import { test, expect } from '@playwright/test';
-import { registerOrLogin, sendMessage, newConversation, HERO_PROMPT, GATEWAY_URL } from './helpers';
+import {
+  registerOrLogin,
+  sendMessage,
+  newConversation,
+  assistantBubbles,
+  tracePanel,
+  HERO_PROMPT,
+  GATEWAY_URL,
+} from './helpers';
 
 const SERVICING_MCP_URL = process.env.SERVICING_MCP_URL || 'http://localhost:8082';
 const WEALTH_HTTP_URL   = process.env.WEALTH_HTTP_URL   || 'http://localhost:8081';
@@ -59,7 +67,7 @@ test.describe('Resilience (Phase 6 M11)', () => {
     expect(raw).toMatch(/data:\s*\[DONE\]/);
   });
 
-  test('LibreChat UI still streams answer after agent fault', async ({ page }) => {
+  test('Conduit Chat still streams a survivor answer after agent fault', async ({ page }) => {
     // Enable servicing MCP fault
     await fetch(`${SERVICING_MCP_URL}/admin/fault`, {
       method:  'POST',
@@ -72,8 +80,13 @@ test.describe('Resilience (Phase 6 M11)', () => {
       await newConversation(page);
 
       const reply = await sendMessage(page, HERO_PROMPT);
-      // Must have a non-trivial answer from the wealth HTTP agents at minimum
+      // A faulted servicing agent must NOT cancel its siblings: the wealth agents still
+      // return, so a non-trivial answer bubble renders in the chat pane.
+      await expect(assistantBubbles(page).last()).toBeVisible();
+      expect((await assistantBubbles(page).last().innerText()).length).toBeGreaterThan(30);
       expect(reply.length).toBeGreaterThan(30);
+      // The glass-box still shows the fan-out was resolved and agents ran.
+      await expect(tracePanel(page).getByText(/Resolved \d+ Agent/i).first()).toBeVisible();
     } finally {
       await fetch(`${SERVICING_MCP_URL}/admin/fault`, {
         method:  'POST',

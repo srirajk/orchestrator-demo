@@ -962,7 +962,7 @@
       "id": 23,
       "type": "stat",
       "title": "Chat BFF",
-      "description": "Prometheus scrape target \u2014 the LibreChat BFF is up. DOWN here is a real alarm.",
+      "description": "Prometheus scrape target \u2014 the Chat BFF is up. DOWN here is a real alarm.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

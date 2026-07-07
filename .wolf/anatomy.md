@@ -490,7 +490,7 @@
 
 ## apps/insights/web/src/
 
-- `App.tsx` — Conduit Insights React SPA (SSO login, 7 views). AnswerQualityView binds `grounding_distribution`→`<ScoreHistogram>` (vertical binned bars + 0→1 axis) and `grounding_by_model`→`<Bars unit="score">`. UserView binds `compaction`→`<CompactionStat>` (summary-attached bar + compactions/tokens-saved/avg-messages stat tiles). All three degrade to graceful empty state when the panel is unavailable. (~13000 tok)
+- `App.tsx` — Conduit Insights React SPA (SSO login, 7 views). AnswerQualityView binds `grounding_distribution`→`<ScoreHistogram>` (vertical binned bars + 0→1 axis) and `grounding_by_model`→`<Bars unit="score">`. UserView binds `compaction`→`<CompactionStat>` (summary-attached bar + compactions/tokens-saved/avg-messages stat tiles). Unbuilt-endpoint placeholder panels have been removed (no stubs shown): TrustView dropped the 'Fabricated IDs' KPI card (trust-strip now 3 cols); AgentsView dropped 'Latency by stage' (Agent fleet now col12); UserView dropped 'Their conversations' + 'Entitlement decisions' (backend conversation-store adapter seam left intact — UI only). Awaiting-data panels (breakers, request volume, cost-over-time, bulkhead) kept. (~13000 tok)
 - `index.css` — Insights SPA styles. Added `.hist-axis` (0→1 axis row under the grounding histogram). (~n/a)
 
 ## gateway/src/main/java/ai/meridian/gateway/
@@ -740,11 +740,6 @@
 
 - `private-banking.json` (~769 tok)
 
-## glassbox/
-
-- `Dockerfile` — Docker container definition (~29 tok)
-- `index.html` — Meridian Glass-Box — Live Decision Trace (~6092 tok)
-- `nginx.conf` — Nginx configuration (~86 tok)
 
 ## iam-service/
 
@@ -937,13 +932,6 @@
 - `promtail.yaml` (~419 tok)
 - `promtail.yaml` (~218 tok)
 
-## librechat/
-
-- `librechat.yaml` (~395 tok)
-
-## librechat/patches/
-
-- `openidStrategy.js` — API routes: GET (1 endpoints) (~9419 tok)
 
 ## mock-agents/
 
@@ -1252,12 +1240,10 @@
 ## tests/e2e/tests/
 
 - `00-login.spec.ts` — Login / registration flow. (~1152 tok)
-- `01-branding.spec.ts` — Phase 5 / M12 — Meridian branding. (~458 tok)
 - `02-hero-prompt.spec.ts` — Phase 4 / M6-M7 — End-to-end hero prompt. (~769 tok)
 - `03-jwt-identity.spec.ts` — Phase 8 / M15 — RS256/JWKS identity. (~1993 tok)
 - `04-entitlements.spec.ts` — Phase 5 / M8 — Cerbos ABAC entitlements. (~1738 tok)
 - `05-resilience.spec.ts` — Phase 6 / M11 — Resilience beat. (~927 tok)
-- `06-glassbox.spec.ts` — Phase 5 / M9 — Glass-box trace panel. (~345 tok)
 - `07-multi-turn.spec.ts` — Multi-turn conversation tests. (~2397 tok)
 - `08-domain-authz.spec.ts` — Phase 11 — Domain-scoped ABAC (segment × agent-domain). (~3237 tok)
 - `09-cerbos-authz.spec.ts` — Cerbos Authorization Matrix — direct PDP API tests (~5810 tok)

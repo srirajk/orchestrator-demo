@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import {
   registerOrLogin,
   newConversation,
+  composer,
   CHAT_URL,
   USER_MGMT_URL,
   TEST_USER,
@@ -11,21 +12,25 @@ import {
 /**
  * Login flow — canonical Conduit chat SPA (:8099) via the Axiom OIDC identity provider.
  *
- * The SPA's AuthGate redirects an unauthenticated visitor to `/api/auth/login`
- * → `/oauth2/authorization/conduit-chat` → the Axiom login page (Spring form login on
- * :8084, `#username` / `#password`) → OIDC callback → back to :8099.
+ * The unauthenticated SPA renders a LoginLanding with a "Sign in with SSO" button. Clicking
+ * it starts `/oauth2/authorization/conduit-chat` → the Axiom login page (Spring form login
+ * on :8084) → OIDC callback → back to :8099.
  *
- * (The legacy LibreChat `#email` / `:3080` login is retired; those assertions moved here.)
+ * Locators are semantic (getByRole / getByLabel / getByPlaceholder) so they survive markup
+ * churn. (The legacy LibreChat `#email` / `:3080` login is retired.)
  */
 test.describe('Login (Axiom OIDC)', () => {
 
-  test('unauthenticated visit redirects to the Axiom login with username + password fields', async ({ page }) => {
+  test('SSO sign-in redirects to the Axiom login with username + password fields', async ({ page }) => {
     await page.goto(`${CHAT_URL}/`, { waitUntil: 'load', timeout: 45_000 });
 
-    // AuthGate bounces us to the Axiom (IAM) login page.
-    await expect(page.locator('#username')).toBeVisible({ timeout: 30_000 });
-    await expect(page.locator('#password')).toBeVisible({ timeout: 10_000 });
-    await expect(page.locator('button[type="submit"], input[type="submit"]').first()).toBeVisible({ timeout: 10_000 });
+    // The SPA landing gates the OIDC flow behind an explicit SSO button.
+    await page.getByRole('button', { name: /sign in with sso/i }).click();
+
+    // Now on the Axiom (IAM) login page — fields addressed by their <label>s.
+    await expect(page.getByLabel('Username')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByLabel('Password')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible({ timeout: 10_000 });
 
     // We are on the IAM origin (:8084), not still on the SPA.
     expect(page.url()).toContain('8084/login');
@@ -33,11 +38,12 @@ test.describe('Login (Axiom OIDC)', () => {
 
   test('invalid credentials are rejected and stay on the login page', async ({ page }) => {
     await page.goto(`${CHAT_URL}/`, { waitUntil: 'load', timeout: 45_000 });
-    await page.waitForSelector('#username', { state: 'visible', timeout: 30_000 });
+    await page.getByRole('button', { name: /sign in with sso/i }).click();
+    await page.getByLabel('Username').waitFor({ state: 'visible', timeout: 30_000 });
 
-    await page.fill('#username', 'nobody');
-    await page.fill('#password', 'wrongpassword123');
-    await page.click('button[type="submit"], input[type="submit"]');
+    await page.getByLabel('Username').fill('nobody');
+    await page.getByLabel('Password').fill('wrongpassword123');
+    await page.getByRole('button', { name: 'Sign in' }).click();
     await page.waitForTimeout(3_000);
 
     // Must NOT have reached the chat SPA.
@@ -49,14 +55,13 @@ test.describe('Login (Axiom OIDC)', () => {
   test('valid persona login lands on the chat SPA', async ({ page }) => {
     await registerOrLogin(page, TEST_USER, TEST_PASSWORD);
     expect(page.url()).toContain('localhost:8099');
-    await expect(page.locator('textarea').first()).toBeVisible({ timeout: 30_000 });
+    await expect(composer(page)).toBeVisible({ timeout: 30_000 });
   });
 
   test('composer is enabled after login', async ({ page }) => {
     await registerOrLogin(page);
-    const textarea = page.locator('textarea').first();
-    await expect(textarea).toBeVisible({ timeout: 30_000 });
-    await expect(textarea).toBeEnabled();
+    await expect(composer(page)).toBeVisible({ timeout: 30_000 });
+    await expect(composer(page)).toBeEnabled();
   });
 
   test('session persists after page reload', async ({ page }) => {
@@ -67,16 +72,15 @@ test.describe('Login (Axiom OIDC)', () => {
 
     // Must NOT be bounced back to the Axiom login page.
     expect(page.url()).not.toContain('8084/login');
-    await expect(page.locator('textarea').first()).toBeVisible({ timeout: 20_000 });
+    await expect(composer(page)).toBeVisible({ timeout: 20_000 });
   });
 
   test('new conversation starts a fresh chat', async ({ page }) => {
     await registerOrLogin(page);
     await newConversation(page);
 
-    const textarea = page.locator('textarea').first();
-    await expect(textarea).toBeVisible({ timeout: 15_000 });
-    const value = await textarea.inputValue().catch(() => '');
+    await expect(composer(page)).toBeVisible({ timeout: 15_000 });
+    const value = await composer(page).inputValue().catch(() => '');
     expect(value.trim()).toBe('');
   });
 
@@ -84,9 +88,8 @@ test.describe('Login (Axiom OIDC)', () => {
     await registerOrLogin(page);
     await newConversation(page);
 
-    const textarea = page.locator('textarea').first();
-    await textarea.fill('Hello Conduit');
-    expect(await textarea.inputValue()).toContain('Hello Conduit');
+    await composer(page).fill('Hello Conduit');
+    expect(await composer(page).inputValue()).toContain('Hello Conduit');
   });
 
   test('IAM /auth/token mints a JWT for the persona', async ({ request }) => {

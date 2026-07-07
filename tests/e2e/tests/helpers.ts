@@ -4,11 +4,6 @@ import { Page, expect } from '@playwright/test';
 export const CHAT_URL       = process.env.CHAT_URL       || 'http://localhost:8099';
 export const GATEWAY_URL    = process.env.GATEWAY_URL    || 'http://localhost:8080';
 export const USER_MGMT_URL  = process.env.USER_MGMT_URL  || 'http://localhost:8084';
-export const GLASSBOX_URL   = process.env.GLASSBOX_URL   || 'http://localhost:4000';
-
-// Legacy LibreChat origin — retained only for specs explicitly about the legacy UI.
-// The canonical path is CHAT_URL (:8099). Do not use this for new assertions.
-export const LIBRECHAT_URL  = process.env.LIBRECHAT_URL  || 'http://localhost:3080';
 
 // Axiom (IAM) is now the identity provider — there is no self-service registration in the
 // chat SPA. Log in as a seeded persona. rm_jane is the default golden-path RM.
@@ -42,16 +37,34 @@ export async function getJwt(userId: string): Promise<string> {
   return data.accessToken as string;
 }
 
+/** The Conduit composer — semantic locator by placeholder ("Ask anything…"). */
+export function composer(page: Page) {
+  return page.getByPlaceholder(/ask anything/i);
+}
+
+/** The glass-box Decision-trace rail — semantic locator by its ARIA landmark name. */
+export function tracePanel(page: Page) {
+  return page.getByRole('complementary', { name: 'Decision trace' });
+}
+
+/** All assistant answer bubbles (keyed off a stable data-testid, not a CSS class). */
+export function assistantBubbles(page: Page) {
+  return page.getByTestId('assistant-message');
+}
+
 /**
  * Log into the canonical chat SPA (:8099) via the Axiom OIDC flow.
  *
- * Flow: the SPA's AuthGate redirects an unauthenticated visitor to `/api/auth/login`
- * → `/oauth2/authorization/conduit-chat` → the Axiom login page at
- * `host.docker.internal:8084/login` (Spring form login, `#username` / `#password`)
- * → OIDC callback → back to `:8099`, session established.
+ * Flow: the unauthenticated SPA shows a LoginLanding with a "Sign in with SSO" button.
+ * Clicking it starts `/oauth2/authorization/conduit-chat` → the Axiom login page at
+ * `host.docker.internal:8084/login` (Spring form login) → OIDC callback → back to `:8099`,
+ * session established and the composer rendered.
  *
  * Named `registerOrLogin` for back-compat with existing specs; Axiom is the IdP now, so
  * there is no in-app registration — this simply logs in as a seeded persona.
+ *
+ * Locators are semantic (getByRole / getByLabel / getByPlaceholder) so the flow survives
+ * CSS/id churn — the previous `#username` breakage was exactly that class of brittleness.
  */
 export async function registerOrLogin(
   page: Page,
@@ -61,36 +74,39 @@ export async function registerOrLogin(
   await page.goto(`${CHAT_URL}/`, { waitUntil: 'load', timeout: 45_000 });
 
   // Already authenticated (session reused across tests)? The composer will be present.
-  const composer = page.locator('textarea').first();
-  if (await composer.isVisible({ timeout: 3_000 }).catch(() => false)) {
+  if (await composer(page).isVisible({ timeout: 3_000 }).catch(() => false)) {
     return;
   }
 
-  // Otherwise AuthGate has bounced us to the Axiom login page (on :8084).
-  await page.waitForSelector('#username', { state: 'visible', timeout: 30_000 });
-  await page.fill('#username', username);
-  await page.fill('#password', password);
-  await page.click('button[type="submit"], input[type="submit"]');
+  // The SPA LoginLanding gates the OIDC flow behind a "Sign in with SSO" button; clicking
+  // it redirects to the Axiom (IAM) login page. (Without this click we never leave the SPA
+  // — the original bug: the helper waited for the login field on the landing page.)
+  const sso = page.getByRole('button', { name: /sign in with sso/i });
+  if (await sso.isVisible({ timeout: 8_000 }).catch(() => false)) {
+    await sso.click();
+  }
 
-  // First login for a client may show a Spring Authorization Server consent screen.
-  // Approve it if present; otherwise this is a no-op.
-  const consent = page.locator('button:has-text("Submit"), button:has-text("Allow"), input[type="submit"]');
-  if (await consent.first().isVisible({ timeout: 3_000 }).catch(() => false)) {
-    // Only click if we're still on the IAM origin (consent), not already back on the SPA.
-    if (page.url().includes(':8084')) {
-      await consent.first().click().catch(() => {});
-    }
+  // Axiom login page — Spring form login. Semantic locators via the field <label>s.
+  await page.getByLabel('Username').waitFor({ state: 'visible', timeout: 30_000 });
+  await page.getByLabel('Username').fill(username);
+  await page.getByLabel('Password').fill(password);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+
+  // First authorization for a client may show a Spring consent screen. Approve if present
+  // and only while still on the IAM origin (never on the SPA).
+  const consent = page.getByRole('button', { name: /submit|allow|authorize/i });
+  if (page.url().includes(':8084') && await consent.first().isVisible({ timeout: 3_000 }).catch(() => false)) {
+    await consent.first().click().catch(() => {});
   }
 
   // Back on the chat SPA with the composer rendered.
   await page.waitForURL(/localhost:8099/, { timeout: 30_000 });
-  await composer.waitFor({ state: 'visible', timeout: 30_000 });
+  await composer(page).waitFor({ state: 'visible', timeout: 30_000 });
 }
 
 /** Send a message in the currently open conversation and wait for the reply. */
 export async function sendMessage(page: Page, text: string): Promise<string> {
-  // Conduit composer: a single <textarea> (placeholder "Ask anything…"); Enter sends.
-  const inputBox = page.locator('textarea').first();
+  const inputBox = composer(page);
   await inputBox.waitFor({ state: 'visible', timeout: 30_000 });
 
   // Wait for any prior streaming reply to settle (textarea is disabled while streaming).
@@ -106,19 +122,17 @@ export async function sendMessage(page: Page, text: string): Promise<string> {
 /**
  * Wait for the streaming reply to complete and return the full page visible text.
  *
- * The Conduit composer disables its textarea and swaps the Send button for a "Stop" button
- * while streaming. Streaming is done when the "Stop" button is gone and the textarea is
- * enabled again.
+ * While streaming, the composer disables its textarea and swaps Send for a "Stop" button.
+ * We first wait for streaming to START (Stop appears) so a slow first token can't make us
+ * observe a stale "already hidden" state and return early; then wait for it to finish.
  */
-export async function waitForReply(page: Page, timeoutMs = 120_000): Promise<string> {
-  const inputBox = page.locator('textarea').first();
-  try {
-    // "Stop" only exists while streaming — wait for it to disappear.
-    await page.locator('button:has-text("Stop")').waitFor({ state: 'hidden', timeout: timeoutMs });
-    await expect(inputBox).toBeEnabled({ timeout: timeoutMs });
-  } catch {
-    // Fall through — collect whatever is on the page.
-  }
+export async function waitForReply(page: Page, timeoutMs = 180_000): Promise<string> {
+  const stop = page.getByRole('button', { name: 'Stop' });
+  // Streaming started — tolerate a very fast turn where Stop flashes and is gone already.
+  await stop.waitFor({ state: 'visible', timeout: 20_000 }).catch(() => {});
+  // Streaming finished — Stop gone and the composer re-enabled.
+  await stop.waitFor({ state: 'hidden', timeout: timeoutMs }).catch(() => {});
+  await expect(composer(page)).toBeEnabled({ timeout: timeoutMs }).catch(() => {});
 
   // Extra buffer for React to flush the last rendered token.
   await page.waitForTimeout(2_000);
@@ -130,6 +144,5 @@ export async function waitForReply(page: Page, timeoutMs = 120_000): Promise<str
 /** Start a fresh conversation (the Conduit sidebar "New chat" navigates to /c/new). */
 export async function newConversation(page: Page): Promise<void> {
   await page.goto(`${CHAT_URL}/c/new`, { waitUntil: 'load', timeout: 30_000 }).catch(() => {});
-  await page.locator('textarea').first()
-      .waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
+  await composer(page).waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
 }

@@ -1,67 +1,59 @@
 import { test, expect } from '@playwright/test';
-import { registerOrLogin, sendMessage, newConversation, getJwt, GATEWAY_URL, OKAFOR_PROMPT } from './helpers';
+import {
+  registerOrLogin,
+  sendMessage,
+  newConversation,
+  assistantBubbles,
+  tracePanel,
+  getJwt,
+  GATEWAY_URL,
+  OKAFOR_PROMPT,
+} from './helpers';
 
 /**
- * Phase 5 / M8 — Cerbos ABAC entitlements.
+ * Phase 5 / M8 — Cerbos ABAC entitlements + coverage.
  * rm_jane must be denied Okafor (REL-00188) and allowed Whitman (REL-00042).
  */
 test.describe('Entitlements (Phase 5 M8)', () => {
 
-  // ── UI path (chat → gateway, identity = rm_jane via verified OIDC Bearer JWT) ─
+  // ── UI path (Conduit Chat → BFF → gateway; identity = rm_jane via OIDC session) ─
 
-  test('Okafor query — gateway denies rm_jane (verified via intercepted SSE)', async ({ page }) => {
-    // Instead of relying on LibreChat to render the SSE response (which can stall on
-    // short denial messages due to SSE buffering), intercept the raw gateway response.
+  test('Okafor query — Conduit Chat surfaces the coverage denial (no data leak)', async ({ page }) => {
     await registerOrLogin(page);
-
-    let capturedGatewayBody = '';
-    // Intercept outgoing requests from LibreChat to the gateway
-    await page.route('**/v1/chat/completions', async route => {
-      const response = await route.fetch();
-      capturedGatewayBody = await response.text();
-      await route.fulfill({ response });
-    });
-
     await newConversation(page);
+
     await sendMessage(page, OKAFOR_PROMPT);
 
-    // The intercepted SSE body from the gateway is the ground truth
-    const lower = capturedGatewayBody.toLowerCase();
-    const isDenied = (
-      lower.includes('not authoriz')     ||   // "not authorized"
-      lower.includes('not authoris')     ||   // legacy spelling
-      lower.includes('access denied')    ||
-      lower.includes('denied')           ||
-      lower.includes('not in book')      ||
-      lower.includes('not allowed')      ||
-      lower.includes('unauthorized')
-    );
-    // If no denial phrase, verify no Okafor financial data leaked
-    if (!isDenied) {
-      const hasOkaforLeakedData = (
-        lower.includes('rel-00188') &&
-        (lower.includes('allocation') || lower.includes('ytd') || lower.includes('settlement'))
-      );
-      expect(hasOkaforLeakedData).toBe(false);
-    } else {
-      expect(isDenied).toBe(true);
-    }
+    // The chat pane must surface a real access-denied notice (role="alert") and a denial
+    // message bubble — never Okafor's data. REL-00188 is not in rm_jane's book.
+    await expect(page.getByRole('alert')).toContainText(/access denied|coverage|access to this client/i);
+    await expect(assistantBubbles(page).last()).toContainText(/not in your coverage|do not have access|denied/i);
+
+    // The glass-box Decision trace shows the deterministic Coverage denial.
+    await expect(tracePanel(page).getByText(/Coverage Denied/i)).toBeVisible();
+
+    // Nothing sensitive about Okafor leaked into the rendered answer.
+    const answer = (await assistantBubbles(page).last().innerText()).toLowerCase();
+    const leaked = answer.includes('rel-00188') &&
+      (answer.includes('allocation') || answer.includes('ytd') || answer.includes('settlement'));
+    expect(leaked).toBe(false);
   });
 
-  test('Whitman query succeeds in LibreChat UI (rm_jane has REL-00042)', async ({ page }) => {
+  test('Whitman query succeeds in Conduit Chat (rm_jane covers REL-00042)', async ({ page }) => {
     await registerOrLogin(page);
     await newConversation(page);
 
-    const whitmanPrompt = 'Show me the portfolio holdings for Whitman Family Office REL-00042';
-    const reply = await sendMessage(page, whitmanPrompt);
+    const reply = await sendMessage(page, 'Show me the portfolio holdings for Whitman Family Office REL-00042');
     const lower = reply.toLowerCase();
 
-    // Must NOT be denied
-    const isDenied = lower.includes('not authoris') || lower.includes('access denied');
-    expect(isDenied).toBe(false);
+    // Must NOT be denied.
+    expect(lower).not.toContain('not in your coverage');
+    expect(lower).not.toContain('access denied');
 
-    // Must contain something meaningful (not an empty or error reply)
-    expect(reply.length).toBeGreaterThan(30);
+    // A grounded answer bubble renders, and the trace shows coverage/access was granted.
+    await expect(assistantBubbles(page).last()).toBeVisible();
+    expect((await assistantBubbles(page).last().innerText()).length).toBeGreaterThan(30);
+    await expect(tracePanel(page).getByText(/Access Allowed|Coverage Passed/i).first()).toBeVisible();
   });
 
   // ── Direct API path with JWT ───────────────────────────────────────────────

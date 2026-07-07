@@ -71,7 +71,10 @@ test.describe('JWT identity (Phase 8 M15)', () => {
     expect(claims.sub).toBe('rm_jane');
     expect(claims.tenant_id).toBe('default');
     expect(claims.aud).toContain('conduit-gateway');
-    expect(claims.segments).toContain('wealth');
+    // `segments` is now a MAP (segment -> data-classification tier), replacing the old flat
+    // array + numeric clearance. Membership is a present key; the value is the tier ceiling.
+    expect(Object.keys(claims.segments as Record<string, string>)).toContain('wealth');
+    expect((claims.segments as Record<string, string>).wealth).toBe('confidential-pii');
     expect(claims).not.toHaveProperty('book');
   });
 

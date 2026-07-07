@@ -52,7 +52,10 @@ export function Message({ message, isStreaming }: Props) {
   })
 
   return (
-    <div className={clsx('flex gap-3 px-4 py-3', isUser ? 'flex-row-reverse' : 'flex-row')}>
+    <div
+      data-testid={isUser ? 'user-message' : 'assistant-message'}
+      className={clsx('flex gap-3 px-4 py-3', isUser ? 'flex-row-reverse' : 'flex-row')}
+    >
       {/* Avatar */}
       <div
         className={clsx(
