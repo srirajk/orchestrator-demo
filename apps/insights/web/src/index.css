@@ -922,6 +922,14 @@ svg {
   background: linear-gradient(180deg, var(--blue), rgba(91, 155, 240, 0.22));
 }
 
+.hist-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  color: var(--faint);
+  font-size: 10.5px;
+}
+
 .pcts {
   display: flex;
   gap: 20px;

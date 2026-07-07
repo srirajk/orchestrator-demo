@@ -4037,5 +4037,28 @@
     ],
     "occurrences": 1,
     "last_seen": "2026-07-07T03:05:00.000Z"
+  },
+  {
+    "id": "bug-243",
+    "timestamp": "2026-07-07T04:10:00.000Z",
+    "error_message": "Three Conduit Insights panels showed hardcoded 'not available yet' EmptyState (Grounding distribution, Grounding by model, Memory compaction) despite the backing data existing.",
+    "file": "gateway/src/main/java/ai/conduit/gateway/insights/BoardCatalog.java",
+    "root_cause": "The panels were never added to BoardCatalog board 7 and the UI had hardcoded EmptyState blocks instead of chart components bound to panel data. Grounding-by-model also needed a score->model join because Langfuse writes the grounding score at trace level (observationId null), so the model must be looked up from the trace's GENERATION observation.",
+    "fix": "Added grounding_distribution (scores->10-bin histogram), grounding_by_model (LangfuseMetricsSource.groundingByModel joins score.traceId to model via modelByTrace over GENERATION observations), and compaction (Prometheus chat_compaction_* counters, no gateway->BFF call) to board 7. UI: replaced the 3 EmptyStates with ScoreHistogram, Bars(unit=score) and CompactionStat, graceful fallback on unavailable. Grounding score name is config (conduit.insights.grounding-score-name). Gotcha: compaction tokensSaved = full-context tokens = 0 and attached% = 0 in current data because no summary has been attached yet (attached=false for all 18) \u2014 that is real telemetry, not a bug; panel renders 0 honestly.",
+    "tags": [
+      "insights",
+      "langfuse",
+      "prometheus",
+      "grounding",
+      "compaction",
+      "world-b",
+      "ui",
+      "react"
+    ],
+    "related_bugs": [
+      "bug-242"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-07-07T04:10:00.000Z"
   }
 ]

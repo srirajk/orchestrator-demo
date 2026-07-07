@@ -483,6 +483,16 @@
 
 - `AnswerSynthesizer.java` — Synthesizes a grounded, streamed answer from agent outputs using Z.AI GLM. System prompt forbids cross-entity aggregation/roll-ups (compute guardrail) and renders WITHHELD sections (structural-gate-denied domains) so mixed in/out-of-access asks fulfill the accessible part + state the withheld part; synthesizeFromHistory prompt also forbids computing/aggregating (bug-237). synthesize()/synthesizeFromHistory() now RETURN the accumulated answer text (String, was void) so ChatService can mirror it onto the ROOT chat.handle span as langfuse.trace.output — the former Span.current().setAttribute("langfuse.trace.output",…) here was unreliable (by synthesis time the active span is not guaranteed to be the root), so the trace-level output never landed and continuous eval scored an empty answer (bug-242). (~7600 tok)
 
+## gateway/src/main/java/ai/conduit/gateway/insights/
+
+- `BoardCatalog.java` — Declarative catalog of the 7 Insights boards + their panels (Prometheus PromQL or Langfuse). Board 7 (Cost & Quality) now also carries three answer-quality panels: `grounding_distribution` (bars histogram — grounding scores bucketed into SCORE_BINS=10 bins over [0,1] via `histogram()`), `grounding_by_model` (bars, score — avg grounding per generating model), and `compaction` (table — BFF compaction counters read from Prometheus: summary-attached %, tokens saved, compaction count, avg messages; range-invariant lifetime totals; gateway never calls the BFF). World-B clean (bins/labels/score-name are config/infra, no domain literals). (~4200 tok)
+- `LangfuseMetricsSource.java` — MetricsSource over the Langfuse public API (cost/tokens/eval scores). Adds `groundingScores(limit)` (raw values of the configured grounding score → histogram input) and `groundingByModel(limit)` (joins each grounding score's traceId to that trace's generation model via `modelByTrace()` over GENERATION observations, then averages per model). Grounding score name is config `conduit.insights.grounding-score-name:grounding` (not a domain literal). (~5400 tok)
+
+## apps/insights/web/src/
+
+- `App.tsx` — Conduit Insights React SPA (SSO login, 7 views). AnswerQualityView binds `grounding_distribution`→`<ScoreHistogram>` (vertical binned bars + 0→1 axis) and `grounding_by_model`→`<Bars unit="score">`. UserView binds `compaction`→`<CompactionStat>` (summary-attached bar + compactions/tokens-saved/avg-messages stat tiles). All three degrade to graceful empty state when the panel is unavailable. (~13000 tok)
+- `index.css` — Insights SPA styles. Added `.hist-axis` (0→1 axis row under the grounding histogram). (~n/a)
+
 ## gateway/src/main/java/ai/meridian/gateway/
 
 - `GatewayApplication.java` — GatewayApplication: main (~93 tok)

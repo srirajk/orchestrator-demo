@@ -655,6 +655,8 @@ function AnswerQualityView({
 }) {
   const quality = boards[7]
   const scores = labeledRows(panel(quality, 'eval_scores')?.rows)
+  const groundingDistribution = labeledRows(panel(quality, 'grounding_distribution')?.rows)
+  const groundingByModel = labeledRows(panel(quality, 'grounding_by_model')?.rows)
   const grounding = scoreFor(scores, 'grounding')
   const safety = scoreFor(scores, 'safety')
   const relevance = scoreFor(scores, 'relevance')
@@ -691,7 +693,7 @@ function AnswerQualityView({
           </div>
         </PanelShell>
         <PanelShell className="col5" title="Grounding distribution" badge="◐ Near real-time" caption="Most answers cluster high — the tail is what to fix">
-          <EmptyState>Grounding distribution endpoint is not available yet.</EmptyState>
+          <ScoreHistogram rows={groundingDistribution} empty="Grounding scores are still collecting." />
         </PanelShell>
         <PanelShell className="col7" title="Needs review — low-scoring answers" badge="↗ Langfuse" caption="Click any to replay the decision and see why it scored low">
           <button type="button" className="out empty-out" onClick={() => onNavigate('iv')}>
@@ -703,7 +705,7 @@ function AnswerQualityView({
           </button>
         </PanelShell>
         <PanelShell className="col5" title="Grounding by model" caption="Is one model less trustworthy? — a real procurement question">
-          <EmptyState>Grounding-by-model is waiting on a model-level score endpoint.</EmptyState>
+          <Bars rows={groundingByModel} unit="score" empty="No model-level grounding scores yet." />
         </PanelShell>
       </div>
     </>
@@ -723,6 +725,7 @@ function UserView({
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null)
   const selected = users.find((user) => user.label === selectedLabel) ?? users[0]
   const qualityScores = labeledRows(panel(boards[7], 'eval_scores')?.rows)
+  const compaction = tableRows(panel(boards[7], 'compaction')?.rows)[0] ?? null
 
   useEffect(() => {
     if (!selectedLabel && users[0]) setSelectedLabel(users[0].label)
@@ -786,7 +789,7 @@ function UserView({
           )}
         </PanelShell>
         <PanelShell className="col5" title="Memory compactions" caption="Long sessions summarized to fit context">
-          <EmptyState>Memory compaction telemetry is not available yet.</EmptyState>
+          <CompactionStat row={compaction} />
         </PanelShell>
       </div>
     </>
@@ -1073,6 +1076,74 @@ function Histogram({ rows }: { rows: LabeledValue[] }) {
         </div>
         <div>
           samples<b>{compactNumber(values.length)}</b>
+        </div>
+      </div>
+    </>
+  )
+}
+
+function ScoreHistogram({ empty, rows }: { empty: string; rows: LabeledValue[] }) {
+  const max = Math.max(...rows.map((row) => row.value), 0)
+  const total = rows.reduce((sum, row) => sum + row.value, 0)
+  if (!rows.length || total <= 0) return <EmptyState>{empty}</EmptyState>
+
+  return (
+    <>
+      <div className="hist">
+        {rows.map((row) => (
+          <div
+            key={row.label}
+            className="hb"
+            title={`${row.label}: ${compactNumber(row.value)}`}
+            style={{ height: `${row.value > 0 ? Math.max(6, (row.value / max) * 100) : 2}%` }}
+          />
+        ))}
+      </div>
+      <div className="hist-axis">
+        <span>0.0</span>
+        <span>grounding score</span>
+        <span>1.0</span>
+      </div>
+      <div className="pcts">
+        <div>
+          samples<b>{compactNumber(total)}</b>
+        </div>
+        <div>
+          top bin<b>{formatLabel(topRow(rows)?.label ?? '')}</b>
+        </div>
+        <div>
+          bins<b>{compactNumber(rows.length)}</b>
+        </div>
+      </div>
+    </>
+  )
+}
+
+function CompactionStat({ row }: { row: TableRecord | null }) {
+  if (!row) return <EmptyState>Memory compaction telemetry is still collecting.</EmptyState>
+  const events = numericField(row, ['events']) ?? 0
+  const attachedPct = numericField(row, ['attachedPct']) ?? 0
+  const tokensSaved = numericField(row, ['tokensSaved']) ?? 0
+  const avgMessages = numericField(row, ['avgMessages']) ?? 0
+
+  return (
+    <>
+      <div className="bar">
+        <span className="bl">Summary attached</span>
+        <div className="track">
+          <div className="fill" style={{ width: `${Math.max(2, Math.min(100, attachedPct))}%` }} />
+        </div>
+        <span className="bv">{percent(attachedPct / 100)}</span>
+      </div>
+      <div className="pcts">
+        <div>
+          compactions<b>{compactNumber(events)}</b>
+        </div>
+        <div>
+          tokens saved<b>{compactNumber(tokensSaved)}</b>
+        </div>
+        <div>
+          avg messages<b>{compactNumber(avgMessages)}</b>
         </div>
       </div>
     </>
