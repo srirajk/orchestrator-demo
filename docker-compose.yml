@@ -386,69 +386,6 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # ── Chat UI (LibreChat — config + cosmetic only; no code fork) ────────────────
-
-  librechat:
-    image: registry.librechat.ai/danny-avila/librechat-dev:latest
-    container_name: conduit-librechat
-    ports:
-      - "3080:3080"
-    environment:
-      HOST: "0.0.0.0"
-      PORT: "3080"
-      MONGO_URI: "mongodb://mongodb:27017/LibreChat"
-      SEARCH: "false"
-      MEILI_NO_ANALYTICS: "true"
-      JWT_SECRET: ${JWT_SECRET:-meridian-demo-jwt-secret-change-in-production}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-meridian-demo-jwt-refresh-secret-change-in-production}
-      ALLOW_REGISTRATION: "true"
-      # OIDC SSO — "Login with Meridian" button
-      ALLOW_SOCIAL_LOGIN: "true"
-      # LibreChat uses DOMAIN_SERVER + OPENID_CALLBACK_URL to build the full callback URL.
-      # DOMAIN_CLIENT is the browser-facing URL; used as the post-OAuth redirect destination.
-      DOMAIN_CLIENT: "http://localhost:3080"
-      DOMAIN_SERVER: "http://localhost:3080"
-      OPENID_CLIENT_ID: "meridian-librechat"
-      OPENID_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-meridian-client-secret-dev}
-      # Must match IAM_ISSUER_URL — LibreChat validates the JWT `iss` claim against this.
-      OPENID_ISSUER: ${IAM_ISSUER_URL:-http://host.docker.internal:8084}
-      # Path only — LibreChat prepends DOMAIN_SERVER
-      OPENID_CALLBACK_URL: "/oauth/openid/callback"
-      OPENID_BUTTON_LABEL: "Login with Meridian SSO"
-      OPENID_SCOPE: "openid profile email"
-      # Required for LibreChat to configure the OIDC session store
-      OPENID_SESSION_SECRET: ${OPENID_SESSION_SECRET:-meridian-openid-session-secret-dev}
-      # Rehydrate req.user.federatedTokens on LibreChat API calls so custom endpoint
-      # headers can resolve {{LIBRECHAT_OPENID_ACCESS_TOKEN}} server-side.
-      OPENID_REUSE_TOKENS: "true"
-      # Allow HTTP issuers in dev (production must use HTTPS)
-      OPENID_ALLOW_HTTP: "true"
-      NO_INDEX: "true"
-      # Increase rate limits for E2E test environment — many rapid login attempts
-      LOGIN_MAX: "200"
-      LOGIN_WINDOW: "1"
-    volumes:
-      - ./.env:/app/.env:ro
-      - ./librechat/librechat.yaml:/app/librechat.yaml:ro
-      # Patch: allows HTTP OIDC issuer in dev (openid-client v6 requires HTTPS by default)
-      - ./librechat/patches/openidStrategy.js:/app/api/strategies/openidStrategy.js:ro
-      - librechat-uploads:/app/uploads
-      - librechat-images:/app/client/public/images
-    depends_on:
-      mongodb:
-        condition: service_healthy
-      gateway:
-        condition: service_healthy
-      iam-service:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3080/"]
-      interval: 15s
-      timeout: 10s
-      retries: 20
-      start_period: 45s
-    restart: unless-stopped
-
   # ── Cerbos PDP — policy enforcement point for ABAC entitlements ──────────────
   cerbos:
     image: ghcr.io/cerbos/cerbos:latest
@@ -514,7 +451,6 @@ services:
       # model-selection guide; override to a stronger model when one is available.
       IAM_POLICY_GENERATION_MODEL: ${IAM_POLICY_GENERATION_MODEL:-glm-4.6}
       # OAuth2 client registration — must match LibreChat's OPENID_CLIENT_ID/SECRET
-      IAM_LIBRECHAT_CLIENT_ID: "meridian-librechat"
       IAM_LIBRECHAT_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-meridian-client-secret-dev}
       IAM_LIBRECHAT_REDIRECT_URI: ${IAM_LIBRECHAT_REDIRECT_URI:-http://localhost:3080/oauth/openid/callback}
       IAM_CONDUIT_CHAT_POST_LOGOUT_REDIRECT_URI: ${IAM_CONDUIT_CHAT_POST_LOGOUT_REDIRECT_URI:-http://localhost:8099/}
@@ -650,18 +586,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-    restart: unless-stopped
-
-  # ── Glass-box live decision trace panel ───────────────────────────────────────
-  glassbox:
-    build:
-      context: ./glassbox
-      dockerfile: Dockerfile
-    container_name: conduit-glassbox
-    ports:
-      - "4000:4000"
-    depends_on:
-      - gateway
     restart: unless-stopped
 
   # ── Langfuse v3 — LLM observability: sessions, dashboards, inline evals ───────
@@ -982,8 +906,6 @@ services:
 volumes:
   redis-data:
   mongo-data:
-  librechat-uploads:
-  librechat-images:
   grafana-data:
   tempo-data:
   langfuse-db-data:
