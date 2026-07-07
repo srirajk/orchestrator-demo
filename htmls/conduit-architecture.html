@@ -1,3 +1,8 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Conduit · Solution Architecture</title>
 <style>
 :root{
@@ -120,16 +125,18 @@ h1 em{color:var(--yellow);font-style:italic;}
   .stage-grid,.svc-cols,.item-row{grid-template-columns:1fr;}
 }
 </style>
+</head>
+<body>
 
 <div class="wrap">
   <div class="eyebrow">Conduit · solution architecture</div>
   <h1>The gateway, <em>opened up.</em></h1>
-  <p class="intro">One plain-English question fans out across specialist agents — HTTP and MCP — over multiple business domains, gets checked against entitlements, and comes back as one grounded, streamed answer. This is the shape that actually runs: the API surface the chat UI calls, the pipeline and platform services behind it, and the domains of external agents + manifests that give it business knowledge <strong>without a single line of gateway code.</strong></p>
+  <p class="intro">A banker asks in plain English — the way they'd ask a colleague — and Conduit fans that question out across the right specialist systems over multiple business lines, checks it against exactly what that person is allowed to see, and streams back one grounded answer, the whole decision visible as it happens. Everything below is the system as it actually runs; its business knowledge comes entirely from configuration, <strong>without a single line of gateway code.</strong></p>
 
   <div class="stat-row">
     <span class="stat"><strong>4</strong> domains</span>
     <span class="stat"><strong>13</strong> specialist agents</span>
-    <span class="stat"><strong>5</strong> API endpoints</span>
+    <span class="stat"><strong>4</strong> client-facing APIs</span>
     <span class="stat"><strong>6</strong> pipeline stages</span>
     <span class="stat"><strong>0</strong> embedded domain knowledge in gateway Java</span>
   </div>
@@ -139,7 +146,7 @@ h1 em{color:var(--yellow);font-style:italic;}
     <div class="hero-solo">
       <div class="hero-card">
         <div class="hero-name">Conduit Chat</div>
-        <div class="hero-sub">LibreChat client + Glass-Box live decision trace</div>
+        <div class="hero-sub">custom React SPA · real OIDC login · built-in glass-box decision trace</div>
       </div>
     </div>
 
@@ -147,10 +154,9 @@ h1 em{color:var(--yellow);font-style:italic;}
 
     <div class="label">Gateway API surface · what the UI calls</div>
     <div class="card-row">
-      <div class="light-card"><div class="h">Chat API</div><div class="s">POST /v1/chat/completions<br>OpenAI-shape · SSE stream</div></div>
-      <div class="light-card"><div class="h">Models API</div><div class="s">GET /v1/models<br>client capability discovery</div></div>
+      <div class="light-card"><div class="h">Chat API</div><div class="s">POST /v1/chat/completions · GET /v1/models<br>OpenAI-compatible + SSE stream — any standard chat client connects unchanged</div></div>
       <div class="light-card"><div class="h">Trace API</div><div class="s">/trace/stream · /trace/history<br>the glass-box feed</div></div>
-      <div class="light-card"><div class="h">Registry API</div><div class="s">/admin/domains · /admin/agents<br>World-B manifest CRUD</div></div>
+      <div class="light-card"><div class="h">Registry API</div><div class="s">/admin/domains · /admin/agents<br>register a domain by manifest, not code</div></div>
       <div class="light-card"><div class="h">Insights API</div><div class="s">/v1/insights/boards · /cost<br>per-conversation trace + LLM cost</div></div>
     </div>
 
@@ -176,7 +182,7 @@ h1 em{color:var(--yellow);font-style:italic;}
       <div class="svc-cols">
         <div>
           <div class="svc-col-label">Intelligence</div>
-          <div class="svc-item"><div class="name">LLM</div><div class="cap">OpenAI-compatible · swappable per call site (CONDUIT_LLM_*)</div></div>
+          <div class="svc-item"><div class="name">LLM</div><div class="cap">OpenAI-compatible · any provider, swappable per call site — no lock-in</div></div>
           <div class="svc-item"><div class="name">Embeddings</div><div class="cap">hash-based stand-in (default) or remote HTTP sidecar</div></div>
         </div>
         <div>
@@ -186,9 +192,9 @@ h1 em{color:var(--yellow);font-style:italic;}
         </div>
         <div>
           <div class="svc-col-label">Trust</div>
-          <div class="svc-item inline"><div class="name">Cerbos PDP — structural gates (infra/cerbos/policies)</div></div>
+          <div class="svc-item inline"><div class="name">Cerbos — policy engine · structural authorization gates</div></div>
           <div class="svc-item inline"><div class="name">Coverage service — book-of-business, per domain</div></div>
-          <div class="svc-item inline"><div class="name">Axiom IAM — OIDC · RS256/JWKS</div></div>
+          <div class="svc-item inline"><div class="name">Axiom — identity &amp; access · OIDC/JWT (RS256 · JWKS) + admin console (policies · users)</div></div>
         </div>
       </div>
     </div>
@@ -212,7 +218,7 @@ h1 em{color:var(--yellow);font-style:italic;}
         <div class="agent-grid">
           <div class="agent-box">Claim-Status</div><div class="agent-box">Policy-Details</div>
         </div>
-        <div class="domain-caption">smallest domain —<br>the World-B proof</div>
+        <div class="domain-caption">smallest domain —<br>the config-not-code proof</div>
       </div>
       <div class="domain-card">
         <div class="h">Asset-Servicing</div>
@@ -235,28 +241,59 @@ h1 em{color:var(--yellow);font-style:italic;}
 
     <div class="dual-row">
       <div class="light-card">
-        <div class="label small">World-B manifests</div>
+        <div class="label small">Manifest-driven onboarding</div>
         <div class="item-row">
           <div class="item-box"><div class="name">domains/*.json</div><div class="cap">4 domain manifests</div></div>
           <div class="item-box"><div class="name">manifests/*.json</div><div class="cap">13 agent manifests</div></div>
           <div class="item-box"><div class="name">manifest.schema.json</div><div class="cap">pinned contract</div></div>
         </div>
-        <div class="box-caption">World-B DNA — onboarding is JSON, not a gateway release.</div>
+        <div class="box-caption">The core principle — a new business domain is configuration (manifests + a data-service URL), never a gateway release.</div>
       </div>
       <div class="light-card">
         <div class="label small">Observability + eval</div>
         <div class="item-row">
-          <div class="item-box"><div class="name">Langfuse</div><div class="cap">traces + scores</div></div>
-          <div class="item-box"><div class="name">Tempo·Loki·Prom.</div><div class="cap">→ Grafana</div></div>
+          <div class="item-box"><div class="name">Langfuse + eval worker</div><div class="cap">traces · cost · continuous grounding/safety scores</div></div>
+          <div class="item-box"><div class="name">Tempo · Loki · Prom.</div><div class="cap">→ Grafana</div></div>
           <div class="item-box"><div class="name">DeepEval</div><div class="cap">release gate · CI</div></div>
         </div>
-        <div class="box-caption">Continuous eval + a pre-merge gate — not bolted on after.</div>
+        <div class="box-caption">The eval worker scores every live answer · a pre-merge gate too — not bolted on after.</div>
       </div>
+    </div>
+
+    <div class="arrow">▼</div>
+
+    <div class="label">Deployment · docker profiles — lean core, opt-in layers</div>
+    <div class="svc-panel">
+      <div class="svc-cols" style="grid-template-columns:repeat(4,1fr);">
+        <div>
+          <div class="svc-col-label">core · always up</div>
+          <div class="svc-item"><div class="name">Gateway · Chat · IAM</div><div class="cap">the decisioning engine + glass-box (Redis-backed — runs with zero measurement)</div></div>
+          <div class="svc-item"><div class="name">Redis · Mongo · Cerbos · Embeddings</div><div class="cap">routing · state · authz · vectors</div></div>
+          <div class="svc-item"><div class="name">otel · Prometheus · Tempo</div><div class="cap">the telemetry spine — load-bearing</div></div>
+        </div>
+        <div>
+          <div class="svc-col-label">--profile langfuse</div>
+          <div class="svc-item"><div class="name">Langfuse + worker</div><div class="cap">traces · cost · quality dashboards</div></div>
+          <div class="svc-item"><div class="name">ClickHouse · MinIO · Postgres</div><div class="cap">Langfuse storage</div></div>
+          <div class="svc-item"><div class="name">Eval worker</div><div class="cap">continuous grounding / safety / relevance scoring — lives with the platform, not the agents</div></div>
+        </div>
+        <div>
+          <div class="svc-col-label">--profile observability</div>
+          <div class="svc-item"><div class="name">Grafana · Loki · Promtail</div><div class="cap">dashboards + log viewing — opt-in, not needed to run</div></div>
+        </div>
+        <div>
+          <div class="svc-col-label">--profile &lt;domain&gt;</div>
+          <div class="svc-item"><div class="name">wealth · insurance · servicing · hr</div><div class="cap">agent fleets spin up per domain — bring only the domains you demo</div></div>
+        </div>
+      </div>
+      <div class="invariant">Lean core runs the engine · measurement, dashboards, and domain agents are opt-in profiles</div>
     </div>
 
   </div>
 
-  <div class="footer-note"><strong>5 API endpoints · 6 pipeline stages · 4 domains · 13 specialist agents</strong> (5 HTTP wealth · 2 HTTP insurance · 5 MCP servicing · 1 HTTP HR) — every one of those boxes is a manifest, never a gateway code change.
-    <span class="footer-fine">Enforced on every PR by scripts/world-b-check.sh (CRITICAL: 0).</span>
+  <div class="footer-note"><strong>4 client-facing APIs · 6 pipeline stages · 4 domains · 13 specialist agents</strong> (5 HTTP wealth · 2 HTTP insurance · 5 MCP servicing · 1 HTTP HR) — every one of those boxes is a manifest, never a gateway code change.
+    <span class="footer-fine">Not aspirational — automatically enforced on every code change, so the gateway can never drift back into domain-specific logic.</span>
   </div>
 </div>
+</body>
+</html>

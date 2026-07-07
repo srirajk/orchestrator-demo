@@ -452,7 +452,7 @@
   <ol class="steps">
     <li>
       <span class="step-h">Ingress</span><span class="step-tag">request arrives</span>
-      <p>The request comes in from the Chat BFF (backend-for-frontend) as OpenAI-shape <strong>SSE</strong>, carrying the conversation window (assembled and compacted by the BFF) and a <strong>verified JWT</strong> that asserts identity, segment, data-classification clearance, and coverage. The token is RS256/JWKS and is <strong>verified at every hop.</strong></p>
+      <p>The request comes in from the Chat BFF (backend-for-frontend) as OpenAI-shape <strong>SSE</strong>, carrying the conversation window (assembled and compacted by the BFF) and a <strong>verified JWT</strong> that asserts identity, segment, data classification, and coverage. The token is RS256/JWKS and is <strong>verified at every hop.</strong></p>
       <p><span class="rule-badge">RULE</span> Authorization is <strong>always</strong> the JWT. Nothing the LLM says is ever trusted for authorization.</p>
     </li>
     <li>
