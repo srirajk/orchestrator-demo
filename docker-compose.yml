@@ -892,30 +892,17 @@ services:
       EVAL_TRACE_LIMIT: ${EVAL_TRACE_LIMIT:-50}
     restart: unless-stopped
 
-  # ── Boot provisioner ──────────────────────────────────────────────────────────
-  # Idempotent seeds so `docker compose up` yields a fully working stack with NO manual
-  # steps (World-B "sweet bring-up"). Each runs once and exits.
-
-  # Seed demo principals into Redis (rm_jane / rm_carlos / uw_sam / rm_guest).
-  seed-users:
-    image: redis/redis-stack-server:7.4.0-v3
-    container_name: conduit-seed-users
-    depends_on:
-      redis-stack:
-        condition: service_healthy
-    volumes:
-      - ./scripts:/scripts:ro
-    environment:
-      REDIS_HOST: redis-stack
-      REDIS_PORT: "6379"
-    command: ["bash", "/scripts/seed-users.sh"]
-    restart: "no"
-
-  # Dedicated demo seeder — does EXACTLY two things over the Docker network with NO host
-  # dependency (no docker exec, no docker socket, no host python):
-  #   1. Register Langfuse model prices  (BEFORE any traffic — Langfuse prices at ingestion)
-  #   2. Seed real demo conversations via the Chat BFF (real OIDC login, real Mongo IDs)
-  # It does NOT touch Redis principals — that stays the separate `seed-users` service above.
+  # ── Boot provisioner: THE one demo-data seeder ────────────────────────────────
+  # Every demo-data seeding step lives in this single service. It runs ONCE, at the end,
+  # after the whole stack is healthy (depends_on: service_healthy on everything the steps
+  # touch), then exits. NO docker exec, NO host dependency, NO docker socket — every hop is
+  # over the Docker network and every endpoint/key/cred comes from env. The orchestration
+  # (health waits → principals → Langfuse prices → BFF conversations → datasets → dashboard,
+  # in that order, each idempotent) is scripts/seed-all.sh.
+  #
+  # One image (infra/seeder) carries everything the steps need: python3 + requests +
+  # langfuse, curl, redis-cli, psql. (minio-init stays separate — it is pre-boot infra that
+  # must run BEFORE minio-dependent services, not demo-data seeding.)
   seeder:
     build:
       context: ./infra/seeder
@@ -924,16 +911,28 @@ services:
     volumes:
       - ./scripts:/scripts:ro
       - ./registry:/registry:ro
+      - ./eval:/eval:ro
     environment:
       # Internal (in-network) URLs — never localhost.
-      LANGFUSE_URL: http://langfuse:3000
+      REDIS_HOST: redis-stack
+      REDIS_PORT: "6379"
+      GATEWAY_URL: http://gateway:8080
       CHAT_BFF_URL: http://conduit-chat:8095
       IAM_URL: http://iam-service:8084
+      LANGFUSE_URL: http://langfuse:3000
       # Same Langfuse key defaults every other service uses.
       LANGFUSE_PROJECT_PUBLIC_KEY: ${LANGFUSE_PROJECT_PUBLIC_KEY:-pk-lf-meridian-public}
       LANGFUSE_PROJECT_SECRET_KEY: ${LANGFUSE_PROJECT_SECRET_KEY:-sk-lf-meridian-secret}
+      # Langfuse Postgres (dashboard step).
+      LANGFUSE_DB_HOST: langfuse-db
+      LANGFUSE_DB_PORT: "5432"
+      LANGFUSE_DB_USER: ${LANGFUSE_DB_USER:-langfuse}
+      LANGFUSE_DB_PASSWORD: ${LANGFUSE_DB_PASSWORD:-langfuse}
+      LANGFUSE_DB_NAME: langfuse
       SEED_PASSWORD: ${SEED_PASSWORD:-Meridian@2024}
     depends_on:
+      redis-stack:
+        condition: service_healthy
       gateway:
         condition: service_healthy
       conduit-chat:
@@ -942,25 +941,9 @@ services:
         condition: service_healthy
       langfuse:
         condition: service_started
-    command: ["bash", "/scripts/seed-demo-container.sh"]
-    restart: "no"
-
-  # Seed the Langfuse golden datasets (conduit-routing, conduit-synthesis). Retries until
-  # Langfuse + its self-seeded project are ready; the seeder itself is idempotent.
-  seed-datasets:
-    build:
-      context: ./eval
-      dockerfile: Dockerfile
-    container_name: conduit-seed-datasets
-    depends_on:
-      - langfuse
-    volumes:
-      - ./scripts:/scripts:ro
-    environment:
-      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PROJECT_PUBLIC_KEY:-pk-lf-meridian-public}
-      LANGFUSE_SECRET_KEY: ${LANGFUSE_PROJECT_SECRET_KEY:-sk-lf-meridian-secret}
-      LANGFUSE_HOST: http://langfuse:3000
-    command: ["sh", "/scripts/seed-datasets.sh"]
+      langfuse-db:
+        condition: service_healthy
+    command: ["bash", "/scripts/seed-all.sh"]
     restart: "no"
 
   # ── k6 load test — Phase 7 only (scale profile) ───────────────────────────────

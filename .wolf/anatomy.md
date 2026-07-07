@@ -1,645 +1,25 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-07-06T14:53:16.372Z
-> Files: 1067 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-07-01T21:14:48.621Z
+> Files: 680 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/
 
-- `AUDIT-REQUIREMENT.md` — LATE ADD (Sriraj, before sleep) — wire into the LAST wave (G / audit) (~327 tok)
 - `audit.py` — query, subst, bare_metric (~1488 tok)
-- `bff-clarify-composer.py` — Clarify-composer acceptance probe. An under-specified ask (no entity named) deterministically (~638 tok)
-- `bff-clarify-probe.py` — Trigger a clarify (under-specified ask → extracted ∩ required = ∅) as two different users, (~491 tok)
-- `bff-clarify-resolve.py` — login, send, run (~474 tok)
-- `bff-edge-probes.py` — Edge-case batch: clarify round-trip, no-coverage persona, bare ID, malformed input, (~830 tok)
-- `bff-hardcases.py` — Hard-cases probe (rm_jane, one conversation): relative/ordinal references, correction turns, (~1114 tok)
-- `bff-insurance-recency.py` — Insurance cross-domain recency probe (uw_sam, one conversation). Mirrors the wealth turn-5/6 (~755 tok)
-- `bff-longconvo.py` — One long (~26-turn) rm_jane working session through the real BFF — stresses multi-turn (~1479 tok)
-- `bff-multiturn-intent.py` — Drive a REAL multi-turn conversation through the Conduit Chat BFF (real OIDC login, (~1021 tok)
-- `bff-oneshot.py` (~291 tok)
-- `bff-polish-probes.py` — Polish-pass probes: mixed in/out-of-segment ask (partial fulfilment + honest denial note) (~640 tok)
-- `CLARIFY-COMPOSER.md` — Clarification composer — manifest-declared clarify POLICY (run after the polish pass lands) (~582 tok)
-- `CODEBASE-HEALTH-REPORT.md` — Codebase Health Report — feat/conduit-chat @ a4f4fba (2026-07-04, overnight) (~1105 tok)
-- `conduit-dashboards.html` (~12666 tok)
-- `conduit-ops-plane.html` — Conduit Insights — Operations Plane (~13836 tok)
-- `dash_analyze.py` — Enumerate Grafana dashboards; run each panel's targets against its datasource (~1189 tok)
-- `decisioning-engineering.html` — Conduit — Engineering the Decisioning Layer (~5364 tok)
-- `dump_turn.py` (~184 tok)
-- `EVIDENCE.md` — Conduit Chat memory COMPACTION — end-to-end proof via REAL BFF OIDC session (~1364 tok)
-- `guardrail_e2e.py` — End-to-end gateway guardrail tests via /v1/chat/completions with real persona JWTs. (~1408 tok)
-- `guardrail_synth.py` — Replay the gateway's EXACT AnswerSynthesizer system prompt + DATA-block format (~1152 tok)
-- `parse_all.py` (~250 tok)
-- `parse_trace.py` (~289 tok)
-- `parse.py` (~243 tok)
-- `POLISH-PASS.md` — Gateway polish pass — run AFTER the recency fix lands + is verified (~530 tok)
-- `pr2-body.md` — Chat UI (~481 tok)
-- `pv.py` (~72 tok)
-- `pv2.py` (~62 tok)
-- `pw-bff-convos.js` — API routes: POST (2 endpoints) (~722 tok)
-- `pw-design.js` — Declares OUT (~279 tok)
-- `pw-replay.js` — Declares OUT (~570 tok)
-- `pw-verify.js` — Declares OUT (~784 tok)
-- `run_turns.sh` — Drives a multi-turn conversation through the REAL BFF OIDC session (cookie jar). (~676 tok)
 - `V2__seed_demo_data.sql` — ============================================================================ (~4215 tok)
-- `validate.sh` — Drives the 3 authz glass-box scenarios against the gateway and captures `gate` frames. (~581 tok)
-- `verify_chat.py` (~338 tok)
-
-## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/3819a0a5-db46-43a1-8702-6f72db1172db/scratchpad/
-
-- `conduit-architecture.html` — Conduit · Solution Architecture (~4696 tok)
-- `conduit-pipeline.html` — Conduit · Gateway Pipeline (~6132 tok)
 
 ## ../../.claude/projects/-Users-srirajkadimisetty-projects-orchestrator-demo/memory/
 
 - `feedback_eval_framework.md` (~487 tok)
 - `feedback_gateway_rules.md` (~526 tok)
-- `feedback_no_deferral_framing.md` (~253 tok)
 - `feedback_observability_standard.md` (~364 tok)
 - `feedback_workflow_parallelism.md` (~341 tok)
-- `MEMORY.md` — Memory Index (~432 tok)
-- `project_abac_model.md` (~601 tok)
+- `MEMORY.md` — Memory Index (~207 tok)
 - `project_domain_manifest_strategy.md` — Agreed Architecture — Domain Manifest + Gateway Strategy (~958 tok)
 - `project_gateway_auth_model.md` (~548 tok)
-- `project_insights_telemetry_privacy.md` (~481 tok)
 - `project_langfuse_observability_model.md` (~462 tok)
 - `project_meridian_gateway.md` — What this project is (~777 tok)
 - `reference_prompt_framework.md` (~323 tok)
-
-## ../conduit-ui-tests/
-
-- `00-START-HERE.md` — Conduit Chat — Manual Test Pack (~488 tok)
-- `01-message-rendering.md` — 01 — Message Rendering & Persistence  ⭐ MOST IMPORTANT (~423 tok)
-- `02-authorization-matrix.md` — 02 — Authorization: allow vs deny across personas (~505 tok)
-- `03-access-notices.md` — 03 — Access Notices: red (denied) vs blue (partial) (~403 tok)
-- `04-glassbox-trace.md` — 04 — Glass-box Decision Trace (right panel) (~363 tok)
-- `05-conversation-management.md` — 05 — Conversation Management (sidebar) (~302 tok)
-- `06-session-logout.md` — 06 — Session & Logout (~354 tok)
-- `07-multiturn-memory.md` — 07 — Multi-turn & Memory (compaction) (~373 tok)
-
-## ../orchestrator-chat/
-
-- `AUTHZ-SPEC.md` — Authorization Model — Spec & Non-Breaking Rollout Plan (~2828 tok)
-- `AXIOM-SCIM-ROADMAP.md` — Axiom Roadmap — SCIM provisioning + Capabilities view (PARKED, don't forget) (~1518 tok)
-- `CODEX-HANDOFF.md` — Handoff → Codex (validation & test) (~1176 tok)
-- `docker-compose.yml` — Docker Compose services (~11560 tok)
-- `FINISHED.md` — FINISHED — auth fixes · per-segment Users screen · compaction · load test (~1444 tok)
-- `MORNING-REPORT.md` — Morning Report — ABAC model + glass-box + chat + eval/guardrails/audit (~1669 tok)
-- `package.json` — Node.js package manifest (~86 tok)
-- `RAG-DESIGN.md` — RAG + Projects — Design (PARKED, revisit later) (~993 tok)
-- `TEST-KIT-FINDINGS.md` — TEST-KIT Findings — persona seed/auth drift (write-up before fix) (~1195 tok)
-- `TEST-KIT.md` — Conduit — Complete Test Kit (personas · entitlements · tracing · telemetry) (~2696 tok)
-- `USER-TESTING-GUIDE.md` — Conduit — User Testing Guide (walk through it one by one) (~1533 tok)
-
-## ../orchestrator-chat/.wolf/
-
-- `anatomy.md` — anatomy.md (~18267 tok)
-- `buglog.json` — Declares annotation (~37379 tok)
-- `cerebrum.md` — Cerebrum (~8628 tok)
-
-## ../orchestrator-chat/apps/admin/
-
-- `package.json` — Node.js package manifest (~191 tok)
-
-## ../orchestrator-chat/apps/admin/src/
-
-- `App.tsx` — Protected (~529 tok)
-
-## ../orchestrator-chat/apps/admin/src/api/
-
-- `client.ts` — ABAC per-segment clearance MAP: `{ segment -> data tier }` (AUTHZ-SPEC §1). Each key is a (~2508 tok)
-
-## ../orchestrator-chat/apps/admin/src/components/
-
-- `Sidebar.tsx` — nav (~802 tok)
-
-## ../orchestrator-chat/apps/admin/src/hooks/
-
-- `useAuth.tsx` — Ctx (~948 tok)
-
-## ../orchestrator-chat/apps/admin/src/pages/
-
-- `AuditLog.tsx` — ACTION_COLORS (~4400 tok)
-- `Dashboard.tsx` — STAT_TONES (~2618 tok)
-- `Policies.tsx` — ACTIONS_MAP (~4078 tok)
-- `Roles.tsx` — EMPTY — renders table, modal (~3386 tok)
-- `Teams.tsx` — EMPTY — renders modal (~4434 tok)
-- `Users.tsx` — A single "segment @ clearance-tier" pairing in the form. (~9028 tok)
-
-## ../orchestrator-chat/apps/chat/
-
-- `.dockerignore` — Keep the Docker build context small and reproducible. (~45 tok)
-- `Dockerfile` — Docker container definition (~419 tok)
-
-## ../orchestrator-chat/apps/chat/bff/
-
-- `pom.xml` (~1010 tok)
-
-## ../orchestrator-chat/apps/chat/bff/src/main/java/ai/conduit/chat/
-
-- `ConduitChatApplication.java` — Conduit Chat BFF — a persistent, LibreChat-like chat backend for the Conduit (~275 tok)
-
-## ../orchestrator-chat/apps/chat/bff/src/main/java/ai/conduit/chat/auth/
-
-- `AccessTokenService.java` — Retrieves the signed-in user's OIDC <b>access token</b> to forward to the Conduit (~1240 tok)
-- `AuthController.java` — Auth entry/exit points that the SPA calls directly. (~897 tok)
-- `CurrentUser.java` — Resolves the authenticated principal from the security context and maps the OIDC (~627 tok)
-- `MeController.java` — {@code GET /api/me} — the authenticated user's public profile. (~157 tok)
-- `UserDto.java` — Public profile shape returned by {@code GET /api/me}. (~55 tok)
-
-## ../orchestrator-chat/apps/chat/bff/src/main/java/ai/conduit/chat/chat/
-
-- `ChatController.java` — The core streaming endpoint: {@code POST /api/conversations/{id}/messages}. (~1670 tok)
-- `ChatStreamService.java` — Pipes the gateway's SSE stream through to the client byte-for-byte while (~2596 tok)
-- `GatewayClient.java` — Client for the Conduit gateway's OpenAI-compatible {@code /v1/chat/completions} (~1392 tok)
-- `GatewayStream.java` — An open streaming response from the gateway: the HTTP status plus the raw body (~258 tok)
-- `SendMessageRequest.java` — Body for {@code POST /api/conversations/{id}/messages}. (~62 tok)
-- `TraceController.java` — Proxies the Conduit gateway's glass-box trace SSE stream to the SPA, scoped to a single (~879 tok)
-
-## ../orchestrator-chat/apps/chat/bff/src/main/java/ai/conduit/chat/config/
-
-- `AppProperties.java` — Strongly-typed configuration for the Conduit Chat BFF, bound from (~1225 tok)
-- `AsyncConfig.java` — Provides a virtual-thread executor used for fire-and-forget background work (~212 tok)
-- `MongoConfig.java` — Enables {@code @CreatedDate}/{@code @LastModifiedDate} auditing on documents. (~84 tok)
-- `SecurityConfig.java` — HTTP security for the BFF. (~2210 tok)
-- `WebConfig.java` — Serves the built React SPA as static resources with a history-API fallback: (~516 tok)
-
-## ../orchestrator-chat/apps/chat/bff/src/main/java/ai/conduit/chat/conversation/
-
-- `Conversation.java` — A conversation owned by a single user. The string {@code id} serializes as (~809 tok)
-- `ConversationController.java` — Conversation CRUD. The streaming send endpoint (~811 tok)
-- `ConversationDetailDto.java` — {@code GET /api/conversations/{id}} response: the conversation plus its messages. (~79 tok)
-- `ConversationDto.java` — Conversation response shape. Exposes {@code id} (string), never the Mongo (~186 tok)
-- `ConversationRepository.java` — Persistence for {@link Conversation}. Every query is scoped by {@code userId} (~158 tok)
-- `ConversationService.java` — Conversation lifecycle. Every operation is scoped by {@code userId}: a (~1275 tok)
-- `CreateConversationRequest.java` — Body for {@code POST /api/conversations}. {@code title} is optional. (~47 tok)
-- `UpdateConversationRequest.java` — Body for {@code PATCH /api/conversations/{id}}. All fields optional (partial update). (~61 tok)
-
-## ../orchestrator-chat/apps/chat/bff/src/main/java/ai/conduit/chat/files/
-
-- `FileController.java` — {@code POST /api/files} — multipart upload of a single {@code file} field, persisted (~734 tok)
-- `FileUploadResponse.java` — Response for {@code POST /api/files}. (~122 tok)
-- `MinioStorageService.java` — MinIO/S3-backed {@link StorageService}. The bucket is created on first use if absent. (~643 tok)
-- `StorageException.java` — Raised when the object store cannot service a request (→ HTTP 502 via the handler). (~76 tok)
-- `StorageService.java` — Object-storage seam for uploaded files. A real interface (not a controller TODO) so (~186 tok)
-
-## ../orchestrator-chat/apps/chat/bff/src/main/java/ai/conduit/chat/memory/
-
-- `ChatMessage.java` — A single {role, content} pair as sent to the (stateless) gateway in (~69 tok)
-- `ContextAssembler.java` — Builds the per-turn context that the client (this BFF) sends to the stateless (~2800 tok)
-- `LlmSummaryService.java` — LLM-backed {@link SummaryService}. Regenerates a conversation's facts-free rolling (~2649 tok)
-- `SummaryService.java` — Maintains a conversation's <b>facts-free</b> rolling topical summary. (~291 tok)
-- `TokenCounter.java` — Estimates the token size of text using a real JVM tiktoken implementation (~678 tok)
-
-## ../orchestrator-chat/apps/chat/bff/src/main/java/ai/conduit/chat/message/
-
-- `Message.java` — A single chat message belonging to a conversation. {@code role} is (~661 tok)
-- `MessageDto.java` — Message response shape. Exposes {@code id} (string), never the Mongo {@code _id}. (~102 tok)
-- `MessageRepository.java` — Persistence for {@link Message}, scoped by conversation. (~207 tok)
-- `MessageService.java` — Persistence-facing operations for conversation messages. (~536 tok)
-
-## ../orchestrator-chat/apps/chat/bff/src/main/java/ai/conduit/chat/project/
-
-- `CreateProjectRequest.java` — Body for {@code POST /api/projects}. (~55 tok)
-- `Project.java` — A user-owned project used to group conversations. Serializes {@code id} (not {@code _id}). (~472 tok)
-- `ProjectController.java` — Project CRUD. (~592 tok)
-- `ProjectDto.java` — Project response shape. Exposes {@code id} (string), never the Mongo {@code _id}. (~84 tok)
-- `ProjectRepository.java` — Persistence for {@link Project}, scoped by {@code userId}. (~132 tok)
-- `ProjectService.java` — Project lifecycle, scoped by {@code userId} for per-user isolation. (~396 tok)
-- `UpdateProjectRequest.java` — Body for {@code PATCH /api/projects/{id}}. All fields optional (partial update). (~51 tok)
-
-## ../orchestrator-chat/apps/chat/bff/src/main/java/ai/conduit/chat/web/
-
-- `BadRequestException.java` — Thrown for malformed / missing request input (→ HTTP 400). (~64 tok)
-- `ErrorResponse.java` — Consistent JSON error body. The {@code error} field preserves parity with the (~90 tok)
-- `GatewayException.java` — Thrown when the Conduit gateway is unreachable or returns a non-2xx status (→ HTTP 502). (~97 tok)
-- `GlobalExceptionHandler.java` — Central mapping of exceptions to consistent JSON error responses. Never leaks (~1604 tok)
-- `HealthController.java` — Lightweight, dependency-free liveness endpoint at {@code /health} for the container (~144 tok)
-- `NotFoundException.java` — Thrown when a resource does not exist or is not owned by the current user (→ HTTP 404). (~70 tok)
-- `UnauthorizedException.java` — Thrown when the caller has no valid authentication context or no usable access token (~187 tok)
-
-## ../orchestrator-chat/apps/chat/bff/src/main/resources/
-
-- `application.yml` (~1290 tok)
-
-## ../orchestrator-chat/apps/chat/server/src/
-
-- `index.ts` — Conduit Chat — BFF server (~539 tok)
-
-## ../orchestrator-chat/apps/chat/server/src/auth/
-
-- `session.ts` — Configured express-session middleware backed by MongoDB via connect-mongo. (~251 tok)
-
-## ../orchestrator-chat/apps/chat/server/src/db/models/
-
-- `Conversation.ts` — Exports IConversation, Conversation (~267 tok)
-
-## ../orchestrator-chat/apps/chat/server/src/routes/
-
-- `auth.ts` — OIDC auth routes. (~1075 tok)
-
-## ../orchestrator-chat/apps/chat/server/src/types/
-
-- `session.d.ts` — Augment express-session's SessionData with our application-specific fields. (~211 tok)
-- `session.ts` — Augment express-session's SessionData with our application-specific fields. (~276 tok)
-
-## ../orchestrator-chat/apps/chat/web/
-
-- `tsconfig.json` — TypeScript configuration (~146 tok)
-- `vite.config.ts` (~75 tok)
-
-## ../orchestrator-chat/apps/chat/web/src/api/
-
-- `client.ts` — Generic fetch wrapper. (~501 tok)
-- `types.ts` — Exports User, Conversation, Message, ConversationDetail, Project (~145 tok)
-
-## ../orchestrator-chat/apps/chat/web/src/components/
-
-- `AuthGate.tsx` — UserContext (~464 tok)
-- `ChatPane.tsx` — ChatPane (~2549 tok)
-- `Message.tsx` — CopyButton — renders table (~1585 tok)
-- `Sidebar.tsx` — ConversationItem (~2911 tok)
-- `TraceRail.tsx` — Compact number/string coercers + duration formatter (mirror of gateway-client presenters). (~2186 tok)
-
-## ../orchestrator-chat/apps/chat/web/src/hooks/
-
-- `useTraceStream.ts` — Frames for the current turn (reset when a new `request_start` arrives). (~1933 tok)
-
-## ../orchestrator-chat/apps/chat/web/src/lib/
-
-- `gatewayTrace.ts` — Gateway trace contract for the chat SPA — the self-contained, canonical definition of the (~971 tok)
-
-## ../orchestrator-chat/apps/insights/web/src/
-
-- `App.tsx` — RANGE_OPTIONS (~15348 tok)
-
-## ../orchestrator-chat/docs/
-
-- `ROUTING-CONTEXT-FIX.md` — Plan — Context-aware agent routing (fix keyword-less misroute) (~1126 tok)
-
-## ../orchestrator-chat/eval/
-
-- `cerbos_golden_dataset.json` (~8751 tok)
-- `eval_deepeval.py` — PartialHonestyMetric: configure_judge_model, measure, a_measure, is_successful + 5 more (~5840 tok)
-- `multiturn-recency-insurance.json` — Declares name (~995 tok)
-- `multiturn-routing.json` (~1568 tok)
-
-## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/api/v1/chat/
-
-- `ChatCompletionsController.java` — Non-streaming ({@code stream:false}) — runs the same pipeline into a buffering emitter, (~2506 tok)
-
-## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/config/
-
-- `SecurityConfig.java` — Spring Security resource server + role-based URL authorization. (~3711 tok)
-
-## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/auth/
-
-- `CerbosEntitlementAdapter.java` — Batch-calls the Cerbos PDP for relationship entitlement checks. (~4058 tok)
-- `EntitlementService.java` — Enforces relationship-level entitlements by delegating to the Cerbos PDP. (~3261 tok)
-- `JwksClient.java` — Fetches and caches the JWKS (public key set) from the Axiom (iam-service) service. (~1088 tok)
-- `Principal.java` — A caller's verified identity + structural attributes used for authorization checks. (~1207 tok)
-- `RequestContext.java` — Per-request context stored in a ThreadLocal. (~275 tok)
-
-## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/chat/
-
-- `ChatService.java` — How many recent user turns (including the current one) are concatenated into the routing (~20626 tok)
-
-## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/clarify/
-
-- `ClarificationComposer.java` — The 4th grounded LLM call site (alongside {@code IntentClassifier}, {@code EntityExtractor}, (~5178 tok)
-
-## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/coverage/
-
-- `CoverageClient.java` — HTTP client for the DISCOVER / CHECK / RESOLVE coverage pipeline. (~1967 tok)
-
-## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/intent/
-
-- `IntentClassifier.java` — Stage A of the request pipeline: classifies the user's intent before routing. (~9814 tok)
-
-## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/manifest/
-
-- `DomainManifest.java` — Clarification style, defaulting to the safe deterministic template when unset. (~474 tok)
-- `DomainManifestStore.java` — Resolves ${VAR_NAME} placeholders in all Coverage URL fields using Spring Environment. (~4566 tok)
-- `EffectiveManifest.java` — True when this domain opts in to LLM-composed (natural) clarification wording. (~855 tok)
-
-## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/infrastructure/identity/
-
-- `IdentityExtractor.java` — Extracts the caller's user ID from the inbound HTTP request. (~404 tok)
-
-## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/infrastructure/telemetry/
-
-- `RequestCorrelationFilter.java` — Sets MDC context keys on every inbound request so all log lines carry: (~1043 tok)
-- `TraceEvent.java` — A single structured event emitted by the request pipeline to the glass-box panel. (~668 tok)
-
-## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/infrastructure/telemetry/event/
-
-- `CheckDeniedData.java` — Trace event payload emitted when an entitlement CHECK denies access, so the glass-box (~279 tok)
-- `GateData.java` — Trace event payload for a single authorization <em>gate</em> decision, emitted so the (~582 tok)
-
-## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/insights/
-
-- `BoardCatalog.java` — Declarative catalog of the 7 Insights boards and their panels, each bound to a PromQL query (~4998 tok)
-- `InsightsAuthorizer.java` — Governance gate for {@code /v1/insights/*} — admin-gated through the SAME Cerbos/ABAC PDP path (~715 tok)
-- `InsightsController.java` — Conduit Insights API — native, admin-gated analytics inside the gateway. (~2378 tok)
-- `InsightsExecutor.java` — Structured, deadline-bounded, partial-tolerant fan-out engine for a board's panels — the (~2350 tok)
-- `LangfuseMetricsSource.java` — {@link MetricsSource} over the Langfuse public API (cost, token usage, eval scores). (~5881 tok)
-- `MetricsSource.java` — Seam over a queryable metrics backend (hard-rule g: build the simple path, leave the (~256 tok)
-- `ModelPricing.java` — Config-driven LLM token pricing for Conduit's cost analytics. (~2022 tok)
-- `PanelSpec.java` — A declarative panel: its identity/type/unit plus a {@code producer} that queries the (~259 tok)
-- `PrometheusMetricsSource.java` — {@link MetricsSource} over the Prometheus HTTP API (PromQL). (~2695 tok)
-- `Range.java` — Selectable analytics time-range for an Insights board — the three windows the UI's timeframe (~685 tok)
-- `Sources.java` — The metric backends a panel producer may query. Passed to every {@link PanelSpec} producer. (~60 tok)
-
-## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/insights/model/
-
-- `Board.java` — One board's rendered panels. Wire shape: {@code {panels:[...]}}. (~49 tok)
-- `LabeledValue.java` — A labelled scalar: {@code {"label":...,"value":...}}. (~112 tok)
-- `Panel.java` — A single rendered panel in a board. (~897 tok)
-- `Point.java` — One point in a time series: {@code t} = epoch-seconds, {@code v} = value. (~67 tok)
-
-## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/orchestration/executor/
-
-- `FlatPlanExecutor.java` — Flat plan executor: fans out all {@link PlanNode}s in parallel on virtual threads (~1927 tok)
-
-## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/orchestration/harness/
-
-- `AgentHarness.java` — Wraps each agent adapter call in a resilience harness: (~4603 tok)
-
-## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/registry/index/
-
-- `VectorIndex.java` — HNSW vector index over example-prompt embeddings. (~2472 tok)
-
-## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/registry/introspection/
-
-- `AgentIntrospector.java` — Derives input/output schemas and resolved connection from agent specs. (~2010 tok)
-
-## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/registry/model/
-
-- `AgentManifest.java` — Full stored manifest = what the domain team submitted + what the gateway derived. (~823 tok)
-
-## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/registry/service/
-
-- `AgentRegistry.java` — Core registry service. (~1593 tok)
-
-## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/resolver/service/
-
-- `AgentResolver.java` — Resolver — Stage A + Stage B from the spec. (~3137 tok)
-
-## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/synthesis/answer/
-
-- `AnswerSynthesizer.java` — Synthesizes a grounded, streamed answer from agent outputs using Z.AI GLM. (~9353 tok)
-
-## ../orchestrator-chat/gateway/src/main/resources/
-
-- `application.yml` (~3148 tok)
-
-## ../orchestrator-chat/gateway/src/test/java/ai/conduit/gateway/domain/auth/
-
-- `AuthzFromMembershipTest.java` — Verifies JWT → Principal mapping and Cerbos-backed entitlement decisions. (~3831 tok)
-
-## ../orchestrator-chat/gateway/src/test/java/ai/conduit/gateway/domain/manifest/
-
-- `EffectiveManifestMergeTest.java` — Class: EffectiveManifestMergeTest (~1272 tok)
-- `EffectiveManifestTest.java` — Targeted unit tests for {@link EffectiveManifest#merge} covering the three (~906 tok)
-
-## ../orchestrator-chat/gateway/src/test/java/ai/conduit/gateway/orchestration/harness/
-
-- `AgentHarnessResilienceIT.java` — Resilience integration test — verifies the harness's core invariant: (~2932 tok)
-
-## ../orchestrator-chat/glassbox/
-
-- `index.html` — Conduit Glass-Box — Live Decision Trace (~6230 tok)
-
-## ../orchestrator-chat/iam-service/src/main/java/com/openwolf/iam/auth/
-
-- `CustomUserDetailsService.java` — Loads {@link UserDetails} for Spring Security's {@link org.springframework.security.authentication.A (~670 tok)
-- `JwtClaimsCustomizer.java` — Enriches OIDC access tokens with mandated claims ({@code tenant_id}, {@code roles}, (~1692 tok)
-- `OidcClaimEnricher.java` — Builds the enrichment claims for an access token <b>inside a read-only transaction</b>. (~2141 tok)
-
-## ../orchestrator-chat/iam-service/src/main/java/com/openwolf/iam/config/
-
-- `SecurityConfig.java` — Security configuration for the IAM service. (~6430 tok)
-
-## ../orchestrator-chat/iam-service/src/main/java/com/openwolf/iam/controller/
-
-- `AuditController.java` — Paginated access to the audit log. All write operations in the IAM service (~714 tok)
-- `AuthController.java` — Custom authentication endpoints — issues RS256 JWTs directly. (~3562 tok)
-- `PolicyController.java` — Manages Cerbos YAML policies: CRUD + generate/validate/apply lifecycle. (~1365 tok)
-
-## ../orchestrator-chat/iam-service/src/main/java/com/openwolf/iam/dto/
-
-- `AuditLogResponse.java` — Class: AuditLogResponse (~106 tok)
-- `UserResponse.java` — Public user representation — password_hash is NEVER included. (~257 tok)
-
-## ../orchestrator-chat/iam-service/src/main/java/com/openwolf/iam/service/
-
-- `AuditService.java` — Records immutable audit entries for every write operation in the IAM service. (~1735 tok)
-- `UserService.java` — Service: UserService (~4722 tok)
-
-## ../orchestrator-chat/iam-service/src/main/resources/db/migration/
-
-- `V4__reconcile_personas.sql` — ============================================================================ (~1409 tok)
-- `V5__abac_segments_map_and_chat_user.sql` — ============================================================================ (~1148 tok)
-- `V6__abac_classification_ladder.sql` — ============================================================================ (~388 tok)
-- `V7__seed_conduit_admin.sql` — ============================================================================ (~512 tok)
-- `V8__seed_demo_bankers.sql` — ============================================================================ (~1319 tok)
-
-## ../orchestrator-chat/iam-service/src/main/resources/templates/
-
-- `login.html` — Axiom — Meridian Identity Platform (~1219 tok)
-
-## ../orchestrator-chat/iam-service/src/test/java/com/openwolf/iam/auth/
-
-- `JwtClaimsCustomizerTest.java` — Captures {@code logAccess} calls so the chat_access audit emit can be asserted. (~1951 tok)
-
-## ../orchestrator-chat/infra/
-
-- `alerting-rules.yml` (~434 tok)
-- `prometheus.yml` (~181 tok)
-
-## ../orchestrator-chat/infra/cerbos/policies/
-
-- `agent_resource.yaml` (~2284 tok)
-- `domain_resource.yaml` (~384 tok)
-- `iam_derived_roles.yaml` (~656 tok)
-- `iam_resource.yaml` — Declares in (~1505 tok)
-- `insights_resource.yaml` (~355 tok)
-- `relationship_resource.yaml` (~271 tok)
-
-## ../orchestrator-chat/infra/grafana/provisioning/dashboards/
-
-- `compaction.json` (~2518 tok)
-
-## ../orchestrator-chat/infra/seeder/
-
-- `Dockerfile` — Docker container definition (~308 tok)
-
-## ../orchestrator-chat/mock-agents/hr-policy/
-
-- `__init__.py` (~0 tok)
-- `Dockerfile` — Docker container definition (~100 tok)
-- `main.py` — API: 1 endpoints (~901 tok)
-- `requirements.txt` — Python dependencies (~81 tok)
-
-## ../orchestrator-chat/mock-agents/hr-policy/policy_qa/
-
-- `__init__.py` (~0 tok)
-- `handler.py` — API: 1 endpoints (~908 tok)
-
-## ../orchestrator-chat/mock-agents/hr-policy/shared/
-
-- `__init__.py` (~0 tok)
-- `canned_data.py` (~6947 tok)
-- `error_schema.py` — ErrorResponse: error_response (~270 tok)
-- `fault_knobs.py` — fault_knob_middleware (~269 tok)
-- `jwt_verify.py` — verify_bearer_token (~1118 tok)
-- `telemetry.py` — setup_telemetry, agent_span (~1097 tok)
-
-## ../orchestrator-chat/mock-agents/hr-policy/tests/
-
-- `__init__.py` (~0 tok)
-- `test_hr_policy.py` — TestHealth: test_health_ok, test_health_domain, test_openapi_json_served, test_openapi_has_get_opera (~2156 tok)
-
-## ../orchestrator-chat/mock-agents/insurance-coverage/
-
-- `main.py` — API: 4 endpoints (~1200 tok)
-
-## ../orchestrator-chat/mock-agents/wealth-coverage/
-
-- `data.py` — discover, check, resolve (~1415 tok)
-- `main.py` — API: 4 endpoints (~1169 tok)
-
-## ../orchestrator-chat/mock-agents/wealth-market-research/
-
-- `__init__.py` (~0 tok)
-- `Dockerfile` — Docker container definition (~105 tok)
-- `main.py` — API: 1 endpoints (~892 tok)
-- `requirements.txt` — Python dependencies (~84 tok)
-
-## ../orchestrator-chat/mock-agents/wealth-market-research/market_research/
-
-- `__init__.py` (~0 tok)
-- `handler.py` — API: 1 endpoints (~864 tok)
-
-## ../orchestrator-chat/mock-agents/wealth-market-research/shared/
-
-- `__init__.py` (~0 tok)
-- `canned_data.py` (~6266 tok)
-- `error_schema.py` — ErrorResponse: error_response (~270 tok)
-- `fault_knobs.py` — fault_knob_middleware (~276 tok)
-- `jwt_verify.py` — verify_bearer_token (~1118 tok)
-- `telemetry.py` — setup_telemetry, agent_span (~1112 tok)
-
-## ../orchestrator-chat/mock-agents/wealth-market-research/tests/
-
-- `__init__.py` (~0 tok)
-- `test_market_research.py` — TestHealth: test_health_ok, test_health_domain, test_openapi_json_served, test_openapi_has_get_opera (~1905 tok)
-
-## ../orchestrator-chat/mock-agents/wealth/shared/
-
-- `canned_data.py` (~2433 tok)
-- `jwt_verify.py` — JWKSUnreachable: verify_bearer_token (~1332 tok)
-
-## ../orchestrator-chat/packages/gateway-client/
-
-- `package.json` — Node.js package manifest (~200 tok)
-- `tsconfig.json` — TypeScript configuration (~154 tok)
-
-## ../orchestrator-chat/packages/gateway-client/src/
-
-- `client.ts` — Base URL for gateway calls. Defaults to `/gateway-api` (proxy path). (~2380 tok)
-- `events.ts` — Presentation-neutral helpers that turn a raw gateway trace event into a (~823 tok)
-- `format.ts` — Framework-agnostic formatting helpers for trace / manifest rendering. (~263 tok)
-- `index.ts` (~350 tok)
-- `selectors.ts` — Manifest field selectors — the gateway may emit snake_case or camelCase (~463 tok)
-- `sse.ts` — Minimal, dependency-free Server-Sent Events parsing over a fetch (~601 tok)
-- `types.ts` — Wire types for the Conduit gateway. (~985 tok)
-
-## ../orchestrator-chat/packages/ui/
-
-- `package.json` — Node.js package manifest (~288 tok)
-- `tailwind.preset.js` (~517 tok)
-- `tsconfig.json` — TypeScript configuration (~172 tok)
-
-## ../orchestrator-chat/packages/ui/src/
-
-- `index.ts` (~210 tok)
-
-## ../orchestrator-chat/packages/ui/src/components/
-
-- `Badge.tsx` — colors (~385 tok)
-- `Button.tsx` — Button (~510 tok)
-- `Dialog.tsx` — Dialog (~966 tok)
-- `EmptyState.tsx` — EmptyState (~223 tok)
-- `Input.tsx` — Input (~1142 tok)
-- `Panel.tsx` — Panel (~190 tok)
-- `Skeleton.tsx` — Skeleton (~85 tok)
-- `StatusPill.tsx` — StatusPill (~156 tok)
-- `Toast.tsx` — Ctx (~590 tok)
-
-## ../orchestrator-chat/packages/ui/styles/
-
-- `tokens.css` — Styles: 5 rules (~543 tok)
-
-## ../orchestrator-chat/registry/
-
-- `agent-manifest.schema.json` (~1829 tok)
-- `domain-manifest.schema.json` (~1255 tok)
-- `model-prices.json` (~325 tok)
-
-## ../orchestrator-chat/registry/domains/
-
-- `hr.json` (~162 tok)
-- `insurance.json` (~299 tok)
-- `wealth-management.json` (~303 tok)
-
-## ../orchestrator-chat/registry/domains/hr/
-
-- `hr-knowledge.json` (~150 tok)
-
-## ../orchestrator-chat/registry/domains/insurance/
-
-- `claims-servicing.json` (~704 tok)
-
-## ../orchestrator-chat/registry/domains/wealth-management/
-
-- `private-banking.json` (~804 tok)
-
-## ../orchestrator-chat/registry/manifests/
-
-- `acme.hr.policy_qa.json` (~646 tok)
-- `acme.wealth.holdings.json` — Declares allocation (~492 tok)
-- `acme.wealth.market_research.json` (~577 tok)
-
-## ../orchestrator-chat/scripts/
-
-- `e2e-matrix.sh` — e2e-matrix.sh — full ABAC variation matrix through the running gateway/chat path. (~1065 tok)
-- `seed-conversations-via-bff.py` — Seed REAL Conduit Chat conversations through the BFF, via the real OIDC login flow. (~2161 tok)
-- `seed-demo-container.sh` — seed-demo-container.sh — Seed the Conduit demo over the Docker network with NO host (~958 tok)
-- `seed-demo-conversations.py` — mint_token, chat, main (~2922 tok)
-- `seed-langfuse-models.py` — main (~1661 tok)
-- `seed-users.sh` — seed-users.sh — Idempotently seed demo principals into Redis. (~1783 tok)
-- `smoke-ui.sh` — smoke-ui.sh — Tier-1 fast gate. No LLM calls, no sleeps: catches integration breakage (~934 tok)
-- `smoke.sh` — smoke.sh — full API/CLI smoke for Conduit. Run against a live stack (docker compose up). (~1998 tok)
-
-## ../orchestrator-chat/tests/e2e/
-
-- `playwright.config.ts` (~314 tok)
-
-## ../orchestrator-chat/tests/e2e/tests/
-
-- `00-login.spec.ts` — Login flow — canonical Conduit chat SPA (:8099) via the Axiom OIDC identity provider. (~1150 tok)
-- `01-branding.spec.ts` — Conduit branding — the canonical chat SPA (:8099) must present itself as "Conduit". (~304 tok)
-- `03-jwt-identity.spec.ts` — Phase 8 / M15 — RS256/JWKS identity. (~2452 tok)
-- `04-entitlements.spec.ts` — Phase 5 / M8 — Cerbos ABAC entitlements. (~1738 tok)
-- `07-multi-turn.spec.ts` — Multi-turn conversation tests. (~2446 tok)
-- `helpers.ts` — Obtain a real RS256 JWT from the iam-service (~1826 tok)
-
-## ../orchestrator-chat/tests/integration/
-
-- `test_gateway_coverage.py` — get_jwt, collect_sse_text, chat, test_6_gateway_health_check (~3725 tok)
-
-## ../orchestrator-chat/tests/load/
-
-- `multi-turn-load-test.js` — Conduit Gateway — Multi-Turn Conversation Load Test (~3684 tok)
 
 ## ./
 
@@ -648,7 +28,7 @@
 - `agent-manifest.schema.json` (~1558 tok)
 - `BUILD_REPORT.md` — Build Report — Conduit AI Gateway (~1028 tok)
 - `CLAUDE.md` — OpenWolf (~1698 tok)
-- `docker-compose.yml` — Docker Compose services (~8832 tok)
+- `docker-compose.yml` — Docker Compose services (~8697 tok)
 - `MORNING-NOTES.md` — Morning notes — OIDC SSO is fixed ✅ (~1292 tok)
 - `README.md` — Project documentation (~4394 tok)
 - `TODO.md` — Conduit — Open TODO / Backlog (~823 tok)
@@ -658,6 +38,14 @@
 
 - `settings.json` (~441 tok)
 - `settings.local.json` (~36 tok)
+
+## .wolf/
+
+- `OPENWOLF.md` — OpenWolf operating protocol for navigation, memory, bug logging, and session-end updates. (~1675 tok)
+- `anatomy.md` — Auto-maintained project file catalog with descriptions and token estimates. (~6443 tok)
+- `buglog.json` — OpenWolf JSON bug log for errors, failures, root causes, and fixes. (~2124 tok)
+- `cerebrum.md` — Long-term project learnings, user preferences, do-not-repeat notes, and decision log. (~6443 tok)
+- `memory.md` — Chronological action log for session work and outcomes. (~2771 tok)
 
 ## .claude/rules/
 
@@ -765,11 +153,6 @@
 
 - `test_insurance.py` — TestInsuranceAuth: test_no_auth_header_is_allowed, test_bearer_unused_is_allowed, test_empty_bearer_ (~3686 tok)
 
-## .claude/worktrees/agent-a9525c1575ed263bd/
-
-- `CONDUIT-CHAT-BUILD-CHECKLIST.md` — Conduit Chat (`apps/chat`) — Build Checklist (~1403 tok)
-- `CONDUIT-CHAT-FEATURES.md` — Conduit Chat — Feature Spec (LibreChat parity + Conduit glass-box) (~2571 tok)
-
 ## .claude/worktrees/agent-acd21fbd8fbefdaf5/gateway/src/main/java/ai/meridian/gateway/domain/auth/
 
 - `CerbosEntitlementAdapter.java` — Batch-calls the Cerbos PDP for relationship entitlement checks. (~3134 tok)
@@ -831,21 +214,6 @@
 - `nodeids` (~2952 tok)
 - `stepwise` (~1 tok)
 
-## .wolf/
-
-- `anatomy.md` — Auto-maintained project file catalog with descriptions and token estimates. (~6443 tok)
-- `buglog.json` — OpenWolf JSON bug log for errors, failures, root causes, and fixes. (~2124 tok)
-- `cerebrum.md` — Long-term project learnings, user preferences, do-not-repeat notes, and decision log. (~6443 tok)
-- `memory.md` — Chronological action log for session work and outcomes. (~2771 tok)
-- `OPENWOLF.md` — OpenWolf operating protocol for navigation, memory, bug logging, and session-end updates. (~1675 tok)
-
-## Glass-box authorization gate trace (2026-07-03)
-
-- `apps/chat/web/src/components/TraceRail.tsx` — collapsible Decision-trace rail: intent→resolve→gate rows (✓/✗ + reason)→answer. (~1400 tok)
-- `apps/chat/web/src/hooks/useTraceStream.ts` — conversation-scoped trace SSE hook + selectDenial(). (~900 tok)
-- `apps/chat/web/src/lib/gatewayTrace.ts` — vendored mirror of @conduit/gateway-client SSE parse + trace types (Docker build-context safe). (~600 tok)
-- `gateway/.../telemetry/event/GateData.java` — Trace payload for one authz gate decision: {gate, effect, reason, agent}; audience|segment|classification|coverage. (~350 tok)
-
 ## admin-ui/
 
 - `.env.example` — Documents optional Vite gateway proxy override and admin JWT storage keys. (~55 tok)
@@ -891,6 +259,10 @@
 - `Skeleton.tsx` — Skeleton (~83 tok)
 - `Toast.tsx` — Ctx (~528 tok)
 
+## admin-ui/src/hooks/
+
+- `useAuth.tsx` — Ctx (~551 tok)
+
 ## admin-ui/src/features/workbench/
 
 - `api.ts` — Typed gateway API boundary for trace health, domain/agent registry, auth-capable trace stream request metadata, and MVP non-streaming chat turns (~1070 tok)
@@ -918,10 +290,6 @@
 - `selectors.ts` — Domain, coverage, agent, and trace selector helpers (~430 tok)
 - `traceEvents.ts` — Trace event tone/title/detail presentation helpers (~780 tok)
 
-## admin-ui/src/hooks/
-
-- `useAuth.tsx` — Ctx (~551 tok)
-
 ## admin-ui/src/pages/
 
 - `AuditLog.tsx` — ACTION_COLORS — renders table (~3652 tok)
@@ -932,32 +300,6 @@
 - `Teams.tsx` — EMPTY — renders modal (~3886 tok)
 - `Users.tsx` — Users screen; per-segment "Segments & clearance" row editor (segment+tier rows, dup/required validation, live segments+classification-schema options), table shows per-segment chips, default chat_user role (~7200 tok)
 - `Workbench.tsx` — Tiny route wrapper around features/workbench/WorkbenchPage (~30 tok)
-
-## apps/admin/ (Axiom Admin Console — split from admin-ui)
-
-
-## conduit-ui-tests/
-
-- `CODEX-DEMO-POLISH.md` — Codex Brief — Demo Polish: Trace-panel reliability + Grafana tidy (~976 tok)
-- `CODEX-INSIGHTS-AUTH.md` — Codex Brief — Insights App: Auth Shell (STEP 3, do this FIRST) (~1012 tok)
-- `CODEX-INSIGHTS-BOARDS.md` — Codex Brief — Insights App: The 7 Boards (STEP 4, AFTER the auth shell) (~930 tok)
-- `CODEX-INSIGHTS-REBUILD.md` — Codex Brief — Insights UI REBUILD (port the mockup file exactly) (~932 tok)
-- `CODEX-INSIGHTS-UI-COMPLETE.md` — Codex Brief — Conduit Insights: the Operations Plane (~2666 tok)
-- `CODEX-INSIGHTS-UI.md` — Codex Brief — Conduit Insights UI (native React boards) (~808 tok)
-- `CODEX-NOTICE-FLICKER-FIX.md` — Codex Brief — Fix the Access-Notice Flicker (frontend only, small + surgical) (~986 tok)
-- `CODEX-PIPELINE-PROGRESS.md` — Codex Brief — Live Pipeline-Progress Line in the Chat Center (frontend only) (~1684 tok)
-- `CODEX-POLISH-PASS.md` — Codex Brief — Conduit Chat Demo-Polish Pass (frontend only) (~2062 tok)
-- `CODEX-STEP1-AXIOM-LOGIN.md` — Codex Brief — STEP 1: Axiom SSO Login Page (polish the IdP login) (~785 tok)
-- `CODEX-STEP2-CONDUIT-SSO-ENTRY.md` — Codex Brief — STEP 2: Conduit Chat "Sign in with SSO" entry page (~905 tok)
-- `CODEX-STEP2B-LOGOUT-FIX.md` — Codex Brief — STEP 2b: Fix logout (real single-sign-out + land on Conduit SSO page) (~827 tok)
-- `CODEX-STEP3C-POLISH.md` — Codex Brief — STEP 3c: Insights boards polish (layout + timeframe + nav + wording) (~778 tok)
-- `CODEX-UI-TEST-PLAN.md` — Codex UI Test Plan — Grafana · Langfuse · Chat UI · Insights UI (~1790 tok)
-- `CONDUIT-CLIENT-BRIEFING.html` — Conduit — Client Briefing (Owner's Study Copy) (~22968 tok)
-- `CONDUIT-DEMO-RUNBOOK.html` — Conduit — Live Demo Runbook (~7829 tok)
-- `INSIGHTS-SPEC.md` — Conduit Insights — Build Spec (native, governed analytics) (~1123 tok)
-- `INSIGHTS-UPGRADES.md` — Conduit Insights — Upgrades & Roadmap (living doc — APPEND, never delete) (~1045 tok)
-- `INSIGHTS-WORDING.md` — Conduit Insights — Wording & Terminology (CANONICAL — use everywhere) (~611 tok)
-- `RESEARCH-copilot-agent-tracing.md` — Research — E2E tracing when the gateway invokes Microsoft Copilot agents over HTTP (2026-07) (~987 tok)
 
 ## docs/
 
@@ -1092,11 +434,11 @@
 - `Dockerfile` — Docker container definition (~86 tok)
 - `eval_deepeval.py` — PartialHonestyMetric: configure_judge_model, measure, a_measure, is_successful + 6 more (~5444 tok)
 - `golden-prompts.json` (~3317 tok)
+- `multiturn-routing.json` — Multi-turn context-aware routing regression guard (Calderon keyword-less-follow-up fix); expected domain/outcome + must_not_route per turn. (~600 tok)
+- `multiturn-recency-insurance.json` — Cross-domain anaphor-recency regression guard (bug-234, uw_sam/insurance): establish policy A → switch B → re-name A → pronoun must bind to just-named A (POL-77002) not older B (POL-77001); asserted via coverage-gate entity in the decision trace. Proves the focal-recency fix is domain-generic. (~500 tok)
 - `langfuse_continuous.py` — check_grounding, check_partial_honesty, llm_judge (~7457 tok)
 - `langfuse_run_experiment.py` — Run a Langfuse experiment against the meridian-routing dataset. (~4132 tok)
 - `langfuse_seed_datasets.py` — Seed Langfuse datasets from eval/golden-prompts.json. (~3565 tok)
-- `multiturn-recency-insurance.json` — Cross-domain anaphor-recency regression guard (bug-234, uw_sam/insurance): establish policy A → switch B → re-name A → pronoun must bind to just-named A (POL-77002) not older B (POL-77001); asserted via coverage-gate entity in the decision trace. Proves the focal-recency fix is domain-generic. (~500 tok)
-- `multiturn-routing.json` — Multi-turn context-aware routing regression guard (Calderon keyword-less-follow-up fix); expected domain/outcome + must_not_route per turn. (~600 tok)
 - `requirements.txt` — Python dependencies (~41 tok)
 
 ## eval/prompts/
@@ -1129,13 +471,13 @@
 
 - `ChatService.java` — Entry point from the controller — called on a virtual thread after the async boundary. Routes FETCH with bias-to-fetch (hasGroundedResolvableReference→resolveContextual entityKnown); FOLLOW_UP fallthrough to fetch when a grounded entity + confident route exist; routing-abstained FETCH degrades to grounded history synthesis when prior assistant data exists (hasPriorAssistantData). Deterministic identifier PRE-CHECK (identifyByIdPattern→resolve+CHECK→deny with the id's OWN domain copy before routing, bug-236); coverage else-branch named-entity backstop (resolveNamedReferenceBackstop/properNounPhrases: resolve typed proper-nouns principal-agnostically→CHECK→deny out-of-coverage NAMED entity instead of clarifying, bug-235); withheldDomains (structural-gate-pruned domains) threaded to the synthesizer for honest partial fulfillment (bug-237). Clarify copy aligned to capability (bug-239): buildDeterministicClarification lists candidates by NAME (+ id) with '- ' bullets (NO positional numbers) and invites "Reply with the <entityNoun> name or identifier" (entityNoun = manifest entity display, no hardcoded 'relationship ID'); buildClarificationQuestion hoists primaryResolvableEntity so the noun frames template + composed. No positional-index parsing anywhere — the resolver only honours name / manifest id_pattern. bug-233. (~16600 tok)
 
-## gateway/src/main/java/ai/conduit/gateway/domain/clarify/
-
-- `ClarificationComposer.java` — The 4th grounded LLM call site (alongside IntentClassifier / EntityExtractor / AnswerSynthesizer). PHRASES a natural clarify question over a GROUNDED candidate set handed in as DELIMITED DATA; it never DECIDES to clarify (that stays deterministic in ChatService: extracted ∩ required = ∅) and never invents. Generic scaffold; entity noun + optional tone come from the manifest (World-B clean). compose() returns null (→ caller serves the deterministic template) when the LLM is unreachable OR validate() rejects: output blank / too long, contains any id_pattern token outside the candidate id set (core foreign-ID guard), or references no candidate. System prompt forbids positional numbers / 'reply with the number' — options are referred to by name + identifier only (bug-239); OPTIONS data list uses '- ' bullets not numbers. Non-streaming, single completion, own tight budget (config conduit.llm.clarification-composer.*, defaults inherit intent-classifier Z.AI/flash). (~2400 tok)
-
 ## gateway/src/main/java/ai/conduit/gateway/domain/intent/
 
 - `IntentClassifier.java` — Stage A: combined intent+entity LLM (manifest-compiled prompt, temperature 0). Focal-entity rules (explicit name in latest msg supersedes history; pronoun→last focal; emit typed NAME not a recalled id; named entity→FETCH not CLARIFY) + deterministic deriveFocalReference() [id in latest msg → user-grounded ref → focalIdByNameMatch (proper-noun tokens vs transcript "Name (ID)") → lastFocalSingleId anaphora carry]. Extracts entities for FETCH_DATA AND FOLLOW_UP (bias-to-fetch fallthrough). bug-233. RECENCY (bug-234): deriveFocalReference() precedence reordered so an anaphoric turn that names no new entity binds to the MOST-RECENTLY-NAMED focal entity (recency carry) BEFORE the grounded-LLM-value fallback; a name shared with the latest message (sharesWord, ≥4 chars) counts as naming-this-turn and supersedes older focus. Fixes pronoun binding to a stale older entity. (~6500 tok)
+
+## gateway/src/main/java/ai/conduit/gateway/domain/clarify/
+
+- `ClarificationComposer.java` — The 4th grounded LLM call site (alongside IntentClassifier / EntityExtractor / AnswerSynthesizer). PHRASES a natural clarify question over a GROUNDED candidate set handed in as DELIMITED DATA; it never DECIDES to clarify (that stays deterministic in ChatService: extracted ∩ required = ∅) and never invents. Generic scaffold; entity noun + optional tone come from the manifest (World-B clean). compose() returns null (→ caller serves the deterministic template) when the LLM is unreachable OR validate() rejects: output blank / too long, contains any id_pattern token outside the candidate id set (core foreign-ID guard), or references no candidate. System prompt forbids positional numbers / 'reply with the number' — options are referred to by name + identifier only (bug-239); OPTIONS data list uses '- ' bullets not numbers. Non-streaming, single completion, own tight budget (config conduit.llm.clarification-composer.*, defaults inherit intent-classifier Z.AI/flash). (~2400 tok)
 
 ## gateway/src/main/java/ai/conduit/gateway/synthesis/answer/
 
@@ -1394,11 +736,6 @@
 - `index.html` — Meridian Glass-Box — Live Decision Trace (~6092 tok)
 - `nginx.conf` — Nginx configuration (~86 tok)
 
-## htmls/
-
-- `CONDUIT-CLIENT-BRIEFING.html` — Conduit — Client Briefing (Owner's Study Copy) (~24919 tok)
-- `CONDUIT-DEMO-RUNBOOK.html` — Conduit — Live Demo Runbook (~8820 tok)
-
 ## iam-service/
 
 - `Dockerfile` — Docker container definition (~216 tok)
@@ -1456,12 +793,12 @@
 - `AssignRoleRequest.java` — Class: AssignRoleRequest (~49 tok)
 - `AuditLogResponse.java` — Class: AuditLogResponse (~99 tok)
 - `CreateGroupRequest.java` — Class: CreateGroupRequest (~96 tok)
+- `ImpersonateRequest.java` — Admin-only impersonation token request DTO accepting userId/user_id. (~55 tok)
 - `CreatePolicyRequest.java` — Class: CreatePolicyRequest (~74 tok)
 - `CreateRoleRequest.java` — Class: CreateRoleRequest (~71 tok)
 - `CreateUserRequest.java` — Class: CreateUserRequest (~129 tok)
 - `ErrorResponse.java` — Standard error response body. Every exception handler returns this shape. (~156 tok)
 - `GroupResponse.java` — Class: GroupResponse (~95 tok)
-- `ImpersonateRequest.java` — Admin-only impersonation token request DTO accepting userId/user_id. (~55 tok)
 - `LoginResponse.java` — Class: LoginResponse (~46 tok)
 - `PageResponse.java` — Generic paginated response wrapper. (~153 tok)
 - `PatchBookRequest.java` — Adds and/or removes relationship IDs from a RM's book. (~75 tok)
@@ -1568,16 +905,13 @@
 
 ## infra/grafana/provisioning/dashboards/
 
-- `agent-health.json` — "Meridian — Agent Health" — SRE ops dashboard: fleet overview (healthy/open stats, error rate timeseries, latency heatmap), repeated per-agent detail row ($agentId: calls/min, error%, p95ms, CB state, bulkhead gauges, timeout%), resilience story row (CB history, bulkhead pressure, HTTP vs MCP bar chart). schemaVersion 39, 10s refresh. (~6972 tok)
-- `business-overview.json` (~8926 tok)
-- `conduit-demo.json` (~10618 tok)
-- `conduit-gateway.json` (~2406 tok)
-- `conversation-trace.json` (~2953 tok)
+- CONSOLIDATED to 4 provisioned boards (Jul 2026): Platform 1, Platform 2, Agents, Business Overview, Conversation Trace. conduit-demo/conduit-gateway/gateway-performance/resource-usage/compaction MOVED to `infra/grafana/_retired/` (still on disk, no longer loaded by Grafana — mount covers `provisioning/` only). Boards generated by scratchpad `build_platform.py`.
+- `agent-health.json` — "Conduit — Agent Health" — SRE per-agent detail board (fleet stats, per-agent rows, CB history, bulkhead pressure). KEPT. (~6972 tok)
+- `business-overview.json` — "Conduit — Business Overview". KEPT. (~8926 tok)
+- `conduit-platform.json` — "Conduit — Platform 1 · Health & Experience" — master board 1/2. Golden-signals top strip (answer-success gauge, E2E p95, TTFT p95, graceful-degradation, dependency health, req/s) + Traffic/Latency/Intent&Clarify/Outcomes/Routing rows. Threshold-colored, per-panel descriptions. uid conduit-platform.
+- `conduit-platform-2.json` — "Conduit — Platform 2 · Internals & Infra" — master board 2/2. Resources (JVM/containers/Redis) + Compaction + Authz (Cerbos allow/deny) + Agents-at-a-glance (state-timeline) + Dependency-health tiles. uid conduit-platform-2.
+- `conversation-trace.json` — "Conduit — Conversation Trace Explorer". FIXED: entity_id var removed; Tempo panel re-keyed to `{ span.conversation.id = "$convId" }` (new gateway span attribute); Loki `|= "$convId"` panels kept. (~2953 tok)
 - `dashboards.yaml` (~55 tok)
-- `gateway-performance.json` (~2829 tok)
-- `meridian-demo.json` (~10773 tok)
-- `meridian-gateway.json` (~2415 tok)
-- `resource-usage.json` (~1597 tok)
 
 ## infra/grafana/provisioning/datasources/
 
@@ -1788,9 +1122,6 @@
 - `jwt_verify.py` — verify_bearer_token (~1103 tok)
 - `telemetry.py` — setup_telemetry, agent_span (~1312 tok)
 
-## packages/ (monorepo shared libs — additive split)
-
-
 ## phases/
 
 - `PHASE-1.md` — Phase 1 — Skeleton & First Streamed Reply (~466 tok)
@@ -1857,19 +1188,19 @@
 - `eval-gate.sh` — Eval release gate — seeds Langfuse datasets, then runs the DeepEval routing (~753 tok)
 - `eval-routing.py` — mint_admin_token, load_prompts, resolve, f1 + 1 more (~1675 tok)
 - `integration-test.sh` — Curl-based integration tests against the running gateway. (~1352 tok)
-- `probe-recency-insurance.py` — Cross-domain anaphor-recency BFF driver (uw_sam via OIDC): 5-turn insurance conversation proving the bug-234 focal-recency fix is domain-generic; pairs with eval/multiturn-recency-insurance.json. (~350 tok)
 - `requirements-eval.txt` — Meridian eval dependencies (not runtime — install on dev/CI machine) (~33 tok)
 - `run-integration-tests.sh` (~354 tok)
 - `scenario-perf.py` — class: check_summary, mint_token, chat, resolve + 4 more (~14188 tok)
-- `seed-datasets.sh` — seed-datasets.sh — boot provisioner step: seed the Langfuse golden datasets (~353 tok)
+- `seed-all.sh` — THE single consolidated demo-data seeder (runs in conduit-seeder, once, after the whole stack is healthy). Ordered idempotent steps: (a) health waits, (b) principals→Redis via seed-users.sh, (c) Langfuse prices via seed-langfuse-models.py BEFORE traffic, (d) BFF conversations via seed-conversations-via-bff.py, (e) datasets via /eval/langfuse_seed_datasets.py, (f) dashboard via seed-langfuse-dashboard.sh. Env-only, no docker exec, no host dep. Per-step + summary logging; exit≠0 if any step fails. Replaced seed-users/seed-datasets/seed-langfuse-dashboard/seeder compose services. (~1400 tok)
+- `seed-langfuse-dashboard.sh` — Idempotently seeds the "Conduit — LLM Quality & Cost" Langfuse dashboard by applying seed-data/langfuse-dashboard.sql to Langfuse Postgres. Env-driven (LANGFUSE_DB_*); uses psql (now in the seeder image) else `docker exec`. Called as step (f) of seed-all.sh. (~500 tok)
 - `seed-demo.py` — mint_token, chat, chat_multi, wait_for_gateway + 1 more (~2771 tok)
 - `seed-demo.sh` — Meridian Gateway — Phoenix/Tempo demo seed (~176 tok)
-- `seed-users.sh` — seed-users.sh — Idempotently seed demo principals into Redis. (~1048 tok)
-- `seed-users.sh` — seed-users.sh — Idempotently seed demo principals into Redis. (~910 tok)
-- `smoke-ui.sh` — Tier-1 fast gate (invoked first by smoke.sh): 10 health URLs 200, CORS preflights per browser origin (chat→BFF :8099, admin→iam :5182→:8084), 4 personas mint JWT. No LLM/sleeps; exit=#failures. (~550 tok)
+- `seed-users.sh` — Idempotently seed demo principals into Redis. PRINCIPALS ONLY now (price/convo/dataset/dashboard tails moved to seed-all.sh). Runs as seed-all.sh step (b) and standalone on host. (~700 tok)
 - `smoke.sh` — smoke.sh — full API/CLI smoke for Conduit. Run against a live stack (docker compose up). (~1581 tok)
+- `smoke-ui.sh` — Tier-1 fast gate (invoked first by smoke.sh): 10 health URLs 200, CORS preflights per browser origin (chat→BFF :8099, admin→iam :5182→:8084), 4 personas mint JWT. No LLM/sleeps; exit=#failures. (~550 tok)
 - `verify-telemetry-e2e.sh` — ───────────────────────────────────────────────────────────────────────────── (~1151 tok)
 - `verify.sh` — Full verification script — runs after each phase to confirm acceptance criteria. (~713 tok)
+- `probe-recency-insurance.py` — Cross-domain anaphor-recency BFF driver (uw_sam via OIDC): 5-turn insurance conversation proving the bug-234 focal-recency fix is domain-generic; pairs with eval/multiturn-recency-insurance.json. (~350 tok)
 - `wait-for-healthy.sh` — Wait until all core docker-compose services report healthy, then exit 0. (~323 tok)
 - `world-b-check.sh` — ───────────────────────────────────────────────────────────────────────────── (~1272 tok)
 
@@ -1884,6 +1215,7 @@
 
 - `principals.json` — 3 demo principals (rm_jane, rm_carlos, rm_guest) matching PrincipalStore hash schema: id, roles/book/segments/domains/adminDomains as JSON arrays, clearance as int string (~200 tok)
 - `principals.json` (~266 tok)
+- `langfuse-dashboard.sql` — Idempotent SQL that seeds the "Conduit — LLM Quality & Cost" Langfuse dashboard: 6 dashboard_widgets rows (cost-by-model, eval-scores, trace-volume, latency p50/p95, token-usage, score-histogram) + 1 dashboards row with the 12-col grid `definition`. Resolves project_id/owner by sub-query; all widgets min_version=1 (v1 views — v2 hits the v4-only events_core table). (~900 tok)
 
 ## test-results/
 
@@ -1894,6 +1226,11 @@
 - `__init__.py` (~0 tok)
 - `README.md` — Project documentation (~1979 tok)
 - `README.md` — Project documentation (~1980 tok)
+
+## tests/schema/
+
+- `requirements.txt` — Python dependencies for registry schema checks (~8 tok)
+- `test_registry_contracts.py` — Validates registry schemas, manifests, cross-references, context envelope and ledger event examples (~1100 tok)
 
 ## tests/e2e/
 
@@ -1935,11 +1272,6 @@
 - `smoke-test.js` — Meridian Gateway — Smoke Test (fast CI check) (~649 tok)
 - `smoke-test.js` — Meridian Gateway — Smoke Test (fast CI check) (~649 tok)
 
-## tests/schema/
-
-- `requirements.txt` — Python dependencies for registry schema checks (~8 tok)
-- `test_registry_contracts.py` — Validates registry schemas, manifests, cross-references, context envelope and ledger event examples (~1100 tok)
-
 ## user-mgmt/
 
 - `Dockerfile` — Docker container definition (~66 tok)
@@ -1966,3 +1298,33 @@
 ## user-mgmt/tests/
 
 - `test_user_mgmt.py` — Tests: jwks_has_correct_structure, jwks_e_is_65537, jwks_n_length, issue_token_returns_rs256_jwt + 20 more (~7203 tok)
+
+## packages/ (monorepo shared libs — additive split)
+
+- `packages/ui/tailwind.preset.js` — Axiom Tailwind preset (colors: axiom/gold/ink/canvas/line, enterprise+gold-focus shadows) shared by all surfaces
+- `packages/ui/styles/tokens.css` — @conduit/ui base + component CSS tokens (surface-card, surface-panel, sidebar-link, section-heading); copy of admin-ui index.css
+- `packages/ui/src/index.ts` — @conduit/ui barrel: Button, Input/Textarea/Select, Badge/RoleBadge, Dialog, Toast, Skeleton, EmptyState, Panel, StatusPill
+- `packages/ui/src/components/*.tsx` — shared React primitives copied from admin-ui components/ui + workbench Panel/StatusPill
+- `packages/ui/package.json` — @conduit/ui; peer react/react-dom; deps clsx+lucide-react; tsc build to dist
+- `packages/gateway-client/src/client.ts` — GatewayClient: chatCompletion, streamChatCompletion/streamChatContent (OpenAI SSE), streamTraceEvents, traceStreamRequest, listDomains/listAgents/traceHealth
+- `packages/gateway-client/src/sse.ts` — dependency-free SSE parse (iterateSseData, splitSseBlocks, sseDataFromBlock)
+- `packages/gateway-client/src/{types,selectors,events,format}.ts` — wire types + manifest selectors + trace event tone/title/detail helpers
+- `packages/gateway-client/package.json` — @conduit/gateway-client; zero runtime deps; tsc build to dist
+- `package.json` (root) — npm workspaces: packages/*, apps/admin; build:packages/build:admin scripts
+
+## apps/admin/ (Axiom Admin Console — split from admin-ui)
+
+- `apps/admin/**` — standalone copy of admin-ui (name: axiom-admin); Dashboard/Users/Teams/Roles/Policies(Cerbos)/Audit + operator Workbench; builds via `npm run build`; keeps local ui/gateway copies (does not yet consume @conduit packages)
+
+## Glass-box authorization gate trace (2026-07-03)
+- `gateway/.../telemetry/event/GateData.java` — Trace payload for one authz gate decision: {gate, effect, reason, agent}; audience|segment|classification|coverage. (~350 tok)
+- `gateway/.../domain/auth/EntitlementService.java` — +explainStructuralGates(): per-agent gate breakdown sourced from Cerbos (invoke + invoke_membership), World-B clean.
+- `gateway/.../domain/auth/CerbosEntitlementAdapter.java` — +checkAgentMembership(): membership-only `invoke_membership` probe; buildAgentRequest parametrized by action.
+- `gateway/.../domain/chat/ChatService.java` — publishes ordered `gate` frames (structural + coverage allow/deny) in handleFetchData.
+- `infra/cerbos/policies/agent_resource.yaml` — +`invoke_membership` action (segment membership without the classification-rank gate) for the glass-box trace.
+- `apps/chat/bff/.../chat/TraceController.java` — GET /api/conversations/{id}/trace/stream; ownership-checked SSE proxy of the gateway trace stream.
+- `apps/chat/bff/.../chat/GatewayClient.java` — +openTraceStream(conversationId).
+- `apps/chat/web/src/lib/gatewayTrace.ts` — vendored mirror of @conduit/gateway-client SSE parse + trace types (Docker build-context safe). (~600 tok)
+- `apps/chat/web/src/hooks/useTraceStream.ts` — conversation-scoped trace SSE hook + selectDenial(). (~900 tok)
+- `apps/chat/web/src/components/TraceRail.tsx` — collapsible Decision-trace rail: intent→resolve→gate rows (✓/✗ + reason)→answer. (~1400 tok)
+- `apps/chat/web/src/components/ChatPane.tsx` — wires the rail + "Access denied → gate: reason" banner.
