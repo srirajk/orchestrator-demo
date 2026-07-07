@@ -194,7 +194,7 @@ public class EntitlementService {
                         domain + " requires " + required + "; you hold " + heldTiers(principal), agent));
             } else {
                 out.add(new GateResult("classification", true,
-                        "clearance meets " + required, agent));
+                        "data classification meets " + required, agent));
             }
         }
         return out;
@@ -202,7 +202,7 @@ public class EntitlementService {
 
     /** Renders the principal's per-segment tiers for a legible classification reason, e.g. "wealth=confidential". */
     private static String heldTiers(Principal principal) {
-        if (principal.segments() == null || principal.segments().isEmpty()) return "no segment clearances";
+        if (principal.segments() == null || principal.segments().isEmpty()) return "no data classification on any segment";
         return principal.segments().entrySet().stream()
                 .map(e -> e.getKey() + "=" + e.getValue())
                 .collect(Collectors.joining(", "));
