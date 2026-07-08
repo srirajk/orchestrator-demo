@@ -38,10 +38,13 @@ Do a case-sensitive, word-boundaried replace of `acme.` → `meridian.` (do NOT 
    did not rename produced-type strings, only agent_ids).
 4. **Golden derived-DAG:** the resolver derives the same DAGs (holdings→concentration, the insurance
    and servicing fan-ins) with the renamed node ids. `cd gateway && mvn test` GREEN (99+).
-5. **Authz snapshot (critical):** BEFORE the rename, capture Cerbos allow/deny for a matrix of
-   principal × agent (rm_jane, uw_sam, the servicing user, plus a not-entitled user, across the
-   verticals). AFTER (Cerbos policies renamed in lockstep + Cerbos restarted), the SAME matrix must be
-   IDENTICAL. If any decision flips, the policy rename is wrong — fix before proceeding.
+5. **Authz snapshot (critical — FULL cross-product, not a sample):** BEFORE the rename, capture Cerbos
+   allow/deny for the **complete cross-product of ALL 16 agent ids × ALL seeded principals**, generated
+   by a script (not a hand-picked handful — a policy that after rename matches NO agent id flips to a
+   silent deny-by-default that a 5-agent sample never sees). AFTER: rename the Cerbos policies in
+   lockstep, **restart Cerbos and CONFIRM from its startup log/admin that the renamed policy files
+   loaded (same policy count)** before capturing the after-matrix (else you snapshot a stale container).
+   The full before/after matrices must be IDENTICAL. Any flip = the policy rename is wrong; fix first.
 6. **Agent tests:** `mock-agents` pytest suites green; `python3 -m pytest tests/e2e/security_harness` —
    the previously-passing checks still pass (identity xfails stay xfail).
 7. **Live BFF (rebuild gateway + all agent services + Cerbos):** the three verticals still answer
