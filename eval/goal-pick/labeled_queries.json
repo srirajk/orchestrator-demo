@@ -1,0 +1,288 @@
+{
+  "thresholds": {
+    "clear_goal_accuracy": 0.9,
+    "abstain_rate": 0.9
+  },
+  "queries": [
+    {
+      "id": "canonical_001",
+      "category": "canonical",
+      "persona": "rm_jane",
+      "query": "Show the top holdings for Whitman Family Office.",
+      "expected_goal": "meridian.wealth.holdings"
+    },
+    {
+      "id": "canonical_002",
+      "category": "canonical",
+      "persona": "rm_jane",
+      "query": "What is the portfolio performance for REL-00042 this quarter?",
+      "expected_goal": "meridian.wealth.performance"
+    },
+    {
+      "id": "canonical_003",
+      "category": "canonical",
+      "persona": "rm_jane",
+      "query": "Give me the risk profile for Whitman Family Office.",
+      "expected_goal": "meridian.wealth.risk_profile"
+    },
+    {
+      "id": "canonical_004",
+      "category": "canonical",
+      "persona": "rm_jane",
+      "query": "Are Whitman Family Office's financial goals on track?",
+      "expected_goal": "meridian.wealth.goal_planning"
+    },
+    {
+      "id": "canonical_005",
+      "category": "canonical",
+      "persona": "rm_jane",
+      "query": "Analyze concentration risk in Whitman Family Office's holdings.",
+      "expected_goal": "meridian.wealth.concentration"
+    },
+    {
+      "id": "canonical_006",
+      "category": "canonical",
+      "persona": "rm_jane",
+      "query": "Give me house-view market commentary on US equities.",
+      "expected_goal": "meridian.wealth.market_research"
+    },
+    {
+      "id": "canonical_007",
+      "category": "canonical",
+      "persona": "hr_partner_lund",
+      "query": "What does the employee handbook say about parental leave?",
+      "expected_goal": "meridian.hr.policy_qa"
+    },
+    {
+      "id": "canonical_008",
+      "category": "canonical",
+      "persona": "uw_sam",
+      "query": "Show policy details for POL-77001.",
+      "expected_goal": "meridian.insurance.policy_details"
+    },
+    {
+      "id": "canonical_009",
+      "category": "canonical",
+      "persona": "uw_sam",
+      "query": "What is the claim status for Continental Freight's policy?",
+      "expected_goal": "meridian.insurance.claim_status"
+    },
+    {
+      "id": "canonical_010",
+      "category": "canonical",
+      "persona": "uw_sam",
+      "query": "Assess renewal risk for POL-77001.",
+      "expected_goal": "meridian.insurance.renewal_risk"
+    },
+    {
+      "id": "canonical_011",
+      "category": "canonical",
+      "persona": "ops_analyst_singh",
+      "query": "Show settlement status for REL-00042.",
+      "expected_goal": "meridian.servicing.settlement_status"
+    },
+    {
+      "id": "canonical_012",
+      "category": "canonical",
+      "persona": "ops_analyst_singh",
+      "query": "Summarize cash management for Whitman Family Office.",
+      "expected_goal": "meridian.servicing.cash_management"
+    },
+    {
+      "id": "canonical_013",
+      "category": "canonical",
+      "persona": "ops_analyst_singh",
+      "query": "List custody positions for REL-00042.",
+      "expected_goal": "meridian.servicing.custody_positions"
+    },
+    {
+      "id": "canonical_014",
+      "category": "canonical",
+      "persona": "ops_analyst_singh",
+      "query": "Calculate NAV for FUND-ALPHA.",
+      "expected_goal": "meridian.servicing.nav"
+    },
+    {
+      "id": "canonical_015",
+      "category": "canonical",
+      "persona": "ops_analyst_singh",
+      "query": "Show corporate actions for Whitman Family Office.",
+      "expected_goal": "meridian.servicing.corporate_actions"
+    },
+    {
+      "id": "canonical_016",
+      "category": "canonical",
+      "persona": "ops_analyst_singh",
+      "query": "Assess settlement risk for REL-00042.",
+      "expected_goal": "meridian.servicing.settlement_risk"
+    },
+    {
+      "id": "near_miss_001",
+      "category": "near_miss",
+      "persona": "rm_jane",
+      "query": "Which positions are creating issuer concentration for Whitman Family Office?",
+      "expected_goal": "meridian.wealth.concentration"
+    },
+    {
+      "id": "near_miss_002",
+      "category": "near_miss",
+      "persona": "rm_jane",
+      "query": "For Calderon Trust, how did returns compare with benchmarks?",
+      "expected_goal": "meridian.wealth.performance"
+    },
+    {
+      "id": "near_miss_003",
+      "category": "near_miss",
+      "persona": "rm_jane",
+      "query": "Does Whitman look too aggressive for the client's stated tolerance?",
+      "expected_goal": "meridian.wealth.risk_profile"
+    },
+    {
+      "id": "near_miss_004",
+      "category": "near_miss",
+      "persona": "rm_jane",
+      "query": "Are the retirement and liquidity objectives for REL-00042 still achievable?",
+      "expected_goal": "meridian.wealth.goal_planning"
+    },
+    {
+      "id": "near_miss_005",
+      "category": "near_miss",
+      "persona": "uw_sam",
+      "query": "Do open losses change the renewal posture for Continental Freight?",
+      "expected_goal": "meridian.insurance.renewal_risk"
+    },
+    {
+      "id": "near_miss_006",
+      "category": "near_miss",
+      "persona": "uw_sam",
+      "query": "Pull the coverage terms and limits on POL-77001.",
+      "expected_goal": "meridian.insurance.policy_details"
+    },
+    {
+      "id": "near_miss_007",
+      "category": "near_miss",
+      "persona": "ops_analyst_singh",
+      "query": "Are any settlement breaks likely to create operating risk for REL-00042?",
+      "expected_goal": "meridian.servicing.settlement_risk"
+    },
+    {
+      "id": "near_miss_008",
+      "category": "near_miss",
+      "persona": "ops_analyst_singh",
+      "query": "What pending trades have not settled for Whitman Family Office?",
+      "expected_goal": "meridian.servicing.settlement_status"
+    },
+    {
+      "id": "near_miss_009",
+      "category": "near_miss",
+      "persona": "ops_analyst_singh",
+      "query": "How much liquidity is available across accounts for REL-00042?",
+      "expected_goal": "meridian.servicing.cash_management"
+    },
+    {
+      "id": "near_miss_010",
+      "category": "near_miss",
+      "persona": "hr_partner_lund",
+      "query": "Can an employee carry over unused vacation days under policy?",
+      "expected_goal": "meridian.hr.policy_qa"
+    },
+    {
+      "id": "cross_domain_001",
+      "category": "cross_domain_confuser",
+      "persona": "rm_jane",
+      "query": "Show concentration risk, not settlement risk, for Whitman Family Office.",
+      "expected_goal": "meridian.wealth.concentration"
+    },
+    {
+      "id": "cross_domain_002",
+      "category": "cross_domain_confuser",
+      "persona": "ops_analyst_singh",
+      "query": "Show settlement risk, not portfolio concentration, for REL-00042.",
+      "expected_goal": "meridian.servicing.settlement_risk"
+    },
+    {
+      "id": "cross_domain_003",
+      "category": "cross_domain_confuser",
+      "persona": "uw_sam",
+      "query": "I need renewal risk for the policy, not investment performance.",
+      "expected_goal": "meridian.insurance.renewal_risk"
+    },
+    {
+      "id": "cross_domain_004",
+      "category": "cross_domain_confuser",
+      "persona": "rm_jane",
+      "query": "Give me client risk tolerance, not insurance renewal risk, for REL-00042.",
+      "expected_goal": "meridian.wealth.risk_profile"
+    },
+    {
+      "id": "cross_domain_005",
+      "category": "cross_domain_confuser",
+      "persona": "ops_analyst_singh",
+      "query": "I want custody positions, not wealth holdings, for Whitman Family Office.",
+      "expected_goal": "meridian.servicing.custody_positions"
+    },
+    {
+      "id": "cross_domain_006",
+      "category": "cross_domain_confuser",
+      "persona": "rm_jane",
+      "query": "I want wealth holdings, not custody positions, for Whitman Family Office.",
+      "expected_goal": "meridian.wealth.holdings"
+    },
+    {
+      "id": "out_of_scope_001",
+      "category": "out_of_scope",
+      "persona": "rm_jane",
+      "query": "What's the cafeteria menu today?",
+      "expected_goal": "abstain"
+    },
+    {
+      "id": "out_of_scope_002",
+      "category": "out_of_scope",
+      "persona": "rm_jane",
+      "query": "Book me a flight to Tokyo next Friday.",
+      "expected_goal": "abstain"
+    },
+    {
+      "id": "out_of_scope_003",
+      "category": "out_of_scope",
+      "persona": "rm_jane",
+      "query": "Write a haiku about compound interest.",
+      "expected_goal": "abstain"
+    },
+    {
+      "id": "out_of_scope_004",
+      "category": "out_of_scope",
+      "persona": "uw_sam",
+      "query": "What is the weather in Chicago?",
+      "expected_goal": "abstain"
+    },
+    {
+      "id": "out_of_scope_005",
+      "category": "out_of_scope",
+      "persona": "ops_analyst_singh",
+      "query": "Summarize yesterday's NBA scores.",
+      "expected_goal": "abstain"
+    },
+    {
+      "id": "out_of_scope_006",
+      "category": "out_of_scope",
+      "persona": "hr_partner_lund",
+      "query": "Generate a logo for a coffee shop.",
+      "expected_goal": "abstain"
+    },
+    {
+      "id": "out_of_scope_007",
+      "category": "out_of_scope",
+      "persona": "rm_jane",
+      "query": "Tell me everything important.",
+      "expected_goal": "abstain"
+    },
+    {
+      "id": "out_of_scope_008",
+      "category": "out_of_scope",
+      "persona": "uw_sam",
+      "query": "Translate this sentence into French: good morning.",
+      "expected_goal": "abstain"
+    }
+  ]
+}
