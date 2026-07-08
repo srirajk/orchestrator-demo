@@ -16,6 +16,7 @@ assert that a given percentage is an industry or regulatory standard.
 """
 from __future__ import annotations
 
+import math
 import os
 from typing import Any, Optional
 
@@ -122,6 +123,10 @@ def compute_concentration(
             raise ConcentrationInputError(
                 f"position {_name_of(p)!r} has a missing or non-numeric 'value'"
             )
+        if not math.isfinite(val):
+            raise ConcentrationInputError(
+                f"position {_name_of(p)!r} has a non-finite 'value' (NaN/inf)"
+            )
         if val < 0:
             raise ConcentrationInputError(
                 f"position {_name_of(p)!r} has a negative 'value'"
@@ -192,6 +197,8 @@ def compute_concentration(
             cls = a.get("asset_class") or a.get("class") or "UNKNOWN"
             pct = a.get("pct")
             if pct is None or isinstance(pct, bool) or not isinstance(pct, (int, float)):
+                continue
+            if not math.isfinite(pct):
                 continue
             frac = float(pct) / 100.0 if pct > 1 else float(pct)
             ac_ranked.append({"asset_class": cls, "fraction": frac})
