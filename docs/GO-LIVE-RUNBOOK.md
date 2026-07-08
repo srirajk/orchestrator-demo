@@ -62,6 +62,22 @@ Expect: trace shows `plan_graph` (holdings → concentration), holdings runs, co
 its output, answer cites single-name % + HHI/effective-positions, flags vs the firm policy. Then run
 the negative: a user NOT entitled to Whitman → clean denial (proves the Step A-6 authz re-gate).
 
+### Multi-turn verification (the DAG must work in a conversation, not just turn 1)
+The DAG inherits the existing `FOLLOW_UP` → fetch fallthrough (`ChatService` ~line 808: a follow-up
+with a grounded entity + confident route falls through to `handleFetchData`, where `tryDag` fires).
+Verify a two-turn conversation:
+1. Turn 1: "Show me the Whitman Family Office holdings." → single-agent holdings answer; entity
+   `relationship_id` is now carried in the conversation.
+2. Turn 2: "Is she over-concentrated?" (no name repeated) → MUST (a) fall through to FETCH_DATA
+   (not history-only synthesis), and (b) route to the `concentration` goal so the DAG derives
+   holdings → concentration with the CARRIED entity. Confirm `effectiveBag.resolved()` contains
+   `relationship_id` from the prior turn at the plan-build site (log it once).
+CONFIRM the two failure modes and their safe fallbacks: if turn 2 is classified history-only, it
+answers from prior messages (no fresh concentration) — a UX gap, not a crash; if routing lands on
+`holdings` not `concentration`, the DAG is single-node and you get the plain holdings answer. Both
+are safe; both are tuning (intent-classifier follow-up bias + the concentration agent's example
+prompts) — not architecture changes.
+
 ## Also pending (tracked, not forgotten)
 - **F1 — servicing entity scope:** the servicing MCP handlers are relationship-scoped at runtime
   (`SETTLEMENTS.get(relationship_id)`), but their sub-domain manifests declare `fund_id`. Before the
