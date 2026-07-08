@@ -1,5 +1,5 @@
 {
-  "agent_id": "acme.servicing.corporate_actions",
+  "agent_id": "meridian.servicing.corporate_actions",
   "name": "Asset Servicing Corporate Actions",
   "description": "Returns upcoming corporate actions such as dividends, splits, and elections pending for a given relationship. Accepts relationship_id as the primary key. Accessed via MCP tool over SSE transport.",
   "version": "1.0.0",
@@ -50,5 +50,13 @@
     "access_mode": "read",
     "data_classification": "confidential",
     "sla_timeout_ms": 30000
+  },
+  "io": {
+    "consumes": [
+      { "entity": "fund_id", "required": true }
+    ],
+    "produces": [
+      { "name": "corporate_actions", "type": "servicing.corporate_actions" }
+    ]
   }
 }

@@ -17,7 +17,7 @@ _LLM_BASE  = os.environ.get("CASH_LLM_BASE_URL") or None
 _LLM_KEY   = os.environ.get("CASH_LLM_API_KEY") or None
 _LLM_MODEL = os.environ.get("CASH_LLM_MODEL") or None
 
-AGENT_ID = "acme.servicing.cash"
+AGENT_ID = "meridian.servicing.cash"
 log = logging.getLogger(__name__)
 
 

@@ -186,7 +186,7 @@ class JwtAuthMiddleware(BaseHTTPMiddleware):
             _log.warning("servicing-mcp: rejected — %s (path=%s)", error, request.url.path)
             return JSONResponse(
                 status_code=401,
-                content=mcp_error_dict(error, "acme.servicing.gateway", 401),
+                content=mcp_error_dict(error, "meridian.servicing.gateway", 401),
             )
         return await call_next(request)
 

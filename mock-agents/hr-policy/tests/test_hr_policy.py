@@ -84,7 +84,7 @@ class TestPolicyIndex:
 
     def test_index_has_agent_id(self):
         r = client.get("/policy-qa")
-        assert r.json()["agent_id"] == "acme.hr.policy_qa"
+        assert r.json()["agent_id"] == "meridian.hr.policy_qa"
 
 
 class TestPoliciesByTopic:
@@ -178,7 +178,7 @@ class TestFaultKnobs:
         assert r.status_code == 503
         body = r.json()
         assert "fault knob" in body["error"]
-        assert body["agent_id"] == "acme.hr.policy_qa"
+        assert body["agent_id"] == "meridian.hr.policy_qa"
 
     def test_delay_knob(self):
         import time

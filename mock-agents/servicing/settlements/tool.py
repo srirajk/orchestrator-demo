@@ -17,7 +17,7 @@ _LLM_BASE  = os.environ.get("SETTLEMENTS_LLM_BASE_URL") or None
 _LLM_KEY   = os.environ.get("SETTLEMENTS_LLM_API_KEY") or None
 _LLM_MODEL = os.environ.get("SETTLEMENTS_LLM_MODEL") or None
 
-AGENT_ID = "acme.servicing.settlement_status"
+AGENT_ID = "meridian.servicing.settlement_status"
 log = logging.getLogger(__name__)
 
 

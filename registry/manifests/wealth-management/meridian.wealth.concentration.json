@@ -1,5 +1,5 @@
 {
-  "agent_id": "acme.wealth.concentration",
+  "agent_id": "meridian.wealth.concentration",
   "name": "Wealth Concentration Analysis",
   "description": "Fan-in analytics agent: consumes a portfolio holdings payload (the wealth.holdings output) and computes single-name and asset-class concentration, HHI and effective number of positions, and breach flags against firm-configured thresholds. Computes from the supplied holdings; does not fetch data and does not take a relationship_id.",
   "version": "1.0.0",

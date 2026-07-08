@@ -187,7 +187,7 @@ Login `admin@meridian.bank`/`changeme`.
 1. Tracing → **Sessions**: a conversation appears as one session (`conv-…`); each turn is a `chat-turn` trace under it.
 2. Open a `chat-turn` from a **domain** question (§2.1).
 - **Expected:** trace has **input** and **output** (the answer), child spans per agent (HTTP + MCP),
-  and **tags** `domain:*` + `agent:*` (e.g. `domain:wealth-management`, `agent:acme.wealth.holdings`).
+  and **tags** `domain:*` + `agent:*` (e.g. `domain:wealth-management`, `agent:meridian.wealth.holdings`).
 - **PASS:** input+output present, agent spans present, domain/agent tags present. *(Chitchat/greeting
   traces legitimately have no tags.)*
 

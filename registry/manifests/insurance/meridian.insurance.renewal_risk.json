@@ -1,5 +1,5 @@
 {
-  "agent_id": "acme.insurance.renewal_risk",
+  "agent_id": "meridian.insurance.renewal_risk",
   "name": "Insurance Renewal Risk Analysis",
   "description": "Fan-in analytics agent: consumes a policy_details payload (insurance.policy_record) AND a claim_status payload (insurance.claim_status) and computes loss ratio, and combined ratio when an expense figure is available, with a breach flag against a firm-configured renewal target. Computes from the supplied policy + claim data; does not fetch data and does not take a policy_id directly.",
   "version": "1.0.0",

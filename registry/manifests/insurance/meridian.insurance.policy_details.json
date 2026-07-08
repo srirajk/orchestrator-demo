@@ -1,5 +1,5 @@
 {
-  "agent_id": "acme.insurance.policy_details",
+  "agent_id": "meridian.insurance.policy_details",
   "name": "Insurance Policy Details",
   "description": "Returns the policy record for a commercial insurance policy: line of business, premium, coverage limit, deductible, status, and effective date. Accepts policy_id as the primary key.",
   "version": "1.0.0",

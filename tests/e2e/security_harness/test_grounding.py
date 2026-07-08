@@ -97,9 +97,9 @@ def test_grounding_no_fabrication(jane_session):
 # Experiment 1 — second wealth.holdings producer -> concentration query should go FLAT
 #   (i.e. the gateway should refuse to silently pick one, per CLAUDE.md's zero-fabrication
 #   posture, and the concentration step should not run against an ambiguous input):
-#     1. Copy registry/manifests/wealth-management/acme.wealth.holdings.json to
-#        e.g. acme.wealth.holdings-2.json, change "agent_id" to
-#        "acme.wealth.holdings-2" and point connection.openapi_url at a second wealth-http
+#     1. Copy registry/manifests/wealth-management/meridian.wealth.holdings.json to
+#        e.g. meridian.wealth.holdings-2.json, change "agent_id" to
+#        "meridian.wealth.holdings-2" and point connection.openapi_url at a second wealth-http
 #        instance (or the same one — the point is two producers of the same output key).
 #     2. Restart the gateway (or trigger a registry reload if supported) so both manifests
 #        are loaded.

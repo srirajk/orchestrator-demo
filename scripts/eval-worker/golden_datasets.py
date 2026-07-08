@@ -20,7 +20,7 @@ GOLDEN_DATASETS = [
             "BlackRock Bond Fund 15% $727,500; Cash 20% $970,000."
         ),
         "expected": ["4,850,000", "Apple", "Microsoft", "Treasury", "Whitman"],
-        "agents": ["acme.wealth.holdings"],
+        "agents": ["meridian.wealth.holdings"],
         "dataset": "wealth-holdings",
     },
     {
@@ -33,7 +33,7 @@ GOLDEN_DATASETS = [
             "Cash 37% $777,000."
         ),
         "expected": ["2,100,000", "Amazon", "Goldman", "Vasquez"],
-        "agents": ["acme.wealth.holdings"],
+        "agents": ["meridian.wealth.holdings"],
         "dataset": "wealth-holdings",
     },
 
@@ -47,7 +47,7 @@ GOLDEN_DATASETS = [
             "Best performing position: Apple +22%. Worst: US Treasury -1.2%."
         ),
         "expected": ["8.3", "12.1", "Apple", "benchmark"],
-        "agents": ["acme.wealth.performance"],
+        "agents": ["meridian.wealth.performance"],
         "dataset": "wealth-performance",
     },
 
@@ -62,7 +62,7 @@ GOLDEN_DATASETS = [
             "Recommended increase: $2,000/month additional contribution."
         ),
         "expected": ["8,000,000", "retirement", "2035", "90%"],
-        "agents": ["acme.wealth.goal_planning"],
+        "agents": ["meridian.wealth.goal_planning"],
         "dataset": "wealth-goals",
     },
 
@@ -77,7 +77,7 @@ GOLDEN_DATASETS = [
             "SETT-003 Vanguard ETF 50 units T+2 2026-06-27 $12,000."
         ),
         "expected": ["SETT-001", "Apple", "18,500", "T+2"],
-        "agents": ["acme.servicing.settlement_status"],
+        "agents": ["meridian.servicing.settlement_status"],
         "dataset": "servicing-settlements",
     },
 
@@ -92,7 +92,7 @@ GOLDEN_DATASETS = [
             "Vanguard ETF distribution $1.20/unit 2026-06-28."
         ),
         "expected": ["Apple", "dividend", "0.25", "Microsoft", "split"],
-        "agents": ["acme.servicing.corporate_actions"],
+        "agents": ["meridian.servicing.corporate_actions"],
         "dataset": "servicing-corporate-actions",
     },
 
@@ -111,9 +111,9 @@ GOLDEN_DATASETS = [
         ),
         "expected": ["4,850,000", "8.3", "retirement", "settlement", "Apple"],
         "agents": [
-            "acme.wealth.holdings", "acme.wealth.performance",
-            "acme.wealth.goal_planning", "acme.servicing.settlement_status",
-            "acme.servicing.corporate_actions",
+            "meridian.wealth.holdings", "meridian.wealth.performance",
+            "meridian.wealth.goal_planning", "meridian.servicing.settlement_status",
+            "meridian.servicing.corporate_actions",
         ],
         "dataset": "multi-agent-hero",
     },
@@ -130,9 +130,9 @@ GOLDEN_DATASETS = [
         ),
         "expected": ["777,000", "custody", "Goldman", "DTC"],
         "agents": [
-            "acme.servicing.custody",
-            "acme.servicing.settlement_status",
-            "acme.servicing.cash_management",
+            "meridian.servicing.custody",
+            "meridian.servicing.settlement_status",
+            "meridian.servicing.cash_management",
         ],
         "dataset": "multi-agent-hero",
     },
@@ -147,7 +147,7 @@ GOLDEN_DATASETS = [
             "Beta 0.92, Sharpe ratio 1.34, VaR 95% = -$145,500/day."
         ),
         "expected": ["Moderate", "0.92", "Sharpe", "145,500"],
-        "agents": ["acme.wealth.risk_profile"],
+        "agents": ["meridian.wealth.risk_profile"],
         "dataset": "wealth-risk",
     },
 ]

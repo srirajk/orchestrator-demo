@@ -17,7 +17,7 @@
   ~16 agents / ~5 edges (both reviews concur). Canonical is a scale seam; revisit when edge count grows
   or a second team onboards. LLM-authored translators (D7) likewise stay a designed seam — NOT built now.
 
-## T1 — Rename `acme.* → meridian.*`  (spec: `rename-acme-to-meridian.md`, gate PATCHED)
+## T1 — Rename `meridian.* → meridian.*`  (spec: `rename-acme-to-meridian.md`, gate PATCHED)
 First (rewrites ids everywhere). Its Move-Safety Gate now requires the **full 16-agents × all-seeded-
 principals authz cross-product** (scripted, not a sample) captured before/after, and a **"Cerbos restarted
 + renamed policy count confirmed loaded"** step before the after-matrix. `git grep acme\.` == 0.

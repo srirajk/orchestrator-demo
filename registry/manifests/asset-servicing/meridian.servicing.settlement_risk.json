@@ -1,5 +1,5 @@
 {
-  "agent_id": "acme.servicing.settlement_risk",
+  "agent_id": "meridian.servicing.settlement_risk",
   "name": "Asset Servicing Settlement Risk Analysis",
   "description": "Fan-in analytics agent: consumes settlement status, custody positions, and cash position outputs to compute failed-settlement aging, CSDR cash-penalty exposure basis, and firm-policy settlement-risk flags. Computes from supplied producer data; does not fetch data and does not claim mandatory buy-in is active.",
   "version": "1.0.0",

@@ -17,7 +17,7 @@ _LLM_BASE  = os.environ.get("NAV_LLM_BASE_URL") or None
 _LLM_KEY   = os.environ.get("NAV_LLM_API_KEY") or None
 _LLM_MODEL = os.environ.get("NAV_LLM_MODEL") or None
 
-AGENT_ID = "acme.servicing.nav"
+AGENT_ID = "meridian.servicing.nav"
 log = logging.getLogger(__name__)
 
 

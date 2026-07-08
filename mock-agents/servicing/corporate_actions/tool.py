@@ -17,7 +17,7 @@ _LLM_BASE  = os.environ.get("CORPORATE_ACTIONS_LLM_BASE_URL") or None
 _LLM_KEY   = os.environ.get("CORPORATE_ACTIONS_LLM_API_KEY") or None
 _LLM_MODEL = os.environ.get("CORPORATE_ACTIONS_LLM_MODEL") or None
 
-AGENT_ID = "acme.servicing.corporate_actions"
+AGENT_ID = "meridian.servicing.corporate_actions"
 log = logging.getLogger(__name__)
 
 

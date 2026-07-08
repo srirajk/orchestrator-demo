@@ -17,5 +17,5 @@
 
   "required_context": [],
 
-  "agents": ["acme.hr.policy_qa"]
+  "agents": ["meridian.hr.policy_qa"]
 }

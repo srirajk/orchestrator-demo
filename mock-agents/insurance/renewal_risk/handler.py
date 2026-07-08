@@ -29,7 +29,7 @@ from shared.error_schema import error_response
 from renewal_risk.compute import compute_renewal_risk, RenewalRiskInputError
 
 router = APIRouter(prefix="/renewal-risk", tags=["renewal_risk"])
-AGENT_ID = "acme.insurance.renewal_risk"
+AGENT_ID = "meridian.insurance.renewal_risk"
 log = logging.getLogger(__name__)
 
 

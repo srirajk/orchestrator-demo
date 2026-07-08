@@ -39,8 +39,8 @@ class DagRealManifestTest {
     private final DagResolver resolver = new DagResolver();
 
     // The flagship fan-in pair, by their real registry ids.
-    private static final String CONCENTRATION_ID = "acme.wealth.concentration";
-    private static final String HOLDINGS_ID       = "acme.wealth.holdings";
+    private static final String CONCENTRATION_ID = "meridian.wealth.concentration";
+    private static final String HOLDINGS_ID       = "meridian.wealth.holdings";
 
     // ── manifest loading ───────────────────────────────────────────────────────────────────────
 

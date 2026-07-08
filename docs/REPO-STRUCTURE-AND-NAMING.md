@@ -5,7 +5,7 @@
 > green. "If we move those manifests we need to test it very hard." Agreed.
 
 ## 1. The two problems (confirmed)
-1. **Naming split.** All 14 `agent_id`s use the `acme.*` namespace, but `provider.organization` is
+1. **Naming split.** All 14 `agent_id`s use the `meridian.*` namespace, but `provider.organization` is
    "Meridian Demo Bank" and the demo persona is Meridian. The id namespace and the persona disagree.
 2. **Folder sprawl.** Docs live at BOTH repo root (`AUTHZ-SPEC.md`, `RAG-DESIGN.md`,
    `ARCHITECTURE-SPLIT.md`, `ADR-STATELESS-GATEWAY.md`, `USER-TESTING-GUIDE.md`, …) AND in `docs/`
@@ -16,7 +16,7 @@
 ## 2. Naming — the decision to make
 The first segment of an `agent_id` is a **tenant/namespace slug**, not necessarily the bank name.
 `acme` is a leftover placeholder tenant. Two coherent options:
-- **(A) Rename `acme.*` → `meridian.*`** (recommended for a single-bank demo). Coherent end-state:
+- **(A) Rename `meridian.*` → `meridian.*`** (recommended for a single-bank demo). Coherent end-state:
   `meridian.wealth.holdings`. Bigger blast radius (see §3), but removes the confusion permanently.
 - **(B) Keep `acme` but DOCUMENT it** as the tenant slug and make the story explicit ("`acme` = the
   onboarding tenant; Meridian is the organization display"). Near-zero risk, but the confusion stays
@@ -24,10 +24,10 @@ The first segment of an `agent_id` is a **tenant/namespace slug**, not necessari
 Recommendation: **B now (document), A as a deliberate change behind the gate** — don't do a 14-id
 rename in the same breath as everything else.
 
-## 3. Blast radius of the `acme.*` → `meridian.*` rename (what MUST change in lockstep)
+## 3. Blast radius of the `meridian.*` → `meridian.*` rename (what MUST change in lockstep)
 - `registry/manifests/*.json` — `agent_id` (14 files) + filenames.
 - `registry/domains/*/*.json` — the `agents[]` membership lists.
-- Agent handlers/tools (`mock-agents/**`) — the `AGENT_ID = "acme...."` constants + error-schema ids.
+- Agent handlers/tools (`mock-agents/**`) — the `AGENT_ID = "meridian...."` constants + error-schema ids.
 - **Cerbos policies** (`infra/cerbos/policies/`) — any resource/derived-role that references an
   agent_id or the segment mapping.
 - Tests — fixtures and assertions referencing ids (`gateway/src/test/**`, `mock-agents/**/test_*`).
@@ -83,4 +83,4 @@ moves, gated by §4.
    `acme` = tenant slug (naming option B). No runtime path changes → light test (build + world-b).
 2. **Deliberate, gated:** `mock-agents/ → agents/` folder rename (updates compose build contexts +
    Dockerfiles) → run §4.
-3. **Deliberate, gated:** `acme.* → meridian.*` id rename → run §4 in full (esp. #7 authz + #11 audit).
+3. **Deliberate, gated:** `meridian.* → meridian.*` id rename → run §4 in full (esp. #7 authz + #11 audit).

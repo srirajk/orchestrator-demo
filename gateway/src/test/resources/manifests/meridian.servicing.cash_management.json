@@ -1,5 +1,5 @@
 {
-  "agent_id": "acme.servicing.cash_management",
+  "agent_id": "meridian.servicing.cash_management",
   "name": "Asset Servicing Cash Management",
   "description": "Returns cash balances and projected cash positions for a given relationship. Accepts relationship_id as the primary key. Accessed via MCP tool over SSE transport.",
   "version": "1.0.0",

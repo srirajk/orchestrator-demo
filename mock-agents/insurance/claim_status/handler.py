@@ -14,7 +14,7 @@ from shared.error_schema import error_response
 from shared.validators import validate_claim_id, validate_policy_id
 
 router = APIRouter(prefix="/claim-status", tags=["claim_status"])
-AGENT_ID = "acme.insurance.claim_status"
+AGENT_ID = "meridian.insurance.claim_status"
 log = logging.getLogger(__name__)
 
 

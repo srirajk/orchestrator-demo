@@ -1,5 +1,5 @@
 {
-  "agent_id": "acme.wealth.risk_profile",
+  "agent_id": "meridian.wealth.risk_profile",
   "name": "Wealth Risk Profile",
   "description": "Returns risk tolerance assessment and concentration flags for a given wealth management relationship. Accepts relationship_id as the primary key.",
   "version": "1.0.0",
@@ -49,5 +49,13 @@
     "access_mode": "read",
     "data_classification": "confidential-pii",
     "sla_timeout_ms": 30000
+  },
+  "io": {
+    "consumes": [
+      { "entity": "relationship_id", "required": true }
+    ],
+    "produces": [
+      { "name": "risk_profile", "type": "wealth.risk_profile" }
+    ]
   }
 }

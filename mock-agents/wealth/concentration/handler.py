@@ -25,7 +25,7 @@ from shared.error_schema import error_response
 from concentration.compute import compute_concentration, ConcentrationInputError
 
 router = APIRouter(prefix="/concentration", tags=["concentration"])
-AGENT_ID = "acme.wealth.concentration"
+AGENT_ID = "meridian.wealth.concentration"
 log = logging.getLogger(__name__)
 
 

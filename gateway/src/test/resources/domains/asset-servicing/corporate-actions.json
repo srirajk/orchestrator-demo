@@ -36,7 +36,7 @@
   "required_context": [],
 
   "agents": [
-    "acme.servicing.corporate_actions",
-    "acme.servicing.nav"
+    "meridian.servicing.corporate_actions",
+    "meridian.servicing.nav"
   ]
 }

@@ -1,5 +1,5 @@
 {
-  "agent_id": "acme.wealth.goal_planning",
+  "agent_id": "meridian.wealth.goal_planning",
   "name": "Wealth Goal Planning",
   "description": "Returns the financial goal status and on-track assessment for a given wealth management relationship, including goal funding progress. Accepts relationship_id as the primary key.",
   "version": "1.0.0",
@@ -49,13 +49,5 @@
     "access_mode": "read",
     "data_classification": "confidential-pii",
     "sla_timeout_ms": 30000
-  },
-  "io": {
-    "consumes": [
-      { "entity": "relationship_id", "required": true }
-    ],
-    "produces": [
-      { "name": "goal_status", "type": "wealth.goal_status" }
-    ]
   }
 }

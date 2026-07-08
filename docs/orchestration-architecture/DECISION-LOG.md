@@ -64,7 +64,13 @@ acyclic); **(3) bounded, guarded loops** (max-iterations + termination predicate
 territory, the real departure. **Invariant:** predicates are code, loops have hard bounds — the LLM
 never decides whether to loop.
 
-### D10 — Request-response is primary and in-JVM; durable/long-running is a Temporal SEAM. 🟡
+### D10 — Request-response is primary and in-JVM; durable/long-running is a Temporal SEAM. 🟡 (durable side PARKED)
+> **PARKED (2026-07-08):** the durable / action-taking side (Temporal, ServiceNow) is out of scope for
+> now — those are pre-built, certified, action-taking workflows we *route to* by question-mapping.
+> Current focus is exclusively the **read-only dynamic req/response engine**. Clean risk split: **read =
+> dynamic engine; write/action = certified durable workflow.** Leave the routing/`ExecutionBackend`
+> seam; build nothing durable now.
+
 The chat path derives + interprets a **plan-as-data**, synchronously, deadline-bounded, streamed — this
 is what we build first. Temporal/Step-Functions assume *authored* workflows and are async/durable →
 wrong for the request path. Long-running / human-approval / durable-side-effect plans hand the *same

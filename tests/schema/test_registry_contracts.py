@@ -119,7 +119,7 @@ def test_context_envelope_contract_accepts_manifest_driven_domain_keys():
         "scope": {
             "domains": ["wealth-management"],
             "sub_domains": ["private-banking"],
-            "agents": ["acme.wealth.holdings"],
+            "agents": ["meridian.wealth.holdings"],
         },
         "context": {
             "entities": {

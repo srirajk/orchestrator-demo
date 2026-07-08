@@ -1,5 +1,5 @@
 {
-  "agent_id": "acme.servicing.settlement_status",
+  "agent_id": "meridian.servicing.settlement_status",
   "name": "Asset Servicing Settlement Status",
   "description": "Returns pending and failed settlement records for a given relationship. Accepts relationship_id as the primary key. Accessed via MCP tool over SSE transport.",
   "version": "1.0.0",
@@ -54,5 +54,13 @@
     "access_mode": "read",
     "data_classification": "confidential",
     "sla_timeout_ms": 30000
+  },
+  "io": {
+    "consumes": [
+      { "entity": "relationship_id", "required": true }
+    ],
+    "produces": [
+      { "name": "settlement_status", "type": "servicing.settlement_status" }
+    ]
   }
 }

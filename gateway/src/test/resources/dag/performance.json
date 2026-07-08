@@ -1,5 +1,5 @@
 {
-  "agent_id": "acme.wealth.performance",
+  "agent_id": "meridian.wealth.performance",
   "name": "Wealth Performance",
   "description": "Returns performance metrics, total return percentage, and P&L for a given wealth management relationship over a specified period. Accepts relationship_id as the primary key.",
   "version": "1.0.0",

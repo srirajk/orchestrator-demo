@@ -1,5 +1,5 @@
 {
-  "agent_id": "acme.insurance.claim_status",
+  "agent_id": "meridian.insurance.claim_status",
   "name": "Insurance Claim Status",
   "description": "Returns the status of an insurance claim: claim amount, status, incident date, and adjuster. Looks up a single claim by claim_id, or all claims filed against a policy by policy_id.",
   "version": "1.0.0",

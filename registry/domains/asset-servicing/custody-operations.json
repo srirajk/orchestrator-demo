@@ -44,8 +44,8 @@
   "required_context": [],
 
   "agents": [
-    "acme.servicing.custody_positions",
-    "acme.servicing.settlement_status",
-    "acme.servicing.settlement_risk"
+    "meridian.servicing.custody_positions",
+    "meridian.servicing.settlement_status",
+    "meridian.servicing.settlement_risk"
   ]
 }

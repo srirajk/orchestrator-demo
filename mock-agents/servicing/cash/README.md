@@ -1,6 +1,6 @@
 # Cash Management Agent
 
-**ID:** `acme.servicing.cash`
+**ID:** `meridian.servicing.cash`
 **Protocol:** MCP (FastMCP SSE)
 **Tool:** `get_cash(relationship_id)`
 
@@ -9,7 +9,7 @@ Returns cash balances (settled and unsettled) by currency, plus projected total 
 Unsettled cash reflects pending settlement trades (cross-references with Settlements agent).
 
 ## OTel spans
-`agent.acme.servicing.cash` — `entity.relationship_id`, `result.projected_cash_usd`, `result.currency_count`
+`agent.meridian.servicing.cash` — `entity.relationship_id`, `result.projected_cash_usd`, `result.currency_count`
 
 ## Fault knobs
 Set `MCP_FAULT_TOOL=get_cash` to make this tool fail.

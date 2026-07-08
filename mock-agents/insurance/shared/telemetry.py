@@ -81,7 +81,7 @@ def agent_span(agent_id: str, entity_id: str = None, input_value: str = None):
     agent invocations in session traces.
 
     Usage:
-        with agent_span("acme.insurance.policy_details", entity_id="POL-77001",
+        with agent_span("meridian.insurance.policy_details", entity_id="POL-77001",
                         input_value=policy_id) as span:
             span.set_attribute("result.status", "active")
             ...

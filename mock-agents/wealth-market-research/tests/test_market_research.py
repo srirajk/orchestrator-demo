@@ -82,7 +82,7 @@ class TestMarketResearchBroadOverview:
 
     def test_broad_overview_has_agent_id(self):
         r = client.get("/market-research")
-        assert r.json()["agent_id"] == "acme.wealth.market_research"
+        assert r.json()["agent_id"] == "meridian.wealth.market_research"
 
     def test_broad_overview_has_available_topics(self):
         r = client.get("/market-research")
@@ -160,7 +160,7 @@ class TestFaultKnobs:
         assert r.status_code == 503
         body = r.json()
         assert "fault knob" in body["error"]
-        assert body["agent_id"] == "acme.wealth.market_research"
+        assert body["agent_id"] == "meridian.wealth.market_research"
 
     def test_delay_knob(self):
         import time

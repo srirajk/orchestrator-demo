@@ -186,7 +186,7 @@ test.describe('Domain-scoped ABAC (Phase 11)', () => {
             resource: {
               kind:          'agent',
               policyVersion: 'default',
-              id:            'acme.wealth.holdings',
+              id:            'meridian.wealth.holdings',
               attr: {
                 domain:              'wealth-management',
                 access_mode:         'read',
@@ -200,7 +200,7 @@ test.describe('Domain-scoped ABAC (Phase 11)', () => {
             resource: {
               kind:          'agent',
               policyVersion: 'default',
-              id:            'acme.servicing.settlement_status',
+              id:            'meridian.servicing.settlement_status',
               attr: {
                 domain:              'asset-servicing',
                 access_mode:         'read',
@@ -218,9 +218,9 @@ test.describe('Domain-scoped ABAC (Phase 11)', () => {
     const resultMap = Object.fromEntries(results.map(r => [r.resource.id, r.actions]));
 
     // Wealth agent → ALLOW (wealth tier confidential-pii >= agent confidential-pii)
-    expect(resultMap['acme.wealth.holdings']?.['invoke']).toBe('EFFECT_ALLOW');
+    expect(resultMap['meridian.wealth.holdings']?.['invoke']).toBe('EFFECT_ALLOW');
     // Servicing agent → DENY (principal is not a member of the "servicing" segment)
-    expect(resultMap['acme.servicing.settlement_status']?.['invoke']).toBe('EFFECT_DENY');
+    expect(resultMap['meridian.servicing.settlement_status']?.['invoke']).toBe('EFFECT_DENY');
   });
 
   test('Cerbos PDP directly denies a servicing-only principal on wealth-management agents', async ({ request }) => {
@@ -242,7 +242,7 @@ test.describe('Domain-scoped ABAC (Phase 11)', () => {
             resource: {
               kind:          'agent',
               policyVersion: 'default',
-              id:            'acme.wealth.holdings',
+              id:            'meridian.wealth.holdings',
               attr: {
                 domain:              'wealth-management',
                 access_mode:         'read',

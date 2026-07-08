@@ -1,6 +1,6 @@
 # Goal Planning Agent
 
-**ID:** `acme.wealth.goal_planning`
+**ID:** `meridian.wealth.goal_planning`
 **Protocol:** HTTP (FastAPI)
 **Endpoint:** `GET /goal-planning?relationship_id=REL-XXXXX`
 
@@ -9,7 +9,7 @@ Returns the client's financial goals (retirement, education, etc.) with current 
 target amounts, target dates, and on-track status.
 
 ## OTel spans
-`agent.acme.wealth.goal_planning` — attributes: `entity.relationship_id`, `result.goal_count`, `result.overall_on_track`
+`agent.meridian.wealth.goal_planning` — attributes: `entity.relationship_id`, `result.goal_count`, `result.overall_on_track`
 
 ## Fault knobs
 | Param | Effect |

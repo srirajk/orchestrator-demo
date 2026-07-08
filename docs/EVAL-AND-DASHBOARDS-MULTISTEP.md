@@ -11,12 +11,12 @@ Definition: for a scenario (goal capability + available entities), the DagResolv
 equal the expected DAG (node set + edges). Because derivation is deterministic, this needs **no LLM
 and no live stack** — it runs in unit tests over the real registry.
 - **Already proven:** `DagRealManifestTest` derives `holdings → concentration` from the REAL manifest
-  registry (goal = `acme.wealth.concentration`, entity `relationship_id` available) — pass.
+  registry (goal = `meridian.wealth.concentration`, entity `relationship_id` available) — pass.
 - **Scenario matrix to extend** as analytics agents are added (each row = goal, available entities,
   expected DAG):
   | scenario | goal | expected DAG |
   |---|---|---|
-  | Wealth concentration | acme.wealth.concentration | holdings → concentration ✅ proven |
+  | Wealth concentration | meridian.wealth.concentration | holdings → concentration ✅ proven |
   | Wealth rebalance | (drift_rebalance) | (holdings ∥ risk_profile ∥ market_research) → drift_rebalance |
   | Wealth review brief | (review_brief) | (performance ∥ holdings ∥ risk_profile ∥ goal_planning ∥ market_research) → review_brief |
   | Insurance renewal | (renewal_risk) | (policy_details ∥ claim_status) → renewal_risk |

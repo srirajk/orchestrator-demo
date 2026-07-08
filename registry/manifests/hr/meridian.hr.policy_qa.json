@@ -1,5 +1,5 @@
 {
-  "agent_id": "acme.hr.policy_qa",
+  "agent_id": "meridian.hr.policy_qa",
   "name": "HR Policy Q&A",
   "description": "Answers questions about Meridian HR policies: parental leave, PTO, benefits, code of conduct, performance management, and learning & development. Enterprise knowledge agent — open to all authenticated users, no coverage check required.",
   "version": "1.0.0",

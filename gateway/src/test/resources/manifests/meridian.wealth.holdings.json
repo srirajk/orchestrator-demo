@@ -1,5 +1,5 @@
 {
-  "agent_id": "acme.wealth.holdings",
+  "agent_id": "meridian.wealth.holdings",
   "name": "Wealth Holdings",
   "description": "Returns the current portfolio positions and asset-class allocation for a given wealth management relationship. Accepts relationship_id as the primary key.",
   "version": "1.0.0",
@@ -35,12 +35,7 @@
         "current holdings for the Whitman relationship",
         "portfolio allocation for this client",
         "what is this account invested in",
-        "position breakdown for the relationship",
-        "portfolio summary for this client",
-        "portfolio value and top positions",
-        "show me the portfolio for this relationship",
-        "total portfolio value",
-        "what does the portfolio hold"
+        "position breakdown for the relationship"
       ],
       "inputModes": [
         "application/json"
@@ -54,13 +49,5 @@
     "access_mode": "read",
     "data_classification": "confidential-pii",
     "sla_timeout_ms": 30000
-  },
-  "io": {
-    "consumes": [
-      { "entity": "relationship_id", "required": true }
-    ],
-    "produces": [
-      { "name": "holdings", "type": "wealth.holdings" }
-    ]
   }
 }

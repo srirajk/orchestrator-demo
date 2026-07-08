@@ -1,5 +1,5 @@
 {
-  "agent_id": "acme.servicing.nav",
+  "agent_id": "meridian.servicing.nav",
   "name": "Asset Servicing NAV",
   "description": "Returns net asset value and as-of date for a fund. NOTE: This agent is keyed by fund_id, NOT relationship_id. It is intentionally NOT selected by relationship-level hero prompts, demonstrating the resolver's selectivity \u2014 it will only be chosen when the user explicitly requests NAV for a specific fund.",
   "version": "1.0.0",

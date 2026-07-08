@@ -1,5 +1,5 @@
 {
-  "agent_id": "acme.wealth.market_research",
+  "agent_id": "meridian.wealth.market_research",
   "name": "Wealth Market Research",
   "description": "Returns Meridian house-view commentary, sector outlooks, and macro analysis for wealth management clients. A knowledge agent — no client entity required. Available topics: equities, fixed_income, alternatives, macro. Omit topic for the broad quarterly outlook.",
   "version": "1.0.0",

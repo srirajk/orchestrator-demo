@@ -9,7 +9,7 @@ from shared.telemetry import agent_span
 from settlement_risk.compute import compute_settlement_risk, SettlementRiskInputError
 
 
-AGENT_ID = "acme.servicing.settlement_risk"
+AGENT_ID = "meridian.servicing.settlement_risk"
 log = logging.getLogger(__name__)
 
 

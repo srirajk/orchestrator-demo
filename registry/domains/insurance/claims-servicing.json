@@ -68,7 +68,7 @@
   },
 
   "agents": [
-    "acme.insurance.policy_details",
-    "acme.insurance.claim_status"
+    "meridian.insurance.policy_details",
+    "meridian.insurance.claim_status"
   ]
 }

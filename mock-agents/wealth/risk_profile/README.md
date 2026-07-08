@@ -1,6 +1,6 @@
 # Risk Profile Agent (with RAG)
 
-**ID:** `acme.wealth.risk_profile`
+**ID:** `meridian.wealth.risk_profile`
 **Protocol:** HTTP (FastAPI)
 **Endpoint:** `GET /risk-profile?relationship_id=REL-XXXXX`
 
@@ -26,7 +26,7 @@ embedding sidecar (`http://embeddings:8083/v1/embeddings`) + cosine similarity o
 ChromaDB collection of the full policy document corpus.
 
 ## OTel spans
-`agent.acme.wealth.risk_profile` — attributes: `entity.relationship_id`, `result.risk_score`,
+`agent.meridian.wealth.risk_profile` — attributes: `entity.relationship_id`, `result.risk_score`,
 `result.concentration_flags`, `rag.retrieved_docs`
 
 ## Fault knobs

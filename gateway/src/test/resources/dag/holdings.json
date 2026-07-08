@@ -1,5 +1,5 @@
 {
-  "agent_id": "acme.wealth.holdings",
+  "agent_id": "meridian.wealth.holdings",
   "name": "Wealth Holdings",
   "description": "Returns the current portfolio positions and asset-class allocation for a given wealth management relationship. Accepts relationship_id as the primary key.",
   "version": "1.0.0",

@@ -17,7 +17,7 @@ _LLM_BASE  = os.environ.get("CUSTODY_LLM_BASE_URL") or None
 _LLM_KEY   = os.environ.get("CUSTODY_LLM_API_KEY") or None
 _LLM_MODEL = os.environ.get("CUSTODY_LLM_MODEL") or None
 
-AGENT_ID = "acme.servicing.custody_positions"
+AGENT_ID = "meridian.servicing.custody_positions"
 log = logging.getLogger(__name__)
 
 

@@ -1,5 +1,5 @@
 {
-  "agent_id": "acme.servicing.custody_positions",
+  "agent_id": "meridian.servicing.custody_positions",
   "name": "Asset Servicing Custody Positions",
   "description": "Returns custody holdings broken down by custodian for a given relationship. Accepts relationship_id as the primary key. Accessed via MCP tool over SSE transport.",
   "version": "1.0.0",
@@ -50,13 +50,5 @@
     "access_mode": "read",
     "data_classification": "confidential",
     "sla_timeout_ms": 30000
-  },
-  "io": {
-    "consumes": [
-      { "entity": "relationship_id", "required": true }
-    ],
-    "produces": [
-      { "name": "custody_positions", "type": "servicing.custody_positions" }
-    ]
   }
 }

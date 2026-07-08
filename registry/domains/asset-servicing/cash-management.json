@@ -44,6 +44,6 @@
   "required_context": [],
 
   "agents": [
-    "acme.servicing.cash_management"
+    "meridian.servicing.cash_management"
   ]
 }

@@ -17,5 +17,5 @@
 
   "required_context": [],
 
-  "agents": ["acme.wealth.market_research"]
+  "agents": ["meridian.wealth.market_research"]
 }

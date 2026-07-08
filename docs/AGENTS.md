@@ -30,7 +30,7 @@ Both domains are accessed in a single question. An RM does not need to know whic
 
 ## Domain 1 — Wealth Management Agents
 
-### Holdings (`acme.wealth.holdings`)
+### Holdings (`meridian.wealth.holdings`)
 **What it does:** Returns the current portfolio positions for a client relationship — every security held, quantity, market value, and how the portfolio is allocated across asset classes (equity, fixed income, cash, alternatives).
 
 **When an RM asks this:**
@@ -48,7 +48,7 @@ Both domains are accessed in a single question. An RM does not need to know whic
 
 ---
 
-### Performance (`acme.wealth.performance`)
+### Performance (`meridian.wealth.performance`)
 **What it does:** Returns how a client's portfolio has performed over a given period — year-to-date return, quarter-to-date return, and profit/loss in dollar terms.
 
 **When an RM asks this:**
@@ -66,7 +66,7 @@ Both domains are accessed in a single question. An RM does not need to know whic
 
 ---
 
-### Goal Planning (`acme.wealth.goal_planning`)
+### Goal Planning (`meridian.wealth.goal_planning`)
 **What it does:** Returns the status of a client's financial goals — retirement, education funding, wealth transfer — and whether each goal is on track given current portfolio value and projected growth.
 
 **When an RM asks this:**
@@ -84,7 +84,7 @@ Both domains are accessed in a single question. An RM does not need to know whic
 
 ---
 
-### Risk Profile (`acme.wealth.risk_profile`)
+### Risk Profile (`meridian.wealth.risk_profile`)
 **What it does:** Returns a client's stated risk tolerance, their current portfolio risk score, and any concentration flags — situations where a single position, sector, or asset class is disproportionately large relative to the overall portfolio.
 
 **When an RM asks this:**
@@ -104,7 +104,7 @@ Both domains are accessed in a single question. An RM does not need to know whic
 
 ## Domain 2 — Asset Servicing Agents
 
-### Custody Positions (`acme.servicing.custody_positions`)
+### Custody Positions (`meridian.servicing.custody_positions`)
 **What it does:** Returns where each asset is physically held — which custodian bank (e.g. DTC, Euroclear, local custodian) holds which securities on behalf of the client.
 
 **When an RM asks this:**
@@ -122,7 +122,7 @@ Both domains are accessed in a single question. An RM does not need to know whic
 
 ---
 
-### Settlement Status (`acme.servicing.settlement_status`)
+### Settlement Status (`meridian.servicing.settlement_status`)
 **What it does:** Returns the status of all pending and recently failed trade settlements for a client — trades that have been executed but not yet settled (typically T+1 or T+2), and any that failed settlement and need attention.
 
 **When an RM asks this:**
@@ -140,7 +140,7 @@ Both domains are accessed in a single question. An RM does not need to know whic
 
 ---
 
-### Corporate Actions (`acme.servicing.corporate_actions`)
+### Corporate Actions (`meridian.servicing.corporate_actions`)
 **What it does:** Returns upcoming corporate actions affecting the client's holdings — dividend payments, stock splits, rights issues, merger elections, and tender offers — along with any elections the RM needs to make on behalf of the client.
 
 **When an RM asks this:**
@@ -158,7 +158,7 @@ Both domains are accessed in a single question. An RM does not need to know whic
 
 ---
 
-### Cash Management (`acme.servicing.cash_management`)
+### Cash Management (`meridian.servicing.cash_management`)
 **What it does:** Returns the current cash balances across all currencies for a client, broken down into settled cash (available now) and unsettled cash (pending settlement), plus projected cash position over the next 30 days.
 
 **When an RM asks this:**
@@ -176,7 +176,7 @@ Both domains are accessed in a single question. An RM does not need to know whic
 
 ---
 
-### NAV — Fund Valuation (`acme.servicing.nav`)
+### NAV — Fund Valuation (`meridian.servicing.nav`)
 **What it does:** Returns the current Net Asset Value (NAV) for an internal fund — the per-unit price as of the latest valuation date. This agent operates at the **fund level**, not the relationship level.
 
 **When an RM asks this:**

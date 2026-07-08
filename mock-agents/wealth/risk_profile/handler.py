@@ -21,7 +21,7 @@ _LLM_KEY   = os.environ.get("RISK_PROFILE_LLM_API_KEY") or None
 _LLM_MODEL = os.environ.get("RISK_PROFILE_LLM_MODEL") or None
 
 router = APIRouter(prefix="/risk-profile", tags=["risk_profile"])
-AGENT_ID = "acme.wealth.risk_profile"
+AGENT_ID = "meridian.wealth.risk_profile"
 log = logging.getLogger(__name__)
 
 

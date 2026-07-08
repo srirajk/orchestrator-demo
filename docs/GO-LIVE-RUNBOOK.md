@@ -11,7 +11,7 @@
 - All new classes exist and are Spring-registered: `orchestration/planner/DagResolver`,
   `orchestration/executor/Blackboard`, `orchestration/executor/DagPlanExecutor`,
   `infrastructure/telemetry/event/PlanGraphData`.
-- `registry/manifests/acme.wealth.concentration.json` is registered; `io` now survives the registry
+- `registry/manifests/meridian.wealth.concentration.json` is registered; `io` now survives the registry
   re-stamp (bug-245 fixed) so the resolver sees producers on the real registry.
 
 ## Step A — wire the flag into ChatService (the one staged edit)
@@ -53,7 +53,7 @@ docker compose -p orchestrator-demo build conduit-gateway wealth-http
 docker compose -p orchestrator-demo up -d conduit-gateway wealth-http
 # enable the flag (env or application.yml):  CONDUIT_ORCHESTRATION_DAG_ENABLED=true
 ```
-Gateway boot log should show the registry loaded WITH `acme.wealth.concentration`.
+Gateway boot log should show the registry loaded WITH `meridian.wealth.concentration`.
 
 ## Step D — run the demo
 As `rm_jane` (entitled to the Whitman relationship) at http://localhost:8099:
