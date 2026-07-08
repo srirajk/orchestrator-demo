@@ -1,0 +1,76 @@
+{
+  "agent_id": "acme.insurance.renewal_risk",
+  "name": "Insurance Renewal Risk Analysis",
+  "description": "Fan-in analytics agent: consumes a policy_details payload (insurance.policy_record) AND a claim_status payload (insurance.claim_status) and computes loss ratio, and combined ratio when an expense figure is available, with a breach flag against a firm-configured renewal target. Computes from the supplied policy + claim data; does not fetch data and does not take a policy_id directly.",
+  "version": "1.0.0",
+  "provider": {
+    "organization": "Meridian Demo Bank"
+  },
+  "domain": "insurance",
+  "audience": "segment",
+  "sub_domain": "claims-servicing",
+  "max_response_tokens": 2000,
+  "protocol": "http",
+  "connection": {
+    "openapi_url": "http://insurance-http:8087/openapi.json",
+    "operation_id": "post_renewal_risk"
+  },
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false
+  },
+  "skills": [
+    {
+      "id": "analyze_renewal_risk",
+      "name": "analyze_renewal_risk",
+      "description": "Analyse renewal risk for a commercial policy from its policy and claims data: loss ratio, combined ratio when an expense figure is available, and a firm-policy breach flag versus a configured renewal target — never a universal loss-ratio cutoff.",
+      "tags": [
+        "renewal",
+        "renewal-risk",
+        "loss-ratio",
+        "combined-ratio",
+        "underwriting",
+        "claims",
+        "insurance"
+      ],
+      "examples": [
+        "should we reprice this policy at renewal given the open claims",
+        "what is the loss ratio on the Continental Freight policy",
+        "is this policy a renewal risk",
+        "should we non-renew this account",
+        "what is the combined ratio for this policy",
+        "how bad are the claims on this policy relative to premium",
+        "flag any policies at risk of non-renewal",
+        "is the loss ratio above our renewal target for this policy"
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    }
+  ],
+  "constraints": {
+    "access_mode": "read",
+    "data_classification": "confidential-pii",
+    "sla_timeout_ms": 15000
+  },
+  "io": {
+    "consumes": [
+      {
+        "from": "insurance.policy_record",
+        "required": true,
+        "select": "{policy_id: policy_id, policy_name: policy_name, insured_name: insured_name, line_of_business: line_of_business, premium: premium, premium_currency: premium_currency, coverage_limit: coverage_limit, deductible: deductible, status: status, effective_date: effective_date, expiry_date: expiry_date, as_of_date: as_of_date}"
+      },
+      {
+        "from": "insurance.claim_status",
+        "required": true,
+        "select": "{policy_id: policy_id, claim_count: claim_count, claims: claims, claim_id: claim_id, amount: amount, status: status}"
+      }
+    ],
+    "produces": [
+      { "name": "renewal_analysis", "type": "insurance.renewal_analysis" }
+    ]
+  }
+}
