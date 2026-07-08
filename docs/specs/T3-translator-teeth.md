@@ -54,30 +54,41 @@ depends on it** — that empty object is the exact hole this task closes.
 Add an OPTIONAL `output_schema` (a JSON-Schema object) to the agent-manifest schema — the documented escape
 hatch used ONLY when neither protocol can introspect an output (validate the schema files stay consistent).
 
-At **registry load / bootstrap**, for every agent `A` and every `A.io.consumes[]` entry that has BOTH a
-`from` and a `select`, run this algorithm:
+**CORRECTED ALGORITHM (validate the MERGED consumer input, NOT per-edge).** A fan-in consumer's input
+schema requires ALL its producers at once, and at runtime the Blackboard MERGES every producer's projected
+output into one object BEFORE the consumer validates it. Boot validation MUST mirror that exactly — validating
+one edge's `select` alone would falsely reject every multi-producer agent (renewal_risk, settlement_risk),
+which is the whole system. So validate **per consumer, as a whole:**
 
-1. Resolve the producer `P` = the agent whose `io.produces[].type` equals this consume's `from`. (If none /
-   ambiguous, that's a separate pre-existing io-graph error — report it, don't crash.)
-2. Obtain `P`'s **output schema** (introspected via Part 1/2, else `P`'s manifest `output_schema`).
-3. **Build a synthetic sample instance** from `P`'s output schema: recurse the schema — for an `object`, emit
-   each declared property; for an `array`, emit exactly one element of the item schema; for a scalar, emit a
-   type-appropriate placeholder (string→"x", number→1, boolean→true); honor `required` (always include
-   required properties). This yields a representative JSON document shaped like `P`'s real output.
-4. **Apply the consume's JMESPath `select`** to that synthetic sample (via `io.burt:jmespath-jackson`).
-5. **Validate the projected result against `A`'s introspected INPUT schema** using the EXISTING
-   `InputContractValidator` (the same code path runtime uses — you are just running it at boot against a
-   schema-derived sample instead of live data).
+At **registry load / bootstrap**, for every agent `A` that has at least one `io.consumes[]` entry with a
+`from` (a producer-ref / fan-in consumer):
+
+1. Collect **ALL** of `A`'s producer-ref consumes (every entry with a `from`, each with its optional `select`).
+2. For EACH such consume: resolve its producer `P` (the agent whose `io.produces[].type` == this `from`; if
+   none/ambiguous, that's a pre-existing io-graph error — report, don't crash), obtain `P`'s **output schema**
+   (introspected via Part 1/2, else `P`'s manifest `output_schema`), and **build a synthetic sample instance**
+   from it (recurse: `object` → emit each declared property; `array` → one element of the item schema; scalar
+   → type-appropriate placeholder string→"x"/number→1/boolean→true; always include `required` properties).
+3. Apply that consume's JMESPath `select` (if present; else identity) to `P`'s sample → the projected slice.
+4. **MERGE all the projected slices into ONE consumer-input object EXACTLY as `Blackboard.bind` does at
+   runtime** — keyed by each producer's `io.produces[].name` (body = `{ <producerName>: <projectedSlice>, … }`).
+   **Reuse the Blackboard's merge logic if you can; otherwise replicate it precisely and say so.** This single
+   merged object is what the consumer actually receives at request time.
+5. **Validate the SINGLE merged object** against `A`'s introspected INPUT schema using the EXISTING
+   `InputContractValidator` (the same code path runtime uses — you're running it at boot against a
+   schema-derived, fully-merged sample instead of live data).
 6. **Decision:**
-   - If validation passes → the edge's `select` is provably shape-compatible. OK.
-   - If it FAILS (a required consumer field is missing/null because the `select` referenced a field `P`'s
-     schema does not contain) → **REJECT at boot** with a precise, actionable error: `agentId`, the offending
-     `from`/`select`, and the specific missing field. Fail that manifest's load (mark it failed / abort
-     bootstrap per the loader's existing failure convention) — it must NOT boot silently.
-   - **HONEST DEGRADATION (no silent pass):** if `P`'s output schema is genuinely unavailable (no
-     introspection AND no manifest `output_schema`), do NOT pass silently and do NOT fail hard — log a
-     clear WARNING naming the unvalidated edge, and emit a boot summary line: `select validation: X validated,
-     Y UNVALIDATED (no output schema)`. After Parts 1-2, Y should be ~0; any residual must be visible, not hidden.
+   - Passes → all of `A`'s edges are provably shape-compatible **together**. OK.
+   - FAILS (a required consumer field is missing/null) → **REJECT `A` at boot** with a precise error:
+     `agentId`, and — by re-checking which producer's slice supplies the missing field — **attribute it to the
+     specific offending `from`/`select`**, plus the field name. Fail that manifest's load per the loader's
+     existing failure convention — must NOT boot silently.
+   - **HONEST DEGRADATION (no silent pass):** if ANY of `A`'s producers' output schema is genuinely unavailable
+     (no introspection AND no manifest `output_schema`), do NOT pass silently and do NOT fail hard — log a clear
+     WARNING naming the unvalidated edge, and emit a boot summary: `select validation: X validated, Y UNVALIDATED
+     (no output schema)`. After Parts 1-2, Y should be ~0; any residual must be visible, not hidden.
+
+Single-producer consumers (one `from`) are just the N=1 case of the same merge — no special path needed.
 
 Runtime `checkComposable` **stays** as the backstop. Boot-time is the new upfront gate; runtime is defense in depth.
 
