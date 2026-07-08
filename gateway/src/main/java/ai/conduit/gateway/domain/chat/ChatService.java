@@ -29,17 +29,25 @@ import ai.conduit.gateway.infrastructure.telemetry.event.IntentClassifiedData;
 import ai.conduit.gateway.infrastructure.telemetry.event.RequestCompleteData;
 import ai.conduit.gateway.infrastructure.telemetry.event.RequestStartData;
 import ai.conduit.gateway.infrastructure.telemetry.event.SynthesisStartData;
+import ai.conduit.gateway.infrastructure.telemetry.event.PlanGraphData;
+import ai.conduit.gateway.orchestration.executor.Blackboard;
+import ai.conduit.gateway.orchestration.executor.DagPlanExecutor;
 import ai.conduit.gateway.orchestration.executor.FlatPlanExecutor;
 import ai.conduit.gateway.orchestration.model.NodeResult;
 import ai.conduit.gateway.orchestration.model.Plan;
 import ai.conduit.gateway.orchestration.model.PlanNode;
+import ai.conduit.gateway.orchestration.planner.DagResolution;
+import ai.conduit.gateway.orchestration.planner.DagResolver;
 import ai.conduit.gateway.registry.model.AgentManifest;
+import ai.conduit.gateway.registry.service.AgentRegistry;
 import ai.conduit.gateway.resolver.model.ResolverResult;
 import ai.conduit.gateway.resolver.service.AgentResolver;
 import ai.conduit.gateway.synthesis.answer.AnswerSynthesizer;
 import ai.conduit.gateway.synthesis.input.EntityBag;
+import ai.conduit.gateway.synthesis.input.EntityResolver;
 import ai.conduit.gateway.synthesis.input.InputSynthesizer;
 import ai.conduit.gateway.synthesis.input.InputSynthesizer.SynthesisResult;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -61,6 +69,8 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -105,6 +115,20 @@ public class ChatService {
     private final Counter intentClarifyCounter;
     private final Counter intentChitchatCounter;
 
+    // ── Multi-step orchestration (feature-flagged; flag OFF ⇒ flat path unchanged) ──────────
+    private final AgentRegistry     registry;
+    private final DagResolver       dagResolver;
+    private final DagPlanExecutor   dagExecutor;
+    private final EntityResolver    entityResolver;
+    /**
+     * When true, a fan-in ("goal") capability whose io consumes another capability's output is
+     * executed as a resolver-derived DAG (producers→consumer) instead of a flat fan-out. Any miss
+     * (goal not uniquely identifiable, unresolved dependency, authz re-gate prune, unbound leaf)
+     * falls through to the unchanged flat path. Default OFF — a no-op until explicitly enabled.
+     */
+    @org.springframework.beans.factory.annotation.Value("${conduit.orchestration.dag-enabled:false}")
+    private boolean dagEnabled;
+
     public ChatService(ObjectMapper mapper,
                        IntentClassifier intentClassifier,
                        AgentResolver resolver,
@@ -117,7 +141,11 @@ public class ChatService {
                        DomainManifestStore manifestStore,
                        ai.conduit.gateway.domain.clarify.ClarificationComposer clarificationComposer,
                        Tracer tracer,
-                       MeterRegistry meterRegistry) {
+                       MeterRegistry meterRegistry,
+                       AgentRegistry registry,
+                       DagResolver dagResolver,
+                       DagPlanExecutor dagExecutor,
+                       EntityResolver entityResolver) {
         this.mapper              = mapper;
         this.intentClassifier    = intentClassifier;
         this.resolver            = resolver;
@@ -131,6 +159,10 @@ public class ChatService {
         this.clarificationComposer = clarificationComposer;
         this.tracer              = tracer;
         this.meterRegistry         = meterRegistry;
+        this.registry            = registry;
+        this.dagResolver         = dagResolver;
+        this.dagExecutor         = dagExecutor;
+        this.entityResolver      = entityResolver;
         this.intentFetchCounter    = Counter.builder("chat.intent").tag("type","FETCH_DATA").register(meterRegistry);
         this.intentFollowUpCounter = Counter.builder("chat.intent").tag("type","FOLLOW_UP").register(meterRegistry);
         this.intentClarifyCounter  = Counter.builder("chat.intent").tag("type","CLARIFY").register(meterRegistry);
@@ -685,9 +717,11 @@ public class ChatService {
             // When coverageRelId is set, the coverage pipeline already resolved the name to a canonical ID
             // (e.g. "Whitman Family Office" → "REL-00042"). Injecting the ID here makes EntityResolver
             // short-circuit via its REL-\d+ pattern match — no call to the external resolve endpoint needed.
+            // Hoisted so it is visible at the plan-build site below (the DAG path binds leaf inputs
+            // and derives available entity keys from it). Null when there was no pre-extraction.
+            EntityBag effectiveBag = preExtracted;
             SynthesisResult synthesis;
             if (preExtracted != null) {
-                EntityBag effectiveBag = preExtracted;
                 if (coverageEntity != null) {
                     String covExtractAs = coverageEntity.extractAs();
                     if (coverageRelId != null) {
@@ -735,22 +769,27 @@ public class ChatService {
                 }
             }
 
-            List<PlanNode> nodes = synthesis.inputs().entrySet().stream()
-                    .map(e -> {
-                        AgentManifest m = finalManifests.stream()
-                                .filter(a -> a.agentId().equals(e.getKey())).findFirst().orElseThrow();
-                        return new PlanNode(e.getKey(), m, e.getValue(), List.of());
-                    }).collect(Collectors.toList());
-
-            nodes.forEach(n -> tracePublisher.publish(TraceEvent.of("agent_start", requestId, conversationId,
-                    new AgentStartData(n.nodeId(), n.agent().protocol()))));
-
             long fanoutStart = System.currentTimeMillis();
-            List<NodeResult> results = executor.execute(new Plan(nodes));
+            // Attempt the multi-step DAG (feature-flagged). Any miss returns empty and the flat
+            // fan-out below runs VERBATIM — flag OFF is a byte-for-byte no-op for this path.
+            List<NodeResult> results = tryDag(synthesis, finalManifests, effectiveBag, principal,
+                    requestId, conversationId).orElseGet(() -> {
+                List<PlanNode> nodes = synthesis.inputs().entrySet().stream()
+                        .map(e -> {
+                            AgentManifest m = finalManifests.stream()
+                                    .filter(a -> a.agentId().equals(e.getKey())).findFirst().orElseThrow();
+                            return new PlanNode(e.getKey(), m, e.getValue(), List.of());
+                        }).collect(Collectors.toList());
+
+                nodes.forEach(n -> tracePublisher.publish(TraceEvent.of("agent_start", requestId, conversationId,
+                        new AgentStartData(n.nodeId(), n.agent().protocol()))));
+
+                return executor.execute(new Plan(nodes));
+            });
             long fanoutElapsedMs = System.currentTimeMillis() - fanoutStart;
             Timer.builder("conduit.fanout.duration")
                     .description("Time from routing decision to all agents completing")
-                    .tag("agent_count", String.valueOf(nodes.size()))
+                    .tag("agent_count", String.valueOf(results.size()))
                     .publishPercentiles(0.5, 0.95, 0.99)
                     .register(meterRegistry)
                     .record(fanoutElapsedMs, TimeUnit.MILLISECONDS);
@@ -785,6 +824,105 @@ public class ChatService {
                     new RequestCompleteData(System.currentTimeMillis() - requestStart,
                             results.size(), (int) okCount)));
         } finally { span.end(); }
+    }
+
+    /**
+     * Feature-flagged multi-step orchestration. When a selected+entitled capability is a fan-in
+     * "goal" (its {@code io} consumes another capability's output via a {@code from} reference), the
+     * {@link DagResolver} derives the producer→consumer DAG from the live registry and the
+     * {@link DagPlanExecutor} runs it by topological layers. Returns {@link Optional#empty()} on ANY
+     * miss — the caller then runs the unchanged flat fan-out, so the flag OFF (or any non-DAG
+     * request) is a strict no-op.
+     *
+     * <p><b>World B:</b> every symbol reasoned over (goal id, entity keys, produced/consumed types)
+     * comes from the manifests at runtime; this method embeds no domain vocabulary.
+     *
+     * @param synthesis      the flat synthesis result (its {@code inputs()} keys are the routed+allowed goal candidates)
+     * @param finalManifests the routed, structurally-entitled manifests (post {@code filterAgents})
+     * @param effectiveBag   the resolved entity bag (may be null when there was no pre-extraction)
+     * @param principal      the verified principal — used to RE-GATE resolver-pulled producers
+     */
+    private Optional<List<NodeResult>> tryDag(SynthesisResult synthesis,
+                                              List<AgentManifest> finalManifests,
+                                              EntityBag effectiveBag,
+                                              Principal principal,
+                                              String requestId,
+                                              String conversationId) {
+        if (!dagEnabled || effectiveBag == null) return Optional.empty();
+
+        // 1. Goal = the single selected+allowed capability whose io declares a `from` (produced-ref)
+        //    consume — a fan-in analytics capability that depends on another capability's output.
+        List<AgentManifest> goals = synthesis.inputs().keySet().stream()
+                .map(id -> finalManifests.stream().filter(m -> m.agentId().equals(id)).findFirst().orElse(null))
+                .filter(m -> m != null && hasProducedRefConsume(m))
+                .toList();
+        if (goals.size() != 1) return Optional.empty();
+        String goalId = goals.get(0).agentId();
+
+        // 2. Available entity keys = what the manifest-driven resolver resolves from the bag (e.g.
+        //    relationship_id from the coverage-injected canonical id). Keyed by entity `key`, which
+        //    is exactly what io.consumes[].entity matches. The id-shaped reference short-circuits in
+        //    the resolver without any network call, so this is deterministic.
+        Set<String> availableEntities = entityResolver.resolve(effectiveBag).resolved().keySet();
+
+        // 3. Resolve the dependency DAG from the live registry snapshot.
+        DagResolution resolution = dagResolver.resolve(goalId, registry.listAll(), availableEntities);
+        if (!resolution.ok() || resolution.plan() == null) {
+            log.info("DAG resolve miss goal={} available={} errors={} — flat fallback",
+                    goalId, availableEntities, resolution.errors());
+            return Optional.empty();
+        }
+        Plan plan = resolution.plan();
+        if (plan.nodes().size() <= 1) {
+            // Single-node plan ⇒ the flat path produces the identical result more simply.
+            return Optional.empty();
+        }
+
+        // 4. AUTHZ RE-GATE (security-critical): the resolver pulled in producer capabilities that
+        //    were NOT in the originally gated set. Re-run the structural entitlement filter over
+        //    EVERY manifest the plan touches; if it prunes even one, refuse the DAG and fall back to
+        //    flat — never invoke a resolver-pulled producer the principal isn't entitled to.
+        List<AgentManifest> planManifests = plan.nodes().stream().map(PlanNode::agent).collect(Collectors.toList());
+        List<AgentManifest> allowedPlan = entitlementService.filterAgents(principal, planManifests);
+        if (allowedPlan.size() < planManifests.size()) {
+            log.warn("DAG authz re-gate pruned {}→{} plan manifests for principal={} — flat fallback (no producer leak)",
+                    planManifests.size(), allowedPlan.size(), principal.id());
+            return Optional.empty();
+        }
+
+        // 5. Bind leaf inputs (entity-satisfied nodes with no upstream dependency) from the bag. A
+        //    missing required leaf input ⇒ refuse the DAG (never fabricate an identifier).
+        List<AgentManifest> leafManifests = plan.nodes().stream()
+                .filter(n -> n.dependsOn().isEmpty()).map(PlanNode::agent).collect(Collectors.toList());
+        Map<String, JsonNode> preBoundInputs = inputSynthesizer.synthesize(effectiveBag, leafManifests).inputs();
+        for (AgentManifest leaf : leafManifests) {
+            if (!preBoundInputs.containsKey(leaf.agentId())) {
+                log.info("DAG leaf '{}' has no bound input (required field unresolved) — flat fallback", leaf.agentId());
+                return Optional.empty();
+            }
+        }
+
+        // 6. Publish the plan graph (glass-box) + one agent_start per node, then execute by layers.
+        List<PlanGraphData.Node> graphNodes = plan.nodes().stream()
+                .map(n -> new PlanGraphData.Node(n.nodeId(), n.agent().agentId(),
+                        n.agent().protocol(), n.dependsOn(), "planned"))
+                .collect(Collectors.toList());
+        tracePublisher.publish(TraceEvent.of("plan_graph", requestId, conversationId,
+                new PlanGraphData(graphNodes)));
+        plan.nodes().forEach(n -> tracePublisher.publish(TraceEvent.of("agent_start", requestId, conversationId,
+                new AgentStartData(n.nodeId(), n.agent().protocol()))));
+
+        Blackboard blackboard = new Blackboard(availableEntities, preBoundInputs, mapper);
+        log.info("DAG firing: goal={} nodes={} available={}", goalId,
+                plan.nodes().stream().map(PlanNode::nodeId).collect(Collectors.toList()), availableEntities);
+        return Optional.of(dagExecutor.execute(plan, blackboard));
+    }
+
+    /** True if any of the manifest's {@code io.consumes} entries is a produced-output ({@code from}) reference. */
+    private static boolean hasProducedRefConsume(AgentManifest m) {
+        AgentManifest.Io io = m.io();
+        if (io == null || io.consumes() == null) return false;
+        return io.consumes().stream().anyMatch(c -> c != null && c.isProducedRef());
     }
 
     private void handleFollowUp(ChatRequest request, SseEmitter emitter,

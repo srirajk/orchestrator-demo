@@ -3,6 +3,7 @@ package ai.conduit.gateway.orchestration.planner;
 import ai.conduit.gateway.orchestration.model.Plan;
 import ai.conduit.gateway.orchestration.model.PlanNode;
 import ai.conduit.gateway.registry.model.AgentManifest;
+import org.springframework.stereotype.Component;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -46,6 +47,7 @@ import java.util.TreeSet;
  *
  * <p>Stateless and side-effect free — a single instance is safe to share across threads.
  */
+@Component
 public final class DagResolver {
 
     /**

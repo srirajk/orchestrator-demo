@@ -183,6 +183,9 @@ services:
       # World B: agent + domain manifests are read from the mounted ./registry volume,
       # NOT baked into the image. Onboard a domain by dropping JSON here + restart.
       CONDUIT_REGISTRY_LOCATION: file:/registry/
+      # Multi-step orchestration (D11): derive+execute the producer→consumer DAG for fan-in
+      # analytics goals. Reversible — set to "false" (or remove) to fall back to flat fan-out.
+      CONDUIT_ORCHESTRATION_DAG_ENABLED: "true"
       CONDUIT_ASSISTANT_DOMAIN_CONTEXT: ${CONDUIT_ASSISTANT_DOMAIN_CONTEXT:-an enterprise assistant for banking staff — covering client financial data, market research, and internal HR policies}
       # ── Conduit Insights: metric sources (in-network URLs; keys from env) ──────
       CONDUIT_INSIGHTS_PROMETHEUS_URL: http://prometheus:9090

@@ -57,8 +57,7 @@
   },
   "io": {
     "consumes": [
-      { "from": "wealth.holdings", "required": true },
-      { "from": "wealth.risk_profile", "required": false }
+      { "from": "wealth.holdings", "required": true }
     ],
     "produces": [
       { "name": "concentration", "type": "wealth.concentration" }
