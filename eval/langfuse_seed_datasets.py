@@ -66,7 +66,7 @@ SYNTHESIS_TEST_CASES = [
             "prompt": "Show me the complete picture for the Whitman Family Office account — holdings, performance, risk profile, settlement status, and cash position",
             "agent_outputs": [
                 {
-                    "agent_id": "acme.wealth.holdings",
+                    "agent_id": "meridian.wealth.holdings",
                     "data": {
                         "relationship_id": "REL-001",
                         "holdings": [
@@ -78,7 +78,7 @@ SYNTHESIS_TEST_CASES = [
                     },
                 },
                 {
-                    "agent_id": "acme.wealth.performance",
+                    "agent_id": "meridian.wealth.performance",
                     "data": {
                         "relationship_id": "REL-001",
                         "ytd_return_pct": 12.4,
@@ -87,7 +87,7 @@ SYNTHESIS_TEST_CASES = [
                     },
                 },
                 {
-                    "agent_id": "acme.wealth.risk_profile",
+                    "agent_id": "meridian.wealth.risk_profile",
                     "data": {
                         "relationship_id": "REL-001",
                         "risk_tolerance": "Moderate",
@@ -95,7 +95,7 @@ SYNTHESIS_TEST_CASES = [
                     },
                 },
                 {
-                    "agent_id": "acme.servicing.settlement_status",
+                    "agent_id": "meridian.servicing.settlement_status",
                     "data": {
                         "relationship_id": "REL-001",
                         "pending_settlements": 2,
@@ -104,7 +104,7 @@ SYNTHESIS_TEST_CASES = [
                     },
                 },
                 {
-                    "agent_id": "acme.servicing.cash_management",
+                    "agent_id": "meridian.servicing.cash_management",
                     "data": {
                         "relationship_id": "REL-001",
                         "cash_balance": 125000,
@@ -137,7 +137,7 @@ SYNTHESIS_TEST_CASES = [
             "prompt": "Show me the Whitman Family Office holdings, performance, and settlement status",
             "agent_outputs": [
                 {
-                    "agent_id": "acme.wealth.holdings",
+                    "agent_id": "meridian.wealth.holdings",
                     "data": {
                         "holdings": [
                             {"ticker": "MSFT", "shares": 800, "market_value": 372000},
@@ -147,14 +147,14 @@ SYNTHESIS_TEST_CASES = [
                     },
                 },
                 {
-                    "agent_id": "acme.wealth.performance",
+                    "agent_id": "meridian.wealth.performance",
                     "data": {
                         "ytd_return_pct": 12.4,
                         "total_value": 2150000,
                     },
                 },
                 {
-                    "agent_id": "acme.servicing.settlement_status",
+                    "agent_id": "meridian.servicing.settlement_status",
                     "data": None,
                     "error": "Agent timeout after 5000ms",
                     "status": "FAILED",

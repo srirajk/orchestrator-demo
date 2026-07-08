@@ -108,7 +108,7 @@ All error responses use the shared error envelope — never return a bare 500 or
 ```json
 {
   "error": "human-readable description",
-  "agent_id": "acme.wealth.holdings",
+  "agent_id": "meridian.wealth.holdings",
   "trace_id": "00-abc123...",
   "status_code": 500
 }
@@ -230,14 +230,14 @@ router = APIRouter()
 
 @router.get("/holdings", tags=["wealth"])
 def get_holdings(relationship_id: str = Query(...)):
-    with agent_span("acme.wealth.holdings", relationship_id=relationship_id) as span:
+    with agent_span("meridian.wealth.holdings", relationship_id=relationship_id) as span:
         data = HOLDINGS.get(relationship_id)
         if data is None:
             raise HTTPException(
                 status_code=404,
                 detail={
                     "error": f"No holdings for relationship_id={relationship_id}",
-                    "agent_id": "acme.wealth.holdings",
+                    "agent_id": "meridian.wealth.holdings",
                     "trace_id": span.get_span_context().trace_id,
                     "status_code": 404,
                 },
