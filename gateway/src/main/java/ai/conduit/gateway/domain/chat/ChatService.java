@@ -38,6 +38,7 @@ import ai.conduit.gateway.orchestration.model.Plan;
 import ai.conduit.gateway.orchestration.model.PlanNode;
 import ai.conduit.gateway.orchestration.planner.DagResolution;
 import ai.conduit.gateway.orchestration.planner.DagResolver;
+import ai.conduit.gateway.orchestration.planner.ResolutionError;
 import ai.conduit.gateway.registry.model.AgentManifest;
 import ai.conduit.gateway.registry.service.AgentRegistry;
 import ai.conduit.gateway.resolver.model.ResolverResult;
@@ -479,6 +480,11 @@ public class ChatService {
                         allowedManifests.size(), manifests.size(), principal.id());
             }
             final List<AgentManifest> finalManifests = allowedManifests;
+            final List<String> finalDomains = finalManifests.stream()
+                    .map(AgentManifest::domain)
+                    .filter(d -> d != null && !d.isBlank())
+                    .distinct()
+                    .toList();
 
             // Domains the request referenced but the structural entitlement gate pruned (outside the
             // caller's access). When the SAME ask mixed an accessible and an inaccessible domain
@@ -498,12 +504,7 @@ public class ChatService {
             // (WORLD-B §5). These tags drive observability slicing AND eval-suite resolution
             // (see docs/EVAL-FRAMEWORK.md — the worker picks a domain/agent's suite by tag).
             if (!finalManifests.isEmpty()) {
-                List<String> domains = finalManifests.stream()
-                        .map(AgentManifest::domain)
-                        .filter(d -> d != null && !d.isBlank())
-                        .distinct()
-                        .toList();
-                String resolvedDomain = String.join(",", domains);
+                String resolvedDomain = String.join(",", finalDomains);
                 if (!resolvedDomain.isBlank()) {
                     rootSpan.setAttribute("langfuse.metadata.domain", resolvedDomain);
                     rootSpan.setAttribute("conduit.domain", resolvedDomain);
@@ -512,7 +513,7 @@ public class ChatService {
                 // agent. Seeding with segmentTags() preserves the segment:* slicing chips set
                 // in handleChat (setAttribute REPLACES, so they must be re-included here).
                 List<String> tags = new ArrayList<>(segmentTags(jwtPrincipal));
-                domains.forEach(d -> tags.add("domain:" + d));
+                finalDomains.forEach(d -> tags.add("domain:" + d));
                 finalManifests.stream()
                         .map(AgentManifest::agentId)
                         .filter(a -> a != null && !a.isBlank())
@@ -791,6 +792,7 @@ public class ChatService {
                     .description("Time from routing decision to all agents completing")
                     .tag("agent_count", String.valueOf(results.size()))
                     .publishPercentiles(0.5, 0.95, 0.99)
+                    .publishPercentileHistogram()
                     .register(meterRegistry)
                     .record(fanoutElapsedMs, TimeUnit.MILLISECONDS);
 
@@ -819,6 +821,7 @@ public class ChatService {
             String answer = answerSynthesizer.synthesize(results, latestPrompt, request.messages(), emitter, streamId, withheldDomains, requestStart);
             setTraceOutput(rootSpan, answer);
             emitRequestOutcome("ANSWERED");
+            finalDomains.forEach(this::emitAssistantDomain);
 
             tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                     new RequestCompleteData(System.currentTimeMillis() - requestStart,
@@ -860,7 +863,8 @@ public class ChatService {
                 .filter(m -> m != null && hasProducedRefConsume(m))
                 .toList();
         if (goals.isEmpty()) return Optional.empty();
-        String goalId = goals.get(0).agentId();
+        AgentManifest goal = goals.get(0);
+        String goalId = goal.agentId();
 
         // 2. Available entity keys = what the manifest-driven resolver resolves from the bag (e.g.
         //    relationship_id from the coverage-injected canonical id). Keyed by entity `key`, which
@@ -873,11 +877,13 @@ public class ChatService {
         if (!resolution.ok() || resolution.plan() == null) {
             log.info("DAG resolve miss goal={} available={} errors={} — flat fallback",
                     goalId, availableEntities, resolution.errors());
+            emitDagFallback(resolutionFallbackReason(resolution), goal.domain());
             return Optional.empty();
         }
         Plan plan = resolution.plan();
         if (plan.nodes().size() <= 1) {
             // Single-node plan ⇒ the flat path produces the identical result more simply.
+            emitDagFallback("single-node", goal.domain());
             return Optional.empty();
         }
 
@@ -890,6 +896,7 @@ public class ChatService {
         if (allowedPlan.size() < planManifests.size()) {
             log.warn("DAG authz re-gate pruned {}→{} plan manifests for principal={} — flat fallback (no producer leak)",
                     planManifests.size(), allowedPlan.size(), principal.id());
+            emitDagFallback("regate-prune", goal.domain());
             return Optional.empty();
         }
 
@@ -901,6 +908,7 @@ public class ChatService {
         for (AgentManifest leaf : leafManifests) {
             if (!preBoundInputs.containsKey(leaf.agentId())) {
                 log.info("DAG leaf '{}' has no bound input (required field unresolved) — flat fallback", leaf.agentId());
+                emitDagFallback("unmet-input", goal.domain());
                 return Optional.empty();
             }
         }
@@ -918,7 +926,23 @@ public class ChatService {
         Blackboard blackboard = new Blackboard(availableEntities, preBoundInputs, mapper);
         log.info("DAG firing: goal={} nodes={} available={}", goalId,
                 plan.nodes().stream().map(PlanNode::nodeId).collect(Collectors.toList()), availableEntities);
+        emitDagPlan(goal.domain(), goalId, plan.nodes().size());
         return Optional.of(dagExecutor.execute(plan, blackboard));
+    }
+
+    private String resolutionFallbackReason(DagResolution resolution) {
+        if (resolution == null || resolution.errors().isEmpty()) return "resolve-miss";
+        boolean ambiguous = resolution.errors().stream()
+                .anyMatch(e -> e.code() == ResolutionError.Code.AMBIGUOUS_PRODUCER);
+        if (ambiguous) return "ambiguous-goal";
+        boolean unmetInput = resolution.errors().stream()
+                .anyMatch(e -> e.code() == ResolutionError.Code.UNMET_REQUIRED_INPUT
+                        || e.code() == ResolutionError.Code.MISSING_PRODUCER
+                        || e.code() == ResolutionError.Code.UNKNOWN_NODE);
+        if (unmetInput) return "unmet-input";
+        boolean cycle = resolution.errors().stream()
+                .anyMatch(e -> e.code() == ResolutionError.Code.CYCLE);
+        return cycle ? "cycle" : resolution.errors().get(0).code().name().toLowerCase();
     }
 
     /** True if any of the manifest's {@code io.consumes} entries is a produced-output ({@code from}) reference. */
@@ -1373,6 +1397,40 @@ public class ChatService {
                 .description("Requests answered from a partial fan-out (a dispatched agent failed)")
                 .register(meterRegistry)
                 .increment();
+    }
+
+    /** Counts DAG plans that actually fired, tagged by manifest-declared dimensions. */
+    private void emitDagPlan(String domain, String goalId, int nodeCount) {
+        Counter.builder("conduit.dag.plan")
+                .description("Multi-step DAG plans executed by the gateway")
+                .tag("domain", safeMetricTag(domain))
+                .tag("goal", safeMetricTag(goalId))
+                .tag("node_count", String.valueOf(nodeCount))
+                .register(meterRegistry)
+                .increment();
+    }
+
+    /** Counts DAG candidates that fell back to the flat path, without domain-specific logic. */
+    private void emitDagFallback(String reason, String domain) {
+        Counter.builder("conduit.dag.fallback")
+                .description("DAG candidates that fell back to flat orchestration")
+                .tag("reason", safeMetricTag(reason))
+                .tag("domain", safeMetricTag(domain))
+                .register(meterRegistry)
+                .increment();
+    }
+
+    /** Counts successful data answers by manifest-declared domain. */
+    private void emitAssistantDomain(String domain) {
+        Counter.builder("conduit.assistant.domain")
+                .description("Successful data answers by manifest-declared domain")
+                .tag("domain", safeMetricTag(domain))
+                .register(meterRegistry)
+                .increment();
+    }
+
+    private static String safeMetricTag(String value) {
+        return value == null || value.isBlank() ? "unknown" : value;
     }
 
     /**
