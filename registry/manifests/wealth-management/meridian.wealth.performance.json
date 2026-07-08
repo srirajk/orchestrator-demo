@@ -35,7 +35,9 @@
         "how has this account performed",
         "year-to-date returns for the client",
         "P&L for the relationship this quarter",
-        "performance of the Whitman portfolio"
+        "performance of the Whitman portfolio",
+        "portfolio performance summary for this relationship",
+        "how did the portfolio perform this quarter"
       ],
       "inputModes": [
         "application/json"

@@ -36,7 +36,10 @@
         "upcoming corporate actions",
         "any dividends or splits coming up",
         "elections due on this account",
-        "corporate action calendar for the relationship"
+        "corporate action calendar for the relationship",
+        "corporate action calendar for the Whitman relationship",
+        "corporate actions summary for this relationship",
+        "any corporate action activity I should know about on this account"
       ],
       "inputModes": [
         "application/json"

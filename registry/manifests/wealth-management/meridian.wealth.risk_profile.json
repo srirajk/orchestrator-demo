@@ -35,7 +35,11 @@
         "risk profile for this client",
         "how concentrated is this portfolio",
         "risk tolerance for the relationship",
-        "any concentration flags on this account"
+        "any concentration flags on this account",
+        "is this portfolio too aggressive for what the client said they could handle",
+        "does the account's risk exposure match the client's stated tolerance",
+        "is this allocation appropriate given the client's risk appetite",
+        "risk profile for the Whitman relationship"
       ],
       "inputModes": [
         "application/json"

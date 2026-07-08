@@ -58,6 +58,25 @@ public class AgentResolver {
     @Value("${conduit.resolver.decisive-score:0.55}")
     private double decisiveScore;
 
+    /**
+     * General routing abstain gate (T1.6) — applied inside {@link #select}, so it runs for EVERY
+     * resolve call (the plain debug path AND the contextual chat path). An absolute floor: below
+     * this, the leader is untrustworthy on its own regardless of how it compares to anything
+     * else. Distinct from {@link #confidenceFloor}, which is a per-candidate long-tail prune, not
+     * a whole-query abstain signal.
+     */
+    @Value("${conduit.routing.min-score:0.40}")
+    private double routingMinScore;
+
+    /**
+     * Minimum raw top-1-vs-top-2 score gap. Below this the leader and runner-up are too close to
+     * call — the router would be guessing, not routing — so the query abstains rather than
+     * serving a coin-flip pick. Domain-agnostic (unlike {@link #domainMargin}, which only compares
+     * the leader against the best OTHER-domain candidate).
+     */
+    @Value("${conduit.routing.min-margin:0.005}")
+    private double routingMinMargin;
+
     private final VectorIndex    vectorIndex;
     private final AgentRegistry  registry;
     private final MeterRegistry  meterRegistry;
@@ -196,8 +215,31 @@ public class AgentResolver {
      * {@code confidenceFloor}. Prunes long-tail matches for focused queries.
      */
     private ResolverResult select(List<RoutingCandidate> candidates, String queryText) {
-        double topScore = candidates.isEmpty() ? 0.0 :
-                candidates.stream().mapToDouble(RoutingCandidate::score).max().orElse(0.0);
+        if (candidates.isEmpty()) {
+            return new ResolverResult(List.of(), List.of(), true, 0.0, queryText);
+        }
+
+        // candidates is sorted descending by score (VectorIndex.search() contract) — get(0) is
+        // the leader.
+        double topScore = candidates.get(0).score();
+
+        // ── General routing abstain gate (T1.6, config-driven, World-B clean) ───────────────
+        // Runs BEFORE the per-candidate floor below. Two independent, domain-agnostic checks:
+        // the leader is weak in absolute terms (routingMinScore), or the leader and runner-up
+        // are too close to call (routingMinMargin). Either ⇒ the whole query abstains — no
+        // partial selection — so the caller falls through to the deterministic clarify/decline
+        // path instead of trusting a guess. Pure score arithmetic; no domain literal.
+        double runnerUpScore = candidates.size() > 1 ? candidates.get(1).score() : 0.0;
+        double topMargin = candidates.size() > 1 ? topScore - runnerUpScore : Double.MAX_VALUE;
+        boolean routingAbstain = topScore < routingMinScore || topMargin < routingMinMargin;
+        if (routingAbstain) {
+            log.debug("Resolver: routing abstain — leader={} topScore={} margin={} (need score>={}, margin>={})",
+                    candidates.get(0).manifest().agentId(), String.format("%.3f", topScore),
+                    candidates.size() > 1 ? String.format("%.3f", topMargin) : "n/a",
+                    String.format("%.3f", routingMinScore), String.format("%.3f", routingMinMargin));
+            meterRegistry.counter("resolver.fallback").increment();
+            return new ResolverResult(List.of(), candidates, true, topScore, queryText);
+        }
 
         double effectiveFloor = topScore > 0.55
                 ? Math.max(confidenceFloor, topScore * relativeFloorFactor)

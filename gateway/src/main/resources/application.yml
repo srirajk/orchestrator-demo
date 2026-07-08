@@ -71,6 +71,21 @@ conduit:
     # is in the cross-domain noise band → abstain to a deterministic clarification. Margin-based
     # (not a raw absolute cutoff) so a lone low-confidence out-of-domain hit is never trusted.
     domain-margin: 0.05
+  # T1.6 — general routing abstain gate, applied to EVERY resolve (debug + contextual chat).
+  # Distinct from conduit.resolver.domain-margin above (which compares the leader against the
+  # best OTHER-domain candidate): this is a raw top-1 floor and a raw top-1-vs-top-2 margin,
+  # independent of domain. Either check failing means "the router is guessing" → abstain to the
+  # deterministic clarify/decline path instead of serving a low-confidence pick.
+  routing:
+    # Absolute floor below which the leader is untrustworthy on its own (e.g. a genuinely
+    # out-of-scope ask). Chosen with daylight on both sides of the labeled eval set: comfortably
+    # above known junk matches (~0.31-0.34) and comfortably below the weakest legitimate match
+    # observed (~0.44) — see eval/goal-pick/labeled_queries.json + docs/specs/routing-hardening-T1.6.md.
+    min-score: 0.40
+    # Minimum top-1-vs-top-2 raw score gap. Deliberately conservative (near-zero): the labeled
+    # eval set's thinnest LEGITIMATE margin is ~0.007, so this only catches a genuine near-tie
+    # (the router truly cannot tell two candidates apart), not an honest close call.
+    min-margin: 0.005
   chat:
     # Recent user turns (incl. current) concatenated into the routing query so keyword-less
     # follow-ups inherit the conversation's domain vocabulary. Bounded to limit domain drift.

@@ -37,10 +37,11 @@
         "failed trades for the relationship",
         "settlement status for this client",
         "unsettled trades I should know about",
-        "pending settlements for the Whitman Family Office relationship",
+        "pending settlements for the Whitman relationship",
         "what are the outstanding trade settlements on the servicing side",
         "show me pending and failed settlements for this relationship",
-        "settlement activity and trade status across wealth and servicing"
+        "which trades have not settled yet for this custody account",
+        "list the failed and pending trade breaks for this relationship"
       ],
       "inputModes": [
         "application/json"

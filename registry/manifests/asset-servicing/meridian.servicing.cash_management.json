@@ -36,7 +36,9 @@
         "cash position for the relationship",
         "projected cash for this account",
         "available cash balances",
-        "liquidity on the Whitman account"
+        "liquidity on the Whitman account",
+        "cash management summary for this relationship",
+        "give me an overview of cash management for this account"
       ],
       "inputModes": [
         "application/json"

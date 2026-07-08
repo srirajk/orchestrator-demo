@@ -40,7 +40,11 @@
         "check diversification for this portfolio",
         "what is the largest position as a share of the portfolio",
         "compute the HHI for this client's holdings",
-        "any overconcentration flags on this relationship"
+        "any overconcentration flags on this relationship",
+        "which holdings are driving issuer concentration in this book",
+        "which positions are the biggest contributors to concentration risk",
+        "are any single names making up too much of the portfolio",
+        "identify the top issuer exposures pushing concentration higher"
       ],
       "inputModes": [
         "application/json"

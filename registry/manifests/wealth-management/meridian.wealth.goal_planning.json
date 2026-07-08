@@ -35,6 +35,7 @@
         "is this client on track for their goals",
         "financial plan status for the relationship",
         "are the Whitman goals funded",
+        "financial goal progress for this relationship this year",
         "goal progress for this account"
       ],
       "inputModes": [

@@ -1,7 +1,9 @@
 {
   "thresholds": {
-    "clear_goal_accuracy": 0.9,
-    "abstain_rate": 0.9
+    "flat_accuracy": 0.9,
+    "analytics_accuracy": 0.9,
+    "abstain_rate": 0.9,
+    "domain_accuracy": 0.9
   },
   "queries": [
     {
@@ -283,6 +285,30 @@
       "persona": "uw_sam",
       "query": "Translate this sentence into French: good morning.",
       "expected_goal": "abstain"
+    },
+    {
+      "id": "held_out_001",
+      "category": "held_out",
+      "persona": "rm_jane",
+      "query": "Which holdings in the Calderon Trust portfolio are contributing most to single-issuer risk?",
+      "expected_goal": "meridian.wealth.concentration",
+      "note": "T1.6 held-out paraphrase — NOT used as a skill example. Different client (Calderon Trust) and different wording ('contributing most to single-issuer risk') than any concentration example added in Part C, proving generalization rather than overfitting."
+    },
+    {
+      "id": "held_out_002",
+      "category": "held_out",
+      "persona": "rm_jane",
+      "query": "Is the Calderon Trust allocation too bold given what the client can stomach?",
+      "expected_goal": "meridian.wealth.risk_profile",
+      "note": "T1.6 held-out paraphrase — NOT used as a skill example. 'too bold' / 'can stomach' is deliberately unlike the 'too aggressive' / 'risk appetite' phrasing added to risk_profile in Part C, proving generalization."
+    },
+    {
+      "id": "held_out_003",
+      "category": "held_out",
+      "persona": "ops_analyst_singh",
+      "query": "Are there any trades sitting unsettled in the Calderon Trust custody account?",
+      "expected_goal": "meridian.servicing.settlement_status",
+      "note": "T1.6 held-out paraphrase — NOT used as a skill example. Confirms settlement_status still recalls correctly after Part C removed its domain-blending example, on a client name never used in its examples."
     }
   ]
 }
