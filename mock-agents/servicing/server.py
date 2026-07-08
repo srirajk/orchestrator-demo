@@ -1,6 +1,6 @@
 """
 Asset Servicing MCP server — Domain 2 mock agents.
-Exposes 5 tools over SSE transport via FastMCP.
+Exposes 6 tools over SSE transport via FastMCP.
 
 Agent layout (each agent in its own top-level subfolder):
   servicing/settlements/          → get_settlements
@@ -8,6 +8,7 @@ Agent layout (each agent in its own top-level subfolder):
   servicing/custody/              → get_custody_positions
   servicing/nav/                  → get_nav  (keyed by fund_id, not relationship_id)
   servicing/cash/                 → get_cash
+  servicing/settlement_risk/      → analyze_settlement_risk (fan-in analytics)
 
 Fault knobs (env vars, set in docker-compose for resilience tests):
   MCP_FAULT_TOOL=get_settlements   → that tool returns an error
@@ -60,6 +61,7 @@ from corporate_actions.tool import get_corporate_actions as _get_corporate_actio
 from custody.tool import get_custody_positions as _get_custody_positions
 from nav.tool import get_nav as _get_nav
 from cash.tool import get_cash as _get_cash
+from settlement_risk.tool import analyze_settlement_risk as _analyze_settlement_risk
 
 from shared.jwt_verify import verify_bearer_token
 from shared.error_schema import mcp_error_dict
@@ -150,6 +152,26 @@ def get_cash(relationship_id: str) -> str:
     return _get_cash(relationship_id)
 
 
+@mcp.tool()
+def analyze_settlement_risk(
+    settlement_status: dict = {},
+    custody_positions: dict = {},
+    cash_position: dict = {},
+) -> str:
+    """
+    Analyse settlement-risk from merged fan-in producer outputs.
+
+    Args:
+        settlement_status: get_settlements output projection.
+        custody_positions: get_custody_positions output projection.
+        cash_position: get_cash output projection.
+
+    Returns:
+        JSON: fails aging, CSDR cash-penalty exposure basis, and firm-policy flags
+    """
+    return _analyze_settlement_risk(settlement_status, custody_positions, cash_position)
+
+
 # ── HTTP middleware — lives at module scope so it applies whenever the app is
 #    imported or run (not only when started via __main__). ────────────────────
 
@@ -174,7 +196,7 @@ async def _health(request: StarletteRequest) -> JSONResponse:
         "status": "ok",
         "service": "servicing-mcp",
         "version": "0.3.0",
-        "agents": ["settlements", "corporate_actions", "custody", "nav", "cash"],
+        "agents": ["settlements", "corporate_actions", "custody", "nav", "cash", "settlement_risk"],
     })
 
 

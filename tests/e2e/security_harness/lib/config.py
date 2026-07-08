@@ -13,6 +13,7 @@ GATEWAY_URL = os.getenv("CONDUIT_GATEWAY_URL", "http://localhost:8080")
 IAM_URL = os.getenv("CONDUIT_IAM_URL", "http://localhost:8084")
 WEALTH_HTTP_URL = os.getenv("CONDUIT_WEALTH_HTTP_URL", "http://localhost:8081")
 INSURANCE_HTTP_URL = os.getenv("CONDUIT_INSURANCE_HTTP_URL", "http://localhost:8087")
+SERVICING_MCP_URL = os.getenv("CONDUIT_SERVICING_MCP_URL", "http://localhost:8082")
 
 DEMO_PASSWORD = os.getenv("CONDUIT_DEMO_PASSWORD", "Meridian@2024")
 
@@ -24,6 +25,8 @@ USER_NOT_ENTITLED = "rm_carlos"
 # uw_sam — insurance underwriter, entitled to POL-77001/POL-77002 only (POL-88003 is
 # uw_dana's — see scripts/seed-users.sh).
 USER_INSURANCE_UNDERWRITER = "uw_sam"
+USER_SERVICING_OPS = "ops_analyst_singh"
+USER_ADMIN = "admin"
 
 WHITMAN_RELATIONSHIP_ID = "REL-00042"
 WHITMAN_NAME = "Whitman Family Office"
@@ -41,4 +44,5 @@ REQUIRED_SERVICES = {
     "iam-service": f"{IAM_URL}/login",
     "wealth-http agent": f"{WEALTH_HTTP_URL}/health",
     "insurance-http agent": f"{INSURANCE_HTTP_URL}/health",
+    "servicing-mcp agent": f"{SERVICING_MCP_URL}/health",
 }

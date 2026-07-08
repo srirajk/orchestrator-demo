@@ -76,6 +76,34 @@ def sam_session() -> requests.Session:
 
 
 @pytest.fixture(scope="session")
+def ops_session() -> requests.Session:
+    """ops_analyst_singh — asset-servicing operations, confidential-pii ceiling."""
+    try:
+        return bff_client.login(harness_config.USER_SERVICING_OPS)
+    except Exception as exc:
+        pytest.exit(
+            f"\n\nCould not log in as '{harness_config.USER_SERVICING_OPS}' via the BFF OIDC flow: {exc}\n"
+            f"Check the user is seeded (scripts/seed-users.sh) and the password matches "
+            f"CONDUIT_DEMO_PASSWORD (default {harness_config.DEMO_PASSWORD!r}).\n",
+            returncode=2,
+        )
+
+
+@pytest.fixture(scope="session")
+def admin_session() -> requests.Session:
+    """admin — platform admin used for cross-domain live DAG evidence."""
+    try:
+        return bff_client.login(harness_config.USER_ADMIN)
+    except Exception as exc:
+        pytest.exit(
+            f"\n\nCould not log in as '{harness_config.USER_ADMIN}' via the BFF OIDC flow: {exc}\n"
+            f"Check the user is seeded and the password matches "
+            f"CONDUIT_DEMO_PASSWORD (default {harness_config.DEMO_PASSWORD!r}).\n",
+            returncode=2,
+        )
+
+
+@pytest.fixture(scope="session")
 def carlos_session() -> requests.Session:
     """rm_carlos — NOT entitled to Whitman Family Office (REL-00042); book = REL-00099 only."""
     try:

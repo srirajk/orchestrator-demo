@@ -1,0 +1,79 @@
+{
+  "agent_id": "acme.servicing.settlement_risk",
+  "name": "Asset Servicing Settlement Risk Analysis",
+  "description": "Fan-in analytics agent: consumes settlement status, custody positions, and cash position outputs to compute failed-settlement aging, CSDR cash-penalty exposure basis, and firm-policy settlement-risk flags. Computes from supplied producer data; does not fetch data and does not claim mandatory buy-in is active.",
+  "version": "1.0.0",
+  "provider": {
+    "organization": "Meridian Demo Bank"
+  },
+  "domain": "asset-servicing",
+  "audience": "segment",
+  "sub_domain": "custody-operations",
+  "max_response_tokens": 2500,
+  "protocol": "mcp",
+  "connection": {
+    "server_url": "http://servicing-mcp:8082/sse",
+    "tool": "analyze_settlement_risk",
+    "transport": "sse"
+  },
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false
+  },
+  "skills": [
+    {
+      "id": "analyze_settlement_risk",
+      "name": "analyze_settlement_risk",
+      "description": "Analyse settlement risk from settlement, custody, and cash data: failed-trade aging, failed amount exposure, CSDR cash-penalty exposure basis, and firm-policy flags without asserting that mandatory buy-in is active.",
+      "tags": [
+        "settlement-risk",
+        "failed-settlements",
+        "csdr",
+        "cash-penalties",
+        "custody",
+        "asset-servicing"
+      ],
+      "examples": [
+        "what is the settlement risk on this servicing relationship",
+        "show fails aging and CSDR cash penalty exposure for this account",
+        "are failed settlements over our firm policy age threshold",
+        "does this fund have settlement fails creating cash penalty exposure",
+        "assess settlement risk using cash and custody context",
+        "what failed trades need escalation under our settlement policy"
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    }
+  ],
+  "constraints": {
+    "access_mode": "read",
+    "data_classification": "confidential-pii",
+    "sla_timeout_ms": 15000
+  },
+  "io": {
+    "consumes": [
+      {
+        "from": "servicing.settlement_status",
+        "required": true,
+        "select": "{relationship_id: relationship_id, pending: pending, failed: failed, as_of_date: as_of_date}"
+      },
+      {
+        "from": "servicing.custody_positions",
+        "required": true,
+        "select": "{relationship_id: relationship_id, holdings_by_custodian: holdings_by_custodian, as_of_date: as_of_date}"
+      },
+      {
+        "from": "servicing.cash_position",
+        "required": true,
+        "select": "{relationship_id: relationship_id, balances: balances, projected_cash_usd: projected_cash_usd, note: note, as_of_date: as_of_date}"
+      }
+    ],
+    "produces": [
+      { "name": "settlement_analysis", "type": "servicing.settlement_analysis" }
+    ]
+  }
+}

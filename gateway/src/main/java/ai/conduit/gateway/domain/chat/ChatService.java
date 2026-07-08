@@ -850,13 +850,16 @@ public class ChatService {
                                               String conversationId) {
         if (!dagEnabled || effectiveBag == null) return Optional.empty();
 
-        // 1. Goal = the single selected+allowed capability whose io declares a `from` (produced-ref)
-        //    consume — a fan-in analytics capability that depends on another capability's output.
+        // 1. Goal = the highest-ranked selected+allowed capability whose io declares a `from`
+        //    (produced-ref) consume — a fan-in analytics capability that depends on another
+        //    capability's output. The resolver preserves ranking in finalManifests; choosing the
+        //    first fan-in goal lets broad-access principals still get a DAG when adjacent fan-in
+        //    analytics also pass the confidence floor.
         List<AgentManifest> goals = synthesis.inputs().keySet().stream()
                 .map(id -> finalManifests.stream().filter(m -> m.agentId().equals(id)).findFirst().orElse(null))
                 .filter(m -> m != null && hasProducedRefConsume(m))
                 .toList();
-        if (goals.size() != 1) return Optional.empty();
+        if (goals.isEmpty()) return Optional.empty();
         String goalId = goals.get(0).agentId();
 
         // 2. Available entity keys = what the manifest-driven resolver resolves from the bag (e.g.

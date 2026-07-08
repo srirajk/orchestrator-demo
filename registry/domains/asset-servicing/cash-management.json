@@ -6,6 +6,15 @@
 
   "entity_types": [
     {
+      "key": "relationship_id",
+      "extract_as": "relationship_reference",
+      "kind": "resolvable",
+      "display": "servicing relationship",
+      "id_pattern": "REL-\\w+",
+      "resolve_type": "relationship",
+      "required": false
+    },
+    {
       "key": "fund_id",
       "extract_as": "fund_reference",
       "kind": "resolvable",

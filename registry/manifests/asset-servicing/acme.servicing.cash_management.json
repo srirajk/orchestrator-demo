@@ -53,7 +53,7 @@
   },
   "io": {
     "consumes": [
-      { "entity": "fund_id", "required": true }
+      { "entity": "relationship_id", "required": true }
     ],
     "produces": [
       { "name": "cash_position", "type": "servicing.cash_position" }
