@@ -118,12 +118,23 @@ public record AgentManifest(
      *       producer→consumer edge.</li>
      * </ul>
      * {@code required} defaults to {@code true} when absent (per schema).
+     *
+     * <p>{@code select} — OPTIONAL, meaningful only on a {@code from} edge: a JMESPath expression
+     * that reshapes the producer's output into exactly what this consumer expects (field
+     * projection, not a blob pass-through). {@code null}/absent = identity pass-through, i.e.
+     * today's behavior — additive and backward-compatible. Evaluated by
+     * {@link ai.conduit.gateway.orchestration.executor.Blackboard#bind}.
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Consume(String entity, String from, Boolean required) {
+    public record Consume(String entity, String from, Boolean required, String select) {
+        /** Backward-compatible 3-arg constructor (pre-{@code select} arity) — defaults select to null. */
+        public Consume(String entity, String from, Boolean required) {
+            this(entity, from, required, null);
+        }
         public boolean isEntityRef()   { return entity != null && !entity.isBlank(); }
         public boolean isProducedRef() { return from   != null && !from.isBlank(); }
         public boolean isRequired()    { return required == null || required; }
+        public boolean hasSelect()     { return select != null && !select.isBlank(); }
     }
 
     /** A named, typed output published for downstream binding via {@code from}. */

@@ -17,6 +17,7 @@ import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Derives input/output schemas and resolved connection from agent specs.
@@ -66,7 +67,7 @@ public class AgentIntrospector {
                     "Operation '" + operationId + "' not found in spec at " + openapiUrl);
         }
 
-        JsonNode inputSchema  = buildInputSchemaFromParams(match.operation());
+        JsonNode inputSchema  = buildInputSchema(match, openapiUrl);
         JsonNode outputSchema = buildOutputSchemaFromResponse(match.operation());
 
         // Resolved connection: base URL from servers + method + path
@@ -98,13 +99,23 @@ public class AgentIntrospector {
         return null;
     }
 
-    private JsonNode buildInputSchemaFromParams(Operation op) {
+    /**
+     * Input schema = query/path parameters (unchanged) PLUS, for a body-taking operation (POST/PUT
+     * with an {@code application/json} requestBody — the common analytics fan-in shape, e.g.
+     * {@code post_concentration}), the body's own JSON Schema properties/required. Without this, a
+     * body-only operation would introspect to an empty {@code {type:object,properties:{}}} — a schema
+     * with no teeth, unable to catch a mis-composed input before dispatch (Blackboard's pre-dispatch
+     * gate). Swagger-parser's Java {@code Schema} model is fiddly for OpenAPI-3.1-style
+     * {@code anyOf}-null (Pydantic's optional-field idiom); fetching the raw spec JSON and resolving
+     * {@code $ref} ourselves keeps this exact and simple.
+     */
+    private JsonNode buildInputSchema(OperationMatch match, String openapiUrl) {
         ObjectNode schema = mapper.createObjectNode();
         schema.put("type", "object");
         ObjectNode props = schema.putObject("properties");
         var required = schema.putArray("required");
 
-        List<Parameter> params = op.getParameters();
+        List<Parameter> params = match.operation().getParameters();
         if (params != null) {
             for (Parameter p : params) {
                 if ("query".equals(p.getIn()) || "path".equals(p.getIn())) {
@@ -115,7 +126,50 @@ public class AgentIntrospector {
                 }
             }
         }
+
+        mergeRequestBodySchema(props, required, match, openapiUrl);
         return schema;
+    }
+
+    private void mergeRequestBodySchema(ObjectNode props, com.fasterxml.jackson.databind.node.ArrayNode required,
+                                        OperationMatch match, String openapiUrl) {
+        if (match.operation().getRequestBody() == null) return;
+        try {
+            JsonNode root = mapper.readTree(URI.create(openapiUrl).toURL());
+            JsonNode bodySchema = root.path("paths").path(match.path())
+                    .path(match.method().toLowerCase()).path("requestBody")
+                    .path("content").path("application/json").path("schema");
+            bodySchema = resolveRef(root, bodySchema);
+            if (!bodySchema.isObject()) return;
+
+            JsonNode bodyProps = bodySchema.path("properties");
+            if (bodyProps.isObject()) {
+                bodyProps.fields().forEachRemaining(e -> props.set(e.getKey(), e.getValue()));
+            }
+            JsonNode bodyRequired = bodySchema.path("required");
+            if (bodyRequired.isArray()) {
+                Set<String> already = new java.util.HashSet<>();
+                required.forEach(n -> already.add(n.asText()));
+                for (JsonNode r : bodyRequired) {
+                    if (r.isTextual() && already.add(r.asText())) required.add(r.asText());
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not derive requestBody schema for '{}' from {}: {}",
+                    match.operation().getOperationId(), openapiUrl, e.getMessage());
+        }
+    }
+
+    /** Resolves a single {@code {"$ref": "#/components/schemas/X"}} indirection against {@code root}. */
+    private JsonNode resolveRef(JsonNode root, JsonNode node) {
+        if (node == null || !node.isObject() || !node.has("$ref")) return node;
+        String ref = node.get("$ref").asText();
+        if (!ref.startsWith("#/")) return node;
+        JsonNode target = root;
+        for (String segment : ref.substring(2).split("/")) {
+            target = target.path(segment);
+        }
+        return target;
     }
 
     private JsonNode buildOutputSchemaFromResponse(Operation op) {

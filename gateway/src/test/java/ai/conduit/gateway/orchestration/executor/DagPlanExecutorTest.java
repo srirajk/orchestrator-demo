@@ -71,6 +71,47 @@ class DagPlanExecutorTest {
         return new Plan(List.of(producer, consumer));
     }
 
+    // ── data-contract plan: consumer declares a select + an introspected input schema ──────────────
+
+    private static AgentManifest agentWithSchema(String id, AgentManifest.Io io, JsonNode inputSchema) {
+        return new AgentManifest(
+                id, id, null, null, null, null, null, null, null, "http",
+                null, null, null,
+                new AgentManifest.Constraints("read", "internal", 5_000),
+                io, inputSchema, null, null, true, null);
+    }
+
+    private static JsonNode schemaRequiring(String field) {
+        var s = MAPPER.createObjectNode();
+        s.put("type", "object");
+        var props = s.putObject("properties");
+        props.putObject(field).put("type", "array");
+        s.putArray("required").add(field);
+        return s;
+    }
+
+    /** Consumer whose edge maps the WRONG upstream field into 'positions' (a string, not an array). */
+    private static Plan producerConsumerPlanWithWrongSelect() {
+        AgentManifest.Io badConsumerIo = new AgentManifest.Io(
+                List.of(new AgentManifest.Consume(null, OUT_TYPE, true, "{positions: holdings}")),
+                List.of(new AgentManifest.Produce("consumerOut", "typeFinal")));
+        PlanNode producer = new PlanNode(PRODUCER, agent(PRODUCER, producerIo()), null, List.of());
+        PlanNode consumer = new PlanNode(CONSUMER,
+                agentWithSchema(CONSUMER, badConsumerIo, schemaRequiring("positions")), null, List.of(PRODUCER));
+        return new Plan(List.of(producer, consumer));
+    }
+
+    /** Consumer with a correct select, requiring the upstream NOT be marked incomplete. */
+    private static Plan producerConsumerPlanRequiringComplete() {
+        AgentManifest.Io consumerIoOk = new AgentManifest.Io(
+                List.of(new AgentManifest.Consume(null, OUT_TYPE, true, "{positions: positions}")),
+                List.of(new AgentManifest.Produce("consumerOut", "typeFinal")));
+        PlanNode producer = new PlanNode(PRODUCER, agent(PRODUCER, producerIo()), null, List.of());
+        PlanNode consumer = new PlanNode(CONSUMER,
+                agentWithSchema(CONSUMER, consumerIoOk, schemaRequiring("positions")), null, List.of(PRODUCER));
+        return new Plan(List.of(producer, consumer));
+    }
+
     // ── recording adapter ────────────────────────────────────────────────────────────────────────
 
     /** Fake HTTP adapter: records invocation order + the input each agent was called with. */
@@ -78,8 +119,14 @@ class DagPlanExecutorTest {
         final List<String> order = new CopyOnWriteArrayList<>();
         final Map<String, JsonNode> inputs = new ConcurrentHashMap<>();
         final boolean producerFails;
+        final JsonNode producerOutput;   // null → default {"holdings":"PAYLOAD"}
 
-        RecordingAdapter(boolean producerFails) { this.producerFails = producerFails; }
+        RecordingAdapter(boolean producerFails) { this(producerFails, null); }
+
+        RecordingAdapter(boolean producerFails, JsonNode producerOutput) {
+            this.producerFails = producerFails;
+            this.producerOutput = producerOutput;
+        }
 
         @Override public String protocol() { return "http"; }
 
@@ -88,7 +135,7 @@ class DagPlanExecutorTest {
             if (input != null) inputs.put(m.agentId(), input);
             if (PRODUCER.equals(m.agentId())) {
                 if (producerFails) throw new RuntimeException("simulated producer failure");
-                return MAPPER.createObjectNode().put("holdings", "PAYLOAD");
+                return producerOutput != null ? producerOutput : MAPPER.createObjectNode().put("holdings", "PAYLOAD");
             }
             return MAPPER.createObjectNode().put("ok", true);
         }
@@ -164,6 +211,59 @@ class DagPlanExecutorTest {
         assertThat(consumer.errorMessage()).containsIgnoringCase("upstream dependency");
 
         // The consumer's agent was never invoked.
+        assertThat(adapter.order).containsExactly(PRODUCER);
+        assertThat(adapter.inputs).doesNotContainKey(CONSUMER);
+    }
+
+    // ── data contract: wrong select fails safe; never a 422, never a wrong number ────────────────
+
+    @Test
+    @DisplayName("WRONG-MAPPING FAILS SAFE end-to-end: consumer never dispatched, plan degrades honestly")
+    void wrongSelectNeverDispatchesConsumer() {
+        RecordingAdapter adapter = new RecordingAdapter(false);
+        DagPlanExecutor exec = executor(harness(adapter));
+
+        JsonNode leafInput = MAPPER.createObjectNode().put("entity", "E-1");
+        Blackboard bb = new Blackboard(Set.of("entity"), Map.of(PRODUCER, leafInput), MAPPER);
+
+        List<NodeResult> results = exec.execute(producerConsumerPlanWithWrongSelect(), bb);
+
+        assertThat(results).hasSize(2);
+        NodeResult producer = results.get(0);
+        NodeResult consumer = results.get(1);
+        assertThat(producer.isOk()).isTrue();   // the producer itself is fine
+
+        // The consumer is FAILED — but via the compose gate, never via a 422 from the agent.
+        assertThat(consumer.isOk()).isFalse();
+        assertThat(consumer.errorMessage()).contains("could not compose");
+
+        // The consumer's agent was NEVER invoked — no malformed request ever left the gateway.
+        assertThat(adapter.order).containsExactly(PRODUCER);
+        assertThat(adapter.inputs).doesNotContainKey(CONSUMER);
+    }
+
+    @Test
+    @DisplayName("INCOMPLETE INPUT REFUSED: upstream _complete=false fails the consumer, no wrong number")
+    void incompleteUpstreamNeverDispatchesConsumer() {
+        JsonNode incompleteHoldings = MAPPER.createObjectNode()
+                .put("_complete", false)
+                .set("positions", MAPPER.createArrayNode().add(MAPPER.createObjectNode().put("ticker", "AAPL")));
+        RecordingAdapter adapter = new RecordingAdapter(false, incompleteHoldings);
+        DagPlanExecutor exec = executor(harness(adapter));
+
+        JsonNode leafInput = MAPPER.createObjectNode().put("entity", "E-1");
+        Blackboard bb = new Blackboard(Set.of("entity"), Map.of(PRODUCER, leafInput), MAPPER);
+
+        List<NodeResult> results = exec.execute(producerConsumerPlanRequiringComplete(), bb);
+
+        assertThat(results).hasSize(2);
+        NodeResult producer = results.get(0);
+        NodeResult consumer = results.get(1);
+        assertThat(producer.isOk()).isTrue();
+
+        assertThat(consumer.isOk()).isFalse();
+        assertThat(consumer.errorMessage()).containsIgnoringCase("incomplete");
+
         assertThat(adapter.order).containsExactly(PRODUCER);
         assertThat(adapter.inputs).doesNotContainKey(CONSUMER);
     }

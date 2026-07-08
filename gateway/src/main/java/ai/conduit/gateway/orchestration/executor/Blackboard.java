@@ -5,6 +5,10 @@ import ai.conduit.gateway.registry.model.AgentManifest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.burt.jmespath.JmesPath;
+import io.burt.jmespath.jackson.JacksonRuntime;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -39,13 +43,29 @@ import java.util.concurrent.ConcurrentHashMap;
  *       outputs.</li>
  * </ol>
  *
- * <p><b>World B:</b> every symbol reasoned over here — produced type, produced name, entity key — comes
- * from the manifests at runtime and is matched by equality only. This class embeds no domain vocabulary.
+ * <h2>Per-edge projection ({@code select}) and the pre-dispatch gate</h2>
+ * A {@code from} edge may declare an optional {@code select} — a JMESPath expression that reshapes
+ * the producer's output into exactly what the consumer expects (field projection, not a blob
+ * pass-through). No {@code select} = identity, i.e. exactly the behavior above, unchanged. Before a
+ * bound node is released to the harness, {@link #checkComposable} runs a fail-safe gate: an upstream
+ * output marked incomplete ({@code _complete:false}/{@code truncated:true}), or a bound input that
+ * doesn't satisfy the consumer's introspected input schema, fails the node with a clear reason
+ * instead of ever dispatching a malformed request — never a 422 to the user, never a wrong number.
  *
- * <p>Thread-safe: {@link #project} is called from parallel node-completion threads within a layer;
- * the produced maps are {@link ConcurrentHashMap}s. {@link #bind} is called before a node is released.
+ * <p><b>World B:</b> every symbol reasoned over here — produced type, produced name, entity key,
+ * JMESPath expression, schema keyword — comes from the manifests/introspection at runtime and is
+ * matched/interpreted generically. This class embeds no domain vocabulary.
+ *
+ * <p>Thread-safe: {@link #project(PlanNode, JsonNode)} is called from parallel node-completion
+ * threads within a layer; the produced maps are {@link ConcurrentHashMap}s. {@link #bind} and
+ * {@link #checkComposable} are called from the caller thread before a node is released.
  */
 public final class Blackboard {
+
+    private static final Logger log = LoggerFactory.getLogger(Blackboard.class);
+
+    /** JMESPath engine over Jackson JsonNode — stateless/thread-safe, one instance for the JVM. */
+    private static final JmesPath<JsonNode> JMES_PATH = new JacksonRuntime();
 
     private final ObjectMapper mapper;
 
@@ -117,17 +137,88 @@ public final class Blackboard {
         }
 
         if (resolvedFrom.size() == 1) {
-            // Single required producer → pass its output straight through as the consumer's input.
-            return producedByType.get(resolvedFrom.get(0).from());
+            // Single required producer → its (optionally projected) output becomes the consumer's
+            // input. No `select` declared → identity pass-through, byte-for-byte today's behavior.
+            AgentManifest.Consume c = resolvedFrom.get(0);
+            return projectEdge(c, producedByType.get(c.from()));
         }
 
         // Fan-in from several producers → merge, keyed by each producer's declared output name.
+        // Each edge is projected independently before merging (still identity when no `select`).
         ObjectNode merged = mapper.createObjectNode();
         for (AgentManifest.Consume c : resolvedFrom) {
             String type = c.from();
             String key = nameByType.getOrDefault(type, type);
-            merged.set(key, producedByType.get(type));
+            merged.set(key, projectEdge(c, producedByType.get(type)));
         }
         return merged;
+    }
+
+    /**
+     * Apply the edge's declared {@code select} (a JMESPath expression) to reshape {@code raw} into
+     * exactly what the consumer expects. No {@code select} (or a null producer output) → identity
+     * (same reference) — the default, backward-compatible path. A malformed expression is treated
+     * as "could not project" (returns {@code null}, which {@link #checkComposable} then reports as
+     * a missing field) rather than throwing and taking the whole request down.
+     */
+    private JsonNode projectEdge(AgentManifest.Consume c, JsonNode raw) {
+        if (raw == null || c == null || !c.hasSelect()) return raw;
+        try {
+            return JMES_PATH.compile(c.select()).search(raw);
+        } catch (Exception e) {
+            log.warn("JMESPath projection failed for select='{}': {}", c.select(), e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Fail-safe gate run before a node is dispatched (hard rule: never a wrong number, never a
+     * fabricated/422 surface to the user). Checks, in order:
+     * <ol>
+     *   <li><b>Completeness contract</b> — any REQUIRED upstream {@code from} producer whose raw
+     *       output is marked {@code _complete:false} or {@code truncated:true} fails this node,
+     *       regardless of what schema validation would say. Generic: reads a manifest/output
+     *       convention, not a domain literal.</li>
+     *   <li><b>Input-schema validation</b> — only for nodes with at least one {@code from} edge
+     *       (entity-only leaf consumers are never gated here, so their behavior is unchanged): the
+     *       bound input must satisfy the consumer's introspected input schema per
+     *       {@link InputContractValidator}.</li>
+     * </ol>
+     *
+     * @return {@code null} if {@code node} may be dispatched as bound; otherwise a human-readable
+     *         reason it cannot ("could not compose input for &lt;agent&gt;: ...").
+     */
+    public String checkComposable(PlanNode node, JsonNode boundInput) {
+        AgentManifest.Io io = node.agent().io();
+        List<AgentManifest.Consume> consumes =
+                (io == null || io.consumes() == null) ? List.of() : io.consumes();
+
+        boolean hasFromEdge = false;
+        for (AgentManifest.Consume c : consumes) {
+            if (c == null || !c.isProducedRef()) continue;
+            hasFromEdge = true;
+            if (!c.isRequired()) continue;
+            JsonNode raw = producedByType.get(c.from());
+            if (raw != null && isIncomplete(raw)) {
+                return "could not compose input for " + node.agent().agentId() + ": upstream '"
+                        + c.from() + "' output is incomplete (marked _complete=false/truncated=true)";
+            }
+        }
+
+        if (!hasFromEdge) return null;   // entity-only consumer — untouched by this contract
+
+        List<String> missing = InputContractValidator.missingFields(node.agent().inputSchema(), boundInput);
+        if (!missing.isEmpty()) {
+            return "could not compose input for " + node.agent().agentId()
+                    + ": missing/mismatched field(s) " + missing;
+        }
+        return null;
+    }
+
+    private static boolean isIncomplete(JsonNode raw) {
+        JsonNode complete = raw.path("_complete");
+        if (complete.isBoolean() && !complete.asBoolean()) return true;
+        JsonNode truncated = raw.path("truncated");
+        return truncated.isBoolean() && truncated.asBoolean();
     }
 }

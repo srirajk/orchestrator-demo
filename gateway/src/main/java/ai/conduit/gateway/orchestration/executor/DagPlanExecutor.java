@@ -4,6 +4,7 @@ import ai.conduit.gateway.orchestration.harness.AgentHarness;
 import ai.conduit.gateway.orchestration.model.NodeResult;
 import ai.conduit.gateway.orchestration.model.Plan;
 import ai.conduit.gateway.orchestration.model.PlanNode;
+import com.fasterxml.jackson.databind.JsonNode;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.opentelemetry.api.trace.Span;
@@ -160,7 +161,16 @@ public class DagPlanExecutor {
         return allOk ? DepState.READY : DepState.WAITING;
     }
 
-    /** Bind and execute a layer of ready nodes in parallel; project survivors into the blackboard. */
+    /**
+     * Bind and execute a layer of ready nodes in parallel; project survivors into the blackboard.
+     *
+     * <p>Binding + the pre-dispatch composability gate ({@link Blackboard#checkComposable}) both run
+     * on the caller thread (deterministic) before the layer is released. A node whose bound input is
+     * not composable (an incomplete upstream, or a schema mismatch — see {@link Blackboard}) is never
+     * handed to the harness: it gets an immediate synthetic FAILED result, same shape as {@link
+     * #unmetResult}, so it degrades through the existing partial-failure path rather than ever
+     * reaching the agent with a malformed request.
+     */
     private void runLayer(List<PlanNode> ready,
                           Blackboard blackboard,
                           Map<String, NodeResult> results,
@@ -168,10 +178,19 @@ public class DagPlanExecutor {
                           Context parentContext,
                           long deadline) {
 
-        // Bind inputs on the caller thread (deterministic) before releasing the layer.
-        List<PlanNode> bound = ready.stream()
-                .map(n -> new PlanNode(n.nodeId(), n.agent(), blackboard.bind(n), n.dependsOn()))
-                .toList();
+        // Bind + gate on the caller thread (deterministic) before releasing the layer.
+        List<PlanNode> bound = new ArrayList<>();
+        for (PlanNode n : ready) {
+            JsonNode input = blackboard.bind(n);
+            PlanNode candidate = new PlanNode(n.nodeId(), n.agent(), input, n.dependsOn());
+            String reason = blackboard.checkComposable(candidate, input);
+            if (reason != null) {
+                log.warn("Node {} (agent={}) NOT dispatched — {}", n.nodeId(), n.agent().agentId(), reason);
+                results.put(n.nodeId(), composeFailure(n, reason));
+                continue;
+            }
+            bound.add(candidate);
+        }
 
         List<CompletableFuture<NodeResult>> futures = bound.stream()
                 .map(node -> CompletableFuture.supplyAsync(() -> {
@@ -227,5 +246,16 @@ public class DagPlanExecutor {
         return new NodeResult(node.nodeId(), node.agent().agentId(), node.agent().protocol(),
                 NodeResult.Status.FAILED, null, 0,
                 "Skipped: an upstream dependency did not complete successfully");
+    }
+
+    /**
+     * Synthetic result for a node whose bound input failed {@link Blackboard#checkComposable} —
+     * never dispatched to the harness/agent. Same shape as {@link #unmetResult}: a plain FAILED
+     * result, so it flows through the existing partial-failure path (transitive dependents are
+     * skipped too; synthesis proceeds from whatever else succeeded and states what's missing).
+     */
+    private NodeResult composeFailure(PlanNode node, String reason) {
+        return new NodeResult(node.nodeId(), node.agent().agentId(), node.agent().protocol(),
+                NodeResult.Status.FAILED, null, 0, reason);
     }
 }

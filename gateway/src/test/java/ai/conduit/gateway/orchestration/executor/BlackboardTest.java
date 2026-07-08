@@ -42,6 +42,10 @@ class BlackboardTest {
         return new AgentManifest.Consume(null, type, required);
     }
 
+    private static AgentManifest.Consume fromRef(String type, boolean required, String select) {
+        return new AgentManifest.Consume(null, type, required, select);
+    }
+
     private static AgentManifest.Consume entityRef(String key) {
         return new AgentManifest.Consume(key, null, true);
     }
@@ -52,6 +56,26 @@ class BlackboardTest {
 
     private static JsonNode obj(String k, String v) {
         return MAPPER.createObjectNode().put(k, v);
+    }
+
+    /** A node builder that also carries a (derived) input schema, for {@code checkComposable} tests. */
+    private static PlanNode nodeWithSchema(String id, AgentManifest.Io io, JsonNode inputSchema,
+                                           JsonNode input, String... deps) {
+        AgentManifest agentWithSchema = new AgentManifest(
+                id, id, null, null, null, null, null, null, null, "http",
+                null, null, null, null, io, inputSchema, null, null, true, null);
+        return new PlanNode(id, agentWithSchema, input, List.of(deps));
+    }
+
+    /** A minimal JSON Schema requiring the given fields (mirrors an introspected consumer schema). */
+    private static JsonNode schemaRequiring(String... fields) {
+        var s = MAPPER.createObjectNode();
+        s.put("type", "object");
+        var props = s.putObject("properties");
+        for (String f : fields) props.putObject(f).put("type", "array");
+        var required = s.putArray("required");
+        for (String f : fields) required.add(f);
+        return s;
     }
 
     // ── entity-only consumer: keeps today's pre-bound leaf input ─────────────────────────────────
@@ -128,5 +152,121 @@ class BlackboardTest {
         PlanNode consumer = node("cons", io(List.of(fromRef("typeA", true)), List.of()), null, "prod");
         Blackboard bb = new Blackboard(Set.of(), Map.of(), MAPPER);
         assertThat(bb.bind(consumer)).isNull();   // no producer output, no pre-bound input
+    }
+
+    // ── select (JMESPath edge projection) ────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("no select → identity pass-through (byte-for-byte, same reference) — default behavior unchanged")
+    void noSelectIsIdentity() {
+        PlanNode consumer = node("cons", io(List.of(fromRef("typeA", true)), List.of()), null, "prod");
+        Blackboard bb = new Blackboard(Set.of(), Map.of(), MAPPER);
+        JsonNode producerOutput = obj("holdings", "payload");
+        bb.project(node("prod", io(List.of(), List.of(produce("out", "typeA"))), null), producerOutput);
+
+        assertThat(bb.bind(consumer)).isSameAs(producerOutput);
+    }
+
+    @Test
+    @DisplayName("select reshapes the producer output into exactly the declared projection")
+    void selectProjectsFields() throws Exception {
+        JsonNode raw = MAPPER.readTree("""
+                {"positions": [{"ticker":"AAPL","value":100}], "total_value": 100,
+                 "agent_narrative": "some prose the consumer should never see"}
+                """);
+        AgentManifest.Consume edge = fromRef("wealth.holdings", true,
+                "{positions: positions, total_value: total_value}");
+        PlanNode consumer = node("cons", io(List.of(edge), List.of()), null, "prod");
+
+        Blackboard bb = new Blackboard(Set.of(), Map.of(), MAPPER);
+        bb.project(node("prod", io(List.of(), List.of(produce("holdings", "wealth.holdings"))), null), raw);
+
+        JsonNode bound = bb.bind(consumer);
+        assertThat(bound.has("agent_narrative")).isFalse();
+        assertThat(bound.get("positions")).isEqualTo(raw.get("positions"));
+        assertThat(bound.get("total_value").asInt()).isEqualTo(100);
+    }
+
+    // ── checkComposable: the fail-safe pre-dispatch gate ─────────────────────────────────────────
+
+    @Test
+    @DisplayName("entity-only consumer is never gated by checkComposable (untouched by this contract)")
+    void entityOnlyConsumerNeverGated() {
+        PlanNode leaf = nodeWithSchema("leaf", io(List.of(entityRef("entity")), List.of()),
+                schemaRequiring("whatever"), obj("entity", "E-1"));
+        Blackboard bb = new Blackboard(Set.of("entity"), Map.of(), MAPPER);
+        assertThat(bb.checkComposable(leaf, leaf.input())).isNull();
+    }
+
+    @Test
+    @DisplayName("well-formed select + matching schema → composable, no reason returned")
+    void wellFormedInputIsComposable() {
+        AgentManifest.Consume edge = fromRef("wealth.holdings", true,
+                "{positions: positions}");
+        JsonNode schema = schemaRequiring("positions");
+        PlanNode consumer = nodeWithSchema("cons", io(List.of(edge), List.of()), schema, null, "prod");
+
+        Blackboard bb = new Blackboard(Set.of(), Map.of(), MAPPER);
+        JsonNode raw = MAPPER.createObjectNode().set("positions",
+                MAPPER.createArrayNode().add(MAPPER.createObjectNode().put("ticker", "AAPL")));
+        bb.project(node("prod", io(List.of(), List.of(produce("holdings", "wealth.holdings"))), null), raw);
+
+        JsonNode bound = bb.bind(consumer);
+        assertThat(bb.checkComposable(consumer, bound)).isNull();
+    }
+
+    @Test
+    @DisplayName("WRONG-MAPPING FAILS SAFE: a select that maps the wrong field is caught before dispatch")
+    void wrongMappingFailsSafe() {
+        // The select maps a field that doesn't exist upstream ('positions_typo') into 'positions' —
+        // the exact shape of a hand-aligned-then-drifted mapping. The consumer's schema requires
+        // 'positions'; the projected input will have it null/absent.
+        AgentManifest.Consume wrongEdge = fromRef("wealth.holdings", true,
+                "{positions: positions_typo}");
+        JsonNode schema = schemaRequiring("positions");
+        PlanNode consumer = nodeWithSchema("cons", io(List.of(wrongEdge), List.of()), schema, null, "prod");
+
+        Blackboard bb = new Blackboard(Set.of(), Map.of(), MAPPER);
+        JsonNode raw = MAPPER.createObjectNode().set("positions",
+                MAPPER.createArrayNode().add(MAPPER.createObjectNode().put("ticker", "AAPL")));
+        bb.project(node("prod", io(List.of(), List.of(produce("holdings", "wealth.holdings"))), null), raw);
+
+        JsonNode bound = bb.bind(consumer);
+        String reason = bb.checkComposable(consumer, bound);
+        assertThat(reason).isNotNull();
+        assertThat(reason).contains("could not compose").contains("positions");
+    }
+
+    @Test
+    @DisplayName("INCOMPLETE INPUT REFUSED: a producer output marked _complete=false fails the consumer")
+    void incompleteUpstreamFailsSafe() {
+        AgentManifest.Consume edge = fromRef("wealth.holdings", true, "{positions: positions}");
+        JsonNode schema = schemaRequiring("positions");
+        PlanNode consumer = nodeWithSchema("cons", io(List.of(edge), List.of()), schema, null, "prod");
+
+        Blackboard bb = new Blackboard(Set.of(), Map.of(), MAPPER);
+        JsonNode raw = MAPPER.createObjectNode()
+                .put("_complete", false)
+                .set("positions", MAPPER.createArrayNode().add(MAPPER.createObjectNode().put("ticker", "AAPL")));
+        bb.project(node("prod", io(List.of(), List.of(produce("holdings", "wealth.holdings"))), null), raw);
+
+        JsonNode bound = bb.bind(consumer);
+        String reason = bb.checkComposable(consumer, bound);
+        assertThat(reason).isNotNull();
+        assertThat(reason).containsIgnoringCase("incomplete");
+    }
+
+    @Test
+    @DisplayName("no schema declared → checkComposable is a no-op (today's behavior for pre-existing agents)")
+    void noSchemaIsPassOpen() {
+        AgentManifest.Consume edge = fromRef("wealth.holdings", true, "{positions: positions_typo}");
+        PlanNode consumer = node("cons", io(List.of(edge), List.of()), null, "prod");   // no inputSchema
+
+        Blackboard bb = new Blackboard(Set.of(), Map.of(), MAPPER);
+        JsonNode raw = obj("positions", "irrelevant");
+        bb.project(node("prod", io(List.of(), List.of(produce("holdings", "wealth.holdings"))), null), raw);
+
+        JsonNode bound = bb.bind(consumer);
+        assertThat(bb.checkComposable(consumer, bound)).isNull();
     }
 }

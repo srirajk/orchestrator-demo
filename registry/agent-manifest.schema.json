@@ -150,7 +150,12 @@
                 "minLength": 1,
                 "description": "A produced-output 'type' that some upstream capability declares in its io.produces. Matching this creates a producer→consumer edge in the DAG."
               },
-              "required": { "type": "boolean", "default": true }
+              "required": { "type": "boolean", "default": true },
+              "select": {
+                "type": "string",
+                "minLength": 1,
+                "description": "OPTIONAL, meaningful only alongside 'from': a JMESPath expression that projects/reshapes the producer's output into exactly what this consumer expects (field projection, not a blob pass-through). Absent = identity pass-through (today's behavior) — additive and backward-compatible. Evaluated by the gateway's Blackboard; matched/interpreted generically, never domain-hardcoded."
+              }
             }
           }
         },
