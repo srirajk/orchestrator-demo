@@ -7,7 +7,7 @@
     "organization": "Meridian Demo Bank"
   },
   "domain": "wealth-management",
-  "audience": "segment",
+  "audience": "enterprise",
   "max_response_tokens": 2000,
   "protocol": "http",
   "connection": {
@@ -57,5 +57,11 @@
     "access_mode": "read",
     "data_classification": "internal",
     "sla_timeout_ms": 5000
+  },
+  "io": {
+    "consumes": [],
+    "produces": [
+      { "name": "market_research", "type": "wealth.market_research" }
+    ]
   }
 }

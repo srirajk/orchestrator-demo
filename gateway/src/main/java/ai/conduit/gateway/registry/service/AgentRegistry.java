@@ -154,6 +154,7 @@ public class AgentRegistry {
                 manifest.capabilities(),
                 manifest.skills(),
                 manifest.constraints(),
+                manifest.io(),
                 manifest.inputSchema(),
                 manifest.outputSchema(),
                 manifest.resolvedConnection(),

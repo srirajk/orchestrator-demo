@@ -54,5 +54,13 @@
     "access_mode": "read",
     "data_classification": "confidential",
     "sla_timeout_ms": 30000
+  },
+  "io": {
+    "consumes": [
+      { "entity": "fund_id", "required": true }
+    ],
+    "produces": [
+      { "name": "settlement_status", "type": "servicing.settlement_status" }
+    ]
   }
 }

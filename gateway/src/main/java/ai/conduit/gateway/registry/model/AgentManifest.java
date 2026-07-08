@@ -32,6 +32,13 @@ public record AgentManifest(
         List<Skill> skills,
         Constraints constraints,
 
+        // ── OPTIONAL semantic dataflow contract (multi-step / DAG orchestration) ──
+        // Nullable: capabilities without an `io` block remain single-node (flat) only.
+        // NOT the wire schema (still derived via introspection) — it declares, in
+        // manifest-symbolic terms, what this capability consumes and produces so the
+        // deterministic DagResolver can wire dependent steps. See agent-manifest.schema.json.
+        @JsonProperty("io") Io io,
+
         // ── Derived at registration time ──────────────────────────────────
         @JsonProperty("input_schema")        JsonNode inputSchema,
         @JsonProperty("output_schema")       JsonNode outputSchema,
@@ -39,6 +46,24 @@ public record AgentManifest(
         @JsonProperty("indexed")             Boolean indexed,
         @JsonProperty("registered_at")       Instant registeredAt
 ) {
+
+    /**
+     * Backward-compatible constructor with the pre-{@code io} arity. Existing call sites that
+     * build a manifest without a dataflow contract keep compiling unchanged; {@code io} is null.
+     * (Jackson deserializes via the canonical/all-component constructor, so this does not affect
+     * manifest parsing.)
+     */
+    public AgentManifest(
+            String agentId, String name, String description, String version, Provider provider,
+            String domain, String audience, String subDomain, Integer maxResponseTokens, String protocol,
+            Connection connection, Capabilities capabilities, List<Skill> skills, Constraints constraints,
+            JsonNode inputSchema, JsonNode outputSchema, ResolvedConnection resolvedConnection,
+            Boolean indexed, Instant registeredAt) {
+        this(agentId, name, description, version, provider, domain, audience, subDomain,
+                maxResponseTokens, protocol, connection, capabilities, skills, constraints,
+                /* io */ null,
+                inputSchema, outputSchema, resolvedConnection, indexed, registeredAt);
+    }
 
     public record Provider(String organization, String contactEmail) {}
 
@@ -75,6 +100,35 @@ public record AgentManifest(
             String method,
             String path
     ) {}
+
+    /**
+     * Semantic dataflow contract: what a capability {@code consumes} (leaf entities or upstream
+     * produced types) and {@code produces} (named, typed outputs). All strings are manifest-declared
+     * symbols matched by equality; none are interpreted by the gateway.
+     */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Io(List<Consume> consumes, List<Produce> produces) {}
+
+    /**
+     * One consumed input. Exactly one of {@code entity} / {@code from} is set (schema {@code oneOf}):
+     * <ul>
+     *   <li>{@code entity} — a sub-domain entity_types key satisfied by deterministic entity
+     *       resolution (a leaf; creates no DAG edge).</li>
+     *   <li>{@code from} — an upstream capability's produced output type; matching it creates a
+     *       producer→consumer edge.</li>
+     * </ul>
+     * {@code required} defaults to {@code true} when absent (per schema).
+     */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Consume(String entity, String from, Boolean required) {
+        public boolean isEntityRef()   { return entity != null && !entity.isBlank(); }
+        public boolean isProducedRef() { return from   != null && !from.isBlank(); }
+        public boolean isRequired()    { return required == null || required; }
+    }
+
+    /** A named, typed output published for downstream binding via {@code from}. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Produce(String name, String type) {}
 
     /** Convenience: all example prompts across all skills (used for embedding). */
     public List<String> allExamples() {

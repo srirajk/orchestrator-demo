@@ -51,5 +51,14 @@
     "access_mode": "read",
     "data_classification": "confidential-pii",
     "sla_timeout_ms": 30000
+  },
+  "io": {
+    "consumes": [
+      { "entity": "policy_id", "required": true },
+      { "entity": "claim_id", "required": false }
+    ],
+    "produces": [
+      { "name": "claim_status", "type": "insurance.claim_status" }
+    ]
   }
 }

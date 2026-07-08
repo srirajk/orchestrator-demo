@@ -172,6 +172,7 @@ public class AgentIntrospector {
                 s.domain(), s.audience(), s.subDomain(), s.maxResponseTokens(), s.protocol(),
                 s.connection(), s.capabilities(), s.skills(),
                 s.constraints(),
+                s.io(),
                 inputSchema, outputSchema, resolved, false, null
         );
     }

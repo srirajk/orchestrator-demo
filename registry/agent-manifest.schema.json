@@ -123,6 +123,59 @@
       "minimum": 1,
       "maximum": 100000,
       "description": "World B: gateway truncates this agent's response to this many tokens before synthesis."
+    },
+    "io": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "OPTIONAL semantic dataflow contract for multi-step (DAG) orchestration. This is NOT the wire input/output schema (that is still DERIVED via introspection) — it declares, in domain terms, what this capability NEEDS and what it PRODUCES, so the deterministic DAG resolver can wire dependent steps (producer.output type == downstream consumer.from). Capabilities without 'io' remain single-node (flat fan-out) only; the DAG path lights up per-capability as contracts are declared. World B: 'entity' references a sub-domain entity_types key; produced/consumed 'type' values are manifest-declared symbolic strings the gateway matches by equality — never hardcoded in gateway Java.",
+      "properties": {
+        "consumes": {
+          "type": "array",
+          "description": "Inputs this capability needs. Each item is EITHER an 'entity' (a leaf input, satisfied by deterministic entity resolution) OR a 'from' (an upstream capability's produced output 'type', which creates a DAG edge). Exactly one of the two per item.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "oneOf": [
+              { "required": ["entity"] },
+              { "required": ["from"] }
+            ],
+            "properties": {
+              "entity": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A sub-domain entity_types 'key' this capability needs (e.g. relationship_id). Satisfied from the blackboard's resolved entities — no upstream agent required."
+              },
+              "from": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A produced-output 'type' that some upstream capability declares in its io.produces. Matching this creates a producer→consumer edge in the DAG."
+              },
+              "required": { "type": "boolean", "default": true }
+            }
+          }
+        },
+        "produces": {
+          "type": "array",
+          "description": "Named, typed outputs this capability places on the blackboard for downstream steps to consume via 'from'.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "type"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Blackboard key under which this capability's result is published for downstream binding."
+              },
+              "type": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Symbolic output type used to match a downstream consumer's 'from'. Manifest-declared; matched by string equality."
+              }
+            }
+          }
+        }
+      }
     }
   },
   "allOf": [

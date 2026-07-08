@@ -49,5 +49,13 @@
     "access_mode": "read",
     "data_classification": "confidential-pii",
     "sla_timeout_ms": 30000
+  },
+  "io": {
+    "consumes": [
+      { "entity": "relationship_id", "required": true }
+    ],
+    "produces": [
+      { "name": "risk_profile", "type": "wealth.risk_profile" }
+    ]
   }
 }

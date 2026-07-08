@@ -1,0 +1,67 @@
+{
+  "agent_id": "acme.wealth.concentration",
+  "name": "Wealth Concentration Analysis",
+  "description": "Fan-in analytics agent: consumes a portfolio holdings payload (the wealth.holdings output) and computes single-name and asset-class concentration, HHI and effective number of positions, and breach flags against firm-configured thresholds. Computes from the supplied holdings; does not fetch data and does not take a relationship_id.",
+  "version": "1.0.0",
+  "provider": {
+    "organization": "Meridian Demo Bank"
+  },
+  "domain": "wealth-management",
+  "audience": "segment",
+  "sub_domain": "private-banking",
+  "max_response_tokens": 2000,
+  "protocol": "http",
+  "connection": {
+    "openapi_url": "http://wealth-http:8081/openapi.json",
+    "operation_id": "post_concentration"
+  },
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false
+  },
+  "skills": [
+    {
+      "id": "analyze_concentration",
+      "name": "analyze_concentration",
+      "description": "Analyse portfolio concentration risk from a holdings payload: per-position weights, top single-name exposure, HHI, effective number of positions, and firm-policy breach flags.",
+      "tags": [
+        "concentration",
+        "risk",
+        "diversification",
+        "hhi",
+        "single-name",
+        "wealth-management"
+      ],
+      "examples": [
+        "is this portfolio too concentrated",
+        "how concentrated is the Whitman relationship",
+        "what is the single-name concentration risk for this client",
+        "does this account breach our concentration limits",
+        "check diversification for this portfolio",
+        "what is the largest position as a share of the portfolio",
+        "compute the HHI for this client's holdings",
+        "any overconcentration flags on this relationship"
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    }
+  ],
+  "constraints": {
+    "access_mode": "read",
+    "data_classification": "confidential-pii",
+    "sla_timeout_ms": 15000
+  },
+  "io": {
+    "consumes": [
+      { "from": "wealth.holdings", "required": true },
+      { "from": "wealth.risk_profile", "required": false }
+    ],
+    "produces": [
+      { "name": "concentration", "type": "wealth.concentration" }
+    ]
+  }
+}
