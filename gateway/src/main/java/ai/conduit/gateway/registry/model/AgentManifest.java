@@ -13,7 +13,8 @@ import java.util.Map;
  *
  * Submitted fields mirror the pinned agent-manifest.schema.json.
  * Derived fields (input_schema, output_schema, resolved_connection, embedding vectors)
- * are populated by the registry pipeline after introspection.
+ * are populated by the registry pipeline after introspection. A submitted output_schema is
+ * allowed only as a fallback when protocol introspection cannot derive one.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record AgentManifest(

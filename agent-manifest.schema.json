@@ -2,14 +2,14 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://conduit.dev/schemas/agent-manifest.schema.json",
   "title": "Meridian Agent Manifest (domain-team submission)",
-  "description": "Canonical contract a domain team submits to register one agent. A2A-Agent-Card-aligned with gateway extensions (protocol, connection, constraints). Input/output schemas are DERIVED by the gateway via introspection and are NOT part of this submission. Validate submissions against this BEFORE introspection and storage.",
+  "description": "Canonical contract a domain team submits to register one agent. A2A-Agent-Card-aligned with gateway extensions (protocol, connection, constraints). Input schemas are DERIVED by the gateway via introspection. output_schema is an optional fallback only when protocol introspection cannot derive an output schema. Validate submissions against this BEFORE introspection and storage.",
   "type": "object",
   "additionalProperties": false,
   "required": ["agent_id", "name", "description", "version", "provider", "domain", "audience", "protocol", "connection", "capabilities", "skills", "constraints"],
   "properties": {
     "agent_id": {
       "type": "string",
-      "description": "Stable dotted identifier, e.g. acme.wealth.holdings",
+      "description": "Stable dotted identifier, e.g. meridian.wealth.holdings",
       "pattern": "^[a-z0-9]+(\\.[a-z0-9_]+)+$"
     },
     "name": { "type": "string", "minLength": 1 },
@@ -123,6 +123,10 @@
       "minimum": 1,
       "maximum": 100000,
       "description": "World B: gateway truncates this agent's response to this many tokens before synthesis."
+    },
+    "output_schema": {
+      "type": "object",
+      "description": "OPTIONAL JSON Schema fallback for the agent's output. Used only when HTTP/MCP introspection cannot derive an output schema; otherwise the gateway stores the introspected schema."
     },
     "io": {
       "type": "object",

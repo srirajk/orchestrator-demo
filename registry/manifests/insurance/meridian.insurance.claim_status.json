@@ -52,6 +52,18 @@
     "data_classification": "confidential-pii",
     "sla_timeout_ms": 30000
   },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "policy_id": { "type": "string" },
+      "claim_count": { "type": "integer" },
+      "claims": { "type": "array", "items": { "type": "object" } },
+      "claim_id": { "type": ["string", "null"] },
+      "amount": { "type": ["number", "null"] },
+      "status": { "type": ["string", "null"] }
+    },
+    "required": ["policy_id", "claims"]
+  },
   "io": {
     "consumes": [
       { "entity": "policy_id", "required": true },

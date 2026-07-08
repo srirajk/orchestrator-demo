@@ -3,6 +3,7 @@ package ai.conduit.gateway.registry.introspection;
 import ai.conduit.gateway.registry.model.AgentManifest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.swagger.v3.parser.OpenAPIV3Parser;
 import io.swagger.v3.oas.models.OpenAPI;
@@ -68,7 +69,9 @@ public class AgentIntrospector {
         }
 
         JsonNode inputSchema  = buildInputSchema(match, openapiUrl);
-        JsonNode outputSchema = buildOutputSchemaFromResponse(match.operation());
+        JsonNode outputSchema = chooseOutputSchema(
+                buildOutputSchemaFromResponse(match, openapiUrl),
+                submission.outputSchema());
 
         // Resolved connection: base URL from servers + method + path
         String baseUrl = resolveBaseUrl(openApi, openapiUrl);
@@ -172,14 +175,51 @@ public class AgentIntrospector {
         return target;
     }
 
-    private JsonNode buildOutputSchemaFromResponse(Operation op) {
-        ObjectNode schema = mapper.createObjectNode();
-        schema.put("type", "object");
-        // Minimal — full output schema parsing from OpenAPI responses is left as a seam
-        if (op.getResponses() != null && op.getResponses().get("200") != null) {
-            schema.put("description", "200 OK response from agent");
+    private JsonNode buildOutputSchemaFromResponse(OperationMatch match, String openapiUrl) {
+        try {
+            JsonNode root = mapper.readTree(URI.create(openapiUrl).toURL());
+            JsonNode responses = root.path("paths").path(match.path())
+                    .path(match.method().toLowerCase()).path("responses");
+            if (!responses.isObject()) return null;
+
+            JsonNode response = null;
+            var fields = responses.fields();
+            while (fields.hasNext()) {
+                var entry = fields.next();
+                if (entry.getKey().startsWith("2")) {
+                    response = entry.getValue();
+                    break;
+                }
+            }
+            if (response == null) return null;
+
+            JsonNode schema = response.path("content").path("application/json").path("schema");
+            if (schema.isMissingNode()) return null;
+            JsonNode resolved = resolveRefs(root, schema);
+            log.debug("Derived output schema for HTTP operation '{}': {}",
+                    match.operation().getOperationId(), resolved);
+            return resolved;
+        } catch (Exception e) {
+            log.warn("Could not derive response schema for '{}' from {}: {}",
+                    match.operation().getOperationId(), openapiUrl, e.getMessage());
+            return null;
         }
-        return schema;
+    }
+
+    private JsonNode resolveRefs(JsonNode root, JsonNode node) {
+        JsonNode direct = resolveRef(root, node);
+        if (direct == null || direct.isMissingNode() || direct.isNull()) return direct;
+        if (direct.isObject()) {
+            ObjectNode out = mapper.createObjectNode();
+            direct.fields().forEachRemaining(entry -> out.set(entry.getKey(), resolveRefs(root, entry.getValue())));
+            return out;
+        }
+        if (direct.isArray()) {
+            ArrayNode out = mapper.createArrayNode();
+            direct.forEach(item -> out.add(resolveRefs(root, item)));
+            return out;
+        }
+        return direct;
     }
 
     private String resolveBaseUrl(OpenAPI api, String openapiUrl) {
@@ -205,8 +245,9 @@ public class AgentIntrospector {
 
         log.debug("Introspecting MCP agent '{}' from {}", submission.agentId(), serverUrl);
 
-        JsonNode inputSchema = mcpIntrospector.getToolInputSchema(serverUrl, toolName);
-        JsonNode outputSchema = mapper.createObjectNode(); // MCP output is untyped; best-effort
+        McpToolIntrospector.ToolSchemas schemas = mcpIntrospector.getToolSchemas(serverUrl, toolName);
+        JsonNode inputSchema = schemas.inputSchema();
+        JsonNode outputSchema = chooseOutputSchema(schemas.outputSchema(), submission.outputSchema());
 
         AgentManifest.ResolvedConnection resolved = new AgentManifest.ResolvedConnection(
                 serverUrl, "MCP", "/tools/call");
@@ -229,5 +270,27 @@ public class AgentIntrospector {
                 s.io(),
                 inputSchema, outputSchema, resolved, false, null
         );
+    }
+
+    private JsonNode chooseOutputSchema(JsonNode introspected, JsonNode submittedFallback) {
+        if (hasUsableSchema(submittedFallback) && isGenericResultWrapper(introspected)) return submittedFallback;
+        if (hasUsableSchema(introspected)) return introspected;
+        if (hasUsableSchema(submittedFallback)) return submittedFallback;
+        return introspected;
+    }
+
+    private boolean isGenericResultWrapper(JsonNode schema) {
+        if (schema == null || !schema.isObject()) return false;
+        JsonNode properties = schema.path("properties");
+        return properties.isObject() && properties.size() == 1 && properties.has("result");
+    }
+
+    private boolean hasUsableSchema(JsonNode schema) {
+        if (schema == null || schema.isMissingNode() || schema.isNull()) return false;
+        if (!schema.isObject()) return true;
+        JsonNode properties = schema.path("properties");
+        if (properties.isObject() && properties.size() > 0) return true;
+        String type = schema.path("type").asText(null);
+        return type != null && !"object".equals(type);
     }
 }

@@ -30,7 +30,7 @@ import java.util.Set;
  * required}, {@code type}, {@code anyOf}, {@code oneOf}, {@code nullable}) — never a
  * domain/entity name.
  */
-final class InputContractValidator {
+public final class InputContractValidator {
 
     private InputContractValidator() {}
 
@@ -40,7 +40,7 @@ final class InputContractValidator {
      *         the common case of no schema / no declared properties — pass-open, matching today's
      *         behavior for every agent that predates this contract).
      */
-    static List<String> missingFields(JsonNode schema, JsonNode input) {
+    public static List<String> missingFields(JsonNode schema, JsonNode input) {
         if (schema == null || schema.isMissingNode() || schema.isNull() || !schema.path("properties").isObject()) {
             return List.of();
         }
@@ -64,7 +64,7 @@ final class InputContractValidator {
     }
 
     /** Explicit {@code required} array if non-empty; otherwise every non-nullable declared property. */
-    static Set<String> effectiveRequiredFields(JsonNode schema) {
+    public static Set<String> effectiveRequiredFields(JsonNode schema) {
         Set<String> explicit = new LinkedHashSet<>();
         JsonNode requiredArr = schema.path("required");
         if (requiredArr.isArray()) {

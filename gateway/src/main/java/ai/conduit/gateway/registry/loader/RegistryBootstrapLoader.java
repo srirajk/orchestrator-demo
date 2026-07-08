@@ -2,6 +2,8 @@ package ai.conduit.gateway.registry.loader;
 
 import ai.conduit.gateway.registry.index.EmbeddingClient;
 import ai.conduit.gateway.registry.index.VectorIndex;
+import ai.conduit.gateway.registry.model.AgentManifest;
+import ai.conduit.gateway.registry.service.SelectContractValidator;
 import ai.conduit.gateway.registry.service.AgentRegistry;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -13,6 +15,9 @@ import org.springframework.context.event.EventListener;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.stereotype.Component;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Loads agent manifests from the external registry location at startup.
@@ -58,31 +63,49 @@ public class RegistryBootstrapLoader {
 
         int loaded = 0;
         int failed = 0;
+        SelectContractValidator.Summary selectSummary = new SelectContractValidator.Summary(0, 0);
 
         try {
             String pattern = registryLocation + "manifests/**/*.json";
             log.info("Loading agent manifests from {}", pattern);
             Resource[] resources = new PathMatchingResourcePatternResolver()
                     .getResources(pattern);
+            List<DerivedResource> derived = new ArrayList<>();
 
             for (Resource resource : resources) {
                 String filename = resource.getFilename();
                 try {
                     JsonNode node = mapper.readTree(resource.getInputStream());
-                    registry.register(node);
-                    loaded++;
-                    log.info("Loaded manifest: {}", filename);
+                    derived.add(new DerivedResource(filename, registry.derive(node)));
                 } catch (Exception e) {
                     failed++;
                     log.warn("Skipping invalid manifest '{}': {}", filename, e.getMessage());
+                }
+            }
+
+            List<AgentManifest> all = derived.stream().map(DerivedResource::manifest).toList();
+            for (DerivedResource resource : derived) {
+                try {
+                    selectSummary = selectSummary.plus(
+                            registry.validateSelectContracts(resource.manifest(), all));
+                    registry.storeAndIndex(resource.manifest());
+                    loaded++;
+                    log.info("Loaded manifest: {}", resource.filename());
+                } catch (Exception e) {
+                    failed++;
+                    log.warn("Skipping invalid manifest '{}': {}", resource.filename(), e.getMessage());
                 }
             }
         } catch (Exception e) {
             log.error("Failed to scan manifests directory: {}", e.getMessage());
         }
 
+        log.info("select validation: {} validated, {} UNVALIDATED (no output schema)",
+                selectSummary.validated(), selectSummary.unvalidated());
         log.info("Registry bootstrap complete: {} loaded, {} failed", loaded, failed);
     }
+
+    private record DerivedResource(String filename, AgentManifest manifest) {}
 
     private void waitForEmbeddingService() {
         for (int attempt = 1; attempt <= PROBE_RETRIES; attempt++) {

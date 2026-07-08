@@ -42,6 +42,7 @@ public class AgentRegistry {
     private final ObjectMapper     mapper;
     private final ManifestValidator validator;
     private final AgentIntrospector introspector;
+    private final SelectContractValidator selectValidator;
     private final VectorIndex       vectorIndex;
     private final MeterRegistry     meterRegistry;
 
@@ -50,12 +51,14 @@ public class AgentRegistry {
             ObjectMapper mapper,
             ManifestValidator validator,
             AgentIntrospector introspector,
+            SelectContractValidator selectValidator,
             VectorIndex vectorIndex,
             MeterRegistry meterRegistry) {
         this.jedis         = jedis;
         this.mapper        = mapper;
         this.validator     = validator;
         this.introspector  = introspector;
+        this.selectValidator = selectValidator;
         this.vectorIndex   = vectorIndex;
         this.meterRegistry = meterRegistry;
     }
@@ -67,29 +70,16 @@ public class AgentRegistry {
      * @return the fully-derived manifest stored in Redis
      */
     public AgentManifest register(JsonNode submissionNode) {
-        // 1. Schema validation
-        validator.validate(submissionNode);
-
-        AgentManifest submission;
-        try {
-            submission = mapper.treeToValue(submissionNode, AgentManifest.class);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to parse manifest: " + e.getMessage(), e);
-        }
-
-        // 2. Introspection — derive schemas + resolved connection
-        AgentManifest derived = introspector.introspect(submission);
+        AgentManifest derived = derive(submissionNode);
+        List<AgentManifest> context = new ArrayList<>(listAll());
+        context.removeIf(m -> m.agentId().equals(derived.agentId()));
+        context.add(derived);
+        SelectContractValidator.Summary summary = validateSelectContracts(derived, context);
+        log.info("select validation: {} validated, {} UNVALIDATED (no output schema)",
+                summary.validated(), summary.unvalidated());
 
         // 3. Stamp and persist
-        AgentManifest stored = stampAndStore(derived);
-
-        // 4. Index example prompts
-        vectorIndex.index(stored);
-
-        meterRegistry.counter("registry.registrations", "protocol", stored.protocol()).increment();
-        log.info("Registered agent '{}' (protocol={}, domain={})",
-                stored.agentId(), stored.protocol(), stored.domain());
-        return stored;
+        return storeAndIndex(derived);
     }
 
     /**
@@ -100,6 +90,35 @@ public class AgentRegistry {
             throw new IllegalArgumentException("Agent '" + agentId + "' not found");
         }
         return register(submissionNode);
+    }
+
+    public AgentManifest derive(JsonNode submissionNode) {
+        validator.validate(submissionNode);
+
+        AgentManifest submission;
+        try {
+            submission = mapper.treeToValue(submissionNode, AgentManifest.class);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to parse manifest: " + e.getMessage(), e);
+        }
+
+        return introspector.introspect(submission);
+    }
+
+    public SelectContractValidator.Summary validateSelectContracts(
+            AgentManifest manifest,
+            List<AgentManifest> allManifests) {
+        return selectValidator.validateOne(manifest, allManifests);
+    }
+
+    public AgentManifest storeAndIndex(AgentManifest derived) {
+        AgentManifest stored = stampAndStore(derived);
+        vectorIndex.index(stored);
+
+        meterRegistry.counter("registry.registrations", "protocol", stored.protocol()).increment();
+        log.info("Registered agent '{}' (protocol={}, domain={})",
+                stored.agentId(), stored.protocol(), stored.domain());
+        return stored;
     }
 
     /**

@@ -53,6 +53,18 @@
     "data_classification": "confidential",
     "sla_timeout_ms": 30000
   },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "relationship_id": { "type": "string" },
+      "balances": { "type": "array", "items": { "type": "object" } },
+      "projected_cash_usd": { "type": "number" },
+      "note": { "type": ["string", "null"] },
+      "as_of_date": { "type": "string" },
+      "agent_narrative": { "type": "string" }
+    },
+    "required": ["relationship_id", "balances", "projected_cash_usd", "as_of_date"]
+  },
   "io": {
     "consumes": [
       { "entity": "relationship_id", "required": true }
