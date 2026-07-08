@@ -32,7 +32,7 @@ def sub_domain_paths():
 
 
 def agent_paths():
-    return sorted((REGISTRY / "manifests").glob("*.json"))
+    return sorted((REGISTRY / "manifests").rglob("*.json"))
 
 
 def test_all_registry_schemas_are_valid_json_schema():

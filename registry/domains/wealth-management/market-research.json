@@ -1,0 +1,21 @@
+{
+  "sub_domain_id": "market-research",
+  "display_name": "Market Research",
+  "parent_domain": "wealth-management",
+  "resource_scoped": false,
+
+  "entity_types": [
+    {
+      "key": "research_topic",
+      "extract_as": "research_topic",
+      "kind": "literal",
+      "display": "research topic",
+      "id_pattern": "(equities|fixed.income|alternatives|macro)",
+      "required": false
+    }
+  ],
+
+  "required_context": [],
+
+  "agents": ["acme.wealth.market_research"]
+}

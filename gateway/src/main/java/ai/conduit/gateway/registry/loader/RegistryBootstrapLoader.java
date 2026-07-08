@@ -60,7 +60,7 @@ public class RegistryBootstrapLoader {
         int failed = 0;
 
         try {
-            String pattern = registryLocation + "manifests/*.json";
+            String pattern = registryLocation + "manifests/**/*.json";
             log.info("Loading agent manifests from {}", pattern);
             Resource[] resources = new PathMatchingResourcePatternResolver()
                     .getResources(pattern);

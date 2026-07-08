@@ -8,6 +8,7 @@
   },
   "domain": "wealth-management",
   "audience": "enterprise",
+  "sub_domain": "market-research",
   "max_response_tokens": 2000,
   "protocol": "http",
   "connection": {

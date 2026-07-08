@@ -57,11 +57,15 @@ class DagRealManifestTest {
     }
 
     private static AgentManifest load(String agentId) {
-        Path file = registryDir().resolve(agentId + ".json");
-        try {
+        // Resolve by filename recursively — manifests are organised into per-domain subfolders.
+        try (var files = Files.walk(registryDir())) {
+            Path file = files
+                    .filter(p -> p.getFileName().toString().equals(agentId + ".json"))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("manifest not found: " + agentId));
             return MAPPER.readValue(Files.readAllBytes(file), AgentManifest.class);
         } catch (Exception e) {
-            throw new RuntimeException("could not load real manifest " + file, e);
+            throw new RuntimeException("could not load real manifest " + agentId, e);
         }
     }
 
@@ -130,7 +134,7 @@ class DagRealManifestTest {
 
     /** Load every shipped manifest (the whole registry snapshot), re-stamped as the registry would. */
     private static List<AgentManifest> loadAllRestamped() {
-        try (var files = Files.list(registryDir())) {
+        try (var files = Files.walk(registryDir())) {
             return files
                     .filter(p -> p.getFileName().toString().endsWith(".json"))
                     .map(p -> {

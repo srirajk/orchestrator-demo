@@ -8,6 +8,7 @@
   },
   "domain": "hr",
   "audience": "enterprise",
+  "sub_domain": "hr-knowledge",
   "max_response_tokens": 2000,
   "protocol": "http",
   "connection": {
