@@ -1,6 +1,11 @@
 {
   "domain_id": "asset-servicing",
   "display_name": "Asset Servicing",
+  "coverage": {
+    "discover_url": "${WEALTH_COVERAGE_URL}/coverage/{principal_id}",
+    "check_url": "${WEALTH_COVERAGE_URL}/coverage/{principal_id}/resources/{id}",
+    "resolve_url": "${WEALTH_COVERAGE_URL}/entities/resolve"
+  },
   "memory_compaction": {
     "envelope_version": "context-envelope.v1",
     "must_preserve": ["domain", "sub_domain"],

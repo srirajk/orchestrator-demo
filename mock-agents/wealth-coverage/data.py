@@ -51,6 +51,9 @@ BOOKS: dict[str, set[str]] = {
     # rm_carlos owns his own distinct client (Sterling). Whitman/Calderon/Okafor are
     # NOT in his book → denied, proving book-of-business isolation between RMs.
     "rm_carlos": {"REL-00201"},
+    # Asset-servicing operations persona. This mirrors IAM personal_resources seed V9
+    # so both demo book stores agree until T4 removes the IAM copy entirely.
+    "ops_analyst_singh": {"REL-00188"},
     "rm_ken":    {"REL-00188"},
     "admin":     set(RELATIONSHIPS.keys()),   # platform admin sees all
 }

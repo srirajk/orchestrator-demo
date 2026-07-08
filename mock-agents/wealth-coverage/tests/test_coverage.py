@@ -35,6 +35,11 @@ class TestDiscover:
         ids = {r["id"] for r in results}
         assert ids == {"REL-00188"}
 
+    def test_ops_analyst_singh_sees_okafor(self):
+        results = discover("ops_analyst_singh")
+        ids = {r["id"] for r in results}
+        assert ids == {"REL-00188"}
+
     def test_unknown_principal_gets_empty_list(self):
         assert discover("nobody") == []
 
@@ -54,6 +59,11 @@ class TestCheck:
         result = check("rm_jane", "REL-00188")
         assert result["allowed"] is False
         assert result["reason"] == "not-in-book"
+
+    def test_ops_analyst_singh_allowed_okafor(self):
+        result = check("ops_analyst_singh", "REL-00188")
+        assert result["allowed"] is True
+        assert result["reason"] == "in-book"
 
     def test_unknown_resource_denied(self):
         result = check("rm_jane", "REL-99999")

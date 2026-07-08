@@ -2,7 +2,7 @@
   "sub_domain_id": "custody-operations",
   "display_name": "Custody Operations",
   "parent_domain": "asset-servicing",
-  "resource_scoped": false,
+  "resource_scoped": true,
 
   "entity_types": [
     {
@@ -41,7 +41,7 @@
     }
   ],
 
-  "required_context": [],
+  "required_context": ["relationship_id"],
 
   "agents": [
     "meridian.servicing.custody_positions",
