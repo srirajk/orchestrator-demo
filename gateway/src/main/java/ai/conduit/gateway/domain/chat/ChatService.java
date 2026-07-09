@@ -415,23 +415,15 @@ public class ChatService {
             }
 
             // ── CONTEXT-AWARE ROUTING ────────────────────────────────────────────────
-            // Route on conversation-enriched text (recent user turns) rather than the bare last
-            // message. Enrichment lets the resolver's confidence/margin gate derive the query's
-            // domain from the conversation's established vocabulary and abstain on a lone
-            // out-of-domain hit. This fixes keyword-less follow-ups
-            // ("summarize for Calderon Trust (REL-00099)?") that otherwise scored in the
-            // cross-domain noise band and were misrouted. For CLARIFY turns (carryContext=false)
-            // we route on the bare message so a terse under-specified ask cannot inherit a
-            // confident domain from history and be answered. No domain literal here — the domain
-            // decision comes from the winning agent manifest's own domain field in the resolver.
-            String routingText = carryContext ? buildRoutingQuery(request) : latestPrompt;
-            // FACET CARRY / BIAS-TO-FETCH: when the current turn already carries an explicit grounded
-            // subject (an id the user typed, or a focal name the deterministic derivation resolved),
-            // the turn is fully specified — only which agents/facet is muddy. Tell the resolver not
-            // to abstain on a low top-vs-noise margin so a terse follow-up ("and for REL-00099?")
-            // inherits the conversation's facet vocabulary and routes, instead of stranding on a
-            // margin tie. Only on the FETCH path (carryContext); CLARIFY turns keep the abstain gate.
+            // Route with the smallest context needed for this turn. If the existing focal-reference
+            // derivation already grounded the entity and the user did NOT type a fresh identifier,
+            // the current message supplies the facet and should not be diluted by older turns. If
+            // the user did type a fresh identifier, use only the immediately prior user turn plus
+            // the current turn so terse overrides can inherit the prior facet without stale facets.
+            // CLARIFY turns route on the bare message so an under-specified ask cannot inherit a
+            // confident domain.
             boolean entityKnown = carryContext && hasGroundedResolvableReference(preExtracted, latestPrompt);
+            String routingText = routingTextForFetch(request, latestPrompt, carryContext, entityKnown);
             ResolverResult resolved = resolver.resolveContextual(routingText, entityKnown);
 
             List<AgentsResolvedData.AgentRef> selectedRefs = resolved.selected().stream()
@@ -758,7 +750,13 @@ public class ChatService {
                     if (coverageRelId != null) {
                         // Inject the coverage-verified canonical ID as the entity reference so
                         // the resolver short-circuits via its id_pattern (no external lookup).
-                        effectiveBag = preExtracted.withReference(covExtractAs, coverageRelId);
+                        // Also carry the manifest entity key itself: DAG planning derives its
+                        // available entity set from resolved keys, while the flat binder reads
+                        // the same canonical value from synthesis. This only happens after the
+                        // resource coverage gate has checked the ID for the current turn.
+                        effectiveBag = preExtracted
+                                .withReference(covExtractAs, coverageRelId)
+                                .withResolvedValue(coverageEntity.key(), coverageRelId);
                     }
                 }
                 synthesis = inputSynthesizer.synthesize(effectiveBag, finalManifests);
@@ -1259,9 +1257,12 @@ public class ChatService {
      * conversation text. Falls back to the latest user message when there is only one turn.
      */
     private String buildRoutingQuery(ChatRequest request) {
+        return buildRoutingQuery(request, Math.max(1, routingContextTurns));
+    }
+
+    private String buildRoutingQuery(ChatRequest request, int window) {
         String latest = extractLatestUserMessage(request);
         if (request.messages() == null || request.messages().isEmpty()) return latest;
-        int window = Math.max(1, routingContextTurns);
         List<String> userTurns = new ArrayList<>();
         for (int i = request.messages().size() - 1; i >= 0 && userTurns.size() < window; i--) {
             Message m = request.messages().get(i);
@@ -1272,6 +1273,27 @@ public class ChatService {
         if (userTurns.size() <= 1) return latest;
         java.util.Collections.reverse(userTurns);  // oldest → newest (current turn last)
         return String.join("\n", userTurns);
+    }
+
+    private String routingTextForFetch(ChatRequest request, String latestPrompt,
+                                       boolean carryContext, boolean entityKnown) {
+        if (!carryContext) return latestPrompt;
+        if (entityKnown && !latestContainsResolvableId(latestPrompt)) {
+            return latestPrompt;
+        }
+        if (entityKnown && latestContainsResolvableId(latestPrompt)) {
+            return buildRoutingQuery(request, 2);
+        }
+        return buildRoutingQuery(request);
+    }
+
+    private boolean latestContainsResolvableId(String latestPrompt) {
+        if (latestPrompt == null || latestPrompt.isBlank()) return false;
+        return manifestStore.entityTypes().stream()
+                .filter(EntityType::isResolvable)
+                .map(EntityType::idPattern)
+                .filter(pattern -> pattern != null && !pattern.isBlank())
+                .anyMatch(pattern -> java.util.regex.Pattern.compile(pattern).matcher(latestPrompt).find());
     }
 
     /**
