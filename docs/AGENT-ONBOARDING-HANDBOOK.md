@@ -21,6 +21,7 @@
 ## Table of contents
 
 1. [Philosophy — the empty engine](#1-philosophy--the-empty-engine)
+   - [Key terms — one sentence each](#key-terms--one-sentence-each)
 2. [Mental model & prerequisites](#2-mental-model--prerequisites)
 3. [Anatomy of an agent manifest](#3-anatomy-of-an-agent-manifest)
 4. [The art of skill examples](#4-the-art-of-skill-examples)
@@ -54,6 +55,14 @@ prompt string. That is the world most "AI gateways" actually live in, and it doe
 demo — every new domain is a code change, a build, a deploy, a regression risk, and a bottleneck on
 one team. **In World B, a new agent — or an entire new business domain — ships as a manifest and a
 running service. The gateway itself does not change.**
+
+Hold onto the contrast in one line each:
+
+- **World A** — the platform is taught each domain by hand, so every new domain is a change to
+  shared platform logic funneled through the one team that owns it, and it quietly stops scaling
+  once a few domains accumulate.
+- **World B** — the platform knows nothing about any domain and only how to read a domain that
+  *describes itself*, so a new domain ships as a self-owned declaration that changes nothing shared.
 
 ### The journey — how World A becomes World B
 
@@ -112,6 +121,108 @@ The practical test, stated as a rule you can apply while typing: **if you find y
 change to the platform to onboard your agent, that is a bug in the manifest model — raise it, do not
 work around it.** In the entire life of this platform so far, three live domains and sixteen agents
 were onboarded with zero changes to the gateway. Yours should be no different.
+
+---
+
+## Key terms — one sentence each
+
+A one-line reference for every term this handbook leans on. Skim it now; keep it open while you read
+the deep chapters. The terms are grouped by where they show up on the request path, so related ones
+sit together.
+
+**The pieces.**
+
+- **Gateway** — the single, domain-agnostic engine that reads manifests, routes questions, composes
+  plans, enforces entitlement, and streams the answer, carrying no domain knowledge of its own.
+- **Agent** — a self-contained service you own that answers one kind of question or performs one
+  computation, described to the gateway entirely by a manifest.
+- **Manifest** — the JSON document you write to describe an agent — identity, routing examples, io
+  contract, constraints — and the only thing the gateway needs in order to onboard you.
+- **Domain** — a business area such as wealth-management or insurance, whose vocabulary and
+  coverage-service URLs live in a domain manifest, never in the gateway.
+- **Sub-domain** — a division within a domain (e.g. private-banking, custody-operations) that
+  supplies the concrete entity types and coverage-service URLs your agent inherits.
+- **Audience** — the one manifest word (`segment` or `enterprise`) that decides whether the
+  structural entitlement gate applies to your agent.
+
+**Finding the right agent (routing).**
+
+- **Semantic routing** — matching a user's question to an agent by *meaning* rather than keywords,
+  by comparing embedded vectors for nearest neighbor.
+- **Skill examples** — the plain-English question phrasings in `skills[].examples` that get embedded
+  and become the actual routing signal, not documentation.
+- **Embedding** — the numeric vector a sentence is turned into (here by MiniLM) so that closeness in
+  vector space approximates closeness in meaning.
+- **Goal** — the single capability the router picks for a question, and the point the resolver builds
+  the plan backward from.
+- **Abstain floor** — the configured score and margin thresholds below which the router declines to
+  route rather than guess, catching out-of-scope and near-tie questions.
+- **Routing measurement-gate** — the labeled goal-pick harness, run in CI on every new agent, that
+  fails onboarding if adding you drops overall accuracy or steals a neighbor's queries.
+- **Poaching** — one agent's over-broad examples capturing questions that rightly belong to a
+  neighboring agent's intent.
+
+**Composing agents (the io contract).**
+
+- **The io contract** — the optional manifest block (`produces`, `consumes`, `condition`, `map`) that
+  makes an agent composable into a multi-step plan; without it, the agent is a flat single node.
+- **Produces** — a symbolic, namespaced output type your agent publishes: the socket other agents
+  plug into.
+- **Consumes** — your declared inputs, each either a resolved `entity` (a leaf input) or a `from`
+  dependency on another agent's produced type.
+- **DAG / plan** — the directed graph of agents assembled for one request by matching consumers'
+  `from` to producers' `type`, never hand-written.
+- **The resolver** — the deterministic component that builds that plan at request time by following
+  type-equality backward from the goal until every input bottoms out in a resolvable entity.
+- **Fan-in** — an agent shape that computes over one or more *other* agents' outputs instead of
+  fetching raw data (e.g. a concentration or settlement-risk analytic).
+- **Select (the translator)** — a human-written JMESPath projection on a `consumes` edge that reshapes
+  a producer's output into the consumer's expected input, diffable and boot-validated instead of
+  LLM-improvised.
+- **JMESPath** — the small, declarative JSON query language used for every `select`, `condition`, and
+  `map.over` expression, chosen because it is deterministic and reviewable.
+- **Conditional (io.condition)** — a JMESPath boolean over a node's bound input that gates *execution*,
+  cleanly skipping the node (`skipped_condition_false`) when false — "not applicable," never "missing."
+- **Map / iteration (io.map)** — a bounded, deterministic instruction to run an agent once per element
+  of a collection, capped by `max_items` / `max_concurrency` and honest about truncation and emptiness.
+- **Blackboard** — the shared per-run store where each agent's output is published under its `name`
+  for downstream consumers to read.
+
+**Running the plan and answering.**
+
+- **Executor** — the component that calls each agent in the plan, forwards the JWT, enforces the three
+  gates per hop, and harvests outputs to the deadline.
+- **Partial-result tolerance** — the guarantee that a failed agent never cancels its siblings; the
+  plan joins to the deadline, harvests survivors, synthesizes from what returned, and states what is
+  missing.
+- **Synthesizer** — the final step that composes one grounded answer from agent outputs, which it
+  treats as delimited data to summarize, never as instructions.
+- **Grounding / grounded figures** — the rule that every number in the answer comes from an agent's
+  output as delimited data; the model summarizes but never computes, recalls, or invents a figure.
+
+**Who may reach it (authorization).**
+
+- **Entitlement** — the whole question of whether this principal may reach this agent and this data,
+  answered by three independent gates configured as data.
+- **The three gates** — structural ("can this segment reach this domain at all?"), classification
+  ("is this data too sensitive for this principal?"), and coverage ("is this specific client in this
+  user's book?"), independent by design for defense in depth.
+- **Coverage / book-of-business** — the set of clients a given user actually covers, answered only by
+  a coverage service and stored nowhere else — never in the gateway, never in a manifest.
+- **RESOLVE-vs-CHECK** — resolution finds an entity across *all* entities (principal-agnostic), while
+  the coverage check is the only gate that decides whether this principal may actually have it.
+- **Per-hop identity / fail-closed** — the requirement that the end-user's JWT is forwarded to and
+  verified by every service, which must deny on any verification failure rather than fall open.
+
+**Service, boot, and discipline.**
+
+- **Introspection** — the gateway deriving your input and output wire schemas from your live service
+  (OpenAPI, or MCP `tools/list`), so you never hand-write those schemas into the manifest.
+- **Entity / entity resolution** — a real business object (a relationship, a policy) and the
+  deterministic lookup that turns a human reference in the question into its real ID, never a
+  fabricated one.
+- **The World-B check** — the automated `scripts/world-b-check.sh` scan that must report CRITICAL 0,
+  proving no domain knowledge leaked into the gateway source.
 
 ---
 
