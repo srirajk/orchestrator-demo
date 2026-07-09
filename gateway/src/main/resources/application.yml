@@ -28,6 +28,10 @@ management:
         http.server.requests: true
         http.client.requests: true
         intent.classify.duration: true
+        conduit.gateway.request.duration: true
+        conduit.gateway.stage.duration: true
+        conduit.fanout.duration: true
+        agent.latency: true
   # Micrometer → OTel bridge: exports traces to the OTel Collector
   tracing:
     enabled: true

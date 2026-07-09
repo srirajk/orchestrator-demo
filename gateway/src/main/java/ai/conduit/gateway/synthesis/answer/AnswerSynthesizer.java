@@ -234,7 +234,14 @@ public class AnswerSynthesizer {
                 if (!validation.ok()) {
                     log.warn("Grounded figure validation failed; serving deterministic fallback: {}",
                             validation.errors());
+                    llmSpan.setAttribute("conduit.grounding.draft_verdict", "failed");
+                    llmSpan.setAttribute("conduit.grounding.fallback", true);
                     finalText = deterministicFigureFallback(originalPrompt, groundedFigures);
+                    GroundedFigureValidator.ValidationResult fallbackValidation =
+                            figureValidator.validate(finalText, groundedFigures);
+                    llmSpan.setAttribute("conduit.grounding.verdict",
+                            fallbackValidation.ok() ? "all-grounded" : "failed");
+                    llmSpan.setAttribute("conduit.grounding.error_count", fallbackValidation.errors().size());
                 }
                 synthesizedText.append(finalText);
                 emitter.send(SseEmitter.event().data(contentDelta(completionId, created, finalText, mapper)));

@@ -27,6 +27,14 @@ datasources:
         tags:
           - key: service.name
             value: service_name
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: "-10m"
+        spanEndTimeShift: "10m"
+        filterByTraceID: true
+        filterBySpanID: false
+        customQuery: true
+        query: '{traceId="${__trace.traceId}"}'
       serviceMap:
         datasourceUid: prometheus
       nodeGraph:

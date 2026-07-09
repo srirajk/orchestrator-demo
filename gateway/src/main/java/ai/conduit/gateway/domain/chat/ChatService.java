@@ -19,6 +19,7 @@ import ai.conduit.gateway.domain.manifest.EffectiveManifest;
 import ai.conduit.gateway.domain.manifest.EntityType;
 import ai.conduit.gateway.infrastructure.telemetry.TraceEvent;
 import ai.conduit.gateway.infrastructure.telemetry.TraceEventPublisher;
+import ai.conduit.gateway.infrastructure.metrics.GatewaySloMetrics;
 import ai.conduit.gateway.infrastructure.telemetry.event.AgentCompleteData;
 import ai.conduit.gateway.infrastructure.telemetry.event.AgentStartData;
 import ai.conduit.gateway.infrastructure.telemetry.event.AgentsResolvedData;
@@ -115,6 +116,8 @@ public class ChatService {
     private final ai.conduit.gateway.domain.clarify.ClarificationComposer clarificationComposer;
     private final Tracer                   tracer;
     private final MeterRegistry meterRegistry;
+    private final GatewaySloMetrics gatewaySloMetrics;
+    private final ThreadLocal<GatewaySloMetrics.RequestScope> gatewayMetricScope = new ThreadLocal<>();
     private final Counter intentFetchCounter;
     private final Counter intentFollowUpCounter;
     private final Counter intentClarifyCounter;
@@ -148,6 +151,7 @@ public class ChatService {
                        ai.conduit.gateway.domain.clarify.ClarificationComposer clarificationComposer,
                        Tracer tracer,
                        MeterRegistry meterRegistry,
+                       GatewaySloMetrics gatewaySloMetrics,
                        AgentRegistry registry,
                        DagResolver dagResolver,
                        DagPlanExecutor dagExecutor,
@@ -166,6 +170,7 @@ public class ChatService {
         this.clarificationComposer = clarificationComposer;
         this.tracer              = tracer;
         this.meterRegistry         = meterRegistry;
+        this.gatewaySloMetrics     = gatewaySloMetrics;
         this.registry            = registry;
         this.dagResolver         = dagResolver;
         this.dagExecutor         = dagExecutor;
@@ -210,6 +215,8 @@ public class ChatService {
     public void handleChat(ChatRequest request, SseEmitter emitter, String userId,
                            Principal jwtPrincipal, String headerConvId, String callerToken) {
         long   requestStart = System.currentTimeMillis();
+        GatewaySloMetrics.RequestScope metricScope = gatewaySloMetrics.start();
+        gatewayMetricScope.set(metricScope);
         emitAdoption(jwtPrincipal);   // adoption-by-role (cardinality-safe: role, not user)
         Span   rootSpan     = tracer.spanBuilder("chat.handle").startSpan();
         // Use the OTel trace_id as the single correlation ID across logs, glass-box, and traces.
@@ -328,6 +335,8 @@ public class ChatService {
             catch (Exception ex) { try { emitter.completeWithError(ex); } catch (Exception ignored) {} }
         } finally {
             baggageScope.close();
+            gatewaySloMetrics.finish(metricScope);
+            gatewayMetricScope.remove();
             rootSpan.end();
         }
     }
@@ -425,12 +434,16 @@ public class ChatService {
             // confident domain.
             boolean entityKnown = carryContext && hasGroundedResolvableReference(preExtracted, latestPrompt);
             String routingText = routingTextForFetch(request, latestPrompt, carryContext, entityKnown);
+            long routingStart = System.nanoTime();
             ResolverResult resolved = resolver.resolveContextual(routingText, entityKnown);
+            recordGatewayStage("routing", System.nanoTime() - routingStart);
 
             List<AgentsResolvedData.AgentRef> selectedRefs = resolved.selected().stream()
                     .map(c -> new AgentsResolvedData.AgentRef(
                             c.manifest().agentId(), c.manifest().protocol(), c.score()))
                     .collect(Collectors.toList());
+            markGatewayDomain(domainsOf(resolved.selected().stream()
+                    .map(c -> c.manifest()).collect(Collectors.toList())));
             List<AgentsResolvedData.FilteredRef> skippedRefs = resolved.skipped().stream()
                     .map(c -> new AgentsResolvedData.FilteredRef(
                             c.manifest().agentId(), "below-confidence-floor"))
@@ -750,6 +763,7 @@ public class ChatService {
             // and derives available entity keys from it). Null when there was no pre-extraction.
             EntityBag effectiveBag = preExtracted;
             SynthesisResult synthesis;
+            long resolutionStart = System.nanoTime();
             if (preExtracted != null) {
                 if (coverageEntity != null) {
                     String covExtractAs = coverageEntity.extractAs();
@@ -769,6 +783,7 @@ public class ChatService {
             } else {
                 synthesis = inputSynthesizer.synthesize(latestPrompt, finalManifests);
             }
+            recordGatewayStage("resolution", System.nanoTime() - resolutionStart);
 
             if (synthesis.needsClarification() && synthesis.inputs().isEmpty()) {
                 emitRequestOutcome("CLARIFIED");
@@ -810,6 +825,7 @@ public class ChatService {
             // fan-out below runs VERBATIM — flag OFF is a byte-for-byte no-op for this path.
             List<NodeResult> results = tryDag(synthesis, finalManifests, effectiveBag, principal,
                     requestId, conversationId, callerToken).orElseGet(() -> {
+                markGatewayPath("flat");
                 List<PlanNode> nodes = synthesis.inputs().entrySet().stream()
                         .map(e -> {
                             AgentManifest m = finalManifests.stream()
@@ -858,7 +874,9 @@ public class ChatService {
                 emitRequestPartial();
             }
 
+            long synthesisStart = System.nanoTime();
             String answer = answerSynthesizer.synthesize(results, latestPrompt, request.messages(), emitter, streamId, withheldDomains, requestStart);
+            recordGatewayStage("synthesis", System.nanoTime() - synthesisStart);
             setTraceOutput(rootSpan, answer);
             emitRequestOutcome("ANSWERED");
             finalDomains.forEach(this::emitAssistantDomain);
@@ -1012,6 +1030,8 @@ public class ChatService {
         Blackboard blackboard = new Blackboard(availableEntities, preBoundInputs, mapper);
         log.info("DAG firing: goal={} nodes={} available={}", goalId,
                 plan.nodes().stream().map(PlanNode::nodeId).collect(Collectors.toList()), availableEntities);
+        markGatewayPath("dag");
+        markGatewayDomain(goal.domain());
         emitDagPlan(goal.domain(), goalId, plan.nodes().size());
         DagPlanExecutor.CoverageContext coverageContext = new DagPlanExecutor.CoverageContext(
                 principal.id(),
@@ -1100,7 +1120,9 @@ public class ChatService {
         }
         Span span = tracer.spanBuilder("chat.follow_up").startSpan();
         try {
+            long synthesisStart = System.nanoTime();
             String answer = answerSynthesizer.synthesizeFromHistory(request.messages(), latestPrompt, emitter, streamId, requestStart);
+            recordGatewayStage("synthesis", System.nanoTime() - synthesisStart);
             setTraceOutput(rootSpan, answer);
             emitRequestOutcome("ANSWERED");
             tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
@@ -1111,7 +1133,9 @@ public class ChatService {
     private void handleChitchat(ChatRequest request, SseEmitter emitter,
                                  String conversationId, String requestId, long requestStart, String streamId,
                                  Span rootSpan) throws Exception {
+        long synthesisStart = System.nanoTime();
         String answer = answerSynthesizer.synthesizeFromHistory(request.messages(), extractLatestUserMessage(request), emitter, streamId, requestStart);
+        recordGatewayStage("synthesis", System.nanoTime() - synthesisStart);
         setTraceOutput(rootSpan, answer);
         emitRequestOutcome("ANSWERED");
         tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
@@ -1526,11 +1550,48 @@ public class ChatService {
 
     /** Increments the request outcome counter. Micrometer caches the Counter by key. */
     private void emitRequestOutcome(String outcome) {
+        GatewaySloMetrics.RequestScope scope = gatewayMetricScope.get();
+        if (scope != null) {
+            scope.outcome(outcome);
+        }
         Counter.builder("conduit.request.outcome")
                 .description("Request resolution outcome")
                 .tag("outcome", outcome)
                 .register(meterRegistry)
                 .increment();
+    }
+
+    private void markGatewayPath(String path) {
+        GatewaySloMetrics.RequestScope scope = gatewayMetricScope.get();
+        if (scope != null) {
+            scope.path(path);
+        }
+    }
+
+    private void markGatewayDomain(String domain) {
+        GatewaySloMetrics.RequestScope scope = gatewayMetricScope.get();
+        if (scope != null && domain != null && !domain.isBlank()) {
+            scope.domain(domain);
+        }
+    }
+
+    private void recordGatewayStage(String stage, long elapsedNanos) {
+        GatewaySloMetrics.RequestScope scope = gatewayMetricScope.get();
+        String path = scope == null ? "unknown" : scope.path();
+        String domain = scope == null ? "unknown" : scope.domain();
+        gatewaySloMetrics.recordStage(stage, path, domain, elapsedNanos);
+    }
+
+    private static String domainsOf(List<AgentManifest> manifests) {
+        if (manifests == null || manifests.isEmpty()) {
+            return "unknown";
+        }
+        return manifests.stream()
+                .map(AgentManifest::domain)
+                .filter(d -> d != null && !d.isBlank())
+                .distinct()
+                .sorted()
+                .collect(Collectors.joining(","));
     }
 
     /**
