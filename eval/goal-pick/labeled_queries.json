@@ -1,235 +1,466 @@
 {
   "thresholds": {
-    "flat_accuracy": 0.9,
-    "analytics_accuracy": 0.9,
+    "domain_accuracy": 0.9,
     "abstain_rate": 0.9,
-    "domain_accuracy": 0.9
+    "canonical_poaching_tolerance": 0
   },
   "queries": [
     {
-      "id": "canonical_001",
+      "id": "canonical_wealth_holdings",
       "category": "canonical",
       "persona": "rm_jane",
-      "query": "Show the top holdings for Whitman Family Office.",
+      "query": "Show the securities held in Whitman Family Office's wealth portfolio.",
       "expected_goal": "meridian.wealth.holdings"
     },
     {
-      "id": "canonical_002",
+      "id": "canonical_wealth_performance",
       "category": "canonical",
       "persona": "rm_jane",
-      "query": "What is the portfolio performance for REL-00042 this quarter?",
+      "query": "How did REL-00042 perform over the latest quarter?",
       "expected_goal": "meridian.wealth.performance"
     },
     {
-      "id": "canonical_003",
+      "id": "canonical_wealth_risk_profile",
       "category": "canonical",
       "persona": "rm_jane",
-      "query": "Give me the risk profile for Whitman Family Office.",
+      "query": "Pull the client risk tolerance assessment for Whitman Family Office.",
       "expected_goal": "meridian.wealth.risk_profile"
     },
     {
-      "id": "canonical_004",
+      "id": "canonical_wealth_goal_planning",
       "category": "canonical",
       "persona": "rm_jane",
-      "query": "Are Whitman Family Office's financial goals on track?",
+      "query": "Are Whitman's financial objectives still funded enough to stay on plan?",
       "expected_goal": "meridian.wealth.goal_planning"
     },
     {
-      "id": "canonical_005",
+      "id": "canonical_wealth_concentration",
       "category": "canonical",
       "persona": "rm_jane",
-      "query": "Analyze concentration risk in Whitman Family Office's holdings.",
+      "query": "Evaluate whether Whitman's portfolio is overexposed to a few issuers.",
       "expected_goal": "meridian.wealth.concentration"
     },
     {
-      "id": "canonical_006",
+      "id": "canonical_wealth_concentration_review",
       "category": "canonical",
       "persona": "rm_jane",
-      "query": "Give me house-view market commentary on US equities.",
+      "query": "Does the completed concentration analysis require a firm review flag?",
+      "expected_goal": "meridian.wealth.concentration_review"
+    },
+    {
+      "id": "canonical_wealth_market_research",
+      "category": "canonical",
+      "persona": "rm_jane",
+      "query": "Give me Meridian's current macro and sector outlook for client discussions.",
       "expected_goal": "meridian.wealth.market_research"
     },
     {
-      "id": "canonical_007",
+      "id": "canonical_hr_policy_qa",
       "category": "canonical",
       "persona": "hr_partner_lund",
-      "query": "What does the employee handbook say about parental leave?",
+      "query": "What does Meridian policy provide for new-parent leave?",
       "expected_goal": "meridian.hr.policy_qa"
     },
     {
-      "id": "canonical_008",
+      "id": "canonical_insurance_policy_details",
       "category": "canonical",
       "persona": "uw_sam",
-      "query": "Show policy details for POL-77001.",
+      "query": "Pull the commercial policy record and limits for POL-77001.",
       "expected_goal": "meridian.insurance.policy_details"
     },
     {
-      "id": "canonical_009",
+      "id": "canonical_insurance_claim_status",
       "category": "canonical",
       "persona": "uw_sam",
-      "query": "What is the claim status for Continental Freight's policy?",
+      "query": "What claims are currently open under policy POL-77001?",
       "expected_goal": "meridian.insurance.claim_status"
     },
     {
-      "id": "canonical_010",
+      "id": "canonical_insurance_renewal_risk",
       "category": "canonical",
       "persona": "uw_sam",
-      "query": "Assess renewal risk for POL-77001.",
+      "query": "Should Continental Freight be treated as a renewal concern given claim losses?",
       "expected_goal": "meridian.insurance.renewal_risk"
     },
     {
-      "id": "canonical_011",
+      "id": "canonical_servicing_settlement_status",
       "category": "canonical",
       "persona": "ops_analyst_singh",
-      "query": "Show settlement status for REL-00042.",
+      "query": "Which pending or failed settlements are outstanding for REL-00188?",
       "expected_goal": "meridian.servicing.settlement_status"
     },
     {
-      "id": "canonical_012",
+      "id": "canonical_servicing_cash_management",
       "category": "canonical",
       "persona": "ops_analyst_singh",
-      "query": "Summarize cash management for Whitman Family Office.",
+      "query": "Review available and projected cash for the Okafor servicing relationship.",
       "expected_goal": "meridian.servicing.cash_management"
     },
     {
-      "id": "canonical_013",
+      "id": "canonical_servicing_custody_positions",
       "category": "canonical",
       "persona": "ops_analyst_singh",
-      "query": "List custody positions for REL-00042.",
+      "query": "Break down REL-00188's assets by custody location.",
       "expected_goal": "meridian.servicing.custody_positions"
     },
     {
-      "id": "canonical_014",
+      "id": "canonical_servicing_nav",
       "category": "canonical",
       "persona": "ops_analyst_singh",
-      "query": "Calculate NAV for FUND-ALPHA.",
+      "query": "Give me the latest fund valuation for FUND-ALPHA.",
       "expected_goal": "meridian.servicing.nav"
     },
     {
-      "id": "canonical_015",
+      "id": "canonical_servicing_corporate_actions",
       "category": "canonical",
       "persona": "ops_analyst_singh",
-      "query": "Show corporate actions for Whitman Family Office.",
+      "query": "What dividend, split, or election events are pending on the servicing book?",
       "expected_goal": "meridian.servicing.corporate_actions"
     },
     {
-      "id": "canonical_016",
+      "id": "canonical_servicing_settlement_risk",
       "category": "canonical",
       "persona": "ops_analyst_singh",
-      "query": "Assess settlement risk for REL-00042.",
+      "query": "What is the settlement risk for REL-00188 (Okafor)?",
       "expected_goal": "meridian.servicing.settlement_risk"
     },
     {
-      "id": "near_miss_001",
-      "category": "near_miss",
+      "id": "canonical_servicing_trade_penalty",
+      "category": "canonical",
+      "persona": "ops_analyst_singh",
+      "query": "Itemize penalty aging for each failed trade row on REL-00188.",
+      "expected_goal": "meridian.servicing.trade_penalty"
+    },
+
+    {
+      "id": "held_out_wealth_holdings",
+      "category": "held_out",
       "persona": "rm_jane",
-      "query": "Which positions are creating issuer concentration for Whitman Family Office?",
-      "expected_goal": "meridian.wealth.concentration"
+      "query": "What securities and asset classes make up the Calderon Trust portfolio?",
+      "expected_goal": "meridian.wealth.holdings",
+      "note": "Held-out paraphrase; not a manifest example."
     },
     {
-      "id": "near_miss_002",
+      "id": "held_out_wealth_performance",
+      "category": "held_out",
+      "persona": "rm_jane",
+      "query": "Calculate the recent investment return for the Calderon Trust wealth portfolio.",
+      "expected_goal": "meridian.wealth.performance",
+      "note": "Held-out paraphrase; not a manifest example."
+    },
+    {
+      "id": "held_out_wealth_risk_profile",
+      "category": "held_out",
+      "persona": "rm_jane",
+      "query": "Show Calderon's wealth risk tolerance rating and exposure profile.",
+      "expected_goal": "meridian.wealth.risk_profile",
+      "note": "Held-out paraphrase; not a manifest example."
+    },
+    {
+      "id": "held_out_wealth_goal_planning",
+      "category": "held_out",
+      "persona": "rm_jane",
+      "query": "Check the funding status of Calderon's financial planning goals.",
+      "expected_goal": "meridian.wealth.goal_planning",
+      "note": "Held-out paraphrase; not a manifest example."
+    },
+    {
+      "id": "held_out_wealth_concentration",
+      "category": "held_out",
+      "persona": "rm_jane",
+      "query": "Which Calderon holdings are making single-issuer exposure look stretched?",
+      "expected_goal": "meridian.wealth.concentration",
+      "note": "Held-out paraphrase; not a manifest example."
+    },
+    {
+      "id": "held_out_wealth_concentration_review",
+      "category": "held_out",
+      "persona": "rm_jane",
+      "query": "After the concentration result, should the breach be escalated for review?",
+      "expected_goal": "meridian.wealth.concentration_review",
+      "note": "Held-out paraphrase; not a manifest example."
+    },
+    {
+      "id": "held_out_wealth_market_research",
+      "category": "held_out",
+      "persona": "rm_jane",
+      "query": "What is the investment desk's latest view on private credit and rates?",
+      "expected_goal": "meridian.wealth.market_research",
+      "note": "Held-out paraphrase; not a manifest example."
+    },
+    {
+      "id": "held_out_hr_policy_qa",
+      "category": "held_out",
+      "persona": "hr_partner_lund",
+      "query": "Can staff use unused vacation later, or does PTO expire?",
+      "expected_goal": "meridian.hr.policy_qa",
+      "note": "Held-out paraphrase; not a manifest example."
+    },
+    {
+      "id": "held_out_insurance_policy_details",
+      "category": "held_out",
+      "persona": "uw_sam",
+      "query": "What coverage, deductible, and premium are recorded for this policy?",
+      "expected_goal": "meridian.insurance.policy_details",
+      "note": "Held-out paraphrase; not a manifest example."
+    },
+    {
+      "id": "held_out_insurance_claim_status",
+      "category": "held_out",
+      "persona": "uw_sam",
+      "query": "Show the loss file status and adjuster details for CLM-5501.",
+      "expected_goal": "meridian.insurance.claim_status",
+      "note": "Held-out paraphrase; not a manifest example."
+    },
+    {
+      "id": "held_out_insurance_renewal_risk",
+      "category": "held_out",
+      "persona": "uw_sam",
+      "query": "Do the incurred losses make this account unattractive to renew?",
+      "expected_goal": "meridian.insurance.renewal_risk",
+      "note": "Held-out paraphrase; not a manifest example."
+    },
+    {
+      "id": "held_out_servicing_settlement_status",
+      "category": "held_out",
+      "persona": "ops_analyst_singh",
+      "query": "Are any Okafor trades still waiting to settle or already failed?",
+      "expected_goal": "meridian.servicing.settlement_status",
+      "note": "Held-out paraphrase; not a manifest example."
+    },
+    {
+      "id": "held_out_servicing_cash_management",
+      "category": "held_out",
+      "persona": "ops_analyst_singh",
+      "query": "How much cash is expected to be available for the Okafor account?",
+      "expected_goal": "meridian.servicing.cash_management",
+      "note": "Held-out paraphrase; not a manifest example."
+    },
+    {
+      "id": "held_out_servicing_custody_positions",
+      "category": "held_out",
+      "persona": "ops_analyst_singh",
+      "query": "Where are Okafor's securities held across custodians?",
+      "expected_goal": "meridian.servicing.custody_positions",
+      "note": "Held-out paraphrase; not a manifest example."
+    },
+    {
+      "id": "held_out_servicing_nav",
+      "category": "held_out",
+      "persona": "ops_analyst_singh",
+      "query": "What is the current valuation number for the alpha fund?",
+      "expected_goal": "meridian.servicing.nav",
+      "note": "Held-out paraphrase; not a manifest example."
+    },
+    {
+      "id": "held_out_servicing_corporate_actions",
+      "category": "held_out",
+      "persona": "ops_analyst_singh",
+      "query": "Are there issuer events requiring a servicing election this week?",
+      "expected_goal": "meridian.servicing.corporate_actions",
+      "note": "Held-out paraphrase; not a manifest example."
+    },
+    {
+      "id": "held_out_servicing_settlement_risk",
+      "category": "held_out",
+      "persona": "ops_analyst_singh",
+      "query": "Could the unsettled Okafor trades create cash penalty exposure or escalation risk?",
+      "expected_goal": "meridian.servicing.settlement_risk",
+      "note": "Held-out paraphrase; not a manifest example."
+    },
+    {
+      "id": "held_out_servicing_trade_penalty",
+      "category": "held_out",
+      "persona": "ops_analyst_singh",
+      "query": "Produce one penalty-aging line for every failed settlement item.",
+      "expected_goal": "meridian.servicing.trade_penalty",
+      "note": "Held-out paraphrase; not a manifest example."
+    },
+
+    {
+      "id": "near_miss_wealth_holdings",
       "category": "near_miss",
       "persona": "rm_jane",
-      "query": "For Calderon Trust, how did returns compare with benchmarks?",
+      "query": "Show the securities currently held by wealth relationship REL-00042.",
+      "expected_goal": "meridian.wealth.holdings"
+    },
+    {
+      "id": "near_miss_wealth_performance",
+      "category": "near_miss",
+      "persona": "rm_jane",
+      "query": "What quarterly return did Whitman's managed wealth account produce?",
       "expected_goal": "meridian.wealth.performance"
     },
     {
-      "id": "near_miss_003",
+      "id": "near_miss_wealth_risk_profile",
       "category": "near_miss",
       "persona": "rm_jane",
-      "query": "Does Whitman look too aggressive for the client's stated tolerance?",
+      "query": "Does the risk exposure line up with what Whitman said they can tolerate?",
       "expected_goal": "meridian.wealth.risk_profile"
     },
     {
-      "id": "near_miss_004",
+      "id": "near_miss_wealth_goal_planning",
       "category": "near_miss",
       "persona": "rm_jane",
-      "query": "Are the retirement and liquidity objectives for REL-00042 still achievable?",
+      "query": "Are REL-00042's financial goal funding targets still achievable?",
       "expected_goal": "meridian.wealth.goal_planning"
     },
     {
-      "id": "near_miss_005",
+      "id": "near_miss_wealth_concentration",
+      "category": "near_miss",
+      "persona": "rm_jane",
+      "query": "Find any oversized single-name exposure in Whitman's portfolio.",
+      "expected_goal": "meridian.wealth.concentration"
+    },
+    {
+      "id": "near_miss_wealth_concentration_review",
+      "category": "near_miss",
+      "persona": "rm_jane",
+      "query": "If concentration breaches exist, surface the review indicator.",
+      "expected_goal": "meridian.wealth.concentration_review"
+    },
+    {
+      "id": "near_miss_wealth_market_research",
+      "category": "near_miss",
+      "persona": "rm_jane",
+      "query": "What are the firm's latest thoughts on equities and alternatives?",
+      "expected_goal": "meridian.wealth.market_research"
+    },
+    {
+      "id": "near_miss_hr_policy_qa",
+      "category": "near_miss",
+      "persona": "hr_partner_lund",
+      "query": "Explain the company's learning reimbursement policy.",
+      "expected_goal": "meridian.hr.policy_qa"
+    },
+    {
+      "id": "near_miss_insurance_policy_details",
+      "category": "near_miss",
+      "persona": "uw_sam",
+      "query": "Is POL-77001 active and what line of business is it?",
+      "expected_goal": "meridian.insurance.policy_details"
+    },
+    {
+      "id": "near_miss_insurance_claim_status",
+      "category": "near_miss",
+      "persona": "uw_sam",
+      "query": "Who is handling the open claim and how much is reserved?",
+      "expected_goal": "meridian.insurance.claim_status"
+    },
+    {
+      "id": "near_miss_insurance_renewal_risk",
       "category": "near_miss",
       "persona": "uw_sam",
       "query": "Do open losses change the renewal posture for Continental Freight?",
       "expected_goal": "meridian.insurance.renewal_risk"
     },
     {
-      "id": "near_miss_006",
-      "category": "near_miss",
-      "persona": "uw_sam",
-      "query": "Pull the coverage terms and limits on POL-77001.",
-      "expected_goal": "meridian.insurance.policy_details"
-    },
-    {
-      "id": "near_miss_007",
+      "id": "near_miss_servicing_settlement_status",
       "category": "near_miss",
       "persona": "ops_analyst_singh",
-      "query": "Are any settlement breaks likely to create operating risk for REL-00042?",
-      "expected_goal": "meridian.servicing.settlement_risk"
-    },
-    {
-      "id": "near_miss_008",
-      "category": "near_miss",
-      "persona": "ops_analyst_singh",
-      "query": "What pending trades have not settled for Whitman Family Office?",
+      "query": "What pending trades have not settled for the Okafor relationship?",
       "expected_goal": "meridian.servicing.settlement_status"
     },
     {
-      "id": "near_miss_009",
+      "id": "near_miss_servicing_cash_management",
       "category": "near_miss",
       "persona": "ops_analyst_singh",
-      "query": "How much liquidity is available across accounts for REL-00042?",
+      "query": "Review liquidity across settlement cash accounts for REL-00188.",
       "expected_goal": "meridian.servicing.cash_management"
     },
     {
-      "id": "near_miss_010",
+      "id": "near_miss_servicing_custody_positions",
       "category": "near_miss",
-      "persona": "hr_partner_lund",
-      "query": "Can an employee carry over unused vacation days under policy?",
-      "expected_goal": "meridian.hr.policy_qa"
-    },
-    {
-      "id": "cross_domain_001",
-      "category": "cross_domain_confuser",
-      "persona": "rm_jane",
-      "query": "Show concentration risk, not settlement risk, for Whitman Family Office.",
-      "expected_goal": "meridian.wealth.concentration"
-    },
-    {
-      "id": "cross_domain_002",
-      "category": "cross_domain_confuser",
       "persona": "ops_analyst_singh",
-      "query": "Show settlement risk, not portfolio concentration, for REL-00042.",
-      "expected_goal": "meridian.servicing.settlement_risk"
-    },
-    {
-      "id": "cross_domain_003",
-      "category": "cross_domain_confuser",
-      "persona": "uw_sam",
-      "query": "I need renewal risk for the policy, not investment performance.",
-      "expected_goal": "meridian.insurance.renewal_risk"
-    },
-    {
-      "id": "cross_domain_004",
-      "category": "cross_domain_confuser",
-      "persona": "rm_jane",
-      "query": "Give me client risk tolerance, not insurance renewal risk, for REL-00042.",
-      "expected_goal": "meridian.wealth.risk_profile"
-    },
-    {
-      "id": "cross_domain_005",
-      "category": "cross_domain_confuser",
-      "persona": "ops_analyst_singh",
-      "query": "I want custody positions, not wealth holdings, for Whitman Family Office.",
+      "query": "Show custody-side holdings rather than wealth portfolio holdings for Okafor.",
       "expected_goal": "meridian.servicing.custody_positions"
     },
     {
-      "id": "cross_domain_006",
-      "category": "cross_domain_confuser",
+      "id": "near_miss_servicing_nav",
+      "category": "near_miss",
+      "persona": "ops_analyst_singh",
+      "query": "I need the net asset value for the named fund, not a client relationship.",
+      "expected_goal": "meridian.servicing.nav"
+    },
+    {
+      "id": "near_miss_servicing_corporate_actions",
+      "category": "near_miss",
+      "persona": "ops_analyst_singh",
+      "query": "Check for dividend elections or split activity pending in servicing.",
+      "expected_goal": "meridian.servicing.corporate_actions"
+    },
+    {
+      "id": "near_miss_servicing_settlement_risk",
+      "category": "near_miss",
+      "persona": "ops_analyst_singh",
+      "query": "Are failed settlements likely to cause operating exposure for REL-00188?",
+      "expected_goal": "meridian.servicing.settlement_risk"
+    },
+    {
+      "id": "near_miss_servicing_trade_penalty",
+      "category": "near_miss",
+      "persona": "ops_analyst_singh",
+      "query": "Return trade id, age, and cash penalty for each failed trade separately.",
+      "expected_goal": "meridian.servicing.trade_penalty"
+    },
+
+    {
+      "id": "confuser_wealth_concentration_vs_servicing_risk",
+      "category": "cross_agent_confuser",
       "persona": "rm_jane",
-      "query": "I want wealth holdings, not custody positions, for Whitman Family Office.",
+      "query": "Show portfolio concentration risk, not settlement risk, for Whitman.",
+      "expected_goal": "meridian.wealth.concentration"
+    },
+    {
+      "id": "confuser_servicing_risk_vs_trade_penalty",
+      "category": "cross_agent_confuser",
+      "persona": "ops_analyst_singh",
+      "query": "I need overall settlement risk, not row-by-row failed-trade penalties, for REL-00188.",
+      "expected_goal": "meridian.servicing.settlement_risk"
+    },
+    {
+      "id": "confuser_trade_penalty_vs_settlement_risk",
+      "category": "cross_agent_confuser",
+      "persona": "ops_analyst_singh",
+      "query": "Itemize per-failed-trade penalties, not a relationship-level settlement risk summary.",
+      "expected_goal": "meridian.servicing.trade_penalty"
+    },
+    {
+      "id": "confuser_servicing_status_vs_trade_penalty",
+      "category": "cross_agent_confuser",
+      "persona": "ops_analyst_singh",
+      "query": "List pending and failed settlements only; do not calculate per-trade penalties.",
+      "expected_goal": "meridian.servicing.settlement_status"
+    },
+    {
+      "id": "confuser_wealth_holdings_vs_custody",
+      "category": "cross_agent_confuser",
+      "persona": "rm_jane",
+      "query": "I want wealth portfolio holdings, not custody-location records, for Whitman.",
       "expected_goal": "meridian.wealth.holdings"
     },
+    {
+      "id": "confuser_custody_vs_wealth_holdings",
+      "category": "cross_agent_confuser",
+      "persona": "ops_analyst_singh",
+      "query": "I want custody-location positions, not wealth portfolio allocation, for REL-00188.",
+      "expected_goal": "meridian.servicing.custody_positions"
+    },
+    {
+      "id": "confuser_policy_details_vs_renewal",
+      "category": "cross_agent_confuser",
+      "persona": "uw_sam",
+      "query": "Show policy terms and limits, not renewal risk, for POL-77001.",
+      "expected_goal": "meridian.insurance.policy_details"
+    },
+    {
+      "id": "confuser_renewal_vs_performance",
+      "category": "cross_agent_confuser",
+      "persona": "uw_sam",
+      "query": "I need insurance renewal risk, not investment performance.",
+      "expected_goal": "meridian.insurance.renewal_risk"
+    },
+
     {
       "id": "out_of_scope_001",
       "category": "out_of_scope",
@@ -285,30 +516,6 @@
       "persona": "uw_sam",
       "query": "Translate this sentence into French: good morning.",
       "expected_goal": "abstain"
-    },
-    {
-      "id": "held_out_001",
-      "category": "held_out",
-      "persona": "rm_jane",
-      "query": "Which holdings in the Calderon Trust portfolio are contributing most to single-issuer risk?",
-      "expected_goal": "meridian.wealth.concentration",
-      "note": "T1.6 held-out paraphrase — NOT used as a skill example. Different client (Calderon Trust) and different wording ('contributing most to single-issuer risk') than any concentration example added in Part C, proving generalization rather than overfitting."
-    },
-    {
-      "id": "held_out_002",
-      "category": "held_out",
-      "persona": "rm_jane",
-      "query": "Is the Calderon Trust allocation too bold given what the client can stomach?",
-      "expected_goal": "meridian.wealth.risk_profile",
-      "note": "T1.6 held-out paraphrase — NOT used as a skill example. 'too bold' / 'can stomach' is deliberately unlike the 'too aggressive' / 'risk appetite' phrasing added to risk_profile in Part C, proving generalization."
-    },
-    {
-      "id": "held_out_003",
-      "category": "held_out",
-      "persona": "ops_analyst_singh",
-      "query": "Are there any trades sitting unsettled in the Calderon Trust custody account?",
-      "expected_goal": "meridian.servicing.settlement_status",
-      "note": "T1.6 held-out paraphrase — NOT used as a skill example. Confirms settlement_status still recalls correctly after Part C removed its domain-blending example, on a client name never used in its examples."
     }
   ]
 }

@@ -179,6 +179,32 @@ def score_row(item: dict[str, Any], response: dict[str, Any], dag_goals: set[str
     }
 
 
+def _canonical_poaching(rows: list[dict[str, Any]], tolerance: int) -> tuple[bool, dict[tuple[str, str], list[dict[str, Any]]]]:
+    """Detect agent-neighbor poaching over canonical intent queries.
+
+    A canonical query belongs to its labeled expected agent. If some other selected
+    agent wins that query, the winner is poaching the expected agent's own intent.
+    The returned mapping is keyed as (poacher, victim), matching the operator-facing
+    collision notation: `poacher -> victim`.
+    """
+    collisions: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        if row.get("category") != "canonical":
+            continue
+        expected = row.get("expected_goal")
+        picked = row.get("picked_goal")
+        if not expected or expected == "abstain" or not picked or picked == "abstain":
+            continue
+        if picked != expected:
+            collisions[(picked, expected)].append(row)
+
+    over_tolerance = {
+        pair: hits for pair, hits in collisions.items()
+        if len(hits) > tolerance
+    }
+    return not over_tolerance, over_tolerance
+
+
 def summarize(rows: list[dict[str, Any]], thresholds: dict[str, float]) -> int:
     # held_out = T1.6 paraphrases NOT used as any skill example (see labeled_queries.json notes);
     # included in the "clear" tally so a passing gate reflects genuine generalization, not just
@@ -205,13 +231,23 @@ def summarize(rows: list[dict[str, Any]], thresholds: dict[str, float]) -> int:
     dom_n = len(domain_rows)
     dom_acc = dom_hits / dom_n if dom_n else 0.0
 
-    print("\nGoal-pick measurement (T1.6 — per-shape, honest)")
+    print("\nRouting measurement gate (fleet coverage + poaching detection)")
     print(f"Queries: {len(rows)}")
     print(f"1. Flat top-agent accuracy      : {flat_acc:6.1%} ({flat_hits}/{flat_n})")
     print(f"2. Analytics goal accuracy      : {an_acc:6.1%} ({an_hits}/{an_n})")
     print(f"3. Out-of-scope abstain rate    : {ab_acc:6.1%} ({ab_hits}/{ab_n})")
     print(f"Overall exact-agent accuracy (flat+analytics combined): {clear_acc:6.1%} ({clear_hits}/{clear_n})")
     print(f"Overall DOMAIN-level accuracy (right domain, agent may differ): {dom_acc:6.1%} ({dom_hits}/{dom_n})")
+    print()
+
+    by_domain: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in domain_rows:
+        by_domain[row.get("expected_domain") or "unknown"].append(row)
+    print("Domain accuracy")
+    for domain in sorted(by_domain):
+        group = by_domain[domain]
+        hits = sum(1 for r in group if r["domain_correct"])
+        print(f"{domain:22} {hits / len(group):6.1%} ({hits}/{len(group)})")
     print()
 
     by_category: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -236,14 +272,29 @@ def summarize(rows: list[dict[str, Any]], thresholds: dict[str, float]) -> int:
             print(f"- {r['id']} [{r['shape']}]: expected={r['expected_goal']} picked={r['picked_goal']}{dom_flag} "
                   f"top_score={r['top_score']} selected=[{selected}]")
 
-    flat_floor = thresholds.get("flat_accuracy", thresholds.get("clear_goal_accuracy", 0.9))
-    analytics_floor = thresholds.get("analytics_accuracy", thresholds.get("clear_goal_accuracy", 0.9))
-    abstain_floor = thresholds.get("abstain_rate", 0.9)
+    poaching_tolerance = int(thresholds.get("canonical_poaching_tolerance", 0))
+    no_poaching, collisions = _canonical_poaching(rows, poaching_tolerance)
+    print("\nCanonical-intent poaching")
+    if collisions:
+        for (poacher, victim), hits in sorted(collisions.items()):
+            ids = ", ".join(r["id"] for r in hits)
+            print(f"- {poacher} -> {victim}: {len(hits)} queries ({ids})")
+            for r in hits:
+                print(f"  * {r['id']}: {r['query']!r}")
+    else:
+        print(f"none (tolerance={poaching_tolerance})")
+
     domain_floor = thresholds.get("domain_accuracy", 0.9)
-    ok = (flat_acc >= flat_floor and an_acc >= analytics_floor and ab_acc >= abstain_floor
-          and dom_acc >= domain_floor)
+    abstain_floor = thresholds.get("abstain_rate", 0.9)
+    ok = (dom_acc >= domain_floor and ab_acc >= abstain_floor and no_poaching)
     if not ok:
         print("\nFAIL: decision gate not met")
+        if dom_acc < domain_floor:
+            print(f"- domain accuracy {dom_acc:6.1%} below floor {domain_floor:6.1%}")
+        if ab_acc < abstain_floor:
+            print(f"- abstain rate {ab_acc:6.1%} below floor {abstain_floor:6.1%}")
+        if not no_poaching:
+            print("- canonical-intent poaching above tolerance")
         return 1
     print("\nPASS: decision gate met")
     return 0

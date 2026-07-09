@@ -165,6 +165,7 @@ Say you're adding **Lending**.
 ```bash
 python3 -m pytest tests/schema
 bash ../scripts/world-b-check.sh     # must stay CRITICAL 0 — proves no domain logic leaked into the gateway
+bash ../scripts/routing-measurement-gate.sh  # must pass before shipping new/changed agent routing examples
 bash ../scripts/verify.sh
 ```
 
