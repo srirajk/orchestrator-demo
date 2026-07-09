@@ -2,14 +2,11 @@
 
 > **Audience.** A domain team — wealth, servicing, insurance, HR, risk, anyone — that wants the
 > Conduit gateway to *find* your agent, *route* the right questions to it, *compose* it into
-> multi-step plans, and *govern* who may reach it. You will do all of this by writing **manifest
-> JSON and standing up a service.** You will not open, read, or change a single line of gateway
-> Java. That is not a convenience. It is the architecture, and this handbook exists to make you
-> fluent in it.
->
-> **Status.** This is the authoritative onboarding guide. It supersedes the earlier quick guide
-> (`docs/ONBOARDING-AN-AGENT.md`), which remains a one-page cheat sheet. Where the two disagree,
-> this document wins.
+> multi-step plans, and *govern* who may reach it. The point of the platform is this: **you
+> describe your agent, and the platform finds it, routes to it, composes it into plans, and governs
+> who may reach it — you don't build any of that plumbing yourself.** You supply a description of
+> your agent and a running service; everything else is done for you. This handbook exists to make
+> you fluent in that.
 >
 > **How to read it.** Sections 1–3 are the mental model and the manifest contract — read them
 > once, top to bottom. Sections 4 and 5 are the two chapters that decide whether your agent
@@ -49,39 +46,39 @@ domain, that relationships have IDs shaped like `REL-…`, that a portfolio can 
 or that CSDR penalties exist. It knows how to read manifests, introspect services, embed sentences,
 resolve a dependency graph, enforce three authorization gates, and stream an answer. Everything
 domain-specific — every entity type, every ID pattern, every user-facing phrase, every routing
-example — lives in **data you supply**: manifest JSON plus a service URL.
+example — lives in **data you supply**: a manifest plus a service URL.
 
-We call this invariant **World B**. In World A, onboarding a new domain means a gateway engineer
-edits Java: adds a `case "wealth":`, a regex for the ID format, a hardcoded prompt string. That is
-the world most "AI gateways" actually live in, and it does not scale past a demo — every new domain
-is a code change, a build, a deploy, a regression risk, and a bottleneck on one team. **In World B,
-a new agent — or an entire new business domain — ships as a manifest and a running service. The
-gateway binary does not change.**
+We call this invariant **World B**. In World A, onboarding a new domain means a platform engineer
+changes the gateway itself: a special case for "wealth", a regex for the ID format, a hardcoded
+prompt string. That is the world most "AI gateways" actually live in, and it does not scale past a
+demo — every new domain is a code change, a build, a deploy, a regression risk, and a bottleneck on
+one team. **In World B, a new agent — or an entire new business domain — ships as a manifest and a
+running service. The gateway itself does not change.**
 
 ### Why this matters to *you*, concretely
 
 - **You are not blocked on the gateway team.** You do not file a ticket asking them to "add support
   for servicing." You write a manifest, stand up your service, and the gateway picks you up at boot.
-- **Your onboarding is reviewable as data.** A manifest is a diffable JSON file. A reviewer reads it
-  and knows exactly what you declared — what you route on, what you consume, what you produce, what
-  classification your data carries. There is no hidden behavior buried in gateway code.
+- **Your onboarding is reviewable as data.** A manifest is a diffable, reviewable file. A reviewer
+  reads it and knows exactly what you declared — what you route on, what you consume, what you
+  produce, what classification your data carries. There is no hidden behavior buried in the platform.
 - **The blast radius of your change is your manifest.** You cannot break another team's agent by
   onboarding yours, because you did not touch shared code. The worst you can do is fail your own
   boot validation — loudly, at startup, before any user sees it.
 
 ### The invariant is enforced, not aspirational
 
-This is not a style guideline you can quietly violate. On every build, `scripts/world-b-check.sh`
-greps `gateway/src/main/java` for domain coupling — domain names, client names, entity-type
-literals, ID patterns like `REL-`/`POL-`, user-facing domain copy — and reports a **CRITICAL**
-count. That count must be **0**. If a gateway change to accommodate your agent would raise it above
-zero, the change is wrong by construction: whatever you were about to hardcode belongs in *your
-manifest*, not in the engine.
+This is not a style guideline you can quietly violate. On every build, an automated check
+(`scripts/world-b-check.sh`) scans the gateway source for domain coupling — domain names, client
+names, entity-type literals, ID patterns like `REL-`/`POL-`, user-facing domain copy — and reports a
+**CRITICAL** count. That count must be **0**. If a platform change to accommodate your agent would
+raise it above zero, the change is wrong by construction: whatever you were about to hardcode belongs
+in *your manifest*, not in the platform.
 
 The practical test, stated as a rule you can apply while typing: **if you find yourself wanting a
-gateway code change to onboard your agent, that is a bug in the manifest model — raise it, do not
+change to the platform to onboard your agent, that is a bug in the manifest model — raise it, do not
 work around it.** In the entire life of this platform so far, three live domains and sixteen agents
-were onboarded with zero gateway edits. Yours should be no different.
+were onboarded with zero changes to the gateway. Yours should be no different.
 
 ---
 
@@ -128,7 +125,7 @@ Two things are worth internalizing from that picture:
 2. **Your agent is a stranger the gateway learns by reading and asking.** It reads your manifest
    (what you *declare*) and it introspects your service (what you *are*). It never assumes.
 
-### Prerequisites — what you need before you write a line of JSON
+### Prerequisites — what you need before you write your manifest
 
 - **A reachable service**, either:
   - **HTTP** with an OpenAPI (Swagger) document the gateway can fetch, or
@@ -148,7 +145,8 @@ Two things are worth internalizing from that picture:
 
 ## 3. Anatomy of an agent manifest
 
-One agent = one JSON file, at `registry/manifests/<domain>/<agent_id>.json`, validated against
+Your agent is described by a **manifest** — a JSON document you write. One agent = one JSON file, at
+`registry/manifests/<domain>/<agent_id>.json`, validated against
 `registry/agent-manifest.schema.json`. Below is every field, what it means, and — the part that
 matters — *why it exists*. Throughout, keep one distinction in mind:
 
@@ -172,7 +170,7 @@ matters — *why it exists*. Throughout, keep one distinction in mind:
 
 | Field | Meaning | Why it exists |
 |---|---|---|
-| `domain` | The business domain, e.g. `wealth-management`. **Not** an enum in the schema. | World B: the gateway validates this against the *loaded domain manifests* at boot, not against a hardcoded list. A new domain is a new manifest, not a new enum value in Java. |
+| `domain` | The business domain, e.g. `wealth-management`. **Not** an enum in the schema. | World B: the gateway validates this against the *loaded domain manifests* at boot, not against a hardcoded list. A new domain is a new manifest, not a value hardcoded into the platform. |
 | `sub_domain` | The sub-domain within it, e.g. `private-banking`, `custody-operations`. | Resolves to a loaded sub-domain manifest, which is where entity types and coverage-service URLs live. This is how your agent inherits its domain's vocabulary without *containing* it. |
 | `audience` | `segment` or `enterprise`. | `segment` = gated by business-segment membership + per-segment classification (the normal case for client data). `enterprise` = any authenticated user, segment gate skipped (e.g. an HR policy Q&A agent). This single word decides whether the structural gate (§7) applies. |
 
@@ -180,7 +178,7 @@ matters — *why it exists*. Throughout, keep one distinction in mind:
 
 | Field | Meaning | Why it exists |
 |---|---|---|
-| `protocol` | `http`, `mcp`, or `a2a`. | Selects which in-JVM `ProtocolAdapter` invokes you. New protocols are added behind that interface, not by branching request-path code. |
+| `protocol` | `http`, `mcp`, or `a2a`. | Selects which `ProtocolAdapter` invokes you. New protocols are added behind that interface, not by branching the request path. |
 | `connection` | The *only* "how to call me" information. HTTP: `{ openapi_url, operation_id }`. MCP: `{ server_url, tool, transport? }`. A2A: `{ agent_card_url }`. | Notice what is **absent**: your input and output data shapes. Those are *derived* by introspection (§6). The connection tells the gateway where to knock; the service tells it what it looks like. |
 | `capabilities` | `{ streaming: bool, … }`. | Declares transport-level features. Additive; unknown keys allowed. |
 
@@ -218,9 +216,9 @@ them with the seriousness of production code, because that is what they are.
 
 ### 4.1 How examples literally become the routing
 
-At boot, the gateway takes every string in every `skills[].examples` array and embeds it with an
-in-JVM MiniLM model (`all-MiniLM-L6-v2`, 384-dimensional, via DJL behind `EmbeddingClient`) into a
-vector index (Redis, HNSW). At request time it embeds the user's question the same way and finds the
+At boot, the gateway takes every string in every `skills[].examples` array and embeds it with a
+MiniLM model (`all-MiniLM-L6-v2`, 384-dimensional, behind `EmbeddingClient`) into a vector index
+(Redis, HNSW). At request time it embeds the user's question the same way and finds the
 nearest example vectors by cosine similarity. The agent whose examples sit *closest in meaning* to
 the question wins the route.
 
@@ -288,7 +286,7 @@ question that mentioned settlements at all. The result was a textbook collision:
 fund" — squarely `settlement_risk`'s intent — was landing on the per-trade penalty mapper, because
 `trade_penalty` had planted flags all over the shared "settlement" region of meaning-space.
 
-The fix was **not** to add more examples or to touch gateway code. It was to **narrow
+The fix was **not** to add more examples or to touch the platform. It was to **narrow
 `trade_penalty` to its true intent.** Its real, distinct job is *"itemize per-failed-trade rows"* —
 one penalty calculation per failed trade — and nothing else. The examples were rewritten to describe
 exactly that and only that:
@@ -704,15 +702,15 @@ guarantees their consumers can be validated.
 
 Every request passes **three independent gates.** They are independent on purpose — defense in depth,
 where each gate answers a different question and no single one is load-bearing alone. You configure all
-three as *data*; none of them lives in gateway code.
+three as *data*; none of them lives in the platform.
 
 ### Gate 1 — Structural (Cerbos): *can this segment reach this domain at all?*
 
 A Cerbos PDP answers the coarse question: does this principal's business segment have any business
 touching this domain? The mapping from segment → domain lives in the Cerbos policy
-(`infra/cerbos/policies/…`) — config, not gateway Java. If your new domain needs a new segment→domain
-mapping, you add it to the policy. **Why a separate structural gate:** it is the cheap, coarse "are you
-even in the right building" check, evaluated before any data is touched.
+(`infra/cerbos/policies/…`) — config, not a platform change. If your new domain needs a new
+segment→domain mapping, you add it to the policy. **Why a separate structural gate:** it is the
+cheap, coarse "are you even in the right building" check, evaluated before any data is touched.
 
 `audience: "enterprise"` agents skip this gate — they are open to any authenticated user (e.g. HR
 policy Q&A). `audience: "segment"` agents are subject to it. That one manifest word decides it.
@@ -790,8 +788,8 @@ it *stays* correct and doesn't harm the system.
 
 - [ ] **Schema valid** — manifest passes `agent-manifest.schema.json`.
 - [ ] **World-B clean** — `scripts/world-b-check.sh` reports **CRITICAL 0**. (You added no domain
-      knowledge to the gateway. If onboarding you required a gateway edit, stop — it belongs in your
-      manifest.)
+      knowledge to the gateway. If onboarding you required a change to the gateway itself, stop — it
+      belongs in your manifest.)
 - [ ] **Boots green** — `N loaded, 0 failed`, your `agent_id` present, and `select validation … 0
       UNVALIDATED`.
 - [ ] **Routes correctly** — a question phrased like your intent reaches your agent; a neighbor's
@@ -940,7 +938,8 @@ Why: `from: "wealth.holdings"` makes the resolver pull in the holdings agent aut
 wrote "call holdings first." The `select` is the declared translator, projecting exactly the fields the
 concentration compute needs, boot-validated against holdings' real output schema. The examples were
 specifically tuned (the last three) to out-score a servicing confuser on the "which positions are
-creating issuer concentration" query — a real routing-hardening fix, done in *manifest data*, not code.
+creating issuer concentration" query — a real routing-hardening fix, done in *manifest data* rather
+than the platform.
 
 ### 11.3 A conditional node — `meridian.wealth.concentration_review`
 
@@ -1034,9 +1033,9 @@ Each of these is a real way onboarding goes wrong. Learn them as a list of "not 
 - **An agent that trusts the caller.** No JWT verification, or a fail-open fallback on verification
   error. Fails security review. Fix: verify the forwarded JWT — signature, issuer, audience, expiry —
   and **fail closed** (§7).
-- **Reaching for a gateway code change to onboard.** If onboarding your agent seems to *need* a Java
-  edit, that is a bug in the manifest model, not a task for you. Raise it; do not hardcode around it
-  (§1).
+- **Reaching for a platform change to onboard.** If onboarding your agent seems to *need* a change to
+  the gateway itself, that is a bug in the manifest model, not a task for you. Raise it; do not
+  hardcode around it (§1).
 
 ---
 
@@ -1075,6 +1074,7 @@ Validate against `registry/agent-manifest.schema.json`. **Required top-level:** 
 
 ---
 
-*Extending Conduit is a config exercise, by design. Two documents to keep close: the World-B
-invariants (`.claude/rules/world-b.md`) and this handbook. If you ever find yourself needing a gateway
-code change to onboard an agent, that is not your task — it is a bug in the manifest model. Raise it.*
+*Extending Conduit is a description exercise, by design. You describe your agent; the platform finds
+it, routes to it, composes it, and governs it. If you ever find yourself needing a change to the
+gateway itself to onboard an agent, that is not your task — it is a bug in the manifest model. Raise
+it.*
