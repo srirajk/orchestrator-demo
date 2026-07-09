@@ -25,10 +25,10 @@ client = TestClient(app)
 
 
 class TestDiscover:
-    def test_rm_jane_sees_her_two_relationships(self):
+    def test_rm_jane_sees_her_relationships(self):
         results = discover("rm_jane")
         ids = {r["id"] for r in results}
-        assert ids == {"REL-00042", "REL-00099"}
+        assert ids == {"REL-00042", "REL-00099", "REL-00333"}
 
     def test_rm_ken_sees_okafor(self):
         results = discover("rm_ken")
@@ -46,7 +46,7 @@ class TestDiscover:
     def test_admin_sees_all(self):
         results = discover("admin")
         ids = {r["id"] for r in results}
-        assert {"REL-00042", "REL-00099", "REL-00188"}.issubset(ids)
+        assert {"REL-00042", "REL-00099", "REL-00188", "REL-00333"}.issubset(ids)
 
 
 class TestCheck:
@@ -111,7 +111,7 @@ class TestDiscoverEndpoint:
         assert resp.status_code == 200
         data = resp.json()
         ids = {r["id"] for r in data}
-        assert ids == {"REL-00042", "REL-00099"}
+        assert ids == {"REL-00042", "REL-00099", "REL-00333"}
         # Verify shape
         for r in data:
             assert "id" in r

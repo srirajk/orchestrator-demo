@@ -23,6 +23,15 @@ RELATIONSHIPS: dict[str, dict] = {
         "owning_rm": "rm_jane",
         "aliases": ["calderon", "calderon trust", "the calderon trust", "calderon account"],
     },
+    "REL-00333": {
+        "id": "REL-00333",
+        "label": "Rivera Diversified Trust",
+        "canonical_name": "Rivera Diversified Trust",
+        "sub_domain": "private-banking",
+        "owning_rm": "rm_jane",
+        "aliases": ["rivera", "rivera diversified", "rivera diversified trust",
+                    "the rivera relationship", "rivera account", "diversified trust"],
+    },
     "REL-00188": {
         "id": "REL-00188",
         "label": "Okafor Family Trust",
@@ -47,7 +56,7 @@ RELATIONSHIPS: dict[str, dict] = {
 # The coverage service is the SOLE source of principal→entities. Whatever a
 # principal's book returns here IS the ground truth for entitlement CHECK.
 BOOKS: dict[str, set[str]] = {
-    "rm_jane":   {"REL-00042", "REL-00099"},
+    "rm_jane":   {"REL-00042", "REL-00099", "REL-00333"},
     # rm_carlos owns his own distinct client (Sterling). Whitman/Calderon/Okafor are
     # NOT in his book → denied, proving book-of-business isolation between RMs.
     "rm_carlos": {"REL-00201"},

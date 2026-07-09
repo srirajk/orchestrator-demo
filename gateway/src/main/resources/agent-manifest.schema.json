@@ -183,6 +183,11 @@
               }
             }
           }
+        },
+        "condition": {
+          "type": "string",
+          "minLength": 1,
+          "description": "OPTIONAL node-level JMESPath expression over this node's merged, bound input. It must evaluate to boolean; true dispatches the node, false cleanly skips it as not applicable."
         }
       }
     }

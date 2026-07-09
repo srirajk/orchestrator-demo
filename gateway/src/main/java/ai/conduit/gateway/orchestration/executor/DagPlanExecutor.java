@@ -1,10 +1,16 @@
 package ai.conduit.gateway.orchestration.executor;
 
 import ai.conduit.gateway.orchestration.harness.AgentHarness;
+import ai.conduit.gateway.infrastructure.telemetry.TraceEvent;
+import ai.conduit.gateway.infrastructure.telemetry.TraceEventPublisher;
+import ai.conduit.gateway.infrastructure.telemetry.event.NodeConditionData;
 import ai.conduit.gateway.orchestration.model.NodeResult;
 import ai.conduit.gateway.orchestration.model.Plan;
 import ai.conduit.gateway.orchestration.model.PlanNode;
 import com.fasterxml.jackson.databind.JsonNode;
+import io.burt.jmespath.JmesPath;
+import io.burt.jmespath.jackson.JacksonRuntime;
+import org.springframework.beans.factory.annotation.Autowired;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.opentelemetry.api.trace.Span;
@@ -49,10 +55,12 @@ import java.util.concurrent.TimeUnit;
 public class DagPlanExecutor {
 
     private static final Logger log = LoggerFactory.getLogger(DagPlanExecutor.class);
+    private static final JmesPath<JsonNode> JMES_PATH = new JacksonRuntime();
 
     private final AgentHarness harness;
     private final Tracer tracer;
     private final MeterRegistry meterRegistry;
+    private final TraceEventPublisher tracePublisher;
     private final long overallDeadlineMs;
 
     public DagPlanExecutor(
@@ -60,9 +68,20 @@ public class DagPlanExecutor {
             Tracer tracer,
             MeterRegistry meterRegistry,
             @Value("${conduit.orchestration.fan-out-deadline-ms:60000}") long overallDeadlineMs) {
+        this(harness, tracer, meterRegistry, null, overallDeadlineMs);
+    }
+
+    @Autowired
+    public DagPlanExecutor(
+            AgentHarness harness,
+            Tracer tracer,
+            MeterRegistry meterRegistry,
+            TraceEventPublisher tracePublisher,
+            @Value("${conduit.orchestration.fan-out-deadline-ms:60000}") long overallDeadlineMs) {
         this.harness = harness;
         this.tracer = tracer;
         this.meterRegistry = meterRegistry;
+        this.tracePublisher = tracePublisher;
         this.overallDeadlineMs = overallDeadlineMs;
     }
 
@@ -75,6 +94,11 @@ public class DagPlanExecutor {
      * @return one {@link NodeResult} per plan node, in plan (topological) order
      */
     public List<NodeResult> execute(Plan plan, Blackboard blackboard) {
+        return execute(plan, blackboard, null, null);
+    }
+
+    public List<NodeResult> execute(Plan plan, Blackboard blackboard,
+                                    String requestId, String conversationId) {
         if (plan == null || plan.nodes() == null || plan.nodes().isEmpty()) {
             log.warn("DagPlanExecutor received an empty plan");
             return List.of();
@@ -102,6 +126,7 @@ public class DagPlanExecutor {
             while (results.size() < allNodes.size()) {
                 List<PlanNode> ready = new ArrayList<>();
                 List<PlanNode> unmet = new ArrayList<>();
+                List<PlanNode> cleanSkipped = new ArrayList<>();
 
                 for (PlanNode node : allNodes) {
                     if (results.containsKey(node.nodeId())) continue;   // already terminal
@@ -109,8 +134,17 @@ public class DagPlanExecutor {
                     switch (state) {
                         case READY -> ready.add(node);
                         case BLOCKED -> unmet.add(node);
+                        case CLEAN_SKIPPED -> cleanSkipped.add(node);
                         case WAITING -> { /* a dep is still pending — a later layer */ }
                     }
+                }
+
+                // Clean condition-false skips propagate as "not applicable", not as failures.
+                for (PlanNode node : cleanSkipped) {
+                    log.info("Node {} (agent={}) SKIPPED — an upstream condition-false node was not applicable",
+                            node.nodeId(), node.agent().agentId());
+                    results.put(node.nodeId(), cleanSkipResult(node,
+                            "Skipped: an upstream condition evaluated false"));
                 }
 
                 // Skip nodes whose dependency failed — harvest, never abort the plan.
@@ -123,7 +157,7 @@ public class DagPlanExecutor {
                 if (ready.isEmpty()) {
                     // No runnable node this pass. If nothing was skipped either, the remaining nodes
                     // are wedged (should not happen for a valid DAG) — mark them unmet and stop.
-                    if (unmet.isEmpty()) {
+                    if (unmet.isEmpty() && cleanSkipped.isEmpty()) {
                         for (PlanNode node : allNodes) {
                             results.computeIfAbsent(node.nodeId(), k -> unmetResult(node));
                         }
@@ -132,7 +166,8 @@ public class DagPlanExecutor {
                     continue;   // skips may have unblocked/blocked more — re-classify
                 }
 
-                runLayer(ready, blackboard, results, exec, parentContext, deadline);
+                runLayer(ready, blackboard, results, exec, parentContext, deadline,
+                        requestId, conversationId);
             }
         } finally {
             exec.close();
@@ -145,19 +180,23 @@ public class DagPlanExecutor {
         return allNodes.stream().map(n -> results.get(n.nodeId())).toList();
     }
 
-    private enum DepState { READY, WAITING, BLOCKED }
+    private enum DepState { READY, WAITING, BLOCKED, CLEAN_SKIPPED }
 
-    /** READY = all deps done+ok; BLOCKED = some dep is terminal-but-not-ok; WAITING = a dep still pending. */
+    /** READY = all deps done+ok; CLEAN_SKIPPED = not applicable; BLOCKED = failed dep; WAITING = pending dep. */
     private DepState classifyDeps(PlanNode node, Map<String, NodeResult> results) {
+        boolean sawCleanSkip = false;
         boolean allOk = true;
         for (String dep : node.dependsOn()) {
             NodeResult r = results.get(dep);
             if (r == null) {
                 allOk = false;            // still pending → keep for a later pass
+            } else if (r.isCleanSkip()) {
+                sawCleanSkip = true;
             } else if (!r.isOk()) {
                 return DepState.BLOCKED;   // a dependency failed/skipped → this node is unmet
             }
         }
+        if (sawCleanSkip) return DepState.CLEAN_SKIPPED;
         return allOk ? DepState.READY : DepState.WAITING;
     }
 
@@ -176,17 +215,26 @@ public class DagPlanExecutor {
                           Map<String, NodeResult> results,
                           ExecutorService exec,
                           Context parentContext,
-                          long deadline) {
+                          long deadline,
+                          String requestId,
+                          String conversationId) {
 
         // Bind + gate on the caller thread (deterministic) before releasing the layer.
         List<PlanNode> bound = new ArrayList<>();
         for (PlanNode n : ready) {
             JsonNode input = blackboard.bind(n);
-            PlanNode candidate = new PlanNode(n.nodeId(), n.agent(), input, n.dependsOn());
+            PlanNode candidate = new PlanNode(n.nodeId(), n.agent(), input, n.dependsOn(), n.condition());
             String reason = blackboard.checkComposable(candidate, input);
             if (reason != null) {
                 log.warn("Node {} (agent={}) NOT dispatched — {}", n.nodeId(), n.agent().agentId(), reason);
                 results.put(n.nodeId(), composeFailure(n, reason));
+                continue;
+            }
+            // T4-REVERIFY: condition input must remain the post-coverage-filter bound input once
+            // per-producer coverage filtering lands, so predicates cannot observe uncovered data.
+            NodeResult conditionResult = evaluateCondition(candidate, input, requestId, conversationId);
+            if (conditionResult != null) {
+                results.put(n.nodeId(), conditionResult);
                 continue;
             }
             bound.add(candidate);
@@ -246,6 +294,47 @@ public class DagPlanExecutor {
         return new NodeResult(node.nodeId(), node.agent().agentId(), node.agent().protocol(),
                 NodeResult.Status.FAILED, null, 0,
                 "Skipped: an upstream dependency did not complete successfully");
+    }
+
+    private NodeResult cleanSkipResult(PlanNode node, String reason) {
+        return new NodeResult(node.nodeId(), node.agent().agentId(), node.agent().protocol(),
+                NodeResult.Status.SKIPPED_CONDITION_FALSE, null, 0, reason);
+    }
+
+    private NodeResult conditionErrorResult(PlanNode node, String reason) {
+        return new NodeResult(node.nodeId(), node.agent().agentId(), node.agent().protocol(),
+                NodeResult.Status.CONDITION_ERROR, null, 0, reason);
+    }
+
+    private NodeResult evaluateCondition(PlanNode node, JsonNode input,
+                                         String requestId, String conversationId) {
+        if (!node.hasCondition()) return null;
+        String expression = node.condition();
+        try {
+            JsonNode result = JMES_PATH.compile(expression).search(input);
+            if (result == null || !result.isBoolean()) {
+                String reason = "condition did not evaluate to boolean";
+                publishCondition(node, expression, "error", reason, requestId, conversationId);
+                return conditionErrorResult(node, reason);
+            }
+            boolean verdict = result.asBoolean();
+            publishCondition(node, expression, verdict ? "true" : "false", null, requestId, conversationId);
+            if (!verdict) {
+                return cleanSkipResult(node, "Skipped: condition evaluated false");
+            }
+            return null;
+        } catch (Exception e) {
+            String reason = "condition evaluation failed: " + e.getMessage();
+            publishCondition(node, expression, "error", reason, requestId, conversationId);
+            return conditionErrorResult(node, reason);
+        }
+    }
+
+    private void publishCondition(PlanNode node, String expression, String verdict, String reason,
+                                  String requestId, String conversationId) {
+        if (tracePublisher == null || requestId == null || conversationId == null) return;
+        tracePublisher.publish(TraceEvent.of("node_condition", requestId, conversationId,
+                new NodeConditionData(node.nodeId(), node.agent().agentId(), expression, verdict, reason)));
     }
 
     /**

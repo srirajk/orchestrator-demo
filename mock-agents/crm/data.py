@@ -11,6 +11,12 @@ RELATIONSHIPS = {
         "aliases": ["calderon", "calderon trust"],
         "type": "relationship"
     },
+    "REL-00333": {
+        "entity_id": "REL-00333",
+        "name": "Rivera Diversified Trust",
+        "aliases": ["rivera", "rivera diversified", "rivera diversified trust", "diversified trust"],
+        "type": "relationship"
+    },
     "REL-00188": {
         "entity_id": "REL-00188",
         "name": "Okafor Capital",
@@ -26,7 +32,7 @@ RELATIONSHIPS = {
 }
 
 BOOKS = {
-    "rm_jane": ["REL-00042", "REL-00099"],
+    "rm_jane": ["REL-00042", "REL-00099", "REL-00333"],
     "rm_carlos": ["REL-00042", "REL-00188"],
     "rm_guest": [],
 }

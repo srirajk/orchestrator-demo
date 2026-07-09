@@ -799,11 +799,13 @@ public class ChatService {
             results.forEach(r -> {
                 String prev = r.isOk() && r.data() != null
                         ? r.data().toString().substring(0, Math.min(80, r.data().toString().length())) : r.status().name();
+                String status = r.isOk() ? "ok" : (r.isCleanSkip() ? "skipped" : "failed");
                 tracePublisher.publish(TraceEvent.of("agent_complete", requestId, conversationId,
-                        new AgentCompleteData(r.agentId(), r.latencyMs(), r.isOk() ? "ok" : "failed", prev)));
+                        new AgentCompleteData(r.agentId(), r.latencyMs(), status, prev)));
             });
 
             long okCount = results.stream().filter(NodeResult::isOk).count();
+            long failureCount = results.stream().filter(NodeResult::isFailure).count();
             log.info("Fan-out complete {}/{} ok", okCount, results.size());
 
             tracePublisher.publish(TraceEvent.of("synthesis_start", requestId, conversationId,
@@ -814,7 +816,7 @@ public class ChatService {
             // never cancels the fan-out (hard-rule d) — we harvest survivors and answer from what
             // came back. Count that partial-answer case so the Platform board can show a
             // degradation rate. Domain-agnostic: a pure count, no agent/domain identity.
-            if (okCount > 0 && okCount < results.size()) {
+            if (okCount > 0 && failureCount > 0) {
                 emitRequestPartial();
             }
 
@@ -927,7 +929,26 @@ public class ChatService {
         log.info("DAG firing: goal={} nodes={} available={}", goalId,
                 plan.nodes().stream().map(PlanNode::nodeId).collect(Collectors.toList()), availableEntities);
         emitDagPlan(goal.domain(), goalId, plan.nodes().size());
-        return Optional.of(dagExecutor.execute(plan, blackboard));
+        List<NodeResult> results = dagExecutor.execute(plan, blackboard, requestId, conversationId);
+        tracePublisher.publish(TraceEvent.of("plan_graph", requestId, conversationId,
+                new PlanGraphData(plan.nodes().stream()
+                        .map(n -> new PlanGraphData.Node(n.nodeId(), n.agent().agentId(),
+                                n.agent().protocol(), n.dependsOn(), statusForPlan(n, results)))
+                        .collect(Collectors.toList()))));
+        return Optional.of(results);
+    }
+
+    private String statusForPlan(PlanNode node, List<NodeResult> results) {
+        return results.stream()
+                .filter(r -> r.nodeId().equals(node.nodeId()))
+                .findFirst()
+                .map(r -> switch (r.status()) {
+                    case OK -> "ok";
+                    case SKIPPED_CONDITION_FALSE -> "skipped_condition_false";
+                    case CONDITION_ERROR -> "condition_error";
+                    default -> r.status().name().toLowerCase();
+                })
+                .orElse("unknown");
     }
 
     private String resolutionFallbackReason(DagResolution resolution) {

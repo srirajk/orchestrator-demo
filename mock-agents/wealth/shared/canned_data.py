@@ -40,6 +40,31 @@ HOLDINGS: dict = {
         "currency": "USD",
         "as_of_date": "2026-06-22",
     },
+    "REL-00333": {
+        "relationship_id": "REL-00333",
+        "relationship_name": "Rivera Diversified Trust",
+        "positions": [
+            {"ticker": "AAPL", "isin": "US0378331005", "qty": 80, "value": 100000},
+            {"ticker": "MSFT", "isin": "US5949181045", "qty": 70, "value": 100000},
+            {"ticker": "GOOGL", "isin": "US02079K3059", "qty": 50, "value": 100000},
+            {"ticker": "JPM", "isin": "US46625H1005", "qty": 100, "value": 100000},
+            {"ticker": "BRK.B", "isin": "US0846707026", "qty": 200, "value": 100000},
+            {"ticker": "V", "isin": "US92826C8394", "qty": 150, "value": 100000},
+            {"ticker": "JNJ", "isin": "US4781601046", "qty": 120, "value": 100000},
+            {"ticker": "PG", "isin": "US7427181091", "qty": 110, "value": 100000},
+            {"ticker": "T-BILL-2026", "isin": "US912796YS72", "qty": 1, "value": 100000},
+            {"ticker": "CASH", "isin": "CASH", "qty": 1, "value": 100000},
+        ],
+        "allocation_by_class": [
+            {"asset_class": "Equity", "pct": 40},
+            {"asset_class": "Fixed Income", "pct": 30},
+            {"asset_class": "Alternatives", "pct": 20},
+            {"asset_class": "Cash", "pct": 10},
+        ],
+        "total_value": 1000000,
+        "currency": "USD",
+        "as_of_date": "2026-06-22",
+    },
     "REL-00188": {
         "relationship_id": "REL-00188",
         "relationship_name": "Okafor Family Account",
@@ -93,6 +118,17 @@ PERFORMANCE: dict = {
         "alpha": -1.1,
         "volatility_pct": 6.2,
         "sharpe_ratio": 1.47,
+        "as_of_date": "2026-06-22",
+    },
+    "REL-00333": {
+        "relationship_id": "REL-00333",
+        "period": "YTD",
+        "total_return_pct": 7.2,
+        "pnl": 72000,
+        "benchmark_return_pct": 10.2,
+        "alpha": -3.0,
+        "volatility_pct": 5.1,
+        "sharpe_ratio": 1.22,
         "as_of_date": "2026-06-22",
     },
     "REL-00188": {
@@ -162,6 +198,22 @@ GOAL_PLANNING: dict = {
         "overall_on_track": True,
         "summary": "Estate preservation goal is on track.",
     },
+    "REL-00333": {
+        "relationship_id": "REL-00333",
+        "goals": [
+            {
+                "goal_id": "G-333",
+                "name": "Balanced Income",
+                "target_amount": 1200000,
+                "current_amount": 1000000,
+                "target_date": "2031-12-31",
+                "on_track": True,
+                "progress_pct": 83.3,
+            },
+        ],
+        "overall_on_track": True,
+        "summary": "Balanced income goal is on track.",
+    },
     "REL-00188": {
         "relationship_id": "REL-00188",
         "goals": [
@@ -222,6 +274,15 @@ RISK_PROFILE: dict = {
         "concentration_flags": [],
         "review_due_date": "2026-11-30",
         "last_reviewed": "2025-11-30",
+    },
+    "REL-00333": {
+        "relationship_id": "REL-00333",
+        "risk_tolerance": "Conservative",
+        "risk_score": 4,
+        "max_drawdown_tolerance_pct": 10,
+        "concentration_flags": [],
+        "review_due_date": "2026-12-31",
+        "last_reviewed": "2026-01-15",
     },
     "REL-00188": {
         "relationship_id": "REL-00188",

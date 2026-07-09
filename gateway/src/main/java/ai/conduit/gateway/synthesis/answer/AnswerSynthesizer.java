@@ -121,7 +121,9 @@ public class AnswerSynthesizer {
                 + "it yourself — state that a consolidated roll-up view is needed and report each entity's "
                 + "own figures individually instead. "
                 + "If an agent's data is missing, explicitly name that agent and state its data was "
-                + "unavailable — never omit the gap silently. "
+                + "unavailable — never omit the gap silently. If a section is marked NOT APPLICABLE, "
+                + "treat it as an honest condition-false branch, not missing data; do not say its "
+                + "data was unavailable. "
                 + "If a WITHHELD section is present, state plainly and briefly that that domain's data was "
                 + "NOT included because it is outside the user's access — fulfill the part you can and never "
                 + "drop the withheld part silently. "
@@ -268,6 +270,10 @@ public class AnswerSynthesizer {
                 sb.append(mapper.writerWithDefaultPrettyPrinter()
                         .writeValueAsString(r.data()));
                 sb.append("\n--- END DATA ---\n\n");
+            } else if (r.isCleanSkip()) {
+                sb.append("--- NOT APPLICABLE: ").append(r.agentId())
+                  .append(" (").append(r.protocol()).append(")")
+                  .append(" --- condition evaluated false; do not report this as missing data ---\n\n");
             } else {
                 sb.append("--- MISSING: ").append(r.agentId())
                   .append(" (").append(r.protocol()).append(")")

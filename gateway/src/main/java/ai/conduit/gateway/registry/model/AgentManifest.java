@@ -108,7 +108,16 @@ public record AgentManifest(
      * symbols matched by equality; none are interpreted by the gateway.
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Io(List<Consume> consumes, List<Produce> produces) {}
+    public record Io(List<Consume> consumes, List<Produce> produces, String condition) {
+        /** Backward-compatible constructor (pre-{@code condition} arity). */
+        public Io(List<Consume> consumes, List<Produce> produces) {
+            this(consumes, produces, null);
+        }
+
+        public boolean hasCondition() {
+            return condition != null && !condition.isBlank();
+        }
+    }
 
     /**
      * One consumed input. Exactly one of {@code entity} / {@code from} is set (schema {@code oneOf}):

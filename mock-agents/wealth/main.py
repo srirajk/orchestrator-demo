@@ -28,6 +28,7 @@ from performance.handler import router as performance_router
 from goal_planning.handler import router as goal_planning_router
 from risk_profile.handler import router as risk_profile_router
 from concentration.handler import router as concentration_router
+from concentration_review.handler import router as concentration_review_router
 
 log = logging.getLogger(__name__)
 
@@ -75,6 +76,7 @@ app.include_router(performance_router)
 app.include_router(goal_planning_router)
 app.include_router(risk_profile_router)
 app.include_router(concentration_router)
+app.include_router(concentration_review_router)
 
 
 @app.get("/health", tags=["infra"], summary="Health check")
@@ -83,5 +85,5 @@ def health():
         "status": "ok",
         "service": "wealth-http",
         "version": "0.3.0",
-        "agents": ["holdings", "performance", "risk_profile", "goal_planning", "concentration"],
+        "agents": ["holdings", "performance", "risk_profile", "goal_planning", "concentration", "concentration_review"],
     }

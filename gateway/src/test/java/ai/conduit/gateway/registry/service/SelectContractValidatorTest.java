@@ -110,6 +110,70 @@ class SelectContractValidatorTest {
         assertThat(summary.unvalidated()).isEqualTo(1);
     }
 
+    @Test
+    @DisplayName("condition validates as boolean over the merged consumer input")
+    void acceptsBooleanCondition() {
+        AgentManifest producer = manifest(
+                "agent.producer",
+                io(List.of(), List.of(produce("producer_output", "type.produced"))),
+                null,
+                outputSchema());
+        AgentManifest consumer = manifest(
+                "agent.consumer",
+                io(List.of(from("type.produced", "{required_input: present_field}")), List.of(),
+                        "required_input == 'x'"),
+                inputSchemaRequiring("required_input"),
+                null);
+
+        SelectContractValidator.Summary summary =
+                validator.validateOne(consumer, List.of(producer, consumer));
+
+        assertThat(summary.validated()).isEqualTo(1);
+        assertThat(summary.unvalidated()).isZero();
+    }
+
+    @Test
+    @DisplayName("BOOT-REJECT: condition referencing absent field is rejected with precise details")
+    void rejectsConditionReferencingAbsentField() {
+        AgentManifest producer = manifest(
+                "agent.producer",
+                io(List.of(), List.of(produce("producer_output", "type.produced"))),
+                null,
+                outputSchema());
+        AgentManifest consumer = manifest(
+                "agent.consumer",
+                io(List.of(from("type.produced", "{required_input: present_field}")), List.of(),
+                        "absent_input > `0`"),
+                inputSchemaRequiring("required_input"),
+                null);
+
+        assertThatThrownBy(() -> validator.validateOne(consumer, List.of(producer, consumer)))
+                .isInstanceOf(SelectContractValidator.ConditionValidationException.class)
+                .hasMessageContaining("agentId=agent.consumer")
+                .hasMessageContaining("condition=absent_input > `0`")
+                .hasMessageContaining("absent_input");
+    }
+
+    @Test
+    @DisplayName("BOOT-REJECT: condition must evaluate to boolean")
+    void rejectsNonBooleanCondition() {
+        AgentManifest producer = manifest(
+                "agent.producer",
+                io(List.of(), List.of(produce("producer_output", "type.produced"))),
+                null,
+                outputSchema());
+        AgentManifest consumer = manifest(
+                "agent.consumer",
+                io(List.of(from("type.produced", "{required_input: present_field}")), List.of(),
+                        "required_input"),
+                inputSchemaRequiring("required_input"),
+                null);
+
+        assertThatThrownBy(() -> validator.validateOne(consumer, List.of(producer, consumer)))
+                .isInstanceOf(SelectContractValidator.ConditionValidationException.class)
+                .hasMessageContaining("expression must evaluate to boolean");
+    }
+
     private static AgentManifest manifest(String id, AgentManifest.Io io, JsonNode inputSchema, JsonNode outputSchema) {
         return new AgentManifest(
                 id, id, "description", "1.0.0", new AgentManifest.Provider("org", null),
@@ -128,6 +192,12 @@ class SelectContractValidatorTest {
     private static AgentManifest.Io io(List<AgentManifest.Consume> consumes,
                                        List<AgentManifest.Produce> produces) {
         return new AgentManifest.Io(consumes, produces);
+    }
+
+    private static AgentManifest.Io io(List<AgentManifest.Consume> consumes,
+                                       List<AgentManifest.Produce> produces,
+                                       String condition) {
+        return new AgentManifest.Io(consumes, produces, condition);
     }
 
     private static AgentManifest.Consume from(String type, String select) {

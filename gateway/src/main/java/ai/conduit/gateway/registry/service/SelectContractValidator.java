@@ -13,7 +13,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Boot-time validation for manifest-declared edge projections.
@@ -27,6 +31,9 @@ public class SelectContractValidator {
 
     private static final Logger log = LoggerFactory.getLogger(SelectContractValidator.class);
     private static final JmesPath<JsonNode> JMES_PATH = new JacksonRuntime();
+    private static final Pattern PATH_TOKEN =
+            Pattern.compile("\\b[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*\\b");
+    private static final Set<String> KEYWORDS = Set.of("true", "false", "null", "and", "or", "not");
 
     private final ObjectMapper mapper;
 
@@ -73,8 +80,19 @@ public class SelectContractValidator {
             projections.add(new EdgeProjection(consume, producerNameFor(producer, consume.from()), projected));
         }
 
+        JsonNode merged = !projections.isEmpty()
+                ? composeLikeBlackboard(projections)
+                : sampleFromSchema(consumer.inputSchema());
+
+        if (hasCondition(consumer)) {
+            if (unvalidated > 0) {
+                throw new ConditionValidationException(consumer.agentId(), consumer.io().condition(),
+                        "could not derive all producer output schemas");
+            }
+            validateCondition(consumer, merged);
+        }
+
         if (!projections.isEmpty() && unvalidated == 0) {
-            JsonNode merged = composeLikeBlackboard(projections);
             List<String> missing = InputContractValidator.missingFields(consumer.inputSchema(), merged);
             if (!missing.isEmpty()) {
                 EdgeProjection edge = attributeMissing(missing.get(0), projections);
@@ -85,6 +103,65 @@ public class SelectContractValidator {
         }
 
         return new Summary(validated, unvalidated);
+    }
+
+    private boolean hasCondition(AgentManifest manifest) {
+        AgentManifest.Io io = manifest == null ? null : manifest.io();
+        return io != null && io.hasCondition();
+    }
+
+    private void validateCondition(AgentManifest consumer, JsonNode mergedInput) {
+        String expression = consumer.io().condition();
+        for (String path : referencedPaths(expression)) {
+            if (!pathExists(mergedInput, path)) {
+                throw new ConditionValidationException(consumer.agentId(), expression,
+                        "references absent field '" + path + "'");
+            }
+        }
+        JsonNode result;
+        try {
+            result = JMES_PATH.compile(expression).search(mergedInput);
+        } catch (Exception e) {
+            throw new ConditionValidationException(consumer.agentId(), expression,
+                    "invalid expression: " + e.getMessage());
+        }
+        if (result == null || !result.isBoolean()) {
+            throw new ConditionValidationException(consumer.agentId(), expression,
+                    "expression must evaluate to boolean");
+        }
+    }
+
+    private Set<String> referencedPaths(String expression) {
+        if (expression == null || expression.isBlank()) return Set.of();
+        String scrubbed = expression
+                .replaceAll("`[^`]*`", " ")
+                .replaceAll("'[^']*'", " ")
+                .replaceAll("\"[^\"]*\"", " ");
+        Matcher matcher = PATH_TOKEN.matcher(scrubbed);
+        Set<String> paths = new LinkedHashSet<>();
+        while (matcher.find()) {
+            String token = matcher.group();
+            if (KEYWORDS.contains(token)) continue;
+            int next = matcher.end();
+            while (next < scrubbed.length() && Character.isWhitespace(scrubbed.charAt(next))) next++;
+            if (next < scrubbed.length() && scrubbed.charAt(next) == '(') continue;
+            paths.add(token);
+        }
+        return paths;
+    }
+
+    private boolean pathExists(JsonNode root, String path) {
+        if (root == null || path == null || path.isBlank()) return false;
+        JsonNode current = root;
+        for (String rawSegment : path.split("\\.")) {
+            String segment = rawSegment;
+            int arrayStart = segment.indexOf('[');
+            if (arrayStart >= 0) segment = segment.substring(0, arrayStart);
+            if (segment.isBlank()) continue;
+            if (!current.isObject() || !current.has(segment)) return false;
+            current = current.get(segment);
+        }
+        return true;
     }
 
     private JsonNode composeLikeBlackboard(List<EdgeProjection> projections) {
@@ -212,6 +289,14 @@ public class SelectContractValidator {
                     + " from=" + from
                     + " select=" + select
                     + " missing=" + missing);
+        }
+    }
+
+    public static final class ConditionValidationException extends RuntimeException {
+        public ConditionValidationException(String agentId, String condition, String reason) {
+            super("condition validation failed: agentId=" + agentId
+                    + " condition=" + condition
+                    + " reason=" + reason);
         }
     }
 }

@@ -30,12 +30,26 @@ public record NodeResult(
         /** Agent did not respond within its SLA timeout. */
         TIMEOUT,
         /** Circuit breaker is open — the agent is currently excluded from calls. */
-        BREAKER_OPEN
+        BREAKER_OPEN,
+        /** Declared node condition evaluated false; node was not applicable, not failed. */
+        SKIPPED_CONDITION_FALSE,
+        /** Declared node condition failed at runtime; visible failure. */
+        CONDITION_ERROR
     }
 
     /** Convenience: true when the call completed successfully with data. */
     @JsonIgnore
     public boolean isOk() {
         return status == Status.OK;
+    }
+
+    @JsonIgnore
+    public boolean isCleanSkip() {
+        return status == Status.SKIPPED_CONDITION_FALSE;
+    }
+
+    @JsonIgnore
+    public boolean isFailure() {
+        return !isOk() && !isCleanSkip();
     }
 }
