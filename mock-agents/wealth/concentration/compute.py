@@ -79,6 +79,34 @@ def _pct(fraction: float) -> float:
     return round(fraction * 100.0, 4)
 
 
+def _is_cash_position(name: str, position: dict[str, Any]) -> bool:
+    candidates = [
+        name,
+        position.get("ticker"),
+        position.get("isin"),
+        position.get("asset_class"),
+        position.get("security"),
+    ]
+    return any(str(v).strip().lower() == "cash" for v in candidates if v is not None)
+
+
+def _cash_allocation_pct(payload: dict[str, Any]) -> Optional[float]:
+    alloc = payload.get("allocation_by_class")
+    if not isinstance(alloc, list):
+        return None
+    for item in alloc:
+        if not isinstance(item, dict):
+            continue
+        label = item.get("asset_class") or item.get("class")
+        if str(label).strip().lower() != "cash":
+            continue
+        pct = item.get("pct")
+        if isinstance(pct, bool) or not isinstance(pct, (int, float)) or not math.isfinite(pct):
+            return None
+        return _pct(float(pct) / 100.0 if pct > 1 else float(pct))
+    return None
+
+
 def compute_concentration(
     payload: dict[str, Any],
     thresholds: Optional[dict[str, float]] = None,
@@ -115,6 +143,7 @@ def compute_concentration(
 
     # Extract (name, value) pairs; value must be a non-negative number.
     parsed: list[tuple[str, float]] = []
+    excluded_cash_value = 0.0
     for p in positions:
         if not isinstance(p, dict):
             raise ConcentrationInputError("each position must be a JSON object")
@@ -131,15 +160,23 @@ def compute_concentration(
             raise ConcentrationInputError(
                 f"position {_name_of(p)!r} has a negative 'value'"
             )
-        parsed.append((_name_of(p), float(val)))
+        name = _name_of(p)
+        if _is_cash_position(name, p):
+            excluded_cash_value += float(val)
+            continue
+        parsed.append((name, float(val)))
 
     basis_total = sum(v for _, v in parsed)
     if basis_total <= 0:
         raise ConcentrationInputError(
-            "sum of position values is zero — cannot compute weights"
+            "sum of non-cash position values is zero — cannot compute weights"
         )
 
-    # --- Per-position weights (denominator = invested base = sum of positions) ---
+    reported_total_value = payload.get("total_value")
+    cash_alloc_pct = _cash_allocation_pct(payload)
+    basis_label = "invested holdings (ex-cash)"
+
+    # --- Per-position weights (denominator = invested holdings ex-cash) ---
     weighted = [
         {"name": name, "value": value, "weight": value / basis_total}
         for name, value in parsed
@@ -175,7 +212,8 @@ def compute_concentration(
                     "breached": True,
                     "policy": "firm-configured",
                     "message": (
-                        f"{r['name']} is {_pct(r['weight'])}% of the portfolio, "
+                        f"{r['name']} is {_pct(r['weight'])}% of invested holdings "
+                        f"(ex-cash), "
                         f"above the firm-configured single-name limit of "
                         f"{_pct(sn_threshold)}% (firm policy, not a regulatory standard)."
                     ),
@@ -183,6 +221,26 @@ def compute_concentration(
             )
 
     notes: list[str] = []
+    notes.append(
+        "Single-name weights, HHI, and single-name breach flags use the invested "
+        "holdings ex-cash basis because this holdings payload does not carry a "
+        "reliable separate cash balance for a cash-inclusive portfolio denominator."
+    )
+    if reported_total_value is not None:
+        notes.append(
+            f"Reported total_value is {reported_total_value}; single-name basis_total_value "
+            f"is {round(basis_total, 2)} ({basis_label})."
+        )
+    if cash_alloc_pct is not None:
+        notes.append(
+            f"Holdings allocation reports {cash_alloc_pct}% cash, but no separate cash "
+            "balance is available for cash-inclusive single-name weighting."
+        )
+    if excluded_cash_value > 0:
+        notes.append(
+            f"Excluded {round(excluded_cash_value, 2)} cash-like position value from "
+            "single-name concentration weights."
+        )
 
     # --- Asset-class concentration: only from allocation_by_class (positions carry
     #     no per-position asset_class in the real holdings shape). ---
@@ -267,7 +325,8 @@ def compute_concentration(
         "currency": payload.get("currency"),
         "position_count": len(parsed),
         "basis_total_value": round(basis_total, 2),
-        "reported_total_value": payload.get("total_value"),
+        "basis_label": basis_label,
+        "reported_total_value": reported_total_value,
         "policy": {
             "source": "firm-configured",
             "single_name_threshold_pct": _pct(sn_threshold),
@@ -276,6 +335,7 @@ def compute_concentration(
             "note": POLICY_NOTE,
         },
         "single_name": {
+            "basis": basis_label,
             "top": {
                 "entity": top["name"],
                 "value": top["value"],

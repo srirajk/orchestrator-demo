@@ -89,6 +89,15 @@ def test_insurance_renewal_multistep(sam_session):
         f"Answer contains no loss-ratio percentage figure: {turn.answer_text!r}"
     )
     lower = turn.answer_text.lower()
+    assert "claims-based" in lower, (
+        f"Answer did not qualify the loss ratio as claims-based: {turn.answer_text!r}"
+    )
+    assert "earned-premium" in lower or "earned premium" in lower, (
+        f"Answer did not include the premium-basis disclosure: {turn.answer_text!r}"
+    )
+    assert "loss-only" in lower and "full claimed value" in lower, (
+        f"Answer did not include the loss-only/full-claimed-value disclosure: {turn.answer_text!r}"
+    )
     assert "not in your coverage" not in lower and "denied" not in lower, (
         f"uw_sam was unexpectedly denied his own policy's renewal analysis: {turn.answer_text!r}"
     )

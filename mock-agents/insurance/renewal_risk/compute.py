@@ -47,6 +47,11 @@ POLICY_NOTE = (
     "the target is carrier-specific (1 - expense - profit - LAE loads)."
 )
 
+LOSS_RATIO_QUALIFIER = (
+    "Claims-based loss ratio: full-claimed-value incurred losses divided by the "
+    "policy premium basis described in the disclosure notes."
+)
+
 LAE_NOTE = (
     "Loss ratio is LOSS-ONLY: the claim record carries a single 'amount' field "
     "with no paid/reserved/LAE breakout, so loss adjustment expense (LAE) is not "
@@ -59,16 +64,17 @@ PREMIUM_NOTE = (
 )
 
 COMBINED_RATIO_OMITTED_NOTE = (
-    "Combined ratio omitted — no expense-ratio (or expense dollar) figure is "
+    "Combined ratio omitted - no expense-ratio (or expense dollar) figure is "
     "present anywhere in the policy or claim record, so loss ratio + expense "
     "ratio cannot be computed without fabricating a number."
 )
 
 STATUS_NOTE = (
-    "Incurred losses sum claim amounts at FULL claimed value. Denied / withdrawn / "
-    "rejected / closed-without-payment claims are EXCLUDED from the numerator; all "
-    "other claims (including reserved / under-review) ARE counted at full claimed "
-    "amount, which may overstate ultimate incurred losses versus paid+reserved figures."
+    "Incurred losses sum claim amounts at FULL claimed value. Non-incurred claim "
+    "statuses such as withdrawn / rejected / closed-without-payment are EXCLUDED "
+    "from the numerator; all other claims (including reserved / under-review) ARE "
+    "counted at full claimed amount, which may overstate ultimate incurred losses "
+    "versus paid+reserved figures."
 )
 
 # S2 (Opus review): claim statuses that do NOT contribute to incurred losses.
@@ -244,7 +250,7 @@ def compute_renewal_risk(
         "breached": flagged,
         "policy": "firm-configured",
         "message": (
-            f"Loss ratio is {_pct(loss_ratio)}%, "
+            f"Claims-based loss ratio is {_pct(loss_ratio)}%, "
             + (
                 f"above the firm-configured renewal target of {_pct(target_loss_ratio)}% "
                 f"(firm policy, not an industry-standard cutoff)."
@@ -255,7 +261,7 @@ def compute_renewal_risk(
         ),
     }
 
-    notes = [PREMIUM_NOTE, LAE_NOTE, STATUS_NOTE, COMBINED_RATIO_OMITTED_NOTE]
+    notes = [LOSS_RATIO_QUALIFIER, PREMIUM_NOTE, LAE_NOTE, STATUS_NOTE, COMBINED_RATIO_OMITTED_NOTE]
     if not claims:
         notes.append("No open claims returned for this policy — incurred losses are $0.")
     if excluded_claim_ids:
@@ -281,6 +287,7 @@ def compute_renewal_risk(
         "claims": claim_lines,
         "incurred_losses": round(incurred_losses, 2),
         "loss_ratio_pct": _pct(loss_ratio),
+        "loss_ratio_label": "claims-based loss ratio",
         "expense_ratio_pct": expense_ratio,
         "combined_ratio_pct": combined_ratio,
         "policy": {
@@ -292,4 +299,5 @@ def compute_renewal_risk(
         "flag": flag,
         "breach_count": 1 if flagged else 0,
         "notes": notes,
+        "client_disclosure": " ".join(notes),
     }

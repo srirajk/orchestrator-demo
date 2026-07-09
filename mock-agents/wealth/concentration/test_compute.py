@@ -46,6 +46,9 @@ def test_weights_sum_to_one():
     # ranked weights are rounded to 6dp for display; sum is ~1.0 within rounding.
     total = sum(r["weight"] for r in a["single_name"]["ranked"])
     assert math.isclose(total, 1.0, abs_tol=1e-5)
+    assert a["basis_label"] == "invested holdings (ex-cash)"
+    assert a["single_name"]["basis"] == "invested holdings (ex-cash)"
+    assert any("ex-cash" in n.lower() for n in a["notes"])
 
 
 def test_top_single_name_correct():
@@ -95,6 +98,26 @@ def test_breach_flag_over_and_under_threshold():
     for f in a["flags"]:
         assert f["policy"] == "firm-configured"
         assert math.isclose(f["threshold_pct"], 10.0, abs_tol=1e-6)
+        if f["type"] == "single_name":
+            assert "invested holdings (ex-cash)" in f["message"]
+
+
+def test_cash_position_excluded_from_single_name_basis():
+    payload = {
+        "relationship_id": "REL-CASH",
+        "positions": [
+            {"ticker": "BIG", "value": 50},
+            {"ticker": "CASH", "isin": "CASH", "value": 50},
+        ],
+        "total_value": 100,
+        "allocation_by_class": [{"asset_class": "Cash", "pct": 50}],
+    }
+    a = compute_concentration(payload, DEFAULT_THRESHOLDS)
+    assert a["basis_total_value"] == 50
+    assert a["single_name"]["top"]["entity"] == "BIG"
+    assert a["single_name"]["top"]["weight_pct"] == 100.0
+    assert all(r["name"] != "CASH" for r in a["single_name"]["ranked"])
+    assert any("excluded 50.0 cash-like" in n.lower() for n in a["notes"])
 
 
 def test_asset_class_concentration_from_allocation():

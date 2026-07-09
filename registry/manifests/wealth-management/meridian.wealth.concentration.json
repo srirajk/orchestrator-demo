@@ -69,6 +69,7 @@
       "currency": { "type": "string" },
       "position_count": { "type": "integer" },
       "basis_total_value": { "type": "number" },
+      "basis_label": { "type": "string" },
       "reported_total_value": { "type": "number" },
       "policy": {
         "type": "object",
@@ -115,7 +116,7 @@
         "name": "concentration",
         "type": "wealth.concentration",
         "figures": [
-          { "label": "Top single-name concentration", "path": "single_name.top.weight_pct", "format": "percent1" },
+          { "label": "Top single-name concentration of invested holdings ex-cash", "path": "single_name.top.weight_pct", "format": "percent1" },
           { "label": "Concentration breach count", "path": "breach_count", "format": "count" },
           { "label": "Diversification HHI", "path": "diversification.hhi", "format": "plain" },
           { "label": "Single-name threshold", "path": "policy.single_name_threshold_pct", "format": "percent1" }

@@ -127,7 +127,7 @@ def test_t5_grounded_figures_wealth_live(jane_session):
 
     figures = _grounded_figures(events, "meridian.wealth.concentration")
     labels = _figures_by_label(figures)
-    assert labels["Top single-name concentration"]["renderedValue"].endswith("%")
+    assert labels["Top single-name concentration of invested holdings ex-cash"]["renderedValue"].endswith("%")
     assert labels["Concentration breach count"]["renderedValue"].isdigit()
     assert "Diversification HHI" in labels
     assert "Single-name threshold" in labels
@@ -144,11 +144,16 @@ def test_t5_grounded_figures_insurance_live(sam_session):
 
     figures = _grounded_figures(events, "meridian.insurance.renewal_risk")
     labels = _figures_by_label(figures)
-    assert labels["Claims loss ratio"]["renderedValue"] == "494.8%"
+    assert labels["Claims-based loss ratio"]["renderedValue"] == "494.8%"
     assert labels["Firm renewal target"]["renderedValue"].endswith("%")
     assert labels["Incurred losses"]["renderedValue"].startswith("$")
     assert labels["Renewal breach count"]["renderedValue"].isdigit()
     _assert_answer_uses_figures(turn.answer_text, figures)
+    lower = turn.answer_text.lower()
+    assert "claims-based" in lower
+    assert "earned-premium" in lower or "earned premium" in lower
+    assert "loss-only" in lower
+    assert "full claimed value" in lower
 
 
 def test_t5_grounded_figures_servicing_live(admin_session):

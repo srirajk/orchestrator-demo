@@ -60,7 +60,10 @@
     "type": "object",
     "properties": {
       "loss_ratio_pct": { "type": "number" },
+      "loss_ratio_label": { "type": "string" },
       "incurred_losses": { "type": "number" },
+      "client_disclosure": { "type": "string" },
+      "notes": { "type": "array", "items": { "type": "string" } },
       "breach_count": { "type": "integer" },
       "policy": {
         "type": "object",
@@ -88,10 +91,11 @@
         "name": "renewal_analysis",
         "type": "insurance.renewal_analysis",
         "figures": [
-          { "label": "Claims loss ratio", "path": "loss_ratio_pct", "format": "percent1" },
+          { "label": "Claims-based loss ratio", "path": "loss_ratio_pct", "format": "percent1" },
           { "label": "Firm renewal target", "path": "policy.target_loss_ratio_pct", "format": "percent1" },
           { "label": "Incurred losses", "path": "incurred_losses", "format": "currency_usd" },
-          { "label": "Renewal breach count", "path": "breach_count", "format": "count" }
+          { "label": "Renewal breach count", "path": "breach_count", "format": "count" },
+          { "label": "Claims-based loss-ratio disclosure", "path": "client_disclosure", "format": "plain" }
         ]
       }
     ]

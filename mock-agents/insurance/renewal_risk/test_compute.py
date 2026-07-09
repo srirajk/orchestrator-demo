@@ -69,6 +69,8 @@ def test_loss_ratio_from_real_shapes_list_form():
     assert a["premium"] == 48500.0
     assert a["policy_id"] == "POL-77001"
     assert a["claim_count"] == 1
+    assert a["loss_ratio_label"] == "claims-based loss ratio"
+    assert "claims-based loss ratio" in a["client_disclosure"].lower()
 
 
 def test_loss_ratio_from_real_shapes_single_form():
@@ -85,6 +87,7 @@ def test_flag_breached_above_target():
     assert a["flag"]["breached"] is True
     assert a["breach_count"] == 1
     assert a["flag"]["policy"] == "firm-configured"
+    assert "Claims-based loss ratio" in a["flag"]["message"]
     assert "firm policy" in a["flag"]["message"]
     assert "industry-standard" in a["flag"]["message"] or "standard" in a["flag"]["message"]
 
@@ -131,6 +134,17 @@ def test_lae_note_present():
     payload = {"policy_record": POLICY_77001, "claim_status": CLAIM_STATUS_LIST_77001}
     a = compute_renewal_risk(payload, DEFAULT_TARGET)
     assert any("lae" in n.lower() for n in a["notes"])
+
+
+def test_client_disclosure_includes_premium_lae_and_status_notes():
+    payload = {"policy_record": POLICY_77001, "claim_status": CLAIM_STATUS_LIST_77001}
+    a = compute_renewal_risk(payload, DEFAULT_TARGET)
+    disclosure = a["client_disclosure"].lower()
+    assert "claims-based loss ratio" in disclosure
+    assert "earned-premium basis" in disclosure
+    assert "loss-only" in disclosure
+    assert "full claimed value" in disclosure
+    assert "combined ratio omitted" in disclosure
 
 
 def test_missing_policy_record_raises():
