@@ -16,9 +16,13 @@ real), and the LLM + agent-invoke spans carry good attributes. What's broken:
 so no `traceparent`/`baggage` is injected; the (correctly-instrumented) agents mint a **fresh, disconnected
 root trace** per call instead of nesting under the gateway trace. (The Cerbos/coverage calls use a different,
 instrumented client and DO show as spans — proving the mechanism works when the client is instrumented.)
-- Build the agent `RestTemplate` via `RestTemplateBuilder` / add the Micrometer `ObservationRestTemplateCustomizer`
-  (or a `ClientHttpRequestInterceptor` that injects the W3C `traceparent`+`baggage` via the OTel propagator),
-  so outbound HTTP agent calls carry the context. Do the MCP adapter path too if it makes outbound calls.
+- **Migrate the agent-calling client from `RestTemplate` to `RestClient`** (the modern synchronous client;
+  RestTemplate is in maintenance mode). Build it from the **Micrometer-instrumented `RestClient.Builder`**
+  (the auto-configured builder / `ObservationRegistry`), which **auto-injects W3C `traceparent`+`baggage`** —
+  so the fix is idiomatic, not a hand-rolled interceptor. **Use RestClient, NOT WebClient** — WebClient is
+  reactive (WebFlux); we are Spring MVC + virtual-threads-on, where synchronous blocking is cheap on VTs and
+  reactive semantics are exactly what we don't want. Rewrite `HttpAdapter`'s calls (getForObject/exchange) to
+  the RestClient fluent API. Do the MCP adapter outbound path too if it makes outbound HTTP calls.
 - **Virtual-thread caveat:** the agent call runs on the executor's virtual thread. The OTel `Context` (like the
   token) does NOT auto-cross VTs — ensure the captured `parentContext`/span is made current on the VT so the
   RestTemplate call injects the RIGHT trace context (the executors already capture `Context.current()`; make it
