@@ -3,7 +3,7 @@ import json
 import logging
 from typing import Any
 
-from shared.error_schema import mcp_error_json
+from shared.error_schema import AgentToolError
 from shared.fault_knobs import maybe_fault
 from shared.telemetry import agent_span
 from settlement_risk.compute import compute_settlement_risk, SettlementRiskInputError
@@ -35,12 +35,12 @@ def analyze_settlement_risk(
         except SettlementRiskInputError as exc:
             span.set_attribute("error", True)
             span.set_attribute("error.type", "invalid_settlement_risk_payload")
-            return mcp_error_json(str(exc), AGENT_ID, 422)
+            raise AgentToolError(str(exc), AGENT_ID, 422) from exc
         except Exception as exc:
             log.error("Settlement risk compute failed: %s", exc)
             span.set_attribute("error", True)
             span.set_attribute("error.type", type(exc).__name__)
-            return mcp_error_json(
+            raise AgentToolError(
                 f"Settlement risk analysis failed: {type(exc).__name__}",
                 AGENT_ID,
                 500,

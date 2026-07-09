@@ -5,7 +5,7 @@ import logging
 import asyncio
 from agents import Runner, function_tool, InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered
 from shared.canned_data import CORPORATE_ACTIONS
-from shared.error_schema import mcp_error_json
+from shared.error_schema import AgentToolError
 from shared.fault_knobs import maybe_fault
 from shared.telemetry import agent_span
 from shared.agent_client import make_agent, LLM_MODEL, LLM_TIMEOUT_S
@@ -62,7 +62,7 @@ async def get_corporate_actions(relationship_id: str) -> str:
         data = CORPORATE_ACTIONS.get(relationship_id)
         if data is None:
             span.set_attribute("error", True)
-            return mcp_error_json(f"Relationship '{relationship_id}' not found.", AGENT_ID, 404)
+            raise AgentToolError(f"Relationship '{relationship_id}' not found.", AGENT_ID, 404)
         actions = data.get("upcoming_actions", [])
         elections_due = sum(1 for a in actions if a.get("election_required"))
         span.set_attribute("result.action_count", len(actions))
@@ -73,4 +73,4 @@ async def get_corporate_actions(relationship_id: str) -> str:
             return json.dumps({**data, "agent_narrative": narrative})
         except Exception as exc:
             log.error("Agent LLM call failed for %s: %s", relationship_id, exc)
-            return mcp_error_json(f"llm_unavailable: {type(exc).__name__}", AGENT_ID, 503)
+            raise AgentToolError(f"llm_unavailable: {type(exc).__name__}", AGENT_ID, 503) from exc

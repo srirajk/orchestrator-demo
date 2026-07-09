@@ -5,7 +5,7 @@ import logging
 import asyncio
 from agents import Runner, function_tool, InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered
 from shared.canned_data import SETTLEMENTS
-from shared.error_schema import mcp_error_json
+from shared.error_schema import AgentToolError
 from shared.fault_knobs import maybe_fault
 from shared.telemetry import agent_span
 from shared.agent_client import make_agent, LLM_MODEL, LLM_TIMEOUT_S
@@ -62,7 +62,7 @@ async def get_settlements(relationship_id: str) -> str:
         data = SETTLEMENTS.get(relationship_id)
         if data is None:
             span.set_attribute("error", True)
-            return mcp_error_json(f"Relationship '{relationship_id}' not found.", AGENT_ID, 404)
+            raise AgentToolError(f"Relationship '{relationship_id}' not found.", AGENT_ID, 404)
         pending = len(data.get("pending", []))
         failed = len(data.get("failed", []))
         span.set_attribute("result.pending_count", pending)

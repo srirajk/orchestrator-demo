@@ -25,6 +25,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -309,9 +310,10 @@ public class McpAdapter implements ProtocolAdapter {
      * { "jsonrpc":"2.0", "id":"...", "result":{ "content":[{"type":"text","text":"{...}"}] } }
      * </pre>
      */
-    private JsonNode extractResult(String rawResponse) throws Exception {
+    JsonNode extractResult(String rawResponse) throws Exception {
         JsonNode root = objectMapper.readTree(rawResponse);
 
+        // (1) PROTOCOL error — the JSON-RPC "error" member. Malformed request, unknown tool, etc.
         JsonNode error = root.path("error");
         if (!error.isMissingNode()) {
             throw new RuntimeException("MCP JSON-RPC error: " + error.path("message").asText(rawResponse));
@@ -322,19 +324,42 @@ public class McpAdapter implements ProtocolAdapter {
             return root;
         }
 
+        // (2) TOOL EXECUTION error — a *successful* JSON-RPC response whose result carries
+        // isError=true. This is the only signal MCP gives for "the tool ran and failed"; there is
+        // no status code as there is over HTTP. Without this check, an agent reporting
+        // "llm_unavailable" is indistinguishable from one that answered: the call is counted OK,
+        // the request is recorded ANSWERED, and the error object is handed to the synthesizer as
+        // ground truth (hard rule c — agent outputs are the only ground truth). Throwing here
+        // makes the harness record a failed node, so okCount / no_data / PARTIAL tell the truth.
+        if (isToolError(result)) {
+            throw new RuntimeException("MCP tool error: "
+                    + firstContentText(result).orElseGet(result::toString));
+        }
+
+        return firstContentText(result)
+                .map(text -> {
+                    try {
+                        return objectMapper.readTree(text);
+                    } catch (Exception e) {
+                        return (JsonNode) objectMapper.createObjectNode().put("text", text);
+                    }
+                })
+                .orElse(result);
+    }
+
+    /** True when the tool ran and reported failure (MCP {@code CallToolResult.isError}). */
+    static boolean isToolError(JsonNode result) {
+        return result.path("isError").asBoolean(false);
+    }
+
+    /** The first {@code content[].text} of an MCP tool result, if present. */
+    static Optional<String> firstContentText(JsonNode result) {
         JsonNode content = result.path("content");
         if (content.isArray() && !content.isEmpty()) {
             String text = content.get(0).path("text").asText(null);
-            if (text != null) {
-                try {
-                    return objectMapper.readTree(text);
-                } catch (Exception e) {
-                    return objectMapper.createObjectNode().put("text", text);
-                }
-            }
+            if (text != null) return Optional.of(text);
         }
-
-        return result;
+        return Optional.empty();
     }
 
     private JsonNode withVerifiedSub(JsonNode data, String verifiedSub) {
