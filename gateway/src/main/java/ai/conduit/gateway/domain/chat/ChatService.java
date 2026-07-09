@@ -874,11 +874,28 @@ public class ChatService {
                 emitRequestPartial();
             }
 
+            // Total failure: agents were dispatched and NONE succeeded. The synthesizer still
+            // renders honest prose ("data unavailable") over the MISSING sections, and the stream
+            // has already begun, so the HTTP status cannot change. But the request must not be
+            // recorded as ANSWERED — otherwise metrics, the SLO board, eval and audit all report
+            // success for a request that returned zero data, and a load test that checks only the
+            // status code reports a false green. Note the guard on failureCount: a plan whose nodes
+            // were all CLEANLY SKIPPED (condition false) has okCount==0 too, and is not a failure.
+            boolean noAgentData = okCount == 0 && failureCount > 0;
+            if (noAgentData) {
+                emitRequestNoData();
+            }
+            if (rootSpan != null) {
+                rootSpan.setAttribute("conduit.agents.ok", okCount);
+                rootSpan.setAttribute("conduit.agents.failed", failureCount);
+                rootSpan.setAttribute("conduit.answer.degraded", failureCount > 0);
+            }
+
             long synthesisStart = System.nanoTime();
             String answer = answerSynthesizer.synthesize(results, latestPrompt, request.messages(), emitter, streamId, withheldDomains, requestStart);
             recordGatewayStage("synthesis", System.nanoTime() - synthesisStart);
             setTraceOutput(rootSpan, answer);
-            emitRequestOutcome("ANSWERED");
+            emitRequestOutcome(noAgentData ? "FAILED" : "ANSWERED");
             finalDomains.forEach(this::emitAssistantDomain);
 
             tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
@@ -1603,6 +1620,19 @@ public class ChatService {
     private void emitRequestPartial() {
         Counter.builder("conduit.request.partial")
                 .description("Requests answered from a partial fan-out (a dispatched agent failed)")
+                .register(meterRegistry)
+                .increment();
+    }
+
+    /**
+     * Counts requests where agents were dispatched and none succeeded. The user still receives
+     * honest prose stating the data was unavailable, but zero domain data was returned — so this
+     * must never be counted as an answered request. This is the metric an operator alerts on when
+     * an agent's circuit breaker opens under load.
+     */
+    private void emitRequestNoData() {
+        Counter.builder("conduit.request.no_data")
+                .description("Requests where every dispatched agent failed (no domain data returned)")
                 .register(meterRegistry)
                 .increment();
     }

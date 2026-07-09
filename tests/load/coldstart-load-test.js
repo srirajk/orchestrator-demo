@@ -22,6 +22,11 @@ const ttft       = new Trend('conduit_ttft_ms',     true);
 const streamTime = new Trend('conduit_stream_ms',   true);
 const errorRate  = new Rate('conduit_error_rate');
 const doneCount  = new Counter('conduit_done_count');
+// HTTP 200 is NOT success. Under load the gateway can stream a fluent "data unavailable"
+// answer with HTTP 200 when an agent's circuit breaker is open. Asserting only the status
+// code reports a false green. These two track whether the ANSWER actually carried the data.
+const degradedRate = new Rate('conduit_degraded_rate');
+const degradedCount = new Counter('conduit_degraded_count');
 
 const GATEWAY_URL = __ENV.GATEWAY_URL || 'http://gateway:8080';
 const AUTH_TOKEN   = __ENV.AUTH_TOKEN || '';
@@ -31,18 +36,26 @@ const DURATION     = __ENV.DURATION || '20s';
 
 // Verified single-agent (flat) prompts — each resolves to exactly one agent per the
 // demo query catalog (servicing.nav / servicing.corporate_actions / wealth.market_research).
+// Each prompt carries the domain data its answer MUST contain. `expect` is checked against the
+// assembled answer text; if it's absent the answer is degraded even when the status is 200.
 const FLAT_PROMPTS = [
-  "What's the latest NAV on fund FND-7781?",
-  'Any upcoming corporate actions — dividends or splits — for REL-00042?',
-  "What is Meridian's house view on equities this quarter?",
+  { text: "What's the latest NAV on fund FND-7781?",
+    expect: /128\.45/ },
+  { text: 'Any upcoming corporate actions — dividends or splits — for REL-00042?',
+    expect: /AAPL|CA-2245|dividend/i },
+  { text: "What is Meridian's house view on equities this quarter?",
+    expect: /equit|neutral|constructive/i },
 ];
 
 // Verified multi-agent fan-in (DAG-ish) prompts — settlement + custody fan-in,
 // and the concentration analytics query (smoke-tested separately).
 const DAG_PROMPTS = [
-  'Show me pending settlements and custody positions for REL-00042.',
-  'What is the concentration risk in the Whitman Family Office holdings?',
-  'Give me a full overview of the Whitman relationship REL-00042.',
+  { text: 'Show me pending settlements and custody positions for REL-00042.',
+    expect: /settle|custod/i },
+  { text: 'What is the concentration risk in the Whitman Family Office holdings?',
+    expect: /concentration|%|position/i },
+  { text: 'Give me a full overview of the Whitman relationship REL-00042.',
+    expect: /whitman|holding|portfolio/i },
 ];
 
 const PROMPTS = PATH_KIND === 'dag' ? DAG_PROMPTS : FLAT_PROMPTS;
@@ -56,10 +69,17 @@ export const options = {
       tags: { path_kind: PATH_KIND, vus: String(VUS) },
     },
   },
+  // A run that streams "data unavailable" at HTTP 200 must FAIL, not pass silently.
+  // DEGRADED_MAX can be raised deliberately when characterising a known-degraded build.
+  thresholds: {
+    conduit_error_rate:    [`rate<${__ENV.ERROR_MAX || '0.01'}`],
+    conduit_degraded_rate: [`rate<${__ENV.DEGRADED_MAX || '0.01'}`],
+  },
 };
 
 export default function () {
-  const prompt = PROMPTS[__VU % PROMPTS.length];
+  const spec = PROMPTS[__VU % PROMPTS.length];
+  const prompt = spec.text;
   const payload = JSON.stringify({
     model: 'conduit-assistant',
     stream: true,
@@ -86,9 +106,7 @@ export default function () {
     responseType: 'text',
   });
 
-  const ok = check(res, {
-    'HTTP 200': r => r.status === 200,
-  });
+  let answer = '';
 
   if (res.status === 200 && res.body) {
     const lines = res.body.split('\n');
@@ -103,13 +121,33 @@ export default function () {
       try {
         const chunk = JSON.parse(data);
         const content = chunk?.choices?.[0]?.delta?.content;
-        if (content && !firstTokenMs) {
-          firstTokenMs = Date.now() - startMs;
-          ttft.add(firstTokenMs);
+        if (content) {
+          answer += content;
+          if (!firstTokenMs) {
+            firstTokenMs = Date.now() - startMs;
+            ttft.add(firstTokenMs);
+          }
         }
       } catch (_) {}
     }
   }
+
+  // An answer is DEGRADED when the data the prompt asked for is absent, or when the gateway
+  // says the data could not be retrieved. Both arrive as HTTP 200 with a well-formed stream.
+  const saysUnavailable = /unavailable|not available|could not (be )?(retrieve|obtain)|no data/i.test(answer);
+  const hasExpectedData = spec.expect.test(answer);
+  const degraded = res.status === 200 && gotDone && (saysUnavailable || !hasExpectedData);
+
+  const ok = check(res, {
+    'HTTP 200': r => r.status === 200,
+    'answer carries the requested data': () => hasExpectedData && !saysUnavailable,
+  });
+
+  if (degraded) {
+    degradedCount.add(1);
+    console.warn(`DEGRADED [${prompt.slice(0, 40)}] -> ${answer.slice(0, 90)}`);
+  }
+  degradedRate.add(degraded);
 
   streamTime.add(Date.now() - startMs);
   errorRate.add(!(ok && gotDone));
