@@ -257,6 +257,25 @@ class SelectContractValidatorTest {
                 .hasMessageContaining("max_items must be positive");
     }
 
+    @Test
+    @DisplayName("BOOT-REJECT: figure path referencing absent producer field is rejected")
+    void rejectsBrokenFigurePathAgainstProducerOutputSchema() {
+        AgentManifest manifest = manifest(
+                "agent.producer",
+                io(List.of(), List.of(new AgentManifest.Produce(
+                        "producer_output",
+                        "type.produced",
+                        null,
+                        List.of(new AgentManifest.ProducedFigure("Declared figure", "absent_field", "plain"))))),
+                null,
+                outputSchema());
+
+        assertThatThrownBy(() -> validator.validateOne(manifest, List.of(manifest)))
+                .isInstanceOf(SelectContractValidator.ProducedFigureValidationException.class)
+                .hasMessageContaining("agentId=agent.producer")
+                .hasMessageContaining("label=Declared figure");
+    }
+
     private static AgentManifest manifest(String id, AgentManifest.Io io, JsonNode inputSchema, JsonNode outputSchema) {
         return new AgentManifest(
                 id, id, "description", "1.0.0", new AgentManifest.Provider("org", null),

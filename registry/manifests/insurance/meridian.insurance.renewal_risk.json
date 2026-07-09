@@ -56,6 +56,20 @@
     "data_classification": "confidential-pii",
     "sla_timeout_ms": 15000
   },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "loss_ratio_pct": { "type": "number" },
+      "incurred_losses": { "type": "number" },
+      "breach_count": { "type": "integer" },
+      "policy": {
+        "type": "object",
+        "properties": {
+          "target_loss_ratio_pct": { "type": "number" }
+        }
+      }
+    }
+  },
   "io": {
     "consumes": [
       {
@@ -70,7 +84,16 @@
       }
     ],
     "produces": [
-      { "name": "renewal_analysis", "type": "insurance.renewal_analysis" }
+      {
+        "name": "renewal_analysis",
+        "type": "insurance.renewal_analysis",
+        "figures": [
+          { "label": "Claims loss ratio", "path": "loss_ratio_pct", "format": "percent1" },
+          { "label": "Firm renewal target", "path": "policy.target_loss_ratio_pct", "format": "percent1" },
+          { "label": "Incurred losses", "path": "incurred_losses", "format": "currency_usd" },
+          { "label": "Renewal breach count", "path": "breach_count", "format": "count" }
+        ]
+      }
     ]
   }
 }

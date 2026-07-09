@@ -2,6 +2,7 @@ package ai.conduit.gateway.synthesis.answer;
 
 import ai.conduit.gateway.api.v1.chat.dto.Message;
 import ai.conduit.gateway.orchestration.model.NodeResult;
+import ai.conduit.gateway.registry.service.AgentRegistry;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -66,6 +67,9 @@ public class AnswerSynthesizer {
     private final int retryBackoffMultiplier;
     private final int requestTimeoutSeconds;
     private final int streamIdleTimeoutSeconds;
+    private final AgentRegistry registry;
+    private final GroundedFigureRenderer figureRenderer;
+    private final GroundedFigureValidator figureValidator;
 
     /**
      * Grounding/system prompt, built from a configurable display name. The DATA-block grounding
@@ -78,6 +82,9 @@ public class AnswerSynthesizer {
 
     public AnswerSynthesizer(
             ObjectMapper mapper,
+            AgentRegistry registry,
+            GroundedFigureRenderer figureRenderer,
+            GroundedFigureValidator figureValidator,
             Tracer tracer,
             MeterRegistry meterRegistry,
             @Value("${conduit.llm.synthesizer.base-url:https://api.z.ai/api/paas/v4}") String baseUrl,
@@ -95,6 +102,9 @@ public class AnswerSynthesizer {
             @Value("${conduit.llm.synthesizer.request-timeout-seconds:${conduit.llm.request-timeout-seconds:30}}") int requestTimeoutSeconds,
             @Value("${conduit.llm.synthesizer.stream-idle-timeout-seconds:30}") int streamIdleTimeoutSeconds) {
         this.mapper = mapper;
+        this.registry = registry;
+        this.figureRenderer = figureRenderer;
+        this.figureValidator = figureValidator;
         this.tracer = tracer;
         this.meterRegistry = meterRegistry;
         this.baseUrl = baseUrl;
@@ -197,7 +207,8 @@ public class AnswerSynthesizer {
                 emitter.send(SseEmitter.event().data(roleDelta(completionId, created, mapper)));
             } catch (Exception ignored) { /* client disconnected before synthesis */ }
 
-            String userContent = buildUserContent(results, withheldDomains);
+            List<GroundedFigure> groundedFigures = figureRenderer.render(results, registry::find);
+            String userContent = buildUserContent(results, withheldDomains, groundedFigures);
             String requestBody = buildRequestBody(userContent, originalPrompt, history);
 
             log.debug("AnswerSynthesizer: calling {} model={} agents={}",
@@ -206,7 +217,22 @@ public class AnswerSynthesizer {
             // Stream the LLM response; accumulate text for grounding check and span output.
             StringBuilder synthesizedText = new StringBuilder();
             long[] tokenCounts = new long[3]; // [prompt, completion, total]
-            streamFromLlm(requestBody, emitter, completionId, created, synthesizedText, showReasoning, tokenCounts, requestStartMillis);
+            if (groundedFigures.isEmpty()) {
+                streamFromLlm(requestBody, emitter, completionId, created, synthesizedText,
+                        showReasoning, tokenCounts, requestStartMillis);
+            } else {
+                String draft = collectFromLlm(requestBody, tokenCounts);
+                String finalText = ensureFiguresMentioned(substituteFigures(draft, groundedFigures), groundedFigures);
+                GroundedFigureValidator.ValidationResult validation =
+                        figureValidator.validate(finalText, groundedFigures);
+                if (!validation.ok()) {
+                    log.warn("Grounded figure validation failed; serving deterministic fallback: {}",
+                            validation.errors());
+                    finalText = deterministicFigureFallback(originalPrompt, groundedFigures);
+                }
+                synthesizedText.append(finalText);
+                emitter.send(SseEmitter.event().data(contentDelta(completionId, created, finalText, mapper)));
+            }
 
             // Set output and token count on span after streaming completes.
             String output = synthesizedText.toString();
@@ -261,7 +287,8 @@ public class AnswerSynthesizer {
 
     // ── Prompt builders ──────────────────────────────────────────────────────
 
-    private String buildUserContent(List<NodeResult> results, List<String> withheldDomains) throws Exception {
+    private String buildUserContent(List<NodeResult> results, List<String> withheldDomains,
+                                    List<GroundedFigure> groundedFigures) throws Exception {
         StringBuilder sb = new StringBuilder();
         for (NodeResult r : results) {
             if (r.isOk()) {
@@ -292,6 +319,21 @@ public class AnswerSynthesizer {
                   .append("access and was not retrieved. State plainly that ").append(d)
                   .append(" data was not included because it is outside the user's access. ---\n\n");
             }
+        }
+        if (groundedFigures != null && !groundedFigures.isEmpty()) {
+            sb.append("--- GROUNDED FIGURES ---\n")
+              .append("Use the placeholder exactly when mentioning a listed figure. ")
+              .append("Mention each listed figure once when it is part of the answer. ")
+              .append("Do not type the figure's digits yourself; the gateway will substitute values.\n");
+            for (GroundedFigure figure : groundedFigures) {
+                ObjectNode row = mapper.createObjectNode();
+                row.put("label", figure.label());
+                row.put("placeholder", figure.placeholder());
+                row.put("source_agent", figure.sourceAgent());
+                row.put("format", figure.format());
+                sb.append(mapper.writeValueAsString(row)).append('\n');
+            }
+            sb.append("--- END GROUNDED FIGURES ---\n\n");
         }
         return sb.toString();
     }
@@ -421,7 +463,129 @@ public class AnswerSynthesizer {
         }
     }
 
+    String substituteFigures(String text, List<GroundedFigure> figures) {
+        String out = text == null ? "" : text;
+        if (figures == null) return out;
+        for (GroundedFigure figure : figures) {
+            out = out.replace(figure.placeholder(), figure.renderedValue());
+            if (figure.placeholder().startsWith("{{") && figure.placeholder().endsWith("}}")) {
+                String token = figure.placeholder().substring(2, figure.placeholder().length() - 2);
+                out = out.replaceAll("\\{\\{\\s*" + Pattern.quote(token) + "\\s*}}",
+                        Matcher.quoteReplacement(figure.renderedValue()));
+            }
+        }
+        return out;
+    }
+
+    String ensureFiguresMentioned(String text, List<GroundedFigure> figures) {
+        String out = text == null ? "" : text;
+        if (figures == null || figures.isEmpty()) return out;
+        List<GroundedFigure> missing = figures.stream()
+                .filter(f -> f.renderedValue() != null && !f.renderedValue().isBlank())
+                .filter(f -> !mentionsFigure(out, f))
+                .toList();
+        if (missing.isEmpty()) return out;
+        StringBuilder sb = new StringBuilder(out.stripTrailing());
+        if (!sb.isEmpty()) sb.append("\n\n");
+        sb.append("Grounded figures from the source data: ");
+        for (int i = 0; i < missing.size(); i++) {
+            GroundedFigure figure = missing.get(i);
+            if (i > 0) sb.append("; ");
+            sb.append(figure.label()).append(" is ").append(figure.renderedValue());
+        }
+        sb.append('.');
+        return sb.toString();
+    }
+
+    private boolean mentionsFigure(String text, GroundedFigure figure) {
+        if (text == null || figure == null || figure.renderedValue() == null) return false;
+        if (!text.contains(figure.renderedValue())) return false;
+        String lower = text.toLowerCase();
+        if (figure.label() == null || figure.label().isBlank()) return true;
+        for (String token : figure.label().toLowerCase().split("[^a-z0-9]+")) {
+            if (token.isBlank()) continue;
+            if (!lower.contains(token)) return false;
+        }
+        return true;
+    }
+
+    String deterministicFigureFallback(String originalPrompt, List<GroundedFigure> figures) {
+        StringBuilder sb = new StringBuilder();
+        if (originalPrompt != null && !originalPrompt.isBlank()) {
+            sb.append("For the request \"").append(originalPrompt).append("\", ");
+        }
+        sb.append("the grounded figures from the source data are: ");
+        for (int i = 0; i < figures.size(); i++) {
+            GroundedFigure figure = figures.get(i);
+            if (i > 0) sb.append("; ");
+            sb.append(figure.label()).append(" is ").append(figure.renderedValue());
+        }
+        sb.append('.');
+        return sb.toString();
+    }
+
     // ── LLM streaming ────────────────────────────────────────────────────────
+
+    private String collectFromLlm(String requestBody, long[] tokenCounts) throws Exception {
+        String bodyWithUsage = requestBody;
+        try {
+            JsonNode req = mapper.readTree(requestBody);
+            ((ObjectNode) req).putObject("stream_options").put("include_usage", true);
+            bodyWithUsage = mapper.writeValueAsString(req);
+        } catch (Exception ignored) { /* leave body unchanged if parse fails */ }
+
+        HttpResponse<java.io.InputStream> response = sendWithRetry(baseUrl + "/chat/completions", bodyWithUsage);
+        if (response.statusCode() != 200) {
+            String body = new String(response.body().readAllBytes());
+            throw new RuntimeException("LLM returned HTTP " + response.statusCode() + ": " + body);
+        }
+
+        StringBuilder out = new StringBuilder();
+        final InputStream bodyStream = response.body();
+        final long idleDeadlineMs = streamIdleTimeoutSeconds * 1000L;
+        final AtomicLong lastActivity = new AtomicLong(System.currentTimeMillis());
+        final AtomicBoolean streaming = new AtomicBoolean(true);
+        Thread watchdog = Thread.ofVirtual().name("synth-buffer-idle-watchdog").start(() -> {
+            try {
+                while (streaming.get()) {
+                    long idle = System.currentTimeMillis() - lastActivity.get();
+                    if (idle >= idleDeadlineMs) {
+                        log.warn("Buffered synthesis stream idle {}ms (>{}s) — closing stalled LLM stream",
+                                idle, streamIdleTimeoutSeconds);
+                        try { bodyStream.close(); } catch (Exception ignored) {}
+                        return;
+                    }
+                    Thread.sleep(Math.min(500L, Math.max(50L, idleDeadlineMs - idle)));
+                }
+            } catch (InterruptedException ignored) { /* normal shutdown */ }
+        });
+
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(bodyStream))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                lastActivity.set(System.currentTimeMillis());
+                if (!line.startsWith("data:")) continue;
+                String data = line.substring("data:".length()).strip();
+                if (data.equals("[DONE]")) break;
+                if (data.isBlank()) continue;
+                try {
+                    JsonNode raw = mapper.readTree(data);
+                    JsonNode usageNode = raw.path("usage");
+                    if (!usageNode.isMissingNode() && !usageNode.isNull()) {
+                        tokenCounts[0] = usageNode.path("prompt_tokens").asLong(0);
+                        tokenCounts[1] = usageNode.path("completion_tokens").asLong(0);
+                        tokenCounts[2] = usageNode.path("total_tokens").asLong(tokenCounts[0] + tokenCounts[1]);
+                    }
+                } catch (Exception ignored) {}
+                DeltaChunk chunk = parseChunk(data);
+                if (chunk != null && chunk.content() != null) out.append(chunk.content());
+            }
+        } finally {
+            streaming.set(false);
+            watchdog.interrupt();
+        }
+        return out.toString();
+    }
 
     /**
      * POST to the LLM with streaming=true and forward each content delta to the emitter.

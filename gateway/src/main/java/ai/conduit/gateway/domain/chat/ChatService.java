@@ -25,6 +25,7 @@ import ai.conduit.gateway.infrastructure.telemetry.event.AgentsResolvedData;
 import ai.conduit.gateway.infrastructure.telemetry.event.CheckDeniedData;
 import ai.conduit.gateway.infrastructure.telemetry.event.EntitlementCheckData;
 import ai.conduit.gateway.infrastructure.telemetry.event.GateData;
+import ai.conduit.gateway.infrastructure.telemetry.event.GroundedFiguresData;
 import ai.conduit.gateway.infrastructure.telemetry.event.IntentClassifiedData;
 import ai.conduit.gateway.infrastructure.telemetry.event.RequestCompleteData;
 import ai.conduit.gateway.infrastructure.telemetry.event.RequestStartData;
@@ -44,6 +45,8 @@ import ai.conduit.gateway.registry.service.AgentRegistry;
 import ai.conduit.gateway.resolver.model.ResolverResult;
 import ai.conduit.gateway.resolver.service.AgentResolver;
 import ai.conduit.gateway.synthesis.answer.AnswerSynthesizer;
+import ai.conduit.gateway.synthesis.answer.GroundedFigure;
+import ai.conduit.gateway.synthesis.answer.GroundedFigureRenderer;
 import ai.conduit.gateway.synthesis.input.EntityBag;
 import ai.conduit.gateway.synthesis.input.EntityResolver;
 import ai.conduit.gateway.synthesis.input.InputSynthesizer;
@@ -104,6 +107,7 @@ public class ChatService {
     private final InputSynthesizer         inputSynthesizer;
     private final FlatPlanExecutor         executor;
     private final AnswerSynthesizer        answerSynthesizer;
+    private final GroundedFigureRenderer   figureRenderer;
     private final EntitlementService       entitlementService;
     private final TraceEventPublisher      tracePublisher;
     private final CoverageClient           coverageClient;
@@ -136,6 +140,7 @@ public class ChatService {
                        InputSynthesizer inputSynthesizer,
                        FlatPlanExecutor executor,
                        AnswerSynthesizer answerSynthesizer,
+                       GroundedFigureRenderer figureRenderer,
                        EntitlementService entitlementService,
                        TraceEventPublisher tracePublisher,
                        CoverageClient coverageClient,
@@ -153,6 +158,7 @@ public class ChatService {
         this.inputSynthesizer    = inputSynthesizer;
         this.executor            = executor;
         this.answerSynthesizer   = answerSynthesizer;
+        this.figureRenderer      = figureRenderer;
         this.entitlementService  = entitlementService;
         this.tracePublisher      = tracePublisher;
         this.coverageClient      = coverageClient;
@@ -834,6 +840,7 @@ public class ChatService {
 
             tracePublisher.publish(TraceEvent.of("synthesis_start", requestId, conversationId,
                     new SynthesisStartData(results.size(), (int) okCount)));
+            publishGroundedFigures(requestId, conversationId, results);
 
             // Graceful-degradation signal: this request is about to SYNTHESIZE an answer, but not
             // every dispatched agent succeeded (0 < successCount < dispatched). A failed sibling
@@ -853,6 +860,20 @@ public class ChatService {
                     new RequestCompleteData(System.currentTimeMillis() - requestStart,
                             results.size(), (int) okCount)));
         } finally { span.end(); }
+    }
+
+    private void publishGroundedFigures(String requestId, String conversationId, List<NodeResult> results) {
+        List<GroundedFigure> figures = figureRenderer.render(results, registry::find);
+        if (figures.isEmpty()) return;
+        tracePublisher.publish(TraceEvent.of("grounded_figures", requestId, conversationId,
+                new GroundedFiguresData(figures.stream()
+                        .map(f -> new GroundedFiguresData.Figure(
+                                f.label(),
+                                f.renderedValue(),
+                                f.rawValue() == null ? null : f.rawValue().toString(),
+                                f.format(),
+                                f.sourceAgent()))
+                        .toList())));
     }
 
     /**

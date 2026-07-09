@@ -127,7 +127,8 @@ public class SelectContractValidator {
         }
 
         Summary entitySummary = validateProducedEntities(consumer);
-        return new Summary(validated, unvalidated).plus(entitySummary);
+        Summary figureSummary = validateProducedFigures(consumer);
+        return new Summary(validated, unvalidated).plus(entitySummary).plus(figureSummary);
     }
 
     private Summary validateProducedEntities(AgentManifest manifest) {
@@ -162,6 +163,50 @@ public class SelectContractValidator {
                 if (!isStringOrStringArray(selected)) {
                     throw new ProducedEntityValidationException(manifest.agentId(), produce.name(), entity.select(),
                             "must evaluate to a string or array of strings");
+                }
+                validated++;
+            }
+        }
+        return new Summary(validated, unvalidated);
+    }
+
+    private Summary validateProducedFigures(AgentManifest manifest) {
+        AgentManifest.Io io = manifest == null ? null : manifest.io();
+        List<AgentManifest.Produce> produces =
+                (io == null || io.produces() == null) ? List.of() : io.produces();
+        int validated = 0;
+        int unvalidated = 0;
+        for (AgentManifest.Produce produce : produces) {
+            List<AgentManifest.ProducedFigure> figures =
+                    (produce == null || produce.figures() == null) ? List.of() : produce.figures();
+            if (figures.isEmpty()) continue;
+            if (!hasUsableSchema(manifest.outputSchema())) {
+                log.warn("figure path validation: agentId={} produce={} UNVALIDATED (no output schema)",
+                        manifest.agentId(), produce.name());
+                unvalidated += figures.size();
+                continue;
+            }
+            JsonNode sample = sampleFromSchema(manifest.outputSchema());
+            for (AgentManifest.ProducedFigure figure : figures) {
+                if (figure == null || figure.label() == null || figure.label().isBlank()) {
+                    throw new ProducedFigureValidationException(manifest.agentId(), produce.name(), null,
+                            "label is required");
+                }
+                if (figure.path() == null || figure.path().isBlank()) {
+                    throw new ProducedFigureValidationException(manifest.agentId(), produce.name(), figure.label(),
+                            "path is required");
+                }
+                JsonNode selected;
+                try {
+                    selected = JMES_PATH.compile(figure.path()).search(sample);
+                } catch (Exception e) {
+                    throw new ProducedFigureValidationException(manifest.agentId(), produce.name(), figure.label(),
+                            "invalid expression: " + e.getMessage());
+                }
+                if (selected == null || selected.isMissingNode() || selected.isNull()
+                        || !(selected.isNumber() || selected.isTextual() || selected.isBoolean())) {
+                    throw new ProducedFigureValidationException(manifest.agentId(), produce.name(), figure.label(),
+                            "must evaluate to a scalar value");
                 }
                 validated++;
             }
@@ -448,6 +493,15 @@ public class SelectContractValidator {
             super("produced entity validation failed: agentId=" + agentId
                     + " produce=" + produce
                     + " select=" + select
+                    + " reason=" + reason);
+        }
+    }
+
+    public static final class ProducedFigureValidationException extends RuntimeException {
+        public ProducedFigureValidationException(String agentId, String produce, String label, String reason) {
+            super("produced figure validation failed: agentId=" + agentId
+                    + " produce=" + produce
+                    + " label=" + label
                     + " reason=" + reason);
         }
     }

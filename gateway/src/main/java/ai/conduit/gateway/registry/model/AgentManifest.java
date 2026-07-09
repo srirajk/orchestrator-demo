@@ -180,16 +180,25 @@ public record AgentManifest(
      * identifier-looking values.
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Produce(String name, String type, List<ProducedEntity> entities) {
+    public record Produce(String name, String type, List<ProducedEntity> entities, List<ProducedFigure> figures) {
         /** Backward-compatible constructor (pre-{@code entities} arity). */
         public Produce(String name, String type) {
-            this(name, type, null);
+            this(name, type, null, null);
+        }
+
+        /** Backward-compatible constructor (pre-{@code figures} arity). */
+        public Produce(String name, String type, List<ProducedEntity> entities) {
+            this(name, type, entities, null);
         }
     }
 
     /** Manifest-declared entity id selector for a produced output. */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record ProducedEntity(String type, String select) {}
+
+    /** Manifest-declared load-bearing figure selector for deterministic rendering. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record ProducedFigure(String label, String path, String format) {}
 
     /** Convenience: all example prompts across all skills (used for embedding). */
     public List<String> allExamples() {

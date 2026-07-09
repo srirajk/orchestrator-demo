@@ -201,6 +201,32 @@
                     }
                   }
                 }
+              },
+              "figures": {
+                "type": "array",
+                "description": "Manifest-declared load-bearing figures emitted by this output. The gateway renders these from data and validates answer attribution generically.",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["label", "path", "format"],
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Human label the answer must use when attributing this rendered figure."
+                    },
+                    "path": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "JMESPath expression over this producer output that evaluates to the figure's raw scalar value."
+                    },
+                    "format": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Generic formatter id, such as percent, percent1, currency_usd, count, plain, or date."
+                    }
+                  }
+                }
               }
             }
           }

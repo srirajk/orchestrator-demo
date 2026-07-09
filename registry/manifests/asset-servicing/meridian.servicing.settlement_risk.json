@@ -54,6 +54,31 @@
     "data_classification": "confidential-pii",
     "sla_timeout_ms": 15000
   },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "failed_amount_usd": { "type": "number" },
+      "breach_count": { "type": "integer" },
+      "aging": {
+        "type": "object",
+        "properties": {
+          "max_failed_age_days": { "type": "integer" }
+        }
+      },
+      "cash_context": {
+        "type": "object",
+        "properties": {
+          "failed_exposure_to_settled_cash_pct": { "type": ["number", "null"] }
+        }
+      },
+      "custody_context": {
+        "type": "object",
+        "properties": {
+          "failed_exposure_to_custody_mv_pct": { "type": ["number", "null"] }
+        }
+      }
+    }
+  },
   "io": {
     "consumes": [
       {
@@ -73,7 +98,17 @@
       }
     ],
     "produces": [
-      { "name": "settlement_analysis", "type": "servicing.settlement_analysis" }
+      {
+        "name": "settlement_analysis",
+        "type": "servicing.settlement_analysis",
+        "figures": [
+          { "label": "CSDR penalty failed settlement amount", "path": "failed_amount_usd", "format": "currency_usd" },
+          { "label": "Max failed age", "path": "aging.max_failed_age_days", "format": "count" },
+          { "label": "Settlement breach count", "path": "breach_count", "format": "count" },
+          { "label": "Failed exposure to settled cash", "path": "cash_context.failed_exposure_to_settled_cash_pct", "format": "percent1" },
+          { "label": "Failed exposure to custody market value", "path": "custody_context.failed_exposure_to_custody_mv_pct", "format": "percent1" }
+        ]
+      }
     ]
   }
 }

@@ -22,7 +22,7 @@ the exact operator steps.
 from __future__ import annotations
 import re
 
-from lib import bff_client, config, ground_truth
+from lib import bff_client, config, ground_truth, trace_client
 from lib.evidence import evidence
 
 _PERCENT_RE = re.compile(r"(\d+(?:\.\d+)?)\s*%")
@@ -31,12 +31,45 @@ _HHI_RE = re.compile(r"HHI[^0-9]{0,20}(\d+(?:\.\d+)?)", re.IGNORECASE)
 # Rounding tolerance: generous enough for "25.4194%" -> "25%"/"25.4%", tight enough that a
 # threshold wobble (e.g. quoting 10% policy as 15%) still trips it.
 _PCT_TOLERANCE = 0.75
+_FALLBACK_PREFIX = "i could not safely validate the generated prose"
 
 
 def _closest_distance(value: float, candidates: set[float]) -> float | None:
     if not candidates:
         return None
     return min(abs(value - c) for c in candidates)
+
+
+def _turn_events(turn):
+    request_id, events = trace_client.trace_for_conversation(turn.conversation_id)
+    assert request_id is not None, "No trace found for this conversation."
+    return request_id, events
+
+
+def _grounded_figures(events, source_agent: str) -> list[dict]:
+    figure_events = trace_client.events_of_type(events, "grounded_figures")
+    assert figure_events, f"No grounded_figures trace event emitted: {events}"
+    figures = []
+    for evt in figure_events:
+        figures.extend(evt.get("data", {}).get("figures") or [])
+    source_figures = [f for f in figures if f.get("sourceAgent") == source_agent]
+    assert source_figures, f"No grounded figures traced for {source_agent}: {figures}"
+    return source_figures
+
+
+def _figures_by_label(figures: list[dict]) -> dict[str, dict]:
+    return {f["label"]: f for f in figures}
+
+
+def _assert_answer_uses_figures(answer: str, figures: list[dict]) -> None:
+    lower = answer.lower()
+    assert _FALLBACK_PREFIX not in lower, f"Answer fell back to robotic figure dump: {answer!r}"
+    for fig in figures:
+        rendered = fig["renderedValue"]
+        assert rendered in answer, (
+            f"Answer did not include code-rendered figure {fig['label']!r}={rendered!r}. "
+            f"Answer: {answer!r}"
+        )
 
 
 def test_grounding_no_fabrication(jane_session):
@@ -85,6 +118,52 @@ def test_grounding_no_fabrication(jane_session):
         f"output: {ungrounded_hhis}. Ground truth HHI values: {sorted(hhi_truth)}. "
         f"Full answer: {turn.answer_text!r}"
     )
+
+
+def test_t5_grounded_figures_wealth_live(jane_session):
+    turn = bff_client.ask(jane_session, f"Is the {config.WHITMAN_NAME} over-concentrated?")
+    assert turn.http_status == 200, f"live turn failed: {turn.http_status}"
+    _, events = _turn_events(turn)
+
+    figures = _grounded_figures(events, "meridian.wealth.concentration")
+    labels = _figures_by_label(figures)
+    assert labels["Top single-name concentration"]["renderedValue"].endswith("%")
+    assert labels["Concentration breach count"]["renderedValue"].isdigit()
+    assert "Diversification HHI" in labels
+    assert "Single-name threshold" in labels
+    _assert_answer_uses_figures(turn.answer_text, figures)
+
+
+def test_t5_grounded_figures_insurance_live(sam_session):
+    turn = bff_client.ask(
+        sam_session,
+        f"Should we reprice the {config.CONTINENTAL_FREIGHT_NAME} policy at renewal given the open claims?",
+    )
+    assert turn.http_status == 200, f"live turn failed: {turn.http_status}"
+    _, events = _turn_events(turn)
+
+    figures = _grounded_figures(events, "meridian.insurance.renewal_risk")
+    labels = _figures_by_label(figures)
+    assert labels["Claims loss ratio"]["renderedValue"] == "494.8%"
+    assert labels["Firm renewal target"]["renderedValue"].endswith("%")
+    assert labels["Incurred losses"]["renderedValue"].startswith("$")
+    assert labels["Renewal breach count"]["renderedValue"].isdigit()
+    _assert_answer_uses_figures(turn.answer_text, figures)
+
+
+def test_t5_grounded_figures_servicing_live(admin_session):
+    turn = bff_client.ask(admin_session, "What is the settlement risk for REL-00188 (Okafor)?")
+    assert turn.http_status == 200, f"live turn failed: {turn.http_status}"
+    _, events = _turn_events(turn)
+
+    figures = _grounded_figures(events, "meridian.servicing.settlement_risk")
+    labels = _figures_by_label(figures)
+    assert labels["CSDR penalty failed settlement amount"]["renderedValue"] == "$185,000.00"
+    assert labels["Max failed age"]["renderedValue"] == "2"
+    assert labels["Settlement breach count"]["renderedValue"].isdigit()
+    assert labels["Failed exposure to settled cash"]["renderedValue"].endswith("%")
+    assert labels["Failed exposure to custody market value"]["renderedValue"].endswith("%")
+    _assert_answer_uses_figures(turn.answer_text, figures)
 
 
 # ── Manual / scripted-toggle experiments (NOT run automatically) ──────────────────────
