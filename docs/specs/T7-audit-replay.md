@@ -40,8 +40,15 @@ system.
 ## The Decision Record (schema) — one per chat turn
 - **Envelope:** record_id, request_id, conversation_id, schema_version, occurred_at(start/end),
   **principal {user_id, segment, audience, access_mode, token_claims_digest, jwks_key_id, AUTH_ASSURANCE:
-  jwt|x-user-id-fallback}**, **origin {channel: librechat|api|eval-worker}** (so eval traffic is
-  segregatable), prev_record_hash, record_hash, outcome {ANSWERED|CLARIFIED|DENIED|PARTIAL|ERROR}+reason.
+  jwt | x-user-id-fallback}** — the weak `x-user-id` path is the **LibreChat-only** fallback (a known auth
+  hole), NOT the eval; recording assurance lets the store distinguish strongly- from weakly-authenticated
+  principals. **origin {channel: librechat|api|...}** — normal provenance. **Eval correction:** the
+  production continuous-eval OBSERVES real recorded traces via Langfuse, scores them (DeepEval), and posts
+  scores back — it issues NO gateway requests and creates NO audit records; the golden-dataset *driver*,
+  when run, authenticates with a real JWT. Neither is "synthetic flooding" (an earlier review
+  mischaracterized a trace-observer as a traffic generator) — so no special eval-flood mitigation is needed;
+  an `eval` origin tag is fine as ordinary provenance if the driver runs. prev_record_hash, record_hash,
+  outcome {ANSWERED|CLARIFIED|DENIED|PARTIAL|ERROR}+reason.
 - **Snapshot references (by content hash — the greenfield keystone):** registry_snapshot_id (SHA-256 over
   canonicalized manifests + domain manifests), policy_bundle_hash (Cerbos), prompt_template_hashes (compiled
   per call site), config_hash (routing thresholds/rerank config/deadlines/model names), embedding_model_id,
@@ -55,12 +62,14 @@ system.
 1. **Content-hashing infra (greenfield):** canonical JSON (RFC-8785-style) + SHA-256 helper; on registry
    load/reload (`RegistryBootstrapLoader`/`AgentRegistry`) compute per-artifact digests + a combined
    `registry_snapshot_id`; store snapshots content-addressed; expose the current snapshot_id.
-2. **Record envelope + snapshot refs** as above — including **AUTH_ASSURANCE** (jwt vs x-user-id fallback —
-   derive from how the principal was authenticated) and **origin** (tag eval-worker requests). Thread the
-   snapshot_id into the per-request context so every event/record carries it.
+2. **Record envelope + snapshot refs** as above — including **AUTH_ASSURANCE** (jwt vs the LibreChat-only
+   x-user-id fallback — derive from how the principal was actually authenticated; this is the real weak-auth
+   case, not the eval) and **origin** (channel provenance). Thread the snapshot_id into the per-request
+   context so every event/record carries it.
 3. **Gate:** every request produces an envelope with a correct snapshot_id, auth-assurance, and origin;
-   changing a manifest changes the snapshot_id (test); eval-worker requests are tagged eval-origin; World-B 0;
-   mvn green. (No store/replay yet — this phase just makes every decision pin *what produced it*.)
+   changing a manifest changes the snapshot_id (test); a request on the x-user-id path is recorded with weaker
+   assurance than a JWT request; World-B 0; mvn green. (No store/replay yet — this phase just makes every
+   decision pin *what produced it* and *how strongly the caller was authenticated*.)
 
 ## Phase T7b — close the capture gaps
 Add the missing captures (behind config; keep the 80-char preview for the live panel):
