@@ -49,7 +49,10 @@ public class EntitlementService {
      */
     public EntitlementResult checkRelationship(Principal principal, String relationshipId) {
         if (relationshipId == null || relationshipId.isBlank()) {
-            return new EntitlementResult(true, relationshipId, principal.id(), "no-entity", "cerbos");
+            String principalId = principal == null ? "anonymous" : principal.id();
+            log.warn("Entitlement denied: blank relationship id for principal={}", principalId);
+            emitAuthzDecision("DENY", resourceType, "coverage");
+            return new EntitlementResult(false, relationshipId, principalId, "blank-entity", "coverage");
         }
 
         // Revocation overlay: check Redis before trusting any cached Cerbos verdict

@@ -189,6 +189,13 @@ public class BoardCatalog {
     private List<PanelSpec> boardLiveTrace(Range range) {
         String w = range.promWindow();
         return List.of(
+                stat("dag_share", "Multi-step share", "%",
+                        "(sum(increase(conduit_dag_plan_total[" + w + "])) or vector(0))"
+                      + " / clamp_min(sum(increase(chat_intent_total{type=\"FETCH_DATA\"}[" + w + "])),1) * 100"),
+                bars("dag_node_count", "DAG node count", "count",
+                        "sum by (node_count) (increase(conduit_dag_plan_total[" + w + "]))", "node_count"),
+                bars("dag_fallbacks", "DAG fallbacks", "count",
+                        "sum by (reason) (increase(conduit_dag_fallback_total[" + w + "]))", "reason"),
                 statNoData("trace_waterfall", "Per-agent latency waterfall", "ms", "waterfall",
                         s -> {
                             List<Map<String, Object>> rows = s.prom().instantRows(

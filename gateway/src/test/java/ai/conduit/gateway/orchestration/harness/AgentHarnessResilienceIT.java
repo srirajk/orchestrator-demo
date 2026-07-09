@@ -11,6 +11,8 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -44,14 +46,14 @@ class AgentHarnessResilienceIT {
     private ProtocolAdapter adapter(String protocol, JsonNode result) {
         return new ProtocolAdapter() {
             @Override public String protocol() { return protocol; }
-            @Override public JsonNode invoke(AgentManifest m, JsonNode i) { return result; }
+            @Override public JsonNode invoke(AgentManifest m, JsonNode i, String bearerToken) { return result; }
         };
     }
 
     private ProtocolAdapter failingAdapter(String protocol) {
         return new ProtocolAdapter() {
             @Override public String protocol() { return protocol; }
-            @Override public JsonNode invoke(AgentManifest m, JsonNode i) {
+            @Override public JsonNode invoke(AgentManifest m, JsonNode i, String bearerToken) {
                 throw new RuntimeException("simulated agent failure");
             }
         };
@@ -60,7 +62,7 @@ class AgentHarnessResilienceIT {
     private ProtocolAdapter slowAdapter(String protocol, long delayMs) {
         return new ProtocolAdapter() {
             @Override public String protocol() { return protocol; }
-            @Override public JsonNode invoke(AgentManifest m, JsonNode i) throws Exception {
+            @Override public JsonNode invoke(AgentManifest m, JsonNode i, String bearerToken) throws Exception {
                 Thread.sleep(delayMs);
                 return MAPPER.createObjectNode().put("ok", true);
             }
@@ -102,6 +104,12 @@ class AgentHarnessResilienceIT {
         return new PlanNode(id, manifest(id, protocol, slaMs), MAPPER.createObjectNode(), List.of());
     }
 
+    private String tokenWithExp(long exp) {
+        String payload = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(("{\"exp\":" + exp + "}").getBytes(StandardCharsets.UTF_8));
+        return "eyJhbGciOiJSUzI1NiJ9." + payload + ".signature";
+    }
+
     /** Construct a harness with sensible test defaults for all config values. */
     private AgentHarness harness(List<ProtocolAdapter> adapters) {
         return new AgentHarness(adapters, cbReg,
@@ -132,6 +140,19 @@ class AgentHarnessResilienceIT {
         assertThat(result.data()).isEqualTo(data);
         assertThat(result.errorMessage()).isNull();
         assertThat(result.latencyMs()).isGreaterThanOrEqualTo(0);
+    }
+
+    @Test
+    void expiredCallerToken_yieldsAuthExpiredBeforeDispatch() {
+        JsonNode data = MAPPER.createObjectNode().put("value", 42);
+        AgentHarness harness = harness(List.of(adapter("http", data)));
+
+        NodeResult result = harness.execute(node("agent-expired", "http", 5_000),
+                null, tokenWithExp(1));
+
+        assertThat(result.status()).isEqualTo(NodeResult.Status.AUTH_EXPIRED);
+        assertThat(result.data()).isNull();
+        assertThat(result.errorMessage()).contains("expired");
     }
 
     @Test
@@ -200,7 +221,7 @@ class AgentHarnessResilienceIT {
         AtomicInteger callCount = new AtomicInteger(0);
         ProtocolAdapter alwaysFails = new ProtocolAdapter() {
             @Override public String protocol() { return "http"; }
-            @Override public JsonNode invoke(AgentManifest m, JsonNode i) {
+            @Override public JsonNode invoke(AgentManifest m, JsonNode i, String bearerToken) {
                 callCount.incrementAndGet();
                 throw new RuntimeException("always fails");
             }

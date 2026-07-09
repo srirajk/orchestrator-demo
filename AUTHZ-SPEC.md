@@ -81,8 +81,8 @@ Confirmed by grep: **coverage services read neither clearance nor segment** — 
 ---
 
 ## 3. New demo assets (all ADDITIVE — nothing existing changes behavior)
-1. **`acme.wealth.market_research`** — house-view / market commentary. `wealth-management · audience:segment · access_mode:read · data_classification:internal`, **knowledge (no coverage)**. Non-PII because it's not client data.
-2. **`acme.hr.policy_qa`** — HR policy Q&A (leave, benefits, conduct). `hr · audience:enterprise · access_mode:read · data_classification:internal`, **knowledge**. + `hr.json` domain, **no coverage** (exercises the no-coverage path — a real World-B check).
+1. **`meridian.wealth.market_research`** — house-view / market commentary. `wealth-management · audience:segment · access_mode:read · data_classification:internal`, **knowledge (no coverage)**. Non-PII because it's not client data.
+2. **`meridian.hr.policy_qa`** — HR policy Q&A (leave, benefits, conduct). `hr · audience:enterprise · access_mode:read · data_classification:internal`, **knowledge**. + `hr.json` domain, **no coverage** (exercises the no-coverage path — a real World-B check).
 3. **Demo user `analyst_amy`** — `chat_user`, `segments:{wealth:"confidential"}`.
 4. **Persona tiers (per-segment):** rm_jane `{wealth:pii, servicing:confidential}`, rm_carlos `{wealth:pii}`, uw_sam `{insurance:pii}`.
 

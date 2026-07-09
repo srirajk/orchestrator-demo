@@ -5,6 +5,7 @@ import ai.conduit.gateway.domain.auth.Principal;
 import ai.conduit.gateway.domain.auth.RequestContext;
 import ai.conduit.gateway.domain.chat.ChatService;
 import ai.conduit.gateway.infrastructure.identity.IdentityExtractor;
+import ai.conduit.gateway.infrastructure.telemetry.MdcPropagation;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -14,8 +15,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
@@ -59,6 +64,23 @@ public class ChatCompletionsController {
         pipelineExecutor.shutdown();
     }
 
+    /**
+     * Reads the caller's verified bearer token off {@link SecurityContextHolder} — MUST be called
+     * on the servlet thread, before offloading to {@link #pipelineExecutor}. {@code
+     * SecurityContextHolder} is thread-local; Spring Security's {@code BearerTokenAuthenticationFilter}
+     * populates it upstream of this controller, but nothing propagates it onto the virtual threads
+     * the pipeline (and the DAG executor further downstream) run on. Returns null for an
+     * unauthenticated/anonymous caller — agent invocation for such a caller fails closed downstream
+     * (HttpAdapter/McpAdapter refuse to call an agent without a token; mock agents fail closed too).
+     */
+    private String extractBearerToken() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth instanceof JwtAuthenticationToken jwtAuth) {
+            return jwtAuth.getToken().getTokenValue();
+        }
+        return null;
+    }
+
     @PostMapping(value = "/chat/completions")
     public Object chatCompletions(
             @RequestBody ChatRequest request,
@@ -67,6 +89,17 @@ public class ChatCompletionsController {
 
         String userId = identityExtractor.extractUserId(httpRequest);
         Principal principal = RequestContext.getPrincipal(); // null if no JWT
+        // F-IDENTITY: capture the caller's verified bearer token HERE, on the servlet thread,
+        // as request-scoped DATA — SecurityContextHolder is thread-local and is NOT propagated
+        // to the pipelineExecutor's virtual threads below (nor to DagPlanExecutor's further down
+        // the call chain). Threaded explicitly through ChatService → FlatPlanExecutor/
+        // DagPlanExecutor → AgentHarness → HttpAdapter/McpAdapter so every agent hop carries it.
+        String callerToken = extractBearerToken();
+        // Same reasoning as callerToken above: capture the servlet thread's MDC (requestId/
+        // conversationId/userId) so it can be re-applied on the pipelineExecutor virtual thread and
+        // threaded onward — otherwise every downstream log line, including the agent-hop identity
+        // log, prints an empty [rid= cid= uid=].
+        Map<String, String> mdcContext = MDC.getCopyOfContextMap();
         String conversationId = httpRequest.getHeader("X-Conversation-Id");
 
         // OpenAI spec: `stream` omitted or false → a single chat.completion JSON object;
@@ -79,7 +112,7 @@ public class ChatCompletionsController {
                 stream, userId, conversationId);
 
         if (!stream) {
-            return nonStreaming(request, userId, principal, conversationId);
+            return nonStreaming(request, userId, principal, conversationId, callerToken, mdcContext);
         }
 
         // ── Streaming path (unchanged) ────────────────────────────────────────────
@@ -96,8 +129,8 @@ public class ChatCompletionsController {
             log.debug("Detected auto-title request — short-circuiting");
             CompletableFuture.runAsync(() -> chatService.streamTitle(emitter), pipelineExecutor);
         } else {
-            CompletableFuture.runAsync(() ->
-                    chatService.handleChat(request, emitter, userId, principal, conversationId), pipelineExecutor);
+            CompletableFuture.runAsync(() -> MdcPropagation.run(mdcContext, () ->
+                    chatService.handleChat(request, emitter, userId, principal, conversationId, callerToken)), pipelineExecutor);
         }
         return emitter;
     }
@@ -108,13 +141,14 @@ public class ChatCompletionsController {
      * {@code {object:"chat.completion", choices:[{message:{...}, finish_reason}], usage}}.
      */
     private ResponseEntity<String> nonStreaming(ChatRequest request, String userId,
-                                                Principal principal, String conversationId) {
+                                                Principal principal, String conversationId, String callerToken,
+                                                Map<String, String> mdcContext) {
         BufferingSseEmitter buf = new BufferingSseEmitter();
         if (chatService.isTitleRequest(request)) {
             CompletableFuture.runAsync(() -> chatService.streamTitle(buf), pipelineExecutor);
         } else {
-            CompletableFuture.runAsync(() ->
-                    chatService.handleChat(request, buf, userId, principal, conversationId), pipelineExecutor);
+            CompletableFuture.runAsync(() -> MdcPropagation.run(mdcContext, () ->
+                    chatService.handleChat(request, buf, userId, principal, conversationId, callerToken)), pipelineExecutor);
         }
         boolean finished = buf.await(150_000L);
         if (!finished) log.warn("Non-streaming request did not complete within 150s — returning partial");

@@ -1,6 +1,6 @@
 # Settlement Status Agent
 
-**ID:** `acme.servicing.settlement_status`
+**ID:** `meridian.servicing.settlement_status`
 **Protocol:** MCP (FastMCP SSE)
 **Tool:** `get_settlements(relationship_id)`
 
@@ -9,7 +9,7 @@ Returns pending and failed settlement trades for a relationship. Failed trades a
 with a Phoenix trace alert attribute (`alert.failed_settlements`).
 
 ## OTel spans
-`agent.acme.servicing.settlement_status` — `entity.relationship_id`, `result.pending_count`, `result.failed_count`, `alert.failed_settlements`
+`agent.meridian.servicing.settlement_status` — `entity.relationship_id`, `result.pending_count`, `result.failed_count`, `alert.failed_settlements`
 
 ## Fault knobs
 Set `MCP_FAULT_TOOL=get_settlements` to make this tool fail for resilience testing.

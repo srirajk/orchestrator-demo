@@ -134,7 +134,7 @@ def build_metrics() -> list:
 
 class TestHoldingsAgent:
     """
-    Evaluates: acme.wealth.holdings
+    Evaluates: meridian.wealth.holdings
     Ground truth: canned data for REL-00042 (Whitman) and REL-00099 (Calderon)
     """
 
@@ -160,7 +160,7 @@ class TestHoldingsAgent:
 
 class TestPerformanceAgent:
     """
-    Evaluates: acme.wealth.performance
+    Evaluates: meridian.wealth.performance
     Key check: YTD return % and P&L dollars must appear in narrative.
     """
 
@@ -188,7 +188,7 @@ class TestPerformanceAgent:
 
 class TestGoalPlanningAgent:
     """
-    Evaluates: acme.wealth.goal_planning
+    Evaluates: meridian.wealth.goal_planning
     Key check: on-track status and funding percentages are grounded in data.
     """
 
@@ -212,7 +212,7 @@ class TestGoalPlanningAgent:
 
 class TestRiskProfileAgent:
     """
-    Evaluates: acme.wealth.risk_profile
+    Evaluates: meridian.wealth.risk_profile
     Key check: risk score and concentration flag details are grounded.
     """
 
@@ -281,7 +281,7 @@ class TestInputGuardrails:
 @pytest.mark.skipif(not _SERVICING_AVAILABLE, reason="servicing tool imports unavailable")
 class TestCustodyAgent:
     """
-    Evaluates: acme.servicing.custody_positions
+    Evaluates: meridian.servicing.custody_positions
     Ground truth: canned data for REL-00042 (Whitman) — the demo relationship.
     """
 
@@ -308,7 +308,7 @@ class TestCustodyAgent:
 @pytest.mark.skipif(not _SERVICING_AVAILABLE, reason="servicing tool imports unavailable")
 class TestSettlementsAgent:
     """
-    Evaluates: acme.servicing.settlement_status
+    Evaluates: meridian.servicing.settlement_status
     Key check: pending/failed counts and trade references are grounded in canned data.
     """
 
@@ -335,7 +335,7 @@ class TestSettlementsAgent:
 @pytest.mark.skipif(not _SERVICING_AVAILABLE, reason="servicing tool imports unavailable")
 class TestCorporateActionsAgent:
     """
-    Evaluates: acme.servicing.corporate_actions
+    Evaluates: meridian.servicing.corporate_actions
     Key check: action types, election deadlines, and dividend amounts must be
     grounded in the canned upcoming_actions data.
     """
@@ -364,7 +364,7 @@ class TestCorporateActionsAgent:
 @pytest.mark.skipif(not _SERVICING_AVAILABLE, reason="servicing tool imports unavailable")
 class TestNavAgent:
     """
-    Evaluates: acme.servicing.nav
+    Evaluates: meridian.servicing.nav
     Note: keyed by fund_id (FND-7781), not relationship_id — this is intentional.
     Key check: NAV per unit, AUM, and valuation date are grounded in canned data.
     """
@@ -392,7 +392,7 @@ class TestNavAgent:
 @pytest.mark.skipif(not _SERVICING_AVAILABLE, reason="servicing tool imports unavailable")
 class TestCashAgent:
     """
-    Evaluates: acme.servicing.cash
+    Evaluates: meridian.servicing.cash
     Key check: settled/unsettled cash balances and projected USD position
     must be grounded in the canned balance data.
     """

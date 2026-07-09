@@ -63,7 +63,7 @@ many agents; keeping them separate is what lets a domain team add an agent witho
 domain config, and vice-versa.
 
 ### Naming conventions
-- Agent file + `agent_id`: `**<provider>.<domain>.<capability>**` (e.g. `acme.insurance.policy_details`).
+- Agent file + `agent_id`: `**<provider>.<domain>.<capability>**` (e.g. `meridian.insurance.policy_details`).
 - Sub-domain file lives under its domain folder: `domains/<domain>/<sub-domain>.json`.
 - The `domain` field in an agent manifest must match a loaded `domain_id`; `sub_domain` must match
   a loaded `sub_domain_id`.
@@ -123,17 +123,17 @@ Say you're adding **Lending**.
   "denial_messages": { "no_coverage": "That loan is not in your book." },
   "messages": { "followup_clarification": "Which loan would you like — by id or borrower name?" },
   "clarification_schema": { "...": "the scoped question options" },
-  "agents": ["acme.lending.loan_status", "acme.lending.amortization"]
+  "agents": ["meridian.lending.loan_status", "meridian.lending.amortization"]
 }
 ```
 > `required_context` is what drives deterministic CLARIFY: if the user names no loan, the gateway
 > asks instead of guessing. `entity_types` is map-based — adding a type is an edit here, not a
 > new Java field.
 
-**4. Add an agent manifest per capability** — `manifests/acme.lending.loan_status.json`:
+**4. Add an agent manifest per capability** — `manifests/meridian.lending.loan_status.json`:
 ```json
 {
-  "agent_id": "acme.lending.loan_status",
+  "agent_id": "meridian.lending.loan_status",
   "name": "Loan Status",
   "description": "Current status, balance, and next payment for a loan.",
   "version": "1.0.0",
@@ -165,6 +165,7 @@ Say you're adding **Lending**.
 ```bash
 python3 -m pytest tests/schema
 bash ../scripts/world-b-check.sh     # must stay CRITICAL 0 — proves no domain logic leaked into the gateway
+bash ../scripts/routing-measurement-gate.sh  # must pass before shipping new/changed agent routing examples
 bash ../scripts/verify.sh
 ```
 

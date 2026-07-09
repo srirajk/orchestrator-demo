@@ -17,7 +17,7 @@ _LLM_BASE  = os.environ.get("SETTLEMENTS_LLM_BASE_URL") or None
 _LLM_KEY   = os.environ.get("SETTLEMENTS_LLM_API_KEY") or None
 _LLM_MODEL = os.environ.get("SETTLEMENTS_LLM_MODEL") or None
 
-AGENT_ID = "acme.servicing.settlement_status"
+AGENT_ID = "meridian.servicing.settlement_status"
 log = logging.getLogger(__name__)
 
 
@@ -82,4 +82,8 @@ def get_settlements(relationship_id: str) -> str:
             return json.dumps({**data, "agent_narrative": narrative})
         except Exception as exc:
             log.error("Agent LLM call failed for %s: %s", relationship_id, exc)
-            return mcp_error_json(f"llm_unavailable: {type(exc).__name__}", AGENT_ID, 503)
+            narrative = (
+                f"Settlement status for {relationship_id}: {pending} pending settlement(s) "
+                f"and {failed} failed settlement(s)."
+            )
+            return json.dumps({**data, "agent_narrative": narrative})

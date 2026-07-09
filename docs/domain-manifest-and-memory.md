@@ -110,7 +110,7 @@ free of raw transcript or raw agent output.
   "scope": {
     "domains": ["wealth-management"],
     "sub_domains": ["private-banking"],
-    "agents": ["acme.wealth.holdings"]
+    "agents": ["meridian.wealth.holdings"]
   },
   "context": {
     "entities": {

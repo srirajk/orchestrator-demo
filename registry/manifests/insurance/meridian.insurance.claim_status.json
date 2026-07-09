@@ -1,0 +1,76 @@
+{
+  "agent_id": "meridian.insurance.claim_status",
+  "name": "Insurance Claim Status",
+  "description": "Returns the status of an insurance claim: claim amount, status, incident date, and adjuster. Looks up a single claim by claim_id, or all claims filed against a policy by policy_id.",
+  "version": "1.0.0",
+  "provider": {
+    "organization": "Meridian Demo Bank"
+  },
+  "domain": "insurance",
+  "audience": "segment",
+  "sub_domain": "claims-servicing",
+  "max_response_tokens": 1500,
+  "protocol": "http",
+  "connection": {
+    "openapi_url": "http://insurance-http:8087/openapi.json",
+    "operation_id": "get_claim_status"
+  },
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false
+  },
+  "skills": [
+    {
+      "id": "get_claim_status",
+      "name": "get_claim_status",
+      "description": "Retrieve the status of an insurance claim \u2014 amount, status, incident date, and adjuster \u2014 by claim ID, or list all claims on a policy.",
+      "tags": [
+        "claim",
+        "claim-status",
+        "claims",
+        "adjuster",
+        "loss",
+        "insurance"
+      ],
+      "examples": [
+        "what is the claim status for CLM-5501",
+        "show me the status of the claim",
+        "are there any open claims on this policy",
+        "who is the adjuster on this claim",
+        "what is the claim amount for the Continental Freight policy"
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    }
+  ],
+  "constraints": {
+    "access_mode": "read",
+    "data_classification": "confidential-pii",
+    "sla_timeout_ms": 30000
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "policy_id": { "type": "string" },
+      "claim_count": { "type": "integer" },
+      "claims": { "type": "array", "items": { "type": "object" } },
+      "claim_id": { "type": ["string", "null"] },
+      "amount": { "type": ["number", "null"] },
+      "status": { "type": ["string", "null"] }
+    },
+    "required": ["policy_id", "claims"]
+  },
+  "io": {
+    "consumes": [
+      { "entity": "policy_id", "required": true },
+      { "entity": "claim_id", "required": false }
+    ],
+    "produces": [
+      { "name": "claim_status", "type": "insurance.claim_status" }
+    ]
+  }
+}

@@ -11,7 +11,7 @@ from fastapi import Request
 from shared.error_schema import error_response
 
 
-AGENT_ID = "acme.insurance.http"
+AGENT_ID = "meridian.insurance.http"
 
 
 async def fault_knob_middleware(request: Request, call_next):

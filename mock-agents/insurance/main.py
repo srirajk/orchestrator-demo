@@ -6,6 +6,7 @@ which the gateway registry introspects (no gateway code change).
 Agent layout (each agent in its own top-level subfolder):
   insurance/policy_details/   → GET /policy-details
   insurance/claim_status/     → GET /claim-status
+  insurance/renewal_risk/     → POST /renewal-risk (2-producer fan-in analytics)
 
 Fault knobs (all endpoints): ?_delay_ms=<n>  ?_fail=true
 Port: 8087
@@ -24,6 +25,7 @@ from shared.jwt_verify import verify_bearer_token
 from shared.telemetry import setup_telemetry
 from policy_details.handler import router as policy_details_router
 from claim_status.handler import router as claim_status_router
+from renewal_risk.handler import router as renewal_risk_router
 
 log = logging.getLogger(__name__)
 
@@ -62,13 +64,17 @@ async def jwt_auth_middleware(request: Request, call_next):
         return JSONResponse(status_code=401, content={"detail": error})
     if claims:
         request.state.principal = claims.get("sub")
-    return await call_next(request)
+    response = await call_next(request)
+    if claims and claims.get("sub"):
+        response.headers["X-Conduit-Verified-Sub"] = claims["sub"]
+    return response
 
 
 app.middleware("http")(fault_knob_middleware)
 
 app.include_router(policy_details_router)
 app.include_router(claim_status_router)
+app.include_router(renewal_risk_router)
 
 
 @app.get("/health", tags=["infra"], summary="Health check")
@@ -77,7 +83,7 @@ def health():
         "status": "ok",
         "service": "insurance-http",
         "version": "0.1.0",
-        "agents": ["policy_details", "claim_status"],
+        "agents": ["policy_details", "claim_status", "renewal_risk"],
     }
 
 

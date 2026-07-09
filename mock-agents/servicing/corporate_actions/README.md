@@ -1,6 +1,6 @@
 # Corporate Actions Agent (with RAG)
 
-**ID:** `acme.servicing.corporate_actions`
+**ID:** `meridian.servicing.corporate_actions`
 **Protocol:** MCP (FastMCP SSE)
 **Tool:** `get_corporate_actions(relationship_id)`
 
@@ -19,7 +19,7 @@ regulatory_context included in JSON response
 ```
 
 ## OTel spans
-`agent.acme.servicing.corporate_actions` — `entity.relationship_id`, `result.action_count`, `rag.retrieved_docs`
+`agent.meridian.servicing.corporate_actions` — `entity.relationship_id`, `result.action_count`, `rag.retrieved_docs`
 
 ## Fault knobs
 Set `MCP_FAULT_TOOL=get_corporate_actions` to make this tool fail.

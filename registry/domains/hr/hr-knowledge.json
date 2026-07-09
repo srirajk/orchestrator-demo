@@ -15,5 +15,7 @@
     }
   ],
 
-  "agents": ["acme.hr.policy_qa"]
+  "required_context": [],
+
+  "agents": ["meridian.hr.policy_qa"]
 }

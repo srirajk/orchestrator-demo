@@ -25,21 +25,33 @@ import ai.conduit.gateway.infrastructure.telemetry.event.AgentsResolvedData;
 import ai.conduit.gateway.infrastructure.telemetry.event.CheckDeniedData;
 import ai.conduit.gateway.infrastructure.telemetry.event.EntitlementCheckData;
 import ai.conduit.gateway.infrastructure.telemetry.event.GateData;
+import ai.conduit.gateway.infrastructure.telemetry.event.GroundedFiguresData;
 import ai.conduit.gateway.infrastructure.telemetry.event.IntentClassifiedData;
 import ai.conduit.gateway.infrastructure.telemetry.event.RequestCompleteData;
 import ai.conduit.gateway.infrastructure.telemetry.event.RequestStartData;
 import ai.conduit.gateway.infrastructure.telemetry.event.SynthesisStartData;
+import ai.conduit.gateway.infrastructure.telemetry.event.PlanGraphData;
+import ai.conduit.gateway.orchestration.executor.Blackboard;
+import ai.conduit.gateway.orchestration.executor.DagPlanExecutor;
 import ai.conduit.gateway.orchestration.executor.FlatPlanExecutor;
 import ai.conduit.gateway.orchestration.model.NodeResult;
 import ai.conduit.gateway.orchestration.model.Plan;
 import ai.conduit.gateway.orchestration.model.PlanNode;
+import ai.conduit.gateway.orchestration.planner.DagResolution;
+import ai.conduit.gateway.orchestration.planner.DagResolver;
+import ai.conduit.gateway.orchestration.planner.ResolutionError;
 import ai.conduit.gateway.registry.model.AgentManifest;
+import ai.conduit.gateway.registry.service.AgentRegistry;
 import ai.conduit.gateway.resolver.model.ResolverResult;
 import ai.conduit.gateway.resolver.service.AgentResolver;
 import ai.conduit.gateway.synthesis.answer.AnswerSynthesizer;
+import ai.conduit.gateway.synthesis.answer.GroundedFigure;
+import ai.conduit.gateway.synthesis.answer.GroundedFigureRenderer;
 import ai.conduit.gateway.synthesis.input.EntityBag;
+import ai.conduit.gateway.synthesis.input.EntityResolver;
 import ai.conduit.gateway.synthesis.input.InputSynthesizer;
 import ai.conduit.gateway.synthesis.input.InputSynthesizer.SynthesisResult;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -61,6 +73,8 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -93,6 +107,7 @@ public class ChatService {
     private final InputSynthesizer         inputSynthesizer;
     private final FlatPlanExecutor         executor;
     private final AnswerSynthesizer        answerSynthesizer;
+    private final GroundedFigureRenderer   figureRenderer;
     private final EntitlementService       entitlementService;
     private final TraceEventPublisher      tracePublisher;
     private final CoverageClient           coverageClient;
@@ -105,25 +120,45 @@ public class ChatService {
     private final Counter intentClarifyCounter;
     private final Counter intentChitchatCounter;
 
+    // ── Multi-step orchestration (feature-flagged; flag OFF ⇒ flat path unchanged) ──────────
+    private final AgentRegistry     registry;
+    private final DagResolver       dagResolver;
+    private final DagPlanExecutor   dagExecutor;
+    private final EntityResolver    entityResolver;
+    /**
+     * When true, a fan-in ("goal") capability whose io consumes another capability's output is
+     * executed as a resolver-derived DAG (producers→consumer) instead of a flat fan-out. Any miss
+     * (goal not uniquely identifiable, unresolved dependency, authz re-gate prune, unbound leaf)
+     * falls through to the unchanged flat path. Default OFF — a no-op until explicitly enabled.
+     */
+    @org.springframework.beans.factory.annotation.Value("${conduit.orchestration.dag-enabled:false}")
+    private boolean dagEnabled;
+
     public ChatService(ObjectMapper mapper,
                        IntentClassifier intentClassifier,
                        AgentResolver resolver,
                        InputSynthesizer inputSynthesizer,
                        FlatPlanExecutor executor,
                        AnswerSynthesizer answerSynthesizer,
+                       GroundedFigureRenderer figureRenderer,
                        EntitlementService entitlementService,
                        TraceEventPublisher tracePublisher,
                        CoverageClient coverageClient,
                        DomainManifestStore manifestStore,
                        ai.conduit.gateway.domain.clarify.ClarificationComposer clarificationComposer,
                        Tracer tracer,
-                       MeterRegistry meterRegistry) {
+                       MeterRegistry meterRegistry,
+                       AgentRegistry registry,
+                       DagResolver dagResolver,
+                       DagPlanExecutor dagExecutor,
+                       EntityResolver entityResolver) {
         this.mapper              = mapper;
         this.intentClassifier    = intentClassifier;
         this.resolver            = resolver;
         this.inputSynthesizer    = inputSynthesizer;
         this.executor            = executor;
         this.answerSynthesizer   = answerSynthesizer;
+        this.figureRenderer      = figureRenderer;
         this.entitlementService  = entitlementService;
         this.tracePublisher      = tracePublisher;
         this.coverageClient      = coverageClient;
@@ -131,6 +166,10 @@ public class ChatService {
         this.clarificationComposer = clarificationComposer;
         this.tracer              = tracer;
         this.meterRegistry         = meterRegistry;
+        this.registry            = registry;
+        this.dagResolver         = dagResolver;
+        this.dagExecutor         = dagExecutor;
+        this.entityResolver      = entityResolver;
         this.intentFetchCounter    = Counter.builder("chat.intent").tag("type","FETCH_DATA").register(meterRegistry);
         this.intentFollowUpCounter = Counter.builder("chat.intent").tag("type","FOLLOW_UP").register(meterRegistry);
         this.intentClarifyCounter  = Counter.builder("chat.intent").tag("type","CLARIFY").register(meterRegistry);
@@ -162,9 +201,14 @@ public class ChatService {
      * @param jwtPrincipal      the JWT-verified principal captured on the servlet thread
      *                          before {@code CompletableFuture.runAsync()}; null if no JWT
      * @param headerConvId      value of the {@code X-Conversation-Id} header, or null
+     * @param callerToken       the caller's raw verified bearer token, captured on the servlet
+     *                          thread alongside {@code jwtPrincipal} (F-IDENTITY). Threaded through
+     *                          to every downstream agent invocation instead of being read from
+     *                          {@code SecurityContextHolder}, which does not survive the hop onto
+     *                          the pipeline/DAG virtual-thread executors. Null if no JWT.
      */
     public void handleChat(ChatRequest request, SseEmitter emitter, String userId,
-                           Principal jwtPrincipal, String headerConvId) {
+                           Principal jwtPrincipal, String headerConvId, String callerToken) {
         long   requestStart = System.currentTimeMillis();
         emitAdoption(jwtPrincipal);   // adoption-by-role (cardinality-safe: role, not user)
         Span   rootSpan     = tracer.spanBuilder("chat.handle").startSpan();
@@ -253,10 +297,10 @@ public class ChatService {
             switch (intentResult.intent()) {
                 case FETCH_DATA -> handleFetchData(request, emitter, latestPrompt,
                         conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan,
-                        intentResult.extractedEntities(), streamId, true);
+                        intentResult.extractedEntities(), streamId, true, callerToken);
                 case FOLLOW_UP  -> handleFollowUp(request, emitter, latestPrompt,
                         conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan,
-                        intentResult.extractedEntities(), streamId);
+                        intentResult.extractedEntities(), streamId, callerToken);
                 // CLARIFY is routed through the SAME deterministic coverage path as FETCH_DATA
                 // (hard-rule e): the LLM never decides clarification. The coverage
                 // discover/intersect/`required ∩ resolved = ∅` check inside handleFetchData
@@ -270,7 +314,7 @@ public class ChatService {
                 // clarification. Enriching it would collapse the FETCH_DATA/CLARIFY distinction.
                 case CLARIFY    -> handleFetchData(request, emitter, latestPrompt,
                         conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan,
-                        intentResult.extractedEntities(), streamId, false);
+                        intentResult.extractedEntities(), streamId, false, callerToken);
                 case CHITCHAT   -> handleChitchat(request, emitter, conversationId, requestId, requestStart, streamId, rootSpan);
             }
 
@@ -294,7 +338,7 @@ public class ChatService {
                                   Principal jwtPrincipal,
                                   String requestId, long requestStart, Span rootSpan,
                                   EntityBag preExtracted, String streamId,
-                                  boolean carryContext) throws Exception {
+                                  boolean carryContext, String callerToken) throws Exception {
         Span span = tracer.spanBuilder("chat.fetch_data").startSpan();
         // coverageRelId is set by the coverage pipeline before synthesis.
         String coverageRelId = null;
@@ -329,9 +373,9 @@ public class ChatService {
                 String sub0 = ir.subDomain().subDomainId();
                 try {
                     CoverageResolveResult rr = coverageClient.resolve(
-                        ir.id(), ir.entityType().resolveType(), t0, ir.coverage());
+                        ir.id(), ir.entityType().resolveType(), t0, ir.coverage(), callerToken);
                     if (rr.resolved() && rr.id() != null) {
-                        CoverageCheckResult check = coverageClient.check(p0.id(), t0, rr.id(), ir.coverage());
+                        CoverageCheckResult check = coverageClient.check(p0.id(), t0, rr.id(), ir.coverage(), callerToken);
                         if (!check.allowed()) {
                             emitRequestOutcome("DENIED");
                             tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
@@ -344,31 +388,42 @@ public class ChatService {
                                 new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
                             return;
                         }
+                    } else {
+                        emitRequestOutcome("DENIED");
+                        tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
+                            GateData.deny(GateData.GATE_COVERAGE,
+                                ir.id() + " could not be resolved", sub0)));
+                        tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
+                            new CheckDeniedData("coverage", ir.id(), p0.id(), "unresolved-entity", "coverage")));
+                        streamTextAndComplete(emitter, mapDenialReason("unknown-resource", sub0), streamId);
+                        tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
+                            new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                        return;
                     }
                 } catch (CoverageClient.CoverageUnavailableException e) {
-                    // Fail open to the normal pipeline — it re-attempts coverage and fails closed there.
-                    log.warn("Identifier pre-check coverage unavailable ({}), falling through", e.getMessage());
+                    log.error("Identifier pre-check coverage unavailable for principal={}: {}",
+                            p0.id(), e.getMessage());
+                    emitRequestOutcome("DENIED");
+                    tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
+                            new CheckDeniedData("coverage", ir.id(), p0.id(), "coverage-unavailable", "coverage")));
+                    streamTextAndComplete(emitter,
+                            "I am unable to verify your coverage right now, so I cannot provide that data.", streamId);
+                    tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
+                            new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                    return;
                 }
             }
 
             // ── CONTEXT-AWARE ROUTING ────────────────────────────────────────────────
-            // Route on conversation-enriched text (recent user turns) rather than the bare last
-            // message. Enrichment lets the resolver's confidence/margin gate derive the query's
-            // domain from the conversation's established vocabulary and abstain on a lone
-            // out-of-domain hit. This fixes keyword-less follow-ups
-            // ("summarize for Calderon Trust (REL-00099)?") that otherwise scored in the
-            // cross-domain noise band and were misrouted. For CLARIFY turns (carryContext=false)
-            // we route on the bare message so a terse under-specified ask cannot inherit a
-            // confident domain from history and be answered. No domain literal here — the domain
-            // decision comes from the winning agent manifest's own domain field in the resolver.
-            String routingText = carryContext ? buildRoutingQuery(request) : latestPrompt;
-            // FACET CARRY / BIAS-TO-FETCH: when the current turn already carries an explicit grounded
-            // subject (an id the user typed, or a focal name the deterministic derivation resolved),
-            // the turn is fully specified — only which agents/facet is muddy. Tell the resolver not
-            // to abstain on a low top-vs-noise margin so a terse follow-up ("and for REL-00099?")
-            // inherits the conversation's facet vocabulary and routes, instead of stranding on a
-            // margin tie. Only on the FETCH path (carryContext); CLARIFY turns keep the abstain gate.
+            // Route with the smallest context needed for this turn. If the existing focal-reference
+            // derivation already grounded the entity and the user did NOT type a fresh identifier,
+            // the current message supplies the facet and should not be diluted by older turns. If
+            // the user did type a fresh identifier, use only the immediately prior user turn plus
+            // the current turn so terse overrides can inherit the prior facet without stale facets.
+            // CLARIFY turns route on the bare message so an under-specified ask cannot inherit a
+            // confident domain.
             boolean entityKnown = carryContext && hasGroundedResolvableReference(preExtracted, latestPrompt);
+            String routingText = routingTextForFetch(request, latestPrompt, carryContext, entityKnown);
             ResolverResult resolved = resolver.resolveContextual(routingText, entityKnown);
 
             List<AgentsResolvedData.AgentRef> selectedRefs = resolved.selected().stream()
@@ -447,6 +502,11 @@ public class ChatService {
                         allowedManifests.size(), manifests.size(), principal.id());
             }
             final List<AgentManifest> finalManifests = allowedManifests;
+            final List<String> finalDomains = finalManifests.stream()
+                    .map(AgentManifest::domain)
+                    .filter(d -> d != null && !d.isBlank())
+                    .distinct()
+                    .toList();
 
             // Domains the request referenced but the structural entitlement gate pruned (outside the
             // caller's access). When the SAME ask mixed an accessible and an inaccessible domain
@@ -466,12 +526,7 @@ public class ChatService {
             // (WORLD-B §5). These tags drive observability slicing AND eval-suite resolution
             // (see docs/EVAL-FRAMEWORK.md — the worker picks a domain/agent's suite by tag).
             if (!finalManifests.isEmpty()) {
-                List<String> domains = finalManifests.stream()
-                        .map(AgentManifest::domain)
-                        .filter(d -> d != null && !d.isBlank())
-                        .distinct()
-                        .toList();
-                String resolvedDomain = String.join(",", domains);
+                String resolvedDomain = String.join(",", finalDomains);
                 if (!resolvedDomain.isBlank()) {
                     rootSpan.setAttribute("langfuse.metadata.domain", resolvedDomain);
                     rootSpan.setAttribute("conduit.domain", resolvedDomain);
@@ -480,7 +535,7 @@ public class ChatService {
                 // agent. Seeding with segmentTags() preserves the segment:* slicing chips set
                 // in handleChat (setAttribute REPLACES, so they must be re-included here).
                 List<String> tags = new ArrayList<>(segmentTags(jwtPrincipal));
-                domains.forEach(d -> tags.add("domain:" + d));
+                finalDomains.forEach(d -> tags.add("domain:" + d));
                 finalManifests.stream()
                         .map(AgentManifest::agentId)
                         .filter(a -> a != null && !a.isBlank())
@@ -537,12 +592,12 @@ public class ChatService {
                             // the candidates ∩ discover intersection in the ambiguous branch.
                             CoverageResolveResult resolveResult = coverageClient.resolve(
                                 preExtracted.reference(coverageEntity.extractAs()),
-                                coverageEntity.resolveType(), tenantId, coverage);
+                                coverageEntity.resolveType(), tenantId, coverage, callerToken);
 
                             if (resolveResult.resolved()) {
                                 coverageRelId = resolveResult.id();
                                 CoverageCheckResult check = coverageClient.check(
-                                    principalId, tenantId, coverageRelId, coverage);
+                                    principalId, tenantId, coverageRelId, coverage, callerToken);
                                 if (!check.allowed()) {
                                     emitRequestOutcome("DENIED");
                                     // Structured coverage gate frame for the glass box: which entity,
@@ -574,7 +629,7 @@ public class ChatService {
                             } else if (resolveResult.isAmbiguous()) {
                                 // Multiple matches — discover what's in RM's coverage and intersect.
                                 List<CoverageResource> discovered = coverageClient.discover(
-                                    principalId, tenantId, coverage);
+                                    principalId, tenantId, coverage, callerToken);
                                 List<CoverageResolveResult.ResolveCandidate> filtered =
                                     resolveResult.candidates().stream()
                                         .filter(c -> discovered.stream()
@@ -610,11 +665,11 @@ public class ChatService {
                             // book). Only a UNIQUE resolution takes this path — a genuinely ambiguous or
                             // unresolvable name still falls through to the clarification below.
                             String backstopId = resolveNamedReferenceBackstop(
-                                latestPrompt, coverageEntity, tenantId, coverage);
+                                latestPrompt, coverageEntity, tenantId, coverage, callerToken);
                             if (backstopId != null) {
                                 coverageRelId = backstopId;
                                 CoverageCheckResult check = coverageClient.check(
-                                    principalId, tenantId, coverageRelId, coverage);
+                                    principalId, tenantId, coverageRelId, coverage, callerToken);
                                 if (!check.allowed()) {
                                     emitRequestOutcome("DENIED");
                                     tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
@@ -640,7 +695,7 @@ public class ChatService {
                             // No user-authored reference in the sent conversation. Deterministic
                             // CLARIFY: do not guess or auto-select a covered resource.
                             List<CoverageResource> discovered = coverageClient.discover(
-                                principalId, tenantId, coverage);
+                                principalId, tenantId, coverage, callerToken);
 
                             if (discovered.isEmpty()) {
                                 emitRequestOutcome("DENIED");
@@ -685,15 +740,23 @@ public class ChatService {
             // When coverageRelId is set, the coverage pipeline already resolved the name to a canonical ID
             // (e.g. "Whitman Family Office" → "REL-00042"). Injecting the ID here makes EntityResolver
             // short-circuit via its REL-\d+ pattern match — no call to the external resolve endpoint needed.
+            // Hoisted so it is visible at the plan-build site below (the DAG path binds leaf inputs
+            // and derives available entity keys from it). Null when there was no pre-extraction.
+            EntityBag effectiveBag = preExtracted;
             SynthesisResult synthesis;
             if (preExtracted != null) {
-                EntityBag effectiveBag = preExtracted;
                 if (coverageEntity != null) {
                     String covExtractAs = coverageEntity.extractAs();
                     if (coverageRelId != null) {
                         // Inject the coverage-verified canonical ID as the entity reference so
                         // the resolver short-circuits via its id_pattern (no external lookup).
-                        effectiveBag = preExtracted.withReference(covExtractAs, coverageRelId);
+                        // Also carry the manifest entity key itself: DAG planning derives its
+                        // available entity set from resolved keys, while the flat binder reads
+                        // the same canonical value from synthesis. This only happens after the
+                        // resource coverage gate has checked the ID for the current turn.
+                        effectiveBag = preExtracted
+                                .withReference(covExtractAs, coverageRelId)
+                                .withResolvedValue(coverageEntity.key(), coverageRelId);
                     }
                 }
                 synthesis = inputSynthesizer.synthesize(effectiveBag, finalManifests);
@@ -735,51 +798,61 @@ public class ChatService {
                 }
             }
 
-            List<PlanNode> nodes = synthesis.inputs().entrySet().stream()
-                    .map(e -> {
-                        AgentManifest m = finalManifests.stream()
-                                .filter(a -> a.agentId().equals(e.getKey())).findFirst().orElseThrow();
-                        return new PlanNode(e.getKey(), m, e.getValue(), List.of());
-                    }).collect(Collectors.toList());
-
-            nodes.forEach(n -> tracePublisher.publish(TraceEvent.of("agent_start", requestId, conversationId,
-                    new AgentStartData(n.nodeId(), n.agent().protocol()))));
-
             long fanoutStart = System.currentTimeMillis();
-            List<NodeResult> results = executor.execute(new Plan(nodes));
+            // Attempt the multi-step DAG (feature-flagged). Any miss returns empty and the flat
+            // fan-out below runs VERBATIM — flag OFF is a byte-for-byte no-op for this path.
+            List<NodeResult> results = tryDag(synthesis, finalManifests, effectiveBag, principal,
+                    requestId, conversationId, callerToken).orElseGet(() -> {
+                List<PlanNode> nodes = synthesis.inputs().entrySet().stream()
+                        .map(e -> {
+                            AgentManifest m = finalManifests.stream()
+                                    .filter(a -> a.agentId().equals(e.getKey())).findFirst().orElseThrow();
+                            return new PlanNode(e.getKey(), m, e.getValue(), List.of());
+                        }).collect(Collectors.toList());
+
+                nodes.forEach(n -> tracePublisher.publish(TraceEvent.of("agent_start", requestId, conversationId,
+                        new AgentStartData(n.nodeId(), n.agent().protocol()))));
+
+                return executor.execute(new Plan(nodes), callerToken);
+            });
             long fanoutElapsedMs = System.currentTimeMillis() - fanoutStart;
             Timer.builder("conduit.fanout.duration")
                     .description("Time from routing decision to all agents completing")
-                    .tag("agent_count", String.valueOf(nodes.size()))
+                    .tag("agent_count", String.valueOf(results.size()))
                     .publishPercentiles(0.5, 0.95, 0.99)
+                    .publishPercentileHistogram()
                     .register(meterRegistry)
                     .record(fanoutElapsedMs, TimeUnit.MILLISECONDS);
 
             results.forEach(r -> {
                 String prev = r.isOk() && r.data() != null
                         ? r.data().toString().substring(0, Math.min(80, r.data().toString().length())) : r.status().name();
+                String status = r.isOk() ? "ok" : (r.isCleanSkip() ? "skipped" : "failed");
                 tracePublisher.publish(TraceEvent.of("agent_complete", requestId, conversationId,
-                        new AgentCompleteData(r.agentId(), r.latencyMs(), r.isOk() ? "ok" : "failed", prev)));
+                        new AgentCompleteData(r.agentId(), r.latencyMs(), status, prev)));
             });
 
             long okCount = results.stream().filter(NodeResult::isOk).count();
+            long failureCount = results.stream().filter(NodeResult::isFailure).count();
             log.info("Fan-out complete {}/{} ok", okCount, results.size());
 
             tracePublisher.publish(TraceEvent.of("synthesis_start", requestId, conversationId,
                     new SynthesisStartData(results.size(), (int) okCount)));
+            publishGroundedFigures(requestId, conversationId, results);
 
             // Graceful-degradation signal: this request is about to SYNTHESIZE an answer, but not
             // every dispatched agent succeeded (0 < successCount < dispatched). A failed sibling
             // never cancels the fan-out (hard-rule d) — we harvest survivors and answer from what
             // came back. Count that partial-answer case so the Platform board can show a
             // degradation rate. Domain-agnostic: a pure count, no agent/domain identity.
-            if (okCount > 0 && okCount < results.size()) {
+            if (okCount > 0 && failureCount > 0) {
                 emitRequestPartial();
             }
 
             String answer = answerSynthesizer.synthesize(results, latestPrompt, request.messages(), emitter, streamId, withheldDomains, requestStart);
             setTraceOutput(rootSpan, answer);
             emitRequestOutcome("ANSWERED");
+            finalDomains.forEach(this::emitAssistantDomain);
 
             tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                     new RequestCompleteData(System.currentTimeMillis() - requestStart,
@@ -787,12 +860,188 @@ public class ChatService {
         } finally { span.end(); }
     }
 
+    private void publishGroundedFigures(String requestId, String conversationId, List<NodeResult> results) {
+        List<GroundedFigure> figures = figureRenderer.render(results, registry::find);
+        if (figures.isEmpty()) return;
+        tracePublisher.publish(TraceEvent.of("grounded_figures", requestId, conversationId,
+                new GroundedFiguresData(figures.stream()
+                        .map(f -> new GroundedFiguresData.Figure(
+                                f.label(),
+                                f.renderedValue(),
+                                f.rawValue() == null ? null : f.rawValue().toString(),
+                                f.format(),
+                                f.sourceAgent()))
+                        .toList())));
+    }
+
+    /**
+     * Feature-flagged multi-step orchestration. When a selected+entitled capability is a fan-in
+     * "goal" (its {@code io} consumes another capability's output via a {@code from} reference), the
+     * {@link DagResolver} derives the producer→consumer DAG from the live registry and the
+     * {@link DagPlanExecutor} runs it by topological layers. Returns {@link Optional#empty()} on ANY
+     * miss — the caller then runs the unchanged flat fan-out, so the flag OFF (or any non-DAG
+     * request) is a strict no-op.
+     *
+     * <p><b>World B:</b> every symbol reasoned over (goal id, entity keys, produced/consumed types)
+     * comes from the manifests at runtime; this method embeds no domain vocabulary.
+     *
+     * @param synthesis      the flat synthesis result (its {@code inputs()} keys are the routed+allowed goal candidates)
+     * @param finalManifests the routed, structurally-entitled manifests (post {@code filterAgents})
+     * @param effectiveBag   the resolved entity bag (may be null when there was no pre-extraction)
+     * @param principal      the verified principal — used to RE-GATE resolver-pulled producers
+     * @param callerToken    the caller's raw verified bearer token (F-IDENTITY) — passed straight
+     *                       through to {@link DagPlanExecutor#execute} for every agent invocation
+     */
+    private Optional<List<NodeResult>> tryDag(SynthesisResult synthesis,
+                                              List<AgentManifest> finalManifests,
+                                              EntityBag effectiveBag,
+                                              Principal principal,
+                                              String requestId,
+                                              String conversationId,
+                                              String callerToken) {
+        if (!dagEnabled || effectiveBag == null) return Optional.empty();
+
+        // 1. Goal = the highest-ranked selected+allowed capability whose io declares a `from`
+        //    (produced-ref) consume — a fan-in analytics capability that depends on another
+        //    capability's output. The resolver preserves ranking in finalManifests; choosing the
+        //    first fan-in goal lets broad-access principals still get a DAG when adjacent fan-in
+        //    analytics also pass the confidence floor.
+        List<AgentManifest> goals = synthesis.inputs().keySet().stream()
+                .map(id -> finalManifests.stream().filter(m -> m.agentId().equals(id)).findFirst().orElse(null))
+                .filter(m -> m != null && hasProducedRefConsume(m))
+                .toList();
+        if (goals.isEmpty()) return Optional.empty();
+        AgentManifest goal = goals.get(0);
+        String goalId = goal.agentId();
+
+        // 2. Available entity keys = what the manifest-driven resolver resolves from the bag (e.g.
+        //    relationship_id from the coverage-injected canonical id). Keyed by entity `key`, which
+        //    is exactly what io.consumes[].entity matches. The id-shaped reference short-circuits in
+        //    the resolver without any network call, so this is deterministic.
+        Set<String> availableEntities = entityResolver.resolve(effectiveBag).resolved().keySet();
+
+        // 3. Resolve the dependency DAG from the live registry snapshot.
+        DagResolution resolution = dagResolver.resolve(goalId, registry.listAll(), availableEntities);
+        if (!resolution.ok() || resolution.plan() == null) {
+            log.info("DAG resolve miss goal={} available={} errors={} — flat fallback",
+                    goalId, availableEntities, resolution.errors());
+            emitDagFallback(resolutionFallbackReason(resolution), goal.domain());
+            return Optional.empty();
+        }
+        Plan plan = resolution.plan();
+        if (plan.nodes().size() <= 1) {
+            // Single-node plan ⇒ the flat path produces the identical result more simply.
+            emitDagFallback("single-node", goal.domain());
+            return Optional.empty();
+        }
+
+        // 4. AUTHZ RE-GATE (security-critical): the resolver pulled in producer capabilities that
+        //    were NOT in the originally gated set. Re-run the structural entitlement filter over
+        //    EVERY manifest the plan touches; if it prunes even one, refuse the DAG and fall back to
+        //    flat — never invoke a resolver-pulled producer the principal isn't entitled to.
+        List<AgentManifest> planManifests = plan.nodes().stream().map(PlanNode::agent).collect(Collectors.toList());
+        List<AgentManifest> allowedPlan = entitlementService.filterAgents(principal, planManifests);
+        if (allowedPlan.size() < planManifests.size()) {
+            log.warn("DAG authz re-gate pruned {}→{} plan manifests for principal={} — flat fallback (no producer leak)",
+                    planManifests.size(), allowedPlan.size(), principal.id());
+            emitDagFallback("regate-prune", goal.domain());
+            return Optional.empty();
+        }
+
+        // 5. Bind leaf inputs (entity-satisfied nodes with no upstream dependency) from the bag. A
+        //    missing required leaf input ⇒ refuse the DAG (never fabricate an identifier).
+        List<AgentManifest> leafManifests = plan.nodes().stream()
+                .filter(n -> n.dependsOn().isEmpty()).map(PlanNode::agent).collect(Collectors.toList());
+        Map<String, JsonNode> preBoundInputs = inputSynthesizer.synthesize(effectiveBag, leafManifests).inputs();
+        for (AgentManifest leaf : leafManifests) {
+            if (!preBoundInputs.containsKey(leaf.agentId())) {
+                log.info("DAG leaf '{}' has no bound input (required field unresolved) — flat fallback", leaf.agentId());
+                emitDagFallback("unmet-input", goal.domain());
+                return Optional.empty();
+            }
+        }
+
+        // 6. Publish the plan graph (glass-box) + one agent_start per node, then execute by layers.
+        List<PlanGraphData.Node> graphNodes = plan.nodes().stream()
+                .map(n -> new PlanGraphData.Node(n.nodeId(), n.agent().agentId(),
+                        n.agent().protocol(), n.dependsOn(), "planned"))
+                .collect(Collectors.toList());
+        tracePublisher.publish(TraceEvent.of("plan_graph", requestId, conversationId,
+                new PlanGraphData(graphNodes)));
+        plan.nodes().forEach(n -> tracePublisher.publish(TraceEvent.of("agent_start", requestId, conversationId,
+                new AgentStartData(n.nodeId(), n.agent().protocol()))));
+
+        Blackboard blackboard = new Blackboard(availableEntities, preBoundInputs, mapper);
+        log.info("DAG firing: goal={} nodes={} available={}", goalId,
+                plan.nodes().stream().map(PlanNode::nodeId).collect(Collectors.toList()), availableEntities);
+        emitDagPlan(goal.domain(), goalId, plan.nodes().size());
+        DagPlanExecutor.CoverageContext coverageContext = new DagPlanExecutor.CoverageContext(
+                principal.id(),
+                principal.tenantId() == null || principal.tenantId().isBlank() ? "default" : principal.tenantId(),
+                callerToken,
+                m -> manifestStore.getEffective(m.agentId(), m.domain(), m.subDomain()),
+                coverageClient::check);
+        List<NodeResult> results = dagExecutor.execute(plan, blackboard, requestId, conversationId,
+                callerToken, coverageContext);
+        tracePublisher.publish(TraceEvent.of("plan_graph", requestId, conversationId,
+                new PlanGraphData(plan.nodes().stream()
+                        .map(n -> new PlanGraphData.Node(n.nodeId(), n.agent().agentId(),
+                                n.agent().protocol(), n.dependsOn(), statusForPlan(n, results)))
+                        .collect(Collectors.toList()))));
+        return Optional.of(results);
+    }
+
+    private String statusForPlan(PlanNode node, List<NodeResult> results) {
+        return results.stream()
+                .filter(r -> r.nodeId().equals(node.nodeId()))
+                .findFirst()
+                .map(r -> switch (r.status()) {
+                    case OK -> mapStatus(r);
+                    case SKIPPED_CONDITION_FALSE -> "skipped_condition_false";
+                    case CONDITION_ERROR -> "condition_error";
+                    default -> r.status().name().toLowerCase();
+                })
+                .orElse("unknown");
+    }
+
+    private String mapStatus(NodeResult result) {
+        JsonNode data = result.data();
+        if (data != null && data.path("_map").asBoolean(false)) {
+            String status = "map: " + data.path("_ok").asInt(0) + "/" + data.path("_ran").asInt(0) + " ok";
+            if (data.path("_truncated").asBoolean(false)) status += " capped";
+            return status;
+        }
+        return "ok";
+    }
+
+    private String resolutionFallbackReason(DagResolution resolution) {
+        if (resolution == null || resolution.errors().isEmpty()) return "resolve-miss";
+        boolean ambiguous = resolution.errors().stream()
+                .anyMatch(e -> e.code() == ResolutionError.Code.AMBIGUOUS_PRODUCER);
+        if (ambiguous) return "ambiguous-goal";
+        boolean unmetInput = resolution.errors().stream()
+                .anyMatch(e -> e.code() == ResolutionError.Code.UNMET_REQUIRED_INPUT
+                        || e.code() == ResolutionError.Code.MISSING_PRODUCER
+                        || e.code() == ResolutionError.Code.UNKNOWN_NODE);
+        if (unmetInput) return "unmet-input";
+        boolean cycle = resolution.errors().stream()
+                .anyMatch(e -> e.code() == ResolutionError.Code.CYCLE);
+        return cycle ? "cycle" : resolution.errors().get(0).code().name().toLowerCase();
+    }
+
+    /** True if any of the manifest's {@code io.consumes} entries is a produced-output ({@code from}) reference. */
+    private static boolean hasProducedRefConsume(AgentManifest m) {
+        AgentManifest.Io io = m.io();
+        if (io == null || io.consumes() == null) return false;
+        return io.consumes().stream().anyMatch(c -> c != null && c.isProducedRef());
+    }
+
     private void handleFollowUp(ChatRequest request, SseEmitter emitter,
                                  String latestPrompt, String conversationId,
                                  String userId,
                                  Principal jwtPrincipal,
                                  String requestId, long requestStart, Span rootSpan,
-                                 EntityBag preExtracted, String streamId) throws Exception {
+                                 EntityBag preExtracted, String streamId, String callerToken) throws Exception {
         // ── BIAS-TO-FETCH FALLTHROUGH ────────────────────────────────────────────
         // A follow-up whose needed data is not already in context ("what's the performance on that
         // portfolio?" when only holdings were shown) must fetch it, not answer "no info" from
@@ -807,7 +1056,7 @@ public class ChatService {
             if (!probe.fallback() && !probe.selected().isEmpty()) {
                 log.info("FOLLOW_UP → fetch fallthrough (grounded entity + confident route) requestId={}", requestId);
                 handleFetchData(request, emitter, latestPrompt, conversationId, userId, jwtPrincipal,
-                        requestId, requestStart, rootSpan, preExtracted, streamId, true);
+                        requestId, requestStart, rootSpan, preExtracted, streamId, true, callerToken);
                 return;
             }
         }
@@ -1008,9 +1257,12 @@ public class ChatService {
      * conversation text. Falls back to the latest user message when there is only one turn.
      */
     private String buildRoutingQuery(ChatRequest request) {
+        return buildRoutingQuery(request, Math.max(1, routingContextTurns));
+    }
+
+    private String buildRoutingQuery(ChatRequest request, int window) {
         String latest = extractLatestUserMessage(request);
         if (request.messages() == null || request.messages().isEmpty()) return latest;
-        int window = Math.max(1, routingContextTurns);
         List<String> userTurns = new ArrayList<>();
         for (int i = request.messages().size() - 1; i >= 0 && userTurns.size() < window; i--) {
             Message m = request.messages().get(i);
@@ -1021,6 +1273,27 @@ public class ChatService {
         if (userTurns.size() <= 1) return latest;
         java.util.Collections.reverse(userTurns);  // oldest → newest (current turn last)
         return String.join("\n", userTurns);
+    }
+
+    private String routingTextForFetch(ChatRequest request, String latestPrompt,
+                                       boolean carryContext, boolean entityKnown) {
+        if (!carryContext) return latestPrompt;
+        if (entityKnown && !latestContainsResolvableId(latestPrompt)) {
+            return latestPrompt;
+        }
+        if (entityKnown && latestContainsResolvableId(latestPrompt)) {
+            return buildRoutingQuery(request, 2);
+        }
+        return buildRoutingQuery(request);
+    }
+
+    private boolean latestContainsResolvableId(String latestPrompt) {
+        if (latestPrompt == null || latestPrompt.isBlank()) return false;
+        return manifestStore.entityTypes().stream()
+                .filter(EntityType::isResolvable)
+                .map(EntityType::idPattern)
+                .filter(pattern -> pattern != null && !pattern.isBlank())
+                .anyMatch(pattern -> java.util.regex.Pattern.compile(pattern).matcher(latestPrompt).find());
     }
 
     /**
@@ -1126,7 +1399,8 @@ public class ChatService {
      * domain names or id prefixes in the gateway.
      */
     private String resolveNamedReferenceBackstop(String latestPrompt, EntityType coverageEntity,
-                                                 String tenantId, DomainManifest.Coverage coverage) {
+                                                 String tenantId, DomainManifest.Coverage coverage,
+                                                 String callerToken) {
         if (coverageEntity == null || coverage == null || latestPrompt == null || latestPrompt.isBlank()) {
             return null;
         }
@@ -1134,7 +1408,7 @@ public class ChatService {
         for (String phrase : properNounPhrases(latestPrompt)) {
             try {
                 CoverageResolveResult r = coverageClient.resolve(
-                    phrase, coverageEntity.resolveType(), tenantId, coverage);
+                    phrase, coverageEntity.resolveType(), tenantId, coverage, callerToken);
                 if (r.resolved() && r.id() != null) {
                     if (found != null && !found.equals(r.id())) return null; // two distinct → ambiguous
                     found = r.id();
@@ -1232,6 +1506,40 @@ public class ChatService {
                 .description("Requests answered from a partial fan-out (a dispatched agent failed)")
                 .register(meterRegistry)
                 .increment();
+    }
+
+    /** Counts DAG plans that actually fired, tagged by manifest-declared dimensions. */
+    private void emitDagPlan(String domain, String goalId, int nodeCount) {
+        Counter.builder("conduit.dag.plan")
+                .description("Multi-step DAG plans executed by the gateway")
+                .tag("domain", safeMetricTag(domain))
+                .tag("goal", safeMetricTag(goalId))
+                .tag("node_count", String.valueOf(nodeCount))
+                .register(meterRegistry)
+                .increment();
+    }
+
+    /** Counts DAG candidates that fell back to the flat path, without domain-specific logic. */
+    private void emitDagFallback(String reason, String domain) {
+        Counter.builder("conduit.dag.fallback")
+                .description("DAG candidates that fell back to flat orchestration")
+                .tag("reason", safeMetricTag(reason))
+                .tag("domain", safeMetricTag(domain))
+                .register(meterRegistry)
+                .increment();
+    }
+
+    /** Counts successful data answers by manifest-declared domain. */
+    private void emitAssistantDomain(String domain) {
+        Counter.builder("conduit.assistant.domain")
+                .description("Successful data answers by manifest-declared domain")
+                .tag("domain", safeMetricTag(domain))
+                .register(meterRegistry)
+                .increment();
+    }
+
+    private static String safeMetricTag(String value) {
+        return value == null || value.isBlank() ? "unknown" : value;
     }
 
     /**

@@ -23,6 +23,15 @@ RELATIONSHIPS: dict[str, dict] = {
         "owning_rm": "rm_jane",
         "aliases": ["calderon", "calderon trust", "the calderon trust", "calderon account"],
     },
+    "REL-00333": {
+        "id": "REL-00333",
+        "label": "Rivera Diversified Trust",
+        "canonical_name": "Rivera Diversified Trust",
+        "sub_domain": "private-banking",
+        "owning_rm": "rm_jane",
+        "aliases": ["rivera", "rivera diversified", "rivera diversified trust",
+                    "the rivera relationship", "rivera account", "diversified trust"],
+    },
     "REL-00188": {
         "id": "REL-00188",
         "label": "Okafor Family Trust",
@@ -41,16 +50,35 @@ RELATIONSHIPS: dict[str, dict] = {
         "aliases": ["sterling", "sterling capital", "sterling capital partners",
                     "the sterling relationship", "sterling account", "sterling partners"],
     },
+    "REL-00444": {
+        "id": "REL-00444",
+        "label": "Map Stress Settlement Account",
+        "canonical_name": "Map Stress Settlement Account",
+        "sub_domain": "private-banking",
+        "owning_rm": "ops_analyst_singh",
+        "aliases": ["map stress", "map stress settlement", "map stress account"],
+    },
+    "REL-00445": {
+        "id": "REL-00445",
+        "label": "Map Empty Settlement Account",
+        "canonical_name": "Map Empty Settlement Account",
+        "sub_domain": "private-banking",
+        "owning_rm": "ops_analyst_singh",
+        "aliases": ["map empty", "map empty settlement", "map empty account"],
+    },
 }
 
 # Book = the set of relationship_ids a principal may access.
 # The coverage service is the SOLE source of principal→entities. Whatever a
 # principal's book returns here IS the ground truth for entitlement CHECK.
 BOOKS: dict[str, set[str]] = {
-    "rm_jane":   {"REL-00042", "REL-00099"},
+    "rm_jane":   {"REL-00042", "REL-00099", "REL-00333"},
     # rm_carlos owns his own distinct client (Sterling). Whitman/Calderon/Okafor are
     # NOT in his book → denied, proving book-of-business isolation between RMs.
     "rm_carlos": {"REL-00201"},
+    # Asset-servicing operations persona. This mirrors IAM personal_resources seed V9
+    # so both demo book stores agree until T4 removes the IAM copy entirely.
+    "ops_analyst_singh": {"REL-00188", "REL-00444", "REL-00445"},
     "rm_ken":    {"REL-00188"},
     "admin":     set(RELATIONSHIPS.keys()),   # platform admin sees all
 }

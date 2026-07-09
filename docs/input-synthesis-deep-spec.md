@@ -79,9 +79,9 @@ resolved bag, then **validate against that agent's `input_schema`**. Outcomes pe
 ```jsonc
 // Bound, validated inputs ready for the adapters:
 {
-  "acme.wealth.holdings":            { "relationship_id": "REL-00042" },
-  "acme.wealth.performance":         { "relationship_id": "REL-00042", "period": "QTD" },
-  "acme.servicing.settlement_status":{ "relationship_id": "REL-00042" }
+  "meridian.wealth.holdings":            { "relationship_id": "REL-00042" },
+  "meridian.wealth.performance":         { "relationship_id": "REL-00042", "period": "QTD" },
+  "meridian.servicing.settlement_status":{ "relationship_id": "REL-00042" }
   // ...
 }
 ```

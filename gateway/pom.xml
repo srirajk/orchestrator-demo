@@ -104,6 +104,13 @@
             <version>2.1.22</version>
         </dependency>
 
+        <!-- ── JMESPath (per-edge dataflow projection — Blackboard field mapping) ── -->
+        <dependency>
+            <groupId>io.burt</groupId>
+            <artifactId>jmespath-jackson</artifactId>
+            <version>0.6.0</version>
+        </dependency>
+
         <!-- ── Resilience4j (harness: breaker + timeout + bulkhead + retry) ──  -->
         <dependency>
             <groupId>io.github.resilience4j</groupId>

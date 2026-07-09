@@ -71,6 +71,29 @@ conduit:
     # is in the cross-domain noise band → abstain to a deterministic clarification. Margin-based
     # (not a raw absolute cutoff) so a lone low-confidence out-of-domain hit is never trusted.
     domain-margin: 0.05
+  # T1.6 — general routing abstain gate, applied to EVERY resolve (debug + contextual chat).
+  # Distinct from conduit.resolver.domain-margin above (which compares the leader against the
+  # best OTHER-domain candidate): this is a raw top-1 floor and a raw top-1-vs-top-2 margin,
+  # independent of domain. Either check failing means "the router is guessing" → abstain to the
+  # deterministic clarify/decline path instead of serving a low-confidence pick.
+  routing:
+    # Absolute floor below which the leader is untrustworthy on its own (e.g. a genuinely
+    # out-of-scope ask). Chosen with daylight on both sides of the labeled eval set: comfortably
+    # above known junk matches (~0.31-0.34) and comfortably below the weakest legitimate match
+    # observed (~0.44) — see eval/goal-pick/labeled_queries.json + docs/specs/routing-hardening-T1.6.md.
+    min-score: 0.40
+    # Minimum top-1-vs-top-2 raw score gap. Deliberately conservative (near-zero): the labeled
+    # eval set's thinnest LEGITIMATE margin is ~0.007, so this only catches a genuine near-tie
+    # (the router truly cannot tell two candidates apart), not an honest close call.
+    min-margin: 0.005
+    rerank:
+      enabled: ${CONDUIT_ROUTING_RERANK_ENABLED:true}
+      # Invoke the LLM only for near-ties; clear embedding winners stay on the fast path.
+      margin-threshold: ${CONDUIT_ROUTING_RERANK_MARGIN_THRESHOLD:0.13}
+      # Also rerank weak-but-eligible leaders close to the abstain floor, giving the model a
+      # chance to choose among the bounded candidates or strengthen abstain.
+      abstain-adjacent-band: ${CONDUIT_ROUTING_RERANK_ABSTAIN_ADJACENT_BAND:0.08}
+      max-candidates: ${CONDUIT_ROUTING_RERANK_MAX_CANDIDATES:5}
   chat:
     # Recent user turns (incl. current) concatenated into the routing query so keyword-less
     # follow-ups inherit the conversation's domain vocabulary. Bounded to limit domain drift.
@@ -94,6 +117,12 @@ conduit:
       retry-initial-delay-ms: ${CONDUIT_LLM_INTENT_CLASSIFIER_RETRY_INITIAL_DELAY_MS:200}
       retry-backoff-multiplier: ${CONDUIT_LLM_INTENT_CLASSIFIER_RETRY_BACKOFF_MULTIPLIER:2}
       request-timeout-seconds: ${CONDUIT_LLM_INTENT_CLASSIFIER_REQUEST_TIMEOUT_SECONDS:10}
+    routing-reranker:
+      base-url: ${CONDUIT_LLM_ROUTING_RERANKER_BASE_URL:${CONDUIT_LLM_INTENT_CLASSIFIER_BASE_URL:https://api.z.ai/api/paas/v4}}
+      api-key: ${CONDUIT_LLM_ROUTING_RERANKER_API_KEY:${CONDUIT_LLM_INTENT_CLASSIFIER_API_KEY:${ZAI_API_KEY:}}}
+      model: ${CONDUIT_LLM_ROUTING_RERANKER_MODEL:${CONDUIT_LLM_INTENT_CLASSIFIER_MODEL:glm-4.5-flash}}
+      temperature: ${CONDUIT_LLM_ROUTING_RERANKER_TEMPERATURE:0.0}
+      request-timeout-seconds: ${CONDUIT_LLM_ROUTING_RERANKER_REQUEST_TIMEOUT_SECONDS:8}
     # ── Entity Extractor (pull relationship/fund/ticker from user prompt) ─────
     entity-extractor:
       base-url: ${CONDUIT_LLM_ENTITY_EXTRACTOR_BASE_URL:https://api.z.ai/api/paas/v4}
@@ -127,6 +156,9 @@ conduit:
     request-timeout-seconds: ${CONDUIT_LLM_REQUEST_TIMEOUT_SECONDS:25}
   orchestration:
     fan-out-deadline-ms: ${CONDUIT_FANOUT_DEADLINE_MS:60000}
+    map:
+      max-items: ${CONDUIT_ORCHESTRATION_MAP_MAX_ITEMS:100}
+      max-concurrency: ${CONDUIT_ORCHESTRATION_MAP_MAX_CONCURRENCY:8}
     harness:
       default-sla-ms: ${CONDUIT_HARNESS_DEFAULT_SLA_MS:5000}
       bulkhead:

@@ -65,6 +65,13 @@ public record EntityBag(
         return new EntityBag(this.references, this.lists, resolved, needsClarification, List.of());
     }
 
+    /** Returns a copy with one resolved entity key overridden. */
+    public EntityBag withResolvedValue(String key, String value) {
+        var next = new java.util.LinkedHashMap<>(this.resolved);
+        if (value == null) next.remove(key); else next.put(key, value);
+        return new EntityBag(this.references, this.lists, next, this.needsClarification, this.candidates);
+    }
+
     public EntityBag withCandidates(List<EntityCandidate> candidates) {
         return new EntityBag(this.references, this.lists, this.resolved, true, candidates);
     }

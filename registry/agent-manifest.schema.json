@@ -2,14 +2,14 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://conduit.dev/schemas/agent-manifest.schema.json",
   "title": "Meridian Agent Manifest (domain-team submission)",
-  "description": "Canonical contract a domain team submits to register one agent. A2A-Agent-Card-aligned with gateway extensions (protocol, connection, constraints). Input/output schemas are DERIVED by the gateway via introspection and are NOT part of this submission. Validate submissions against this BEFORE introspection and storage.",
+  "description": "Canonical contract a domain team submits to register one agent. A2A-Agent-Card-aligned with gateway extensions (protocol, connection, constraints). Input schemas are DERIVED by the gateway via introspection. output_schema is an optional fallback only when protocol introspection cannot derive an output schema. Validate submissions against this BEFORE introspection and storage.",
   "type": "object",
   "additionalProperties": false,
   "required": ["agent_id", "name", "description", "version", "provider", "domain", "audience", "protocol", "connection", "capabilities", "skills", "constraints"],
   "properties": {
     "agent_id": {
       "type": "string",
-      "description": "Stable dotted identifier, e.g. acme.wealth.holdings",
+      "description": "Stable dotted identifier, e.g. meridian.wealth.holdings",
       "pattern": "^[a-z0-9]+(\\.[a-z0-9_]+)+$"
     },
     "name": { "type": "string", "minLength": 1 },
@@ -123,6 +123,148 @@
       "minimum": 1,
       "maximum": 100000,
       "description": "World B: gateway truncates this agent's response to this many tokens before synthesis."
+    },
+    "output_schema": {
+      "type": "object",
+      "description": "OPTIONAL JSON Schema fallback for the agent's output. Used only when HTTP/MCP introspection cannot derive an output schema; otherwise the gateway stores the introspected schema."
+    },
+    "io": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "OPTIONAL semantic dataflow contract for multi-step (DAG) orchestration. This is NOT the wire input/output schema (that is still DERIVED via introspection) — it declares, in domain terms, what this capability NEEDS and what it PRODUCES, so the deterministic DAG resolver can wire dependent steps (producer.output type == downstream consumer.from). Capabilities without 'io' remain single-node (flat fan-out) only; the DAG path lights up per-capability as contracts are declared. World B: 'entity' references a sub-domain entity_types key; produced/consumed 'type' values are manifest-declared symbolic strings the gateway matches by equality — never hardcoded in gateway Java.",
+      "properties": {
+        "consumes": {
+          "type": "array",
+          "description": "Inputs this capability needs. Each item is EITHER an 'entity' (a leaf input, satisfied by deterministic entity resolution) OR a 'from' (an upstream capability's produced output 'type', which creates a DAG edge). Exactly one of the two per item.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "oneOf": [
+              { "required": ["entity"] },
+              { "required": ["from"] }
+            ],
+            "properties": {
+              "entity": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A sub-domain entity_types 'key' this capability needs (e.g. relationship_id). Satisfied from the blackboard's resolved entities — no upstream agent required."
+              },
+              "from": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A produced-output 'type' that some upstream capability declares in its io.produces. Matching this creates a producer→consumer edge in the DAG."
+              },
+              "required": { "type": "boolean", "default": true },
+              "select": {
+                "type": "string",
+                "minLength": 1,
+                "description": "OPTIONAL, meaningful only alongside 'from': a JMESPath expression that projects/reshapes the producer's output into exactly what this consumer expects (field projection, not a blob pass-through). Absent = identity pass-through (today's behavior) — additive and backward-compatible. Evaluated by the gateway's Blackboard; matched/interpreted generically, never domain-hardcoded."
+              }
+            }
+          }
+        },
+        "produces": {
+          "type": "array",
+          "description": "Named, typed outputs this capability places on the blackboard for downstream steps to consume via 'from'.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "type"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Blackboard key under which this capability's result is published for downstream binding."
+              },
+              "type": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Symbolic output type used to match a downstream consumer's 'from'. Manifest-declared; matched by string equality."
+              },
+              "entities": {
+                "type": "array",
+                "description": "Manifest-declared entity ids emitted by this output. Runtime filtering uses these selectors only; the gateway never scans arbitrary JSON for ids.",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "select"],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Entity type whose coverage service is declared by the domain/sub-domain manifest."
+                    },
+                    "select": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "JMESPath expression over this producer output that evaluates to a string id or array of string ids."
+                    }
+                  }
+                }
+              },
+              "figures": {
+                "type": "array",
+                "description": "Manifest-declared load-bearing figures emitted by this output. The gateway renders these from data and validates answer attribution generically.",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["label", "path", "format"],
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Human label the answer must use when attributing this rendered figure."
+                    },
+                    "path": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "JMESPath expression over this producer output that evaluates to the figure's raw scalar value."
+                    },
+                    "format": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Generic formatter id, such as percent, percent1, currency_usd, count, plain, or date."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "condition": {
+          "type": "string",
+          "minLength": 1,
+          "description": "OPTIONAL node-level JMESPath expression over this node's merged, bound input. It must evaluate to boolean; true dispatches the node, false cleanly skips it as not applicable."
+        },
+        "map": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["over"],
+          "description": "OPTIONAL dynamic map expansion. The gateway evaluates 'over' against this node's merged, bound input; each selected item is optionally reshaped by 'item_select' and dispatched to this same capability, bounded by the declared caps and global gateway ceilings.",
+          "properties": {
+            "over": {
+              "type": "string",
+              "minLength": 1,
+              "description": "JMESPath expression over the bound input that must evaluate to an array."
+            },
+            "item_select": {
+              "type": "string",
+              "minLength": 1,
+              "description": "OPTIONAL JMESPath expression over each array item that produces the per-item wire input."
+            },
+            "max_items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "OPTIONAL per-node item cap; runtime clamps to the gateway global maximum."
+            },
+            "max_concurrency": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "OPTIONAL per-node concurrency cap; runtime clamps to the gateway global maximum."
+            }
+          }
+        }
+      }
     }
   },
   "allOf": [

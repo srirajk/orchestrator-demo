@@ -2,9 +2,17 @@
 Shared JWT verification for mock agents.
 
 Verifies RS256 JWTs issued by Axiom (iam-service) using the JWKS endpoint.
-Policy:
-  - No Authorization header  → allow (gateway is trust boundary; startup introspection has no token)
-  - Authorization: Bearer <token> present but invalid → 401
+
+Policy (F-IDENTITY fix — fails CLOSED, not open):
+  - No Authorization header                         → 401 (DATA endpoints always require a
+    verified caller identity; the gateway propagates one on every agent hop). Callers that
+    legitimately have no caller identity — health checks, OpenAPI/docs introspection, and the
+    MCP initialize/tools/list handshake the gateway runs at boot — are exempted BEFORE this
+    function is ever called, in the per-service middleware (see each service's main.py /
+    server.py). This function itself never grants an anonymous allow.
+  - Authorization: Bearer <token> present but invalid → 401 (this includes a JWKS-fetch
+    failure — an agent that cannot verify a signature must reject, not allow; see the
+    JWKSUnreachable handling below)
   - Authorization: Bearer <token> present and valid   → allow, set request.state.principal
 """
 
@@ -17,7 +25,7 @@ from jwt.algorithms import RSAAlgorithm
 
 log = logging.getLogger(__name__)
 
-JWKS_URL = os.getenv("JWKS_URL", "http://iam-service:8084/.well-known/jwks.json")
+JWKS_URL = os.getenv("JWKS_URL", "http://iam-service:8084/oauth2/jwks")
 VALID_ISSUERS = {"http://host.docker.internal:8084", "http://iam-service:8084", "http://localhost:8084"}
 EXPECTED_AUDIENCE = os.getenv("AGENT_JWT_AUDIENCE", "conduit-gateway")
 
@@ -75,15 +83,23 @@ def verify_bearer_token(authorization: str | None) -> tuple[bool, str | None, di
     claims        → decoded JWT payload when allowed and token was present
     """
     if not authorization:
-        # No token — allow (gateway already authenticated the user)
-        return True, None, None
+        # F-IDENTITY: fail CLOSED. A missing token here means the caller was never
+        # authenticated, or the gateway's identity-propagation seam broke upstream —
+        # never fall through to an anonymous allow on a data endpoint. Legitimate
+        # no-token callers (health/openapi/docs introspection, MCP initialize/tools/list)
+        # are carved out by the middleware before verify_bearer_token is invoked.
+        return False, "Missing Authorization header", None
 
     if not authorization.startswith("Bearer "):
         return False, "Authorization header must be Bearer token", None
 
     token = authorization[7:].strip()
-    if not token or token == "unused":
-        return True, None, None
+    if not token:
+        # F-IDENTITY: an empty bearer value is not a token — fail CLOSED, same as a
+        # missing header. (The historical "unused"/empty placeholder bypass — a leftover
+        # accommodation with no live caller — is removed for the same reason: any string
+        # here must be a real, verifiable JWT or the request is rejected.)
+        return False, "Empty bearer token", None
 
     # Count dots — must have exactly 2 (header.payload.signature)
     if token.count(".") != 2:
@@ -105,11 +121,17 @@ def verify_bearer_token(authorization: str | None) -> tuple[bool, str | None, di
     try:
         public_key = _fetch_public_key(kid)
     except JWKSUnreachable:
-        # Infrastructure fault: JWKS endpoint unreachable. Dev fallback — allow so the
-        # local stack keeps working when iam-service is down. (The gateway is still the
-        # real trust boundary; this hop is defence-in-depth.)
-        log.warning("JWKS unreachable — allowing kid=%s (dev fallback)", kid)
-        return True, None, None
+        # F-IDENTITY: fail CLOSED, not open. A JWKS fetch failure means this agent CANNOT
+        # verify the signature — that is indistinguishable, from the caller's side, from an
+        # attacker holding a forged token, so it must be rejected exactly like an unknown
+        # kid or a bad signature. (The previous "allow so local dev keeps working" fallback
+        # was live-fire masking real signature verification: with the wrong JWKS_URL this
+        # branch fired on EVERY request, so tampered-signature tokens were accepted too —
+        # see bug-250 / test_tampered_signature_rejected.) If iam-service is genuinely
+        # down, agents correctly reject data calls until it recovers — the gateway would
+        # itself refuse to serve a request without a working JWKS in the same way.
+        log.warning("JWKS unreachable — rejecting kid=%s (fail closed)", kid)
+        return False, "JWKS endpoint unreachable — cannot verify token", None
 
     if public_key is None:
         # JWKS fetched successfully but has no key for this kid → the token was signed

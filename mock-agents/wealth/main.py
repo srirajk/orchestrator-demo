@@ -27,6 +27,8 @@ from holdings.handler import router as holdings_router
 from performance.handler import router as performance_router
 from goal_planning.handler import router as goal_planning_router
 from risk_profile.handler import router as risk_profile_router
+from concentration.handler import router as concentration_router
+from concentration_review.handler import router as concentration_review_router
 
 log = logging.getLogger(__name__)
 
@@ -65,7 +67,10 @@ async def jwt_auth_middleware(request: Request, call_next):
         return JSONResponse(status_code=401, content={"detail": error})
     if claims:
         request.state.principal = claims.get("sub")
-    return await call_next(request)
+    response = await call_next(request)
+    if claims and claims.get("sub"):
+        response.headers["X-Conduit-Verified-Sub"] = claims["sub"]
+    return response
 
 app.middleware("http")(fault_knob_middleware)
 
@@ -73,6 +78,8 @@ app.include_router(holdings_router)
 app.include_router(performance_router)
 app.include_router(goal_planning_router)
 app.include_router(risk_profile_router)
+app.include_router(concentration_router)
+app.include_router(concentration_review_router)
 
 
 @app.get("/health", tags=["infra"], summary="Health check")
@@ -81,5 +88,5 @@ def health():
         "status": "ok",
         "service": "wealth-http",
         "version": "0.3.0",
-        "agents": ["holdings", "performance", "risk_profile", "goal_planning"],
+        "agents": ["holdings", "performance", "risk_profile", "goal_planning", "concentration", "concentration_review"],
     }

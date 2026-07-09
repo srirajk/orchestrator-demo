@@ -14,7 +14,7 @@ from shared.error_schema import error_response
 from shared.validators import validate_policy_id
 
 router = APIRouter(prefix="/policy-details", tags=["policy_details"])
-AGENT_ID = "acme.insurance.policy_details"
+AGENT_ID = "meridian.insurance.policy_details"
 log = logging.getLogger(__name__)
 
 

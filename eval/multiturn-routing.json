@@ -8,7 +8,7 @@
       "intent": "FETCH_DATA",
       "expected_domain": "wealth-management",
       "expected_outcome": "ANSWERED",
-      "must_not_route": ["acme.insurance.claim_status"],
+      "must_not_route": ["meridian.insurance.claim_status"],
       "note": "Baseline in-coverage wealth query — must keep working."
     },
     {
@@ -17,7 +17,7 @@
       "intent": "FETCH_DATA",
       "expected_domain": "wealth-management",
       "expected_outcome": "DENIED",
-      "must_not_route": ["acme.insurance.claim_status"],
+      "must_not_route": ["meridian.insurance.claim_status"],
       "note": "Out-of-coverage: routes to wealth (has domain vocabulary), coverage CHECK denies. Clean deny, NOT misrouted to insurance."
     },
     {
@@ -26,7 +26,7 @@
       "intent": "FETCH_DATA",
       "expected_domain": "wealth-management",
       "expected_outcome": "ANSWERED",
-      "must_not_route": ["acme.insurance.claim_status"],
+      "must_not_route": ["meridian.insurance.claim_status"],
       "note": "THE fix. Keyword-less follow-up; bare-message routing scored insurance.claim_status @0.312 and pruned wealth → wrong deny. Context-enriched routing now routes to wealth; Calderon is in the book → succeeds."
     },
     {
@@ -34,7 +34,7 @@
       "user": "Calderon Trust (REL-00099)?",
       "intent": "FETCH_DATA",
       "expected_outcome": "ANSWERED",
-      "must_not_route": ["acme.insurance.claim_status"],
+      "must_not_route": ["meridian.insurance.claim_status"],
       "focus_mechanism": "focal-entity",
       "note": "FOCAL ENTITY (bug-233): a terse ask that EXPLICITLY names the entity (name + id) is not ambiguous — it answers, it does not clarify. Supersedes the earlier bug-232 CLARIFY expectation: an explicitly-stated entity in the latest message wins."
     },
@@ -43,7 +43,7 @@
       "user": "Calderon Trust ?",
       "intent": "FETCH_DATA",
       "expected_outcome": "ANSWERED",
-      "must_not_route": ["acme.insurance.claim_status"],
+      "must_not_route": ["meridian.insurance.claim_status"],
       "focus_mechanism": "focal-entity",
       "note": "FOCAL ENTITY (bug-233): a bare but explicitly-named entity ('Calderon Trust') is the subject → FETCH_DATA and answer (Calderon is in the book). Only a message that names NO entity and back-references none may clarify."
     },
@@ -53,7 +53,7 @@
       "intent": "FETCH_DATA",
       "expected_domain": "wealth-management",
       "expected_outcome": "ANSWERED",
-      "must_not_route": ["acme.insurance.claim_status"],
+      "must_not_route": ["meridian.insurance.claim_status"],
       "focus_mechanism": "focal-entity",
       "note": "FOCAL ENTITY (bug-233): the entity NAMED in the latest turn (Whitman) supersedes the entity discussed just before (Calderon) — the extractor must not drag the prior subject back in and manufacture a Whitman-vs-Calderon clarify. Whitman holdings answer."
     },
@@ -63,7 +63,7 @@
       "intent": "FOLLOW_UP",
       "expected_domain": "wealth-management",
       "expected_outcome": "ANSWERED",
-      "must_not_route": ["acme.insurance.claim_status"],
+      "must_not_route": ["meridian.insurance.claim_status"],
       "focus_mechanism": "anaphora + bias-to-fetch",
       "note": "ANAPHORA + BIAS-TO-FETCH (bug-233): 'that portfolio' resolves to the last focal entity (Whitman); performance was not shown before, so the FOLLOW_UP must fall through to a fetch (bias-to-fetch) rather than answer 'no info' from memory."
     },
@@ -73,7 +73,7 @@
       "intent": "FETCH_DATA",
       "expected_domain": "asset-servicing",
       "expected_outcome": "ANSWERED",
-      "must_not_route": ["acme.insurance.claim_status"],
+      "must_not_route": ["meridian.insurance.claim_status"],
       "focus_mechanism": "facet-carry-setup",
       "note": "Establishes a settlement facet on Whitman by explicit id; sets up the terse id-only follow-up below."
     },
@@ -82,7 +82,7 @@
       "user": "and for REL-00099?",
       "intent": "FETCH_DATA",
       "expected_outcome": "ANSWERED",
-      "must_not_route": ["acme.insurance.claim_status"],
+      "must_not_route": ["meridian.insurance.claim_status"],
       "focus_mechanism": "facet-carry + id-backstop",
       "note": "FACET CARRY + ID BACKSTOP (bug-233): the bare 'and for REL-00099?' inherits the prior turn's settlement facet (routing does not abstain on the margin because the turn carries an explicit grounded id) and the deterministic id_pattern backstop recovers REL-00099 when the LLM drops it. Calderon settlement answers."
     }

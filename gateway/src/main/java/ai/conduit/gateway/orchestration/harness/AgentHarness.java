@@ -5,6 +5,7 @@ import ai.conduit.gateway.orchestration.model.NodeResult;
 import ai.conduit.gateway.orchestration.model.PlanNode;
 import ai.conduit.gateway.registry.model.AgentManifest;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
@@ -15,11 +16,15 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.time.Instant;
+import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
@@ -49,6 +54,7 @@ import java.util.concurrent.TimeoutException;
 public class AgentHarness {
 
     private static final Logger log = LoggerFactory.getLogger(AgentHarness.class);
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final List<ProtocolAdapter> adapters;
     private final CircuitBreakerRegistry cbRegistry;
@@ -107,13 +113,15 @@ public class AgentHarness {
     }
 
     /**
-     * Execute a single plan node through the resilience harness.
+     * Execute a single plan node through the resilience harness, with no caller identity.
+     * Test-only convenience (real production adapters — {@code HttpAdapter}/{@code McpAdapter} —
+     * refuse to call an agent without a bearer token; see {@link #execute(PlanNode, ExecutorService, String)}).
      *
      * <p>Never throws — all failures are captured in the returned {@link NodeResult}.
      */
     public NodeResult execute(PlanNode node) {
         // Delegate to overloaded form with no external executor (creates a per-call virtual thread).
-        return execute(node, null);
+        return execute(node, null, null);
     }
 
     /**
@@ -124,10 +132,37 @@ public class AgentHarness {
      * <p>Never throws — all failures are captured in the returned {@link NodeResult}.
      */
     public NodeResult execute(PlanNode node, ExecutorService exec) {
+        return execute(node, exec, null);
+    }
+
+    /**
+     * Execute a plan node through the resilience harness, propagating {@code callerToken} — the
+     * calling principal's verified JWT, captured as request-scoped DATA at ingress — to the adapter.
+     *
+     * <p><b>F-IDENTITY:</b> this is the seam that carries caller identity onto the pipeline/DAG
+     * virtual-thread executors, since {@code SecurityContextHolder} (thread-local) does not survive
+     * the hop from the servlet thread. {@code callerToken} flows caller → {@code ChatService} →
+     * {@code FlatPlanExecutor}/{@code DagPlanExecutor} → here → {@code ProtocolAdapter.invoke}.
+     *
+     * <p>Never throws — all failures are captured in the returned {@link NodeResult}.
+     */
+    public NodeResult execute(PlanNode node, ExecutorService exec, String callerToken) {
         AgentManifest agent = node.agent();
         String agentId     = agent.agentId();
         long start         = System.currentTimeMillis();
         int  slaMs         = resolveTimeoutMs(agent);
+
+        String identityProblem = identityProblem(callerToken);
+        if (identityProblem != null) {
+            long latency = System.currentTimeMillis() - start;
+            log.warn("Agent {} not dispatched — caller identity {}", agentId, identityProblem);
+            NodeResult authExpired = new NodeResult(node.nodeId(), agentId, agent.protocol(),
+                    NodeResult.Status.AUTH_EXPIRED, null, latency,
+                    "Caller identity " + identityProblem);
+            emitCallCounter(agentId, agent.protocol(), authExpired.status().name());
+            emitLatencyTimer(agentId, agent.protocol(), latency);
+            return authExpired;
+        }
 
         ProtocolAdapter adapter = findAdapter(agent.protocol());
         if (adapter == null) {
@@ -161,25 +196,37 @@ public class AgentHarness {
             return failed(node, latency, "Bulkhead queue full (" + bulkheadQueueCapacity + " max)");
         }
 
+        // MDC (requestId/conversationId/userId) is thread-local and does not survive the hop onto
+        // vtExecutor's virtual thread, so the "propagating JWT to agent" log line in HttpAdapter/
+        // McpAdapter — the security-relevant one — would otherwise print an empty [rid= cid= uid=].
+        // Captured on this calling thread (re-populated by FlatPlanExecutor/DagPlanExecutor's own
+        // MdcPropagation.run) and re-applied inside the submitted task.
+        final Map<String, String> mdcContext = MDC.getCopyOfContextMap();
+
         // Submit to the virtual-thread executor. The virtual thread parks on
         // executing.acquire() — it unmounts from its carrier, freeing the OS thread
         // for other work. This is the correct pattern: no platform thread pool needed.
         Future<JsonNode> future = vtExecutor.submit(() -> {
-            // Phase 1: leave the queue. Whether we successfully acquire an executing
-            // slot OR the acquire() is interrupted (future cancelled on SLA timeout),
-            // the queue permit is released exactly once in this finally — so a
-            // timed-out call parked on acquire() can never leak its queue permit.
+            if (mdcContext != null) MDC.setContextMap(mdcContext);
             try {
-                executing.acquire();  // park this virtual thread until a slot opens
+                // Phase 1: leave the queue. Whether we successfully acquire an executing
+                // slot OR the acquire() is interrupted (future cancelled on SLA timeout),
+                // the queue permit is released exactly once in this finally — so a
+                // timed-out call parked on acquire() can never leak its queue permit.
+                try {
+                    executing.acquire();  // park this virtual thread until a slot opens
+                } finally {
+                    queued.release();     // free the queue permit deterministically
+                }
+                // Phase 2: executing slot is held — run the call and release it on the way out.
+                try {
+                    return CircuitBreaker.decorateCallable(cb,
+                            () -> adapter.invoke(node.agent(), node.input(), callerToken)).call();
+                } finally {
+                    executing.release();
+                }
             } finally {
-                queued.release();     // free the queue permit deterministically
-            }
-            // Phase 2: executing slot is held — run the call and release it on the way out.
-            try {
-                return CircuitBreaker.decorateCallable(cb,
-                        () -> adapter.invoke(node.agent(), node.input())).call();
-            } finally {
-                executing.release();
+                MDC.clear();
             }
         });
 
@@ -278,6 +325,24 @@ public class AgentHarness {
                 null,
                 latencyMs,
                 message);
+    }
+
+    private String identityProblem(String callerToken) {
+        if (callerToken == null || callerToken.isBlank()) {
+            return null;
+        }
+        try {
+            String[] parts = callerToken.split("\\.");
+            if (parts.length < 2) return null;
+            JsonNode claims = MAPPER.readTree(Base64.getUrlDecoder().decode(parts[1]));
+            JsonNode exp = claims.path("exp");
+            if (!exp.isNumber()) return null;
+            long expiresAt = exp.asLong();
+            if (Instant.now().getEpochSecond() >= expiresAt) return "expired";
+            return null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // ── Metric helpers ───────────────────────────────────────────────────────

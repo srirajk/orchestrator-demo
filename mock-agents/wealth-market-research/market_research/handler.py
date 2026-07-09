@@ -17,7 +17,7 @@ from shared.telemetry import agent_span
 from shared.error_schema import error_response
 
 router = APIRouter(prefix="/market-research", tags=["market_research"])
-AGENT_ID = "acme.wealth.market_research"
+AGENT_ID = "meridian.wealth.market_research"
 log = logging.getLogger(__name__)
 
 

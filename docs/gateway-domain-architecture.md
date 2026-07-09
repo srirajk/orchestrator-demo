@@ -81,7 +81,7 @@ Per-agent execution contract. Gateway derives call parameters from this.
 
 ```json
 {
-  "agent_id": "acme.wealth.holdings",
+  "agent_id": "meridian.wealth.holdings",
   "domain": "wealth-management",
   "protocol": "http",
   "connection": { "url": "${WEALTH_HTTP_URL}/holdings" },
@@ -357,9 +357,9 @@ registry/
       cash-management.json
 
   manifests/
-    acme.wealth.holdings.json           ← agent (declares domain + sub_domain)
-    acme.wealth.performance.json
-    acme.servicing.custody_positions.json
+    meridian.wealth.holdings.json           ← agent (declares domain + sub_domain)
+    meridian.wealth.performance.json
+    meridian.servicing.custody_positions.json
 ```
 
 ### What Each Level Declares
@@ -396,14 +396,14 @@ registry/
       "default": "most recent quarter"
     }
   },
-  "agents": ["acme.wealth.holdings", "acme.wealth.performance", "acme.wealth.risk_profile"]
+  "agents": ["meridian.wealth.holdings", "meridian.wealth.performance", "meridian.wealth.risk_profile"]
 }
 ```
 
-**Agent** (`registry/manifests/acme.wealth.holdings.json`):
+**Agent** (`registry/manifests/meridian.wealth.holdings.json`):
 ```json
 {
-  "agent_id": "acme.wealth.holdings",
+  "agent_id": "meridian.wealth.holdings",
   "domain": "wealth-management",
   "sub_domain": "private-banking",
   "protocol": "http",

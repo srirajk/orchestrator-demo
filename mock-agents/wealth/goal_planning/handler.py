@@ -15,7 +15,7 @@ _LLM_KEY   = os.environ.get("GOAL_PLANNING_LLM_API_KEY") or None
 _LLM_MODEL = os.environ.get("GOAL_PLANNING_LLM_MODEL") or None
 
 router = APIRouter(prefix="/goal-planning", tags=["goal_planning"])
-AGENT_ID = "acme.wealth.goal_planning"
+AGENT_ID = "meridian.wealth.goal_planning"
 log = logging.getLogger(__name__)
 
 

@@ -4,14 +4,14 @@ import ai.conduit.gateway.adapter.ProtocolAdapter;
 import ai.conduit.gateway.registry.model.AgentManifest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -60,7 +60,7 @@ public class HttpAdapter implements ProtocolAdapter {
     }
 
     @Override
-    public JsonNode invoke(AgentManifest manifest, JsonNode input) throws Exception {
+    public JsonNode invoke(AgentManifest manifest, JsonNode input, String bearerToken) throws Exception {
         String openapiUrl = manifest.connection().openapiUrl();
         if (openapiUrl == null || openapiUrl.isBlank()) {
             throw new IllegalArgumentException(
@@ -68,6 +68,8 @@ public class HttpAdapter implements ProtocolAdapter {
         }
 
         String baseUrl = deriveBaseUrl(openapiUrl);
+        // Spec fetch is unauthenticated introspection (agents exempt /openapi.json from
+        // jwt_verify) — only the actual data call below requires the caller's identity.
         JsonNode spec = fetchSpec(baseUrl, openapiUrl);
 
         OperationInfo op = findOperation(spec, manifest.connection().operationId());
@@ -77,17 +79,28 @@ public class HttpAdapter implements ProtocolAdapter {
                     + "' not found in OpenAPI spec at " + openapiUrl);
         }
 
+        // F-IDENTITY: this is a data-plane call — it must carry the caller's verified identity.
+        // Never silently invoke without it; a missing token here means the security context was
+        // not propagated (a bug upstream), not a green light to call anonymously.
+        if (bearerToken == null || bearerToken.isBlank()) {
+            throw new IllegalStateException(
+                    "No caller identity available for agent " + manifest.agentId()
+                    + " — refusing to invoke without a bearer token");
+        }
+
         String fullPath = baseUrl + op.path();
         log.debug("HttpAdapter → {} {} for agent {}", op.method(), fullPath, manifest.agentId());
 
-        String responseBody;
+        ResponseEntity<String> response;
         if ("get".equalsIgnoreCase(op.method())) {
-            responseBody = invokeGet(fullPath, input);
+            response = invokeGet(fullPath, input, bearerToken);
         } else {
-            responseBody = invokePost(fullPath, input);
+            response = invokePost(fullPath, input, bearerToken);
         }
 
-        return objectMapper.readTree(responseBody);
+        String responseBody = response.getBody() != null ? response.getBody() : "{}";
+        return withVerifiedSub(objectMapper.readTree(responseBody),
+                response.getHeaders().getFirst("X-Conduit-Verified-Sub"));
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -155,7 +168,7 @@ public class HttpAdapter implements ProtocolAdapter {
     }
 
     /** Build a GET request by appending all input fields as query parameters. */
-    private String invokeGet(String url, JsonNode input) {
+    private ResponseEntity<String> invokeGet(String url, JsonNode input, String bearerToken) {
         UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url);
         if (input != null) {
             Iterator<Map.Entry<String, JsonNode>> fields = input.fields();
@@ -169,42 +182,43 @@ public class HttpAdapter implements ProtocolAdapter {
         }
         URI uri = builder.build(true).toUri();
         log.debug("GET {}", uri);
-        var response = restTemplate.exchange(uri, HttpMethod.GET,
-                new HttpEntity<>(agentHeaders()), String.class);
-        return response.getBody() != null ? response.getBody() : "{}";
+        return restTemplate.exchange(uri, HttpMethod.GET,
+                new HttpEntity<>(agentHeaders(bearerToken)), String.class);
     }
 
     /** POST the input JsonNode as the request body. */
-    private String invokePost(String url, JsonNode input) throws Exception {
+    private ResponseEntity<String> invokePost(String url, JsonNode input, String bearerToken) throws Exception {
         log.debug("POST {} body={}", url, input);
         String body = input != null ? objectMapper.writeValueAsString(input) : "{}";
-        HttpHeaders headers = agentHeaders();
+        HttpHeaders headers = agentHeaders(bearerToken);
         headers.setContentType(MediaType.APPLICATION_JSON);
-        var response = restTemplate.exchange(url, HttpMethod.POST,
+        return restTemplate.exchange(url, HttpMethod.POST,
                 new HttpEntity<>(body, headers), String.class);
-        return response.getBody() != null ? response.getBody() : "{}";
     }
 
     /**
-     * Build outbound headers, propagating the caller's JWT when present.
-     * Agents verify the signature themselves — no implicit gateway trust.
+     * Build outbound headers, propagating the caller's JWT.
+     *
+     * <p>F-IDENTITY: {@code bearerToken} is passed explicitly by the caller (harness → adapter) —
+     * never read from {@code SecurityContextHolder}, which is thread-local and does not survive the
+     * hop onto the pipeline/DAG virtual-thread executors. Callers (see {@link #invoke}) already
+     * guarantee non-null/blank before reaching here for data-plane calls.
      */
-    private HttpHeaders agentHeaders() {
+    private HttpHeaders agentHeaders(String bearerToken) {
         HttpHeaders headers = new HttpHeaders();
-        String token = extractBearerToken();
-        if (token != null) {
-            headers.setBearerAuth(token);
-            log.debug("HttpAdapter: propagating JWT to agent");
-        }
+        headers.setBearerAuth(bearerToken);
+        log.debug("HttpAdapter: propagating JWT to agent");
         return headers;
     }
 
-    private String extractBearerToken() {
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth instanceof JwtAuthenticationToken jwtAuth) {
-            return jwtAuth.getToken().getTokenValue();
+    private JsonNode withVerifiedSub(JsonNode data, String verifiedSub) {
+        if (verifiedSub == null || verifiedSub.isBlank() || data == null || !data.isObject()) {
+            return data;
         }
-        return null;
+        ObjectNode copy = objectMapper.createObjectNode();
+        copy.put("_verified_sub", verifiedSub);
+        copy.setAll((ObjectNode) data);
+        return copy;
     }
 
     /** Lightweight value type for a matched OpenAPI operation. */

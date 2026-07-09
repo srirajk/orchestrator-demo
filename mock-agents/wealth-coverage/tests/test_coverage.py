@@ -25,15 +25,20 @@ client = TestClient(app)
 
 
 class TestDiscover:
-    def test_rm_jane_sees_her_two_relationships(self):
+    def test_rm_jane_sees_her_relationships(self):
         results = discover("rm_jane")
         ids = {r["id"] for r in results}
-        assert ids == {"REL-00042", "REL-00099"}
+        assert ids == {"REL-00042", "REL-00099", "REL-00333"}
 
     def test_rm_ken_sees_okafor(self):
         results = discover("rm_ken")
         ids = {r["id"] for r in results}
-        assert ids == {"REL-00188"}
+        assert ids == {"REL-00188", "REL-00444", "REL-00445"}
+
+    def test_ops_analyst_singh_sees_okafor(self):
+        results = discover("ops_analyst_singh")
+        ids = {r["id"] for r in results}
+        assert ids == {"REL-00188", "REL-00444", "REL-00445"}
 
     def test_unknown_principal_gets_empty_list(self):
         assert discover("nobody") == []
@@ -41,7 +46,7 @@ class TestDiscover:
     def test_admin_sees_all(self):
         results = discover("admin")
         ids = {r["id"] for r in results}
-        assert {"REL-00042", "REL-00099", "REL-00188"}.issubset(ids)
+        assert {"REL-00042", "REL-00099", "REL-00188", "REL-00333", "REL-00444", "REL-00445"}.issubset(ids)
 
 
 class TestCheck:
@@ -54,6 +59,11 @@ class TestCheck:
         result = check("rm_jane", "REL-00188")
         assert result["allowed"] is False
         assert result["reason"] == "not-in-book"
+
+    def test_ops_analyst_singh_allowed_okafor(self):
+        result = check("ops_analyst_singh", "REL-00188")
+        assert result["allowed"] is True
+        assert result["reason"] == "in-book"
 
     def test_unknown_resource_denied(self):
         result = check("rm_jane", "REL-99999")
@@ -101,7 +111,7 @@ class TestDiscoverEndpoint:
         assert resp.status_code == 200
         data = resp.json()
         ids = {r["id"] for r in data}
-        assert ids == {"REL-00042", "REL-00099"}
+        assert ids == {"REL-00042", "REL-00099", "REL-00333"}
         # Verify shape
         for r in data:
             assert "id" in r

@@ -1,0 +1,81 @@
+{
+  "agent_id": "meridian.insurance.policy_details",
+  "name": "Insurance Policy Details",
+  "description": "Returns the policy record for a commercial insurance policy: line of business, premium, coverage limit, deductible, status, and effective date. Accepts policy_id as the primary key.",
+  "version": "1.0.0",
+  "provider": {
+    "organization": "Meridian Demo Bank"
+  },
+  "domain": "insurance",
+  "audience": "segment",
+  "sub_domain": "claims-servicing",
+  "max_response_tokens": 2000,
+  "protocol": "http",
+  "connection": {
+    "openapi_url": "http://insurance-http:8087/openapi.json",
+    "operation_id": "get_policy_details"
+  },
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false
+  },
+  "skills": [
+    {
+      "id": "get_policy_details",
+      "name": "get_policy_details",
+      "description": "Retrieve policy details \u2014 line of business, premium, coverage limit, deductible, status, and effective date \u2014 for a commercial insurance policy.",
+      "tags": [
+        "policy",
+        "policy-details",
+        "premium",
+        "coverage-limit",
+        "underwriting",
+        "insurance"
+      ],
+      "examples": [
+        "show me the policy details for the Continental Freight policy",
+        "what is the coverage limit for this policy",
+        "what is the premium for POL-77001",
+        "what line of business is this policy",
+        "is this policy active"
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    }
+  ],
+  "constraints": {
+    "access_mode": "read",
+    "data_classification": "confidential-pii",
+    "sla_timeout_ms": 30000
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "policy_id": { "type": "string" },
+      "policy_name": { "type": "string" },
+      "line_of_business": { "type": "string" },
+      "insured_name": { "type": "string" },
+      "premium": { "type": "number" },
+      "premium_currency": { "type": "string" },
+      "coverage_limit": { "type": "number" },
+      "deductible": { "type": "number" },
+      "status": { "type": "string" },
+      "effective_date": { "type": "string" },
+      "expiry_date": { "type": "string" },
+      "as_of_date": { "type": "string" }
+    },
+    "required": ["policy_id", "policy_name", "line_of_business", "insured_name", "premium", "premium_currency", "coverage_limit", "deductible", "status", "effective_date", "expiry_date", "as_of_date"]
+  },
+  "io": {
+    "consumes": [
+      { "entity": "policy_id", "required": true }
+    ],
+    "produces": [
+      { "name": "policy_record", "type": "insurance.policy_record" }
+    ]
+  }
+}

@@ -158,9 +158,9 @@ If your sub-domain is role-based (`resource_scoped: false`), item 4 is not requi
   },
 
   "agents": [
-    "acme.wealth.holdings",
-    "acme.wealth.performance",
-    "acme.wealth.risk_profile"
+    "meridian.wealth.holdings",
+    "meridian.wealth.performance",
+    "meridian.wealth.risk_profile"
   ]
 }
 ```
@@ -178,8 +178,8 @@ If your sub-domain is role-based (`resource_scoped: false`), item 4 is not requi
   "required_context": [],
 
   "agents": [
-    "acme.servicing.custody_positions",
-    "acme.servicing.settlement_status"
+    "meridian.servicing.custody_positions",
+    "meridian.servicing.settlement_status"
   ]
 }
 ```
@@ -210,7 +210,7 @@ If your sub-domain is role-based (`resource_scoped: false`), item 4 is not requi
 
 ```json
 {
-  "agent_id":    "acme.wealth.holdings",
+  "agent_id":    "meridian.wealth.holdings",
   "domain":      "wealth-management",
   "sub_domain":  "private-banking",
 
@@ -232,7 +232,7 @@ If your sub-domain is role-based (`resource_scoped: false`), item 4 is not requi
 
 ```json
 {
-  "agent_id":    "acme.servicing.settlement_status",
+  "agent_id":    "meridian.servicing.settlement_status",
   "domain":      "asset-servicing",
   "sub_domain":  "custody-operations",
 
