@@ -3377,10 +3377,10 @@
   {
     "id": "bug-209",
     "timestamp": "2026-07-01T21:44:01Z",
-    "error_message": "test_manifest_cross_references_are_consistent failed: acme.servicing.nav had sub_domain cash-management but was listed under corporate-actions",
-    "file": "registry/manifests/acme.servicing.nav.json",
+    "error_message": "test_manifest_cross_references_are_consistent failed: meridian.servicing.nav had sub_domain cash-management but was listed under corporate-actions",
+    "file": "registry/manifests/meridian.servicing.nav.json",
     "root_cause": "The agent manifest sub_domain field drifted from the sub-domain manifest membership and existing docs.",
-    "fix": "Changed acme.servicing.nav sub_domain to corporate-actions so agent, sub-domain manifest, and docs agree.",
+    "fix": "Changed meridian.servicing.nav sub_domain to corporate-actions so agent, sub-domain manifest, and docs agree.",
     "tags": [
       "registry",
       "manifest",
@@ -3799,7 +3799,7 @@
   {
     "id": "bug-232",
     "timestamp": "2026-07-05T00:00:00Z",
-    "error_message": "Chat keyword-less follow-up misrouted and wrongly denied: 'can you then summarize for Calderon Trust (REL-00099)?' selected only acme.insurance.claim_status @0.312, pruned the wealth agents 'below-confidence-floor', then the segment gate denied with 'You do not have access to any of the required services.' Calderon (REL-00099) IS in rm_jane's book.",
+    "error_message": "Chat keyword-less follow-up misrouted and wrongly denied: 'can you then summarize for Calderon Trust (REL-00099)?' selected only meridian.insurance.claim_status @0.312, pruned the wealth agents 'below-confidence-floor', then the segment gate denied with 'You do not have access to any of the required services.' Calderon (REL-00099) IS in rm_jane's book.",
     "file": "gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java, gateway/src/main/java/ai/conduit/gateway/resolver/service/AgentResolver.java",
     "root_cause": "The chat path routed on the BARE last user message (extractLatestUserMessage) with NO domain scope (resolver.resolve(latestPrompt)). A keyword-less follow-up embeds into the cross-domain noise band (~0.30); the porous absolute floor 0.30 let a single out-of-domain agent (insurance @0.312) through while the true wealth agents fell below the floor. The empty-selection CLARIFY fallback was also starved: a lone noise hit kept selected non-empty, so it bypassed clarification and went to a wrong deny. Model-independent (gpt-4o-mini and gpt-5.4-mini identical).",
     "fix": "Context-aware routing. (1) Route on conversation-enriched text (recent user turns, bounded by conduit.chat.routing-context-turns) so a keyword-less follow-up inherits the conversation's established domain vocabulary and the true matches rise above the floor. (2) New AgentResolver.resolveContextual(): confidence/abstain gate \u2014 route only if the leading candidate clears the floor AND is either decisively strong (>= conduit.resolver.decisive-score) or beats the best OTHER-domain candidate by conduit.resolver.domain-margin; otherwise abstain (empty+fallback) -> deterministic CLARIFY, fixing the starved fallback. Margin-based, not a raw cutoff. Applied the normal dynamic floor to the broad pass (NOT a rigid single-domain re-scope) so legitimate cross-domain fan-out (holdings + settlements) is preserved. (3) CLARIFY-intent turns route on the bare message (carryContext=false) so a terse ask cannot inherit a confident domain and be answered. Domain decision comes from the winning agent manifest's own domain() field \u2014 no domain literal in gateway (world-b-check CRITICAL 0). Verified via BFF multi-turn: turn3 Calderon now routes wealth-led (holdings @0.587, no insurance) and answers; turn5 bare 'Calderon Trust?' clean CLARIFY; Okafor out-of-coverage clean deny not insurance; hero cross-domain query still fans out; golden routing eval 91.5%.",
@@ -4084,5 +4084,174 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-07-07T13:20:00Z"
+  },
+  {
+    "id": "bug-245",
+    "timestamp": "2026-07-08T01:05:00Z",
+    "error_message": "AgentManifest.io dropped when manifests re-stamped through AgentIntrospector.withDerived and AgentRegistry.stampAndStore \u2014 both used the old-arity (19-arg) constructor that sets io=null, so DagResolver saw MISSING_PRODUCER over the real registry.",
+    "file": "gateway/src/main/java/ai/conduit/gateway/registry/introspection/AgentIntrospector.java, gateway/src/main/java/ai/conduit/gateway/registry/service/AgentRegistry.java",
+    "root_cause": "AgentManifest gained an optional `io` component plus a backward-compatible 19-arg delegating constructor (io=null). The two registry re-stamp sites still called that old-arity ctor, silently discarding io on every snapshot rebuild.",
+    "fix": "Passed the source manifest's io() through the full canonical constructor at both re-stamp sites (s.io() in withDerived, manifest.io() in stampAndStore). Added DagRealManifestTest asserting io survives the load+re-stamp round-trip and that the old-arity ctor drops io (regression guard).",
+    "tags": [
+      "world-b",
+      "dag",
+      "orchestration",
+      "AgentManifest",
+      "io",
+      "registry",
+      "constructor-arity"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-08T01:05:00Z"
+  },
+  {
+    "id": "bug-246",
+    "timestamp": "2026-07-08",
+    "error_message": "RegistryBootstrapLoader: Skipping invalid manifest 'meridian.wealth.concentration.json': property 'io' is not defined in the schema and the schema does not allow additional properties. Running gateway loaded only 13 agents; DAG never fired (concentration absent from registry).",
+    "file": "gateway/src/main/resources/agent-manifest.schema.json",
+    "root_cause": "ManifestValidator validates against the CLASSPATH schema (/agent-manifest.schema.json from gateway/src/main/resources), which was stale \u2014 it lacked the optional 'io' block and had additionalProperties:false at root, so every io-bearing manifest was rejected at bootstrap. registry/agent-manifest.schema.json (the pinned copy) had 'io'; the two had drifted.",
+    "fix": "Synced the bundled classpath schema from the pinned registry copy (cp registry/agent-manifest.schema.json gateway/src/main/resources/). Now io-bearing manifests validate; concentration registers \u2192 14 agents. mvn test still 90/90.",
+    "tags": [
+      "schema",
+      "registry",
+      "manifest-validation",
+      "dag",
+      "io",
+      "world-b"
+    ],
+    "related_bugs": [
+      "bug-245"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-07-08"
+  },
+  {
+    "id": "bug-247",
+    "timestamp": "2026-07-08",
+    "error_message": "meridian.wealth.concentration FAILED: 422 Unprocessable Entity 'holdings payload has no positions to analyse' when the DAG fired holdings\u2192concentration.",
+    "file": "registry/manifests/wealth-management/meridian.wealth.concentration.json",
+    "root_cause": "concentration.io declared TWO from-consumes (wealth.holdings required + wealth.risk_profile optional). The resolver pulled in BOTH producers (holdings + risk_profile); both ran and produced, so Blackboard.bind took its 2-producer MERGE branch and wrapped each output under its produces[].name \u2192 {holdings:{...}, risk_profile:{...}}. The concentration wire endpoint (HoldingsPayload) expects the holdings fields at TOP LEVEL, so top-level 'positions' was absent \u2192 422. The Blackboard merge convention (wrap-by-name) does not match the concentration agent's flat pass-through wire contract.",
+    "fix": "Removed the optional {from: wealth.risk_profile} edge from concentration's io so the fan-in is a clean single-producer pass-through (holdings output piped straight through). concentration now returns 200 with real single-name %/HHI/breach flags. risk_profile was 'context annotation, never required' per the agent, so no functional loss. Manifest-only change (World-B clean, no gateway Java). Follow-up seam: align Blackboard multi-producer merge with agent wire contracts before re-adding optional producers.",
+    "tags": [
+      "dag",
+      "blackboard",
+      "fan-in",
+      "merge",
+      "passthrough",
+      "manifest",
+      "concentration",
+      "world-b"
+    ],
+    "related_bugs": [
+      "bug-246"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-07-08"
+  },
+  {
+    "id": "bug-248",
+    "timestamp": "2026-07-08",
+    "error_message": "F-IDENTITY: caller JWT never reached downstream agents. HttpAdapter/McpAdapter read SecurityContextHolder.getContext().getAuthentication() to get the bearer token, but the request pipeline runs on a virtual-thread executor (ChatCompletionsController's pipelineExecutor) and the DAG executor runs on its own virtual threads \u2014 SecurityContextHolder is thread-local and is NOT propagated there, so the token was always null and no Authorization header was ever sent to agents.",
+    "file": "gateway/src/main/java/ai/conduit/gateway/api/v1/chat/ChatCompletionsController.java, gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java, gateway/src/main/java/ai/conduit/gateway/orchestration/executor/{FlatPlanExecutor,DagPlanExecutor}.java, gateway/src/main/java/ai/conduit/gateway/orchestration/harness/AgentHarness.java, gateway/src/main/java/ai/conduit/gateway/adapter/{http/HttpAdapter,mcp/McpAdapter}.java",
+    "root_cause": "Thread-local SecurityContextHolder read on the wrong thread \u2014 no DelegatingSecurityContextExecutor / inheritable strategy anywhere in the request pipeline, and the offload to virtual threads happens before any agent call.",
+    "fix": "Capture the caller's bearer token on the SERVLET thread in ChatCompletionsController (extractBearerToken(), reading SecurityContextHolder before CompletableFuture.runAsync) and thread it explicitly as a `callerToken` parameter: ChatCompletionsController -> ChatService.handleChat -> handleFetchData/handleFollowUp/tryDag -> FlatPlanExecutor.execute(plan, callerToken) / DagPlanExecutor.execute(plan, blackboard, callerToken) -> AgentHarness.execute(node, exec, callerToken) -> ProtocolAdapter.invoke(manifest, input, bearerToken). HttpAdapter/McpAdapter now use the PASSED token and throw IllegalStateException (surfaced as a FAILED NodeResult, never a silent no-auth call) if it is null/blank on a data-plane call.",
+    "tags": [
+      "security",
+      "f-identity",
+      "jwt",
+      "virtual-threads",
+      "security-context-holder",
+      "propagation",
+      "p0"
+    ],
+    "related_bugs": [
+      "bug-249",
+      "bug-250"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-07-08"
+  },
+  {
+    "id": "bug-249",
+    "timestamp": "2026-07-08",
+    "error_message": "mock-agents jwt_verify.py failed OPEN on a missing/invalid token: 'if not authorization: return True' (allow), plus a second bypass 'if not token or token == \"unused\": return True' \u2014 meaning ANY caller could reach a data endpoint with zero auth, or trivially bypass verification entirely by sending 'Authorization: Bearer unused'.",
+    "file": "mock-agents/{wealth,insurance,hr-policy,wealth-market-research,servicing}/shared/jwt_verify.py",
+    "root_cause": "Deliberate 'gateway is the trust boundary' design assumption that was never actually true once F-IDENTITY (bug-248) is accounted for \u2014 hop-level auth was effectively off and untestable. The 'Bearer unused' bypass was a stale accommodation with no live caller (grepped: not referenced in any librechat.yaml/.env/compose config).",
+    "fix": "Both branches now fail CLOSED: missing header -> 401 'Missing Authorization header'; empty bearer value -> 401 'Empty bearer token' (the 'unused' special-case was removed entirely \u2014 it now falls through to the normal invalid-format rejection). Existing per-service middleware exemptions (/health, /openapi.json, /docs, /redoc) are unchanged. servicing-mcp's JwtAuthMiddleware additionally gained a narrow exemption for the MCP introspection handshake (JSON-RPC 'initialize'/'tools/list' with no Authorization) since the gateway's boot-time McpToolIntrospector legitimately has no caller identity; 'tools/call' (the real data-plane invocation) always requires a valid token.",
+    "tags": [
+      "security",
+      "f-identity",
+      "jwt",
+      "fail-open",
+      "fail-closed",
+      "mock-agents",
+      "p0"
+    ],
+    "related_bugs": [
+      "bug-248"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-07-08"
+  },
+  {
+    "id": "bug-250",
+    "timestamp": "2026-07-08",
+    "error_message": "wealth-http log: \"Failed to fetch JWKS from http://iam-service:8084/.well-known/jwks.json: Redirect response '301'\" followed by \"JWKS unreachable \u2014 allowing kid=... (dev fallback)\" on every single agent call \u2014 real RS256 signature verification was NEVER actually happening at the agent hop; every call silently rode the JWKS-unreachable dev-fallback allow path.",
+    "file": "mock-agents/{wealth,insurance,hr-policy,wealth-market-research,servicing}/shared/jwt_verify.py",
+    "root_cause": "jwt_verify.py's JWKS_URL default pointed at http://iam-service:8084/.well-known/jwks.json, which 301-redirects to /oauth2/jwks; httpx.get() does not follow redirects by default, so the fetch always raised and hit the (separately legitimate) 'JWKS endpoint unreachable -> dev fallback allow' branch. The gateway's OWN JWKS client (CONDUIT_AUTH_JWKS_URL) was already correctly pointed at /oauth2/jwks directly, so this asymmetry had been masking the agent-side verification gap.",
+    "fix": "Changed JWKS_URL default to http://iam-service:8084/oauth2/jwks (matching the gateway's working config) \u2014 no redirect hop, so JWKS fetch succeeds and real signature verification executes. Verified post-fix: docker exec into wealth-http running verify_bearer_token() with a real rm_jane JWT returns allowed=True with full decoded claims (sub=rm_jane, permissions, segments) instead of a fallback allow with claims=None.",
+    "tags": [
+      "jwks",
+      "jwt",
+      "rs256",
+      "redirect",
+      "dev-fallback",
+      "mock-agents",
+      "iam-service"
+    ],
+    "related_bugs": [
+      "bug-248",
+      "bug-249"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-07-08"
+  },
+  {
+    "id": "bug-147",
+    "timestamp": "2026-07-09T18:30:00-04:00",
+    "error_message": "integration-test.sh: 'Stream missing [DONE] terminator' and 'Title request did not return a proper SSE stream'",
+    "file": "scripts/integration-test.sh",
+    "root_cause": "Assertion grepped for 'data:[DONE]' (no space), but the gateway correctly emits the OpenAI wire shape 'data: [DONE]' (AnswerSynthesizer.java:264 sends the payload as \" [DONE]\" with a leading space). Pre-existing test bug, NOT a regression \u2014 proven byte-identical on baseline Boot 3.5.0/JDK21.",
+    "fix": "Corrected both greps to assert the exact OpenAI shape 'data: [DONE]'. Strengthens the byte-contract assertion rather than loosening it.",
+    "tags": [
+      "sse",
+      "byte-contract",
+      "test-bug",
+      "false-negative",
+      "jdk25"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-09T18:30:00-04:00"
+  },
+  {
+    "id": "bug-229",
+    "timestamp": "2026-07-09T18:30:00-04:00",
+    "error_message": "e2e-matrix.sh case #04 rm_carlos: expect=allow but deny=yes -> FAIL, despite a correct grounded answer",
+    "file": "scripts/e2e-matrix.sh",
+    "root_cause": "Two bugs. (1) The deny detector was a loose prose grep ('outside', 'not.*access'), so a CORRECT partial answer (hard rule d: harvest survivors, state what's missing \u2014 'asset-servicing data was not included because it is outside your access') was misclassified as a denial. (2) expect=deny cases passed on a denial PHRASE alone with grounding regex rx='x' (a placeholder), so a response that LEAKED data while uttering a denial phrase would have falsely PASSED. Pre-existing, reproduced identically on baseline JDK21.",
+    "fix": "A full denial is now defined as: refusal phrase AND no domain data returned. Replaced rx='x' on all 5 deny cases with real leak regexes (names/figures that must NOT appear). Net: deny cases now also assert zero data leakage \u2014 strictly stronger than before.",
+    "tags": [
+      "e2e",
+      "authz",
+      "false-positive",
+      "false-pass",
+      "leak-detection",
+      "partial-results"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-09T18:30:00-04:00"
   }
 ]
