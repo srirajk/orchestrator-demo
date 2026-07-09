@@ -55,6 +55,39 @@ demo — every new domain is a code change, a build, a deploy, a regression risk
 one team. **In World B, a new agent — or an entire new business domain — ships as a manifest and a
 running service. The gateway itself does not change.**
 
+### The journey — how World A becomes World B
+
+World A is where almost everyone starts, because it feels natural. Your **first** domain arrives —
+say wealth — and you teach the platform about it: it learns what a relationship is, what
+"over-concentrated" means, how to recognize and route a wealth question. It works. You ship it, and
+it looks like a triumph.
+
+Your **second** domain — insurance — arrives, and you teach the platform again: policy rules, claim
+status, a different ID shape. Still fine. But notice what just happened: the platform now *contains*
+two domains' worth of knowledge, side by side, and the two teams now share one codebase.
+
+By the **fifth or tenth** domain, the triumph has quietly become a trap. The platform is a monolith
+of everyone's domain knowledge — wealth's ID format next to insurance's policy logic next to
+servicing's settlement rules. Every new domain is now a change to *shared* code: a build, a deploy, a
+regression risk across *all* domains, and a queue behind the one team that owns the platform. A bug
+in the servicing logic can break wealth. Onboarding has become a platform *project*, negotiated and
+scheduled, rather than something a domain team can just *do*. This is the point at which most
+"AI gateways" quietly stop scaling — not because anyone made a bad decision, but because every
+individually-reasonable "just add a case for my domain" accreted into a tangle no one can safely touch.
+
+**World B is the inversion that escapes the trap.** The insight is to turn the relationship inside
+out: what if the platform knew *nothing* about wealth, insurance, or servicing — and instead knew
+only how to read a domain that *describes itself*? Then domain knowledge doesn't live in the platform
+at all; it lives in a **declaration the domain team owns**. Each domain becomes a self-contained
+package — a manifest plus a running service — that the platform interprets without ever having been
+taught about it. Adding the tenth domain is exactly as easy as adding the first, touches no other
+team's work, and is owned by the people who actually understand it.
+
+That inversion is the entire reason this handbook exists. You onboard by *describing* your agent — what
+it answers, what it needs, what it produces, who may reach it — and a platform that knows how to read
+descriptions, but nothing about your domain, does the rest. Everything that follows is just the
+vocabulary of that description, and how to write it well.
+
 ### Why this matters to *you*, concretely
 
 - **You are not blocked on the gateway team.** You do not file a ticket asking them to "add support
