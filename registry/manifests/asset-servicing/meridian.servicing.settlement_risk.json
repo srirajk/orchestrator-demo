@@ -35,11 +35,11 @@
       ],
       "examples": [
         "what is the settlement risk on this servicing relationship",
-        "show fails aging and CSDR cash penalty exposure for this account",
+        "assess settlement risk with custody holdings and cash balance context",
         "are failed settlements over our firm policy age threshold",
         "does this fund have settlement fails creating cash penalty exposure",
         "assess settlement risk using cash and custody context",
-        "what failed trades need escalation under our settlement policy"
+        "what settlement issues need escalation using cash custody and settlement context"
       ],
       "inputModes": [
         "application/json"

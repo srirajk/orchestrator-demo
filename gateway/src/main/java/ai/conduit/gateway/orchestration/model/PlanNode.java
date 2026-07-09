@@ -31,4 +31,9 @@ public record PlanNode(
     public boolean hasCondition() {
         return condition != null && !condition.isBlank();
     }
+
+    public boolean hasMap() {
+        AgentManifest.Io io = agent == null ? null : agent.io();
+        return io != null && io.hasMap();
+    }
 }

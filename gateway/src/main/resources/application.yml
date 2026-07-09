@@ -142,6 +142,9 @@ conduit:
     request-timeout-seconds: ${CONDUIT_LLM_REQUEST_TIMEOUT_SECONDS:25}
   orchestration:
     fan-out-deadline-ms: ${CONDUIT_FANOUT_DEADLINE_MS:60000}
+    map:
+      max-items: ${CONDUIT_ORCHESTRATION_MAP_MAX_ITEMS:100}
+      max-concurrency: ${CONDUIT_ORCHESTRATION_MAP_MAX_CONCURRENCY:8}
     harness:
       default-sla-ms: ${CONDUIT_HARNESS_DEFAULT_SLA_MS:5000}
       bulkhead:

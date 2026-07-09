@@ -188,6 +188,34 @@
           "type": "string",
           "minLength": 1,
           "description": "OPTIONAL node-level JMESPath expression over this node's merged, bound input. It must evaluate to boolean; true dispatches the node, false cleanly skips it as not applicable."
+        },
+        "map": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["over"],
+          "description": "OPTIONAL dynamic map expansion. The gateway evaluates 'over' against this node's merged, bound input; each selected item is optionally reshaped by 'item_select' and dispatched to this same capability, bounded by the declared caps and global gateway ceilings.",
+          "properties": {
+            "over": {
+              "type": "string",
+              "minLength": 1,
+              "description": "JMESPath expression over the bound input that must evaluate to an array."
+            },
+            "item_select": {
+              "type": "string",
+              "minLength": 1,
+              "description": "OPTIONAL JMESPath expression over each array item that produces the per-item wire input."
+            },
+            "max_items": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "OPTIONAL per-node item cap; runtime clamps to the gateway global maximum."
+            },
+            "max_concurrency": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "OPTIONAL per-node concurrency cap; runtime clamps to the gateway global maximum."
+            }
+          }
         }
       }
     }

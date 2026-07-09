@@ -9,6 +9,7 @@ Agent layout (each agent in its own top-level subfolder):
   servicing/nav/                  → get_nav  (keyed by fund_id, not relationship_id)
   servicing/cash/                 → get_cash
   servicing/settlement_risk/      → analyze_settlement_risk (fan-in analytics)
+  servicing/settlement_penalty/   → calculate_trade_penalty (map item analytics)
 
 Fault knobs (env vars, set in docker-compose for resilience tests):
   MCP_FAULT_TOOL=get_settlements   → that tool returns an error
@@ -62,6 +63,7 @@ from custody.tool import get_custody_positions as _get_custody_positions
 from nav.tool import get_nav as _get_nav
 from cash.tool import get_cash as _get_cash
 from settlement_risk.tool import analyze_settlement_risk as _analyze_settlement_risk
+from settlement_penalty.tool import calculate_trade_penalty as _calculate_trade_penalty
 
 from shared.jwt_verify import verify_bearer_token
 from shared.error_schema import mcp_error_dict
@@ -172,6 +174,48 @@ def analyze_settlement_risk(
     return _analyze_settlement_risk(settlement_status, custody_positions, cash_position)
 
 
+@mcp.tool()
+def calculate_trade_penalty(
+    trade_id: str,
+    security: str,
+    settle_date: str,
+    amount: float,
+    side: str,
+    as_of_date: str,
+    isin: str = "",
+    reason: str = "",
+    fail_item: bool | None = False,
+) -> str:
+    """
+    Calculate CSDR cash-penalty exposure for a single failed settlement.
+
+    Args:
+        trade_id: Failed trade identifier.
+        security: Security symbol/name.
+        settle_date: Contractual settlement date in ISO format.
+        amount: Failed settlement cash amount.
+        side: Trade side.
+        as_of_date: Evaluation date in ISO format.
+        isin: Optional instrument identifier.
+        reason: Optional failure reason.
+        fail_item: Test-only injected item failure flag.
+
+    Returns:
+        JSON: one failed-trade penalty calculation and policy flags.
+    """
+    return _calculate_trade_penalty(
+        trade_id=trade_id,
+        security=security,
+        settle_date=settle_date,
+        amount=amount,
+        side=side,
+        as_of_date=as_of_date,
+        isin=isin,
+        reason=reason,
+        fail_item=fail_item,
+    )
+
+
 # ── HTTP middleware — lives at module scope so it applies whenever the app is
 #    imported or run (not only when started via __main__). ────────────────────
 
@@ -196,7 +240,15 @@ async def _health(request: StarletteRequest) -> JSONResponse:
         "status": "ok",
         "service": "servicing-mcp",
         "version": "0.3.0",
-        "agents": ["settlements", "corporate_actions", "custody", "nav", "cash", "settlement_risk"],
+        "agents": [
+            "settlements",
+            "corporate_actions",
+            "custody",
+            "nav",
+            "cash",
+            "settlement_risk",
+            "settlement_penalty",
+        ],
     })
 
 

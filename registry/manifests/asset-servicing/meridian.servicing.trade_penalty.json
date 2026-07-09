@@ -1,0 +1,113 @@
+{
+  "agent_id": "meridian.servicing.trade_penalty",
+  "name": "Asset Servicing Failed Trade Penalty",
+  "description": "Computes CSDR-style cash penalty aging for each failed settlement item selected from settlement status.",
+  "version": "1.0.0",
+  "provider": {
+    "organization": "Meridian Demo Bank"
+  },
+  "domain": "asset-servicing",
+  "audience": "segment",
+  "sub_domain": "custody-operations",
+  "max_response_tokens": 2000,
+  "protocol": "mcp",
+  "connection": {
+    "server_url": "http://servicing-mcp:8082/sse",
+    "tool": "calculate_trade_penalty",
+    "transport": "sse"
+  },
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false
+  },
+  "skills": [
+    {
+      "id": "calculate_trade_penalty",
+      "name": "calculate_trade_penalty",
+      "description": "Calculate per-failed-trade CSDR cash-penalty exposure and aging from settlement status records.",
+      "tags": [
+        "settlements",
+        "failed-trades",
+        "csdr",
+        "cash-penalty",
+        "map-iteration",
+        "asset-servicing"
+      ],
+      "examples": [
+        "For asset servicing relationship REL-00188 Okafor, itemize failed trade CSDR cash penalty aging by failed trade.",
+        "For asset servicing relationship REL-00445 Map Empty, itemize failed trade CSDR cash penalty aging by failed trade.",
+        "For asset servicing relationship REL-00444 Map Stress, run failed settlement CSDR penalty map iteration and tell me what was skipped.",
+        "itemize failed trade CSDR penalties for this relationship",
+        "calculate each failed settlement cash penalty exposure",
+        "map iteration over failed settlement trades",
+        "per failed trade penalty aging for REL-00188",
+        "show CSDR penalty aging by failed trade",
+        "failed trade cash penalty details for the Okafor relationship",
+        "list every failed settlement with penalty exposure",
+        "run failed settlement penalty map for REL-00444",
+        "show skipped failed trades when map cap is reached"
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    }
+  ],
+  "constraints": {
+    "access_mode": "read",
+    "data_classification": "confidential",
+    "sla_timeout_ms": 30000
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "trade_id": { "type": "string" },
+      "security": { "type": "string" },
+      "isin": { "type": "string" },
+      "settle_date": { "type": "string" },
+      "as_of_date": { "type": "string" },
+      "amount": { "type": "number" },
+      "side": { "type": "string" },
+      "reason": { "type": "string" },
+      "age_days": { "type": "integer" },
+      "csdr_daily_penalty_bps": { "type": "number" },
+      "estimated_daily_penalty_usd": { "type": "number" },
+      "estimated_accrued_penalty_usd": { "type": "number" },
+      "mandatory_buy_in_active": { "type": "boolean" },
+      "agent_narrative": { "type": "string" }
+    },
+    "required": [
+      "trade_id",
+      "security",
+      "settle_date",
+      "as_of_date",
+      "amount",
+      "side",
+      "age_days",
+      "csdr_daily_penalty_bps",
+      "estimated_daily_penalty_usd",
+      "estimated_accrued_penalty_usd",
+      "mandatory_buy_in_active"
+    ]
+  },
+  "io": {
+    "consumes": [
+      {
+        "from": "servicing.settlement_status",
+        "required": true,
+        "select": "{failed: failed}"
+      }
+    ],
+    "map": {
+      "over": "failed",
+      "item_select": "{trade_id: trade_id, security: security, isin: isin, settle_date: settle_date, amount: amount, side: side, as_of_date: as_of_date, reason: reason, fail_item: fail_item}",
+      "max_items": 2,
+      "max_concurrency": 2
+    },
+    "produces": [
+      { "name": "trade_penalties", "type": "servicing.trade_penalties" }
+    ]
+  }
+}

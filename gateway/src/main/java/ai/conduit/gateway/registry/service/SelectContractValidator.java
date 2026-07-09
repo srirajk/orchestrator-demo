@@ -8,6 +8,8 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.burt.jmespath.JmesPath;
 import io.burt.jmespath.jackson.JacksonRuntime;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -36,9 +38,21 @@ public class SelectContractValidator {
     private static final Set<String> KEYWORDS = Set.of("true", "false", "null", "and", "or", "not");
 
     private final ObjectMapper mapper;
+    private final int globalMapMaxItems;
+    private final int globalMapMaxConcurrency;
 
     public SelectContractValidator(ObjectMapper mapper) {
+        this(mapper, 100, 8);
+    }
+
+    @Autowired
+    public SelectContractValidator(
+            ObjectMapper mapper,
+            @Value("${conduit.orchestration.map.max-items:100}") int globalMapMaxItems,
+            @Value("${conduit.orchestration.map.max-concurrency:8}") int globalMapMaxConcurrency) {
         this.mapper = mapper;
+        this.globalMapMaxItems = globalMapMaxItems;
+        this.globalMapMaxConcurrency = globalMapMaxConcurrency;
     }
 
     public Summary validateOne(AgentManifest consumer, List<AgentManifest> manifests) {
@@ -92,12 +106,22 @@ public class SelectContractValidator {
             validateCondition(consumer, merged);
         }
 
+        if (hasMap(consumer)) {
+            if (unvalidated > 0) {
+                throw new MapValidationException(consumer.agentId(), consumer.io().map(),
+                        "could not derive all producer output schemas");
+            }
+            validateMap(consumer, merged);
+        }
+
         if (!projections.isEmpty() && unvalidated == 0) {
-            List<String> missing = InputContractValidator.missingFields(consumer.inputSchema(), merged);
-            if (!missing.isEmpty()) {
-                EdgeProjection edge = attributeMissing(missing.get(0), projections);
-                throw new SelectValidationException(consumer.agentId(), edge.consume().from(),
-                        edge.consume().select(), missing);
+            if (!hasMap(consumer)) {
+                List<String> missing = InputContractValidator.missingFields(consumer.inputSchema(), merged);
+                if (!missing.isEmpty()) {
+                    EdgeProjection edge = attributeMissing(missing.get(0), projections);
+                    throw new SelectValidationException(consumer.agentId(), edge.consume().from(),
+                            edge.consume().select(), missing);
+                }
             }
             validated = projections.size();
         }
@@ -108,6 +132,11 @@ public class SelectContractValidator {
     private boolean hasCondition(AgentManifest manifest) {
         AgentManifest.Io io = manifest == null ? null : manifest.io();
         return io != null && io.hasCondition();
+    }
+
+    private boolean hasMap(AgentManifest manifest) {
+        AgentManifest.Io io = manifest == null ? null : manifest.io();
+        return io != null && io.hasMap();
     }
 
     private void validateCondition(AgentManifest consumer, JsonNode mergedInput) {
@@ -128,6 +157,61 @@ public class SelectContractValidator {
         if (result == null || !result.isBoolean()) {
             throw new ConditionValidationException(consumer.agentId(), expression,
                     "expression must evaluate to boolean");
+        }
+    }
+
+    private void validateMap(AgentManifest consumer, JsonNode mergedInput) {
+        AgentManifest.MapSpec map = consumer.io().map();
+        if (map == null || !map.hasOver()) {
+            throw new MapValidationException(consumer.agentId(), map, "map.over is required");
+        }
+        if (globalMapMaxItems <= 0 || globalMapMaxConcurrency <= 0) {
+            throw new MapValidationException(consumer.agentId(), map,
+                    "global map ceilings must be positive");
+        }
+        if (map.maxItems() != null && map.maxItems() <= 0) {
+            throw new MapValidationException(consumer.agentId(), map, "max_items must be positive");
+        }
+        if (map.maxConcurrency() != null && map.maxConcurrency() <= 0) {
+            throw new MapValidationException(consumer.agentId(), map, "max_concurrency must be positive");
+        }
+
+        for (String path : referencedPaths(map.over())) {
+            if (!pathExists(mergedInput, path)) {
+                throw new MapValidationException(consumer.agentId(), map,
+                        "map.over references absent field '" + path + "'");
+            }
+        }
+
+        JsonNode collection;
+        try {
+            collection = JMES_PATH.compile(map.over()).search(mergedInput);
+        } catch (Exception e) {
+            throw new MapValidationException(consumer.agentId(), map,
+                    "invalid map.over expression: " + e.getMessage());
+        }
+        if (collection == null || !collection.isArray()) {
+            throw new MapValidationException(consumer.agentId(), map,
+                    "map.over must evaluate to an array");
+        }
+
+        JsonNode itemSample = collection.isEmpty() ? mapper.createObjectNode() : collection.get(0);
+        JsonNode projected;
+        if (map.hasItemSelect()) {
+            try {
+                projected = JMES_PATH.compile(map.itemSelect()).search(itemSample);
+            } catch (Exception e) {
+                throw new MapValidationException(consumer.agentId(), map,
+                        "invalid item_select expression: " + e.getMessage());
+            }
+        } else {
+            projected = itemSample;
+        }
+
+        List<String> missing = InputContractValidator.missingFields(consumer.inputSchema(), projected);
+        if (!missing.isEmpty()) {
+            throw new MapValidationException(consumer.agentId(), map,
+                    "item_select does not satisfy input schema: " + missing);
         }
     }
 
@@ -296,6 +380,15 @@ public class SelectContractValidator {
         public ConditionValidationException(String agentId, String condition, String reason) {
             super("condition validation failed: agentId=" + agentId
                     + " condition=" + condition
+                    + " reason=" + reason);
+        }
+    }
+
+    public static final class MapValidationException extends RuntimeException {
+        public MapValidationException(String agentId, AgentManifest.MapSpec map, String reason) {
+            super("map validation failed: agentId=" + agentId
+                    + " over=" + (map == null ? null : map.over())
+                    + " item_select=" + (map == null ? null : map.itemSelect())
                     + " reason=" + reason);
         }
     }

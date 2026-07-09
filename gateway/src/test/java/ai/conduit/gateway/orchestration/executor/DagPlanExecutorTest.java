@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -40,6 +41,7 @@ class DagPlanExecutorTest {
 
     private static final String PRODUCER = "cap.producer";
     private static final String CONSUMER = "cap.consumer";
+    private static final String MAPPER_AGENT = "cap.mapper";
     private static final String OUT_TYPE = "typeOut";
 
     // ── manifest / plan builders ─────────────────────────────────────────────────────────────────
@@ -64,6 +66,14 @@ class DagPlanExecutorTest {
                 List.of(new AgentManifest.Produce("consumerOut", "typeFinal")));
     }
 
+    private static AgentManifest.Io mapIo(int maxItems, int maxConcurrency) {
+        return new AgentManifest.Io(
+                List.of(new AgentManifest.Consume(null, OUT_TYPE, true, "{items: items}")),
+                List.of(new AgentManifest.Produce("mapOut", "typeMap")),
+                null,
+                new AgentManifest.MapSpec("items", "{value: value, fail: fail}", maxItems, maxConcurrency));
+    }
+
     /** Two-node plan producer → consumer, in topological order, as the resolver would emit it. */
     private static Plan producerConsumerPlan() {
         PlanNode producer = new PlanNode(PRODUCER, agent(PRODUCER, producerIo()), null, List.of());
@@ -86,6 +96,15 @@ class DagPlanExecutorTest {
         s.put("type", "object");
         var props = s.putObject("properties");
         props.putObject(field).put("type", "array");
+        s.putArray("required").add(field);
+        return s;
+    }
+
+    private static JsonNode schemaRequiringString(String field) {
+        var s = MAPPER.createObjectNode();
+        s.put("type", "object");
+        var props = s.putObject("properties");
+        props.putObject(field).put("type", "string");
         s.putArray("required").add(field);
         return s;
     }
@@ -118,6 +137,8 @@ class DagPlanExecutorTest {
     private static final class RecordingAdapter implements ProtocolAdapter {
         final List<String> order = new CopyOnWriteArrayList<>();
         final Map<String, JsonNode> inputs = new ConcurrentHashMap<>();
+        final AtomicInteger inFlightMap = new AtomicInteger();
+        final AtomicInteger maxInFlightMap = new AtomicInteger();
         final boolean producerFails;
         final JsonNode producerOutput;   // null → default {"holdings":"PAYLOAD"}
 
@@ -136,6 +157,19 @@ class DagPlanExecutorTest {
             if (PRODUCER.equals(m.agentId())) {
                 if (producerFails) throw new RuntimeException("simulated producer failure");
                 return producerOutput != null ? producerOutput : MAPPER.createObjectNode().put("holdings", "PAYLOAD");
+            }
+            if (MAPPER_AGENT.equals(m.agentId())) {
+                int active = inFlightMap.incrementAndGet();
+                maxInFlightMap.accumulateAndGet(active, Math::max);
+                try {
+                    if (input != null && input.path("fail").asBoolean(false)) {
+                        return MAPPER.createObjectNode()
+                                .put("text", "Error executing tool test_tool: simulated item failure");
+                    }
+                    return MAPPER.createObjectNode().put("seen", input.path("value").asText());
+                } finally {
+                    inFlightMap.decrementAndGet();
+                }
             }
             return MAPPER.createObjectNode().put("ok", true);
         }
@@ -266,5 +300,83 @@ class DagPlanExecutorTest {
 
         assertThat(adapter.order).containsExactly(PRODUCER);
         assertThat(adapter.inputs).doesNotContainKey(CONSUMER);
+    }
+
+    @Test
+    @DisplayName("map node fans out over bounded items, tolerates item failures, and preserves order")
+    void mapNodeAggregatesSurvivorsInCollectionOrder() {
+        JsonNode producerOutput = MAPPER.createObjectNode().set("items", MAPPER.createArrayNode()
+                .add(MAPPER.createObjectNode().put("value", "a"))
+                .add(MAPPER.createObjectNode().put("value", "b").put("fail", true))
+                .add(MAPPER.createObjectNode().put("value", "c")));
+        RecordingAdapter adapter = new RecordingAdapter(false, producerOutput);
+        DagPlanExecutor exec = executor(harness(adapter));
+        PlanNode producer = new PlanNode(PRODUCER, agent(PRODUCER, producerIo()), null, List.of());
+        PlanNode mapper = new PlanNode(MAPPER_AGENT,
+                agentWithSchema(MAPPER_AGENT, mapIo(10, 2), schemaRequiringString("value")),
+                null, List.of(PRODUCER));
+        Blackboard bb = new Blackboard(Set.of("entity"),
+                Map.of(PRODUCER, MAPPER.createObjectNode().put("entity", "E-1")), MAPPER);
+
+        List<NodeResult> results = exec.execute(new Plan(List.of(producer, mapper)), bb);
+
+        NodeResult mapped = results.get(1);
+        assertThat(mapped.isOk()).isTrue();
+        assertThat(mapped.data().path("_items").asInt()).isEqualTo(3);
+        assertThat(mapped.data().path("_ran").asInt()).isEqualTo(3);
+        assertThat(mapped.data().path("_ok").asInt()).isEqualTo(2);
+        assertThat(mapped.data().path("_failed").asInt()).isEqualTo(1);
+        assertThat(mapped.data().path("results").get(0).path("data").path("seen").asText()).isEqualTo("a");
+        assertThat(mapped.data().path("results").get(1).path("status").asText()).isEqualTo("failed");
+        assertThat(mapped.data().path("results").get(2).path("data").path("seen").asText()).isEqualTo("c");
+    }
+
+    @Test
+    @DisplayName("map node caps oversized arrays and reports truncation")
+    void mapNodeCapsOversizedArrays() {
+        JsonNode producerOutput = MAPPER.createObjectNode().set("items", MAPPER.createArrayNode()
+                .add(MAPPER.createObjectNode().put("value", "a"))
+                .add(MAPPER.createObjectNode().put("value", "b"))
+                .add(MAPPER.createObjectNode().put("value", "c")));
+        RecordingAdapter adapter = new RecordingAdapter(false, producerOutput);
+        DagPlanExecutor exec = executor(harness(adapter));
+        PlanNode producer = new PlanNode(PRODUCER, agent(PRODUCER, producerIo()), null, List.of());
+        PlanNode mapper = new PlanNode(MAPPER_AGENT,
+                agentWithSchema(MAPPER_AGENT, mapIo(2, 1), schemaRequiringString("value")),
+                null, List.of(PRODUCER));
+        Blackboard bb = new Blackboard(Set.of("entity"),
+                Map.of(PRODUCER, MAPPER.createObjectNode().put("entity", "E-1")), MAPPER);
+
+        List<NodeResult> results = exec.execute(new Plan(List.of(producer, mapper)), bb);
+
+        NodeResult mapped = results.get(1);
+        assertThat(mapped.isOk()).isTrue();
+        assertThat(mapped.data().path("_truncated").asBoolean()).isTrue();
+        assertThat(mapped.data().path("_total").asInt()).isEqualTo(3);
+        assertThat(mapped.data().path("_ran").asInt()).isEqualTo(2);
+        assertThat(mapped.data().path("results")).hasSize(2);
+        assertThat(adapter.maxInFlightMap.get()).isLessThanOrEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("empty map input is a successful empty aggregate, not a failure")
+    void emptyMapInputIsOk() {
+        JsonNode producerOutput = MAPPER.createObjectNode().set("items", MAPPER.createArrayNode());
+        RecordingAdapter adapter = new RecordingAdapter(false, producerOutput);
+        DagPlanExecutor exec = executor(harness(adapter));
+        PlanNode producer = new PlanNode(PRODUCER, agent(PRODUCER, producerIo()), null, List.of());
+        PlanNode mapper = new PlanNode(MAPPER_AGENT,
+                agentWithSchema(MAPPER_AGENT, mapIo(10, 2), schemaRequiringString("value")),
+                null, List.of(PRODUCER));
+        Blackboard bb = new Blackboard(Set.of("entity"),
+                Map.of(PRODUCER, MAPPER.createObjectNode().put("entity", "E-1")), MAPPER);
+
+        List<NodeResult> results = exec.execute(new Plan(List.of(producer, mapper)), bb);
+
+        NodeResult mapped = results.get(1);
+        assertThat(mapped.isOk()).isTrue();
+        assertThat(mapped.data().path("_items").asInt()).isZero();
+        assertThat(mapped.data().path("_ok").asInt()).isZero();
+        assertThat(adapter.order).containsExactly(PRODUCER);
     }
 }

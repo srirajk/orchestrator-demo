@@ -82,4 +82,8 @@ def get_settlements(relationship_id: str) -> str:
             return json.dumps({**data, "agent_narrative": narrative})
         except Exception as exc:
             log.error("Agent LLM call failed for %s: %s", relationship_id, exc)
-            return mcp_error_json(f"llm_unavailable: {type(exc).__name__}", AGENT_ID, 503)
+            narrative = (
+                f"Settlement status for {relationship_id}: {pending} pending settlement(s) "
+                f"and {failed} failed settlement(s)."
+            )
+            return json.dumps({**data, "agent_narrative": narrative})

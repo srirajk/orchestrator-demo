@@ -174,6 +174,89 @@ class SelectContractValidatorTest {
                 .hasMessageContaining("expression must evaluate to boolean");
     }
 
+    @Test
+    @DisplayName("map validates over the merged consumer input and item_select against the item input schema")
+    void acceptsMapOverMergedInput() {
+        AgentManifest producer = manifest(
+                "agent.producer",
+                io(List.of(), List.of(produce("producer_output", "type.produced"))),
+                null,
+                outputSchemaWithArray());
+        AgentManifest consumer = manifest(
+                "agent.consumer",
+                io(List.of(from("type.produced", "{items: items}")), List.of(),
+                        null, new AgentManifest.MapSpec("items", "{required_input: present_field}", 5, 2)),
+                inputSchemaRequiring("required_input"),
+                null);
+
+        SelectContractValidator.Summary summary =
+                validator.validateOne(consumer, List.of(producer, consumer));
+
+        assertThat(summary.validated()).isEqualTo(1);
+        assertThat(summary.unvalidated()).isZero();
+    }
+
+    @Test
+    @DisplayName("BOOT-REJECT: map.over must evaluate to an array")
+    void rejectsMapOverScalar() {
+        AgentManifest producer = manifest(
+                "agent.producer",
+                io(List.of(), List.of(produce("producer_output", "type.produced"))),
+                null,
+                outputSchema());
+        AgentManifest consumer = manifest(
+                "agent.consumer",
+                io(List.of(from("type.produced", "{items: present_field}")), List.of(),
+                        null, new AgentManifest.MapSpec("items", "{required_input: present_field}", 5, 2)),
+                inputSchemaRequiring("required_input"),
+                null);
+
+        assertThatThrownBy(() -> validator.validateOne(consumer, List.of(producer, consumer)))
+                .isInstanceOf(SelectContractValidator.MapValidationException.class)
+                .hasMessageContaining("map.over must evaluate to an array");
+    }
+
+    @Test
+    @DisplayName("BOOT-REJECT: map item_select must satisfy the consumer input schema")
+    void rejectsBadMapItemSelect() {
+        AgentManifest producer = manifest(
+                "agent.producer",
+                io(List.of(), List.of(produce("producer_output", "type.produced"))),
+                null,
+                outputSchemaWithArray());
+        AgentManifest consumer = manifest(
+                "agent.consumer",
+                io(List.of(from("type.produced", "{items: items}")), List.of(),
+                        null, new AgentManifest.MapSpec("items", "{wrong: present_field}", 5, 2)),
+                inputSchemaRequiring("required_input"),
+                null);
+
+        assertThatThrownBy(() -> validator.validateOne(consumer, List.of(producer, consumer)))
+                .isInstanceOf(SelectContractValidator.MapValidationException.class)
+                .hasMessageContaining("item_select does not satisfy input schema")
+                .hasMessageContaining("required_input");
+    }
+
+    @Test
+    @DisplayName("BOOT-REJECT: map caps must be positive")
+    void rejectsBadMapCaps() {
+        AgentManifest producer = manifest(
+                "agent.producer",
+                io(List.of(), List.of(produce("producer_output", "type.produced"))),
+                null,
+                outputSchemaWithArray());
+        AgentManifest consumer = manifest(
+                "agent.consumer",
+                io(List.of(from("type.produced", "{items: items}")), List.of(),
+                        null, new AgentManifest.MapSpec("items", "{required_input: present_field}", 0, 2)),
+                inputSchemaRequiring("required_input"),
+                null);
+
+        assertThatThrownBy(() -> validator.validateOne(consumer, List.of(producer, consumer)))
+                .isInstanceOf(SelectContractValidator.MapValidationException.class)
+                .hasMessageContaining("max_items must be positive");
+    }
+
     private static AgentManifest manifest(String id, AgentManifest.Io io, JsonNode inputSchema, JsonNode outputSchema) {
         return new AgentManifest(
                 id, id, "description", "1.0.0", new AgentManifest.Provider("org", null),
@@ -200,6 +283,13 @@ class SelectContractValidatorTest {
         return new AgentManifest.Io(consumes, produces, condition);
     }
 
+    private static AgentManifest.Io io(List<AgentManifest.Consume> consumes,
+                                       List<AgentManifest.Produce> produces,
+                                       String condition,
+                                       AgentManifest.MapSpec map) {
+        return new AgentManifest.Io(consumes, produces, condition, map);
+    }
+
     private static AgentManifest.Consume from(String type, String select) {
         return new AgentManifest.Consume(null, type, true, select);
     }
@@ -214,6 +304,21 @@ class SelectContractValidatorTest {
         var props = schema.putObject("properties");
         props.putObject("present_field").put("type", "string");
         schema.putArray("required").add("present_field");
+        return schema;
+    }
+
+    private static JsonNode outputSchemaWithArray() {
+        var schema = MAPPER.createObjectNode();
+        schema.put("type", "object");
+        var props = schema.putObject("properties");
+        var items = props.putObject("items");
+        items.put("type", "array");
+        var item = items.putObject("items");
+        item.put("type", "object");
+        var itemProps = item.putObject("properties");
+        itemProps.putObject("present_field").put("type", "string");
+        item.putArray("required").add("present_field");
+        schema.putArray("required").add("items");
         return schema;
     }
 

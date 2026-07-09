@@ -61,7 +61,24 @@
     "properties": {
       "relationship_id": { "type": "string" },
       "pending": { "type": "array", "items": { "type": "object" } },
-      "failed": { "type": "array", "items": { "type": "object" } },
+      "failed": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "trade_id": { "type": "string" },
+            "security": { "type": "string" },
+            "isin": { "type": "string" },
+            "settle_date": { "type": "string" },
+            "as_of_date": { "type": "string" },
+            "amount": { "type": "number" },
+            "side": { "type": "string" },
+            "reason": { "type": "string" },
+            "fail_item": { "type": "boolean" }
+          },
+          "required": ["trade_id", "security", "settle_date", "as_of_date", "amount", "side"]
+        }
+      },
       "as_of_date": { "type": "string" },
       "agent_narrative": { "type": "string" }
     },

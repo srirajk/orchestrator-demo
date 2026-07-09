@@ -111,6 +111,11 @@ public class InputSynthesizerImpl implements InputSynthesizer {
      */
     private JsonNode bind(AgentManifest agent, EntityBag bag) {
         JsonNode inputSchema = agent.inputSchema();
+        if (isUpstreamMapConsumer(agent)) {
+            log.debug("Agent '{}' is a map consumer fed by upstream producers; using DAG placeholder input.",
+                    agent.agentId());
+            return mapper.createObjectNode();
+        }
 
         if (inputSchema == null || inputSchema.isNull() || inputSchema.isMissingNode()) {
             // No schema → agent accepts an empty body (e.g. a list-all endpoint)
@@ -150,6 +155,13 @@ public class InputSynthesizerImpl implements InputSynthesizer {
         }
 
         return output;
+    }
+
+    private boolean isUpstreamMapConsumer(AgentManifest agent) {
+        AgentManifest.Io io = agent == null ? null : agent.io();
+        if (io == null || !io.hasMap() || io.consumes() == null) return false;
+        return io.consumes().stream()
+                .anyMatch(c -> c != null && c.isProducedRef() && c.isRequired());
     }
 
     /**

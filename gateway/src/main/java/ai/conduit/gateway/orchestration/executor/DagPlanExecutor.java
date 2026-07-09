@@ -3,11 +3,16 @@ package ai.conduit.gateway.orchestration.executor;
 import ai.conduit.gateway.orchestration.harness.AgentHarness;
 import ai.conduit.gateway.infrastructure.telemetry.TraceEvent;
 import ai.conduit.gateway.infrastructure.telemetry.TraceEventPublisher;
+import ai.conduit.gateway.infrastructure.telemetry.event.MapIterationData;
 import ai.conduit.gateway.infrastructure.telemetry.event.NodeConditionData;
 import ai.conduit.gateway.orchestration.model.NodeResult;
 import ai.conduit.gateway.orchestration.model.Plan;
 import ai.conduit.gateway.orchestration.model.PlanNode;
+import ai.conduit.gateway.registry.model.AgentManifest;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.burt.jmespath.JmesPath;
 import io.burt.jmespath.jackson.JacksonRuntime;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +35,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -56,19 +62,22 @@ public class DagPlanExecutor {
 
     private static final Logger log = LoggerFactory.getLogger(DagPlanExecutor.class);
     private static final JmesPath<JsonNode> JMES_PATH = new JacksonRuntime();
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final AgentHarness harness;
     private final Tracer tracer;
     private final MeterRegistry meterRegistry;
     private final TraceEventPublisher tracePublisher;
     private final long overallDeadlineMs;
+    private final int globalMapMaxItems;
+    private final int globalMapMaxConcurrency;
 
     public DagPlanExecutor(
             AgentHarness harness,
             Tracer tracer,
             MeterRegistry meterRegistry,
             @Value("${conduit.orchestration.fan-out-deadline-ms:60000}") long overallDeadlineMs) {
-        this(harness, tracer, meterRegistry, null, overallDeadlineMs);
+        this(harness, tracer, meterRegistry, null, overallDeadlineMs, 100, 8);
     }
 
     @Autowired
@@ -77,12 +86,16 @@ public class DagPlanExecutor {
             Tracer tracer,
             MeterRegistry meterRegistry,
             TraceEventPublisher tracePublisher,
-            @Value("${conduit.orchestration.fan-out-deadline-ms:60000}") long overallDeadlineMs) {
+            @Value("${conduit.orchestration.fan-out-deadline-ms:60000}") long overallDeadlineMs,
+            @Value("${conduit.orchestration.map.max-items:100}") int globalMapMaxItems,
+            @Value("${conduit.orchestration.map.max-concurrency:8}") int globalMapMaxConcurrency) {
         this.harness = harness;
         this.tracer = tracer;
         this.meterRegistry = meterRegistry;
         this.tracePublisher = tracePublisher;
         this.overallDeadlineMs = overallDeadlineMs;
+        this.globalMapMaxItems = Math.max(1, globalMapMaxItems);
+        this.globalMapMaxConcurrency = Math.max(1, globalMapMaxConcurrency);
     }
 
     /**
@@ -237,6 +250,18 @@ public class DagPlanExecutor {
                 results.put(n.nodeId(), conditionResult);
                 continue;
             }
+            // T4-REVERIFY: dynamic map expansion also runs on the post-bind, post-condition input.
+            // If future coverage filtering changes bind shape, item selection must remain scoped to
+            // that already-filtered input rather than any raw upstream payload.
+            if (candidate.hasMap()) {
+                NodeResult mapResult = executeMapNode(candidate, exec, parentContext, deadline,
+                        requestId, conversationId);
+                results.put(n.nodeId(), mapResult);
+                if (mapResult.isOk()) {
+                    blackboard.project(candidate, mapResult.data());
+                }
+                continue;
+            }
             bound.add(candidate);
         }
 
@@ -287,6 +312,191 @@ public class DagPlanExecutor {
         return new NodeResult(node.nodeId(), node.agent().agentId(), node.agent().protocol(),
                 NodeResult.Status.TIMEOUT, null, overallDeadlineMs,
                 "Did not complete within the " + overallDeadlineMs + "ms overall deadline");
+    }
+
+    private NodeResult executeMapNode(PlanNode node,
+                                      ExecutorService exec,
+                                      Context parentContext,
+                                      long deadline,
+                                      String requestId,
+                                      String conversationId) {
+        long start = System.currentTimeMillis();
+        AgentManifest.MapSpec map = node.agent().io().map();
+        JsonNode collection;
+        try {
+            collection = JMES_PATH.compile(map.over()).search(node.input());
+        } catch (Exception e) {
+            return new NodeResult(node.nodeId(), node.agent().agentId(), node.agent().protocol(),
+                    NodeResult.Status.FAILED, null, elapsed(start),
+                    "map.over evaluation failed: " + e.getMessage());
+        }
+        if (collection == null || collection.isMissingNode() || collection.isNull()) {
+            collection = MAPPER.createArrayNode();
+        }
+        if (!collection.isArray()) {
+            return new NodeResult(node.nodeId(), node.agent().agentId(), node.agent().protocol(),
+                    NodeResult.Status.FAILED, null, elapsed(start),
+                    "map.over did not evaluate to an array");
+        }
+
+        int total = collection.size();
+        int effectiveMaxItems = clampCap(map.maxItems(), globalMapMaxItems);
+        int effectiveMaxConcurrency = clampCap(map.maxConcurrency(), globalMapMaxConcurrency);
+        int ran = Math.min(total, effectiveMaxItems);
+        boolean truncated = total > ran;
+        if (truncated) {
+            log.warn("Node {} (agent={}) map capped: total={} ran={} cap={}",
+                    node.nodeId(), node.agent().agentId(), total, ran, effectiveMaxItems);
+            Counter.builder("conduit.dag.map.capped")
+                    .description("Map nodes capped by configured item limits")
+                    .tag("reason", "map-capped")
+                    .register(meterRegistry)
+                    .increment();
+        }
+
+        if (ran == 0) {
+            ObjectNode aggregate = aggregateFor(node, total, ran, 0, 0, truncated,
+                    MAPPER.createArrayNode(), null);
+            publishMapIteration(node, map.over(), total, ran, 0, 0, truncated,
+                    effectiveMaxItems, effectiveMaxConcurrency, requestId, conversationId);
+            return new NodeResult(node.nodeId(), node.agent().agentId(), node.agent().protocol(),
+                    NodeResult.Status.OK, aggregate, elapsed(start), null);
+        }
+
+        Semaphore permits = new Semaphore(effectiveMaxConcurrency);
+        List<CompletableFuture<MapItemOutcome>> futures = new ArrayList<>();
+        for (int i = 0; i < ran; i++) {
+            final int index = i;
+            final JsonNode rawItem = collection.get(i);
+            futures.add(CompletableFuture.supplyAsync(() -> invokeMapItem(
+                    node, map, rawItem, index, permits, exec, parentContext), exec));
+        }
+
+        long remaining = Math.max(1, deadline - System.currentTimeMillis());
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                .orTimeout(remaining, TimeUnit.MILLISECONDS)
+                .exceptionally(t -> null)
+                .join();
+
+        ArrayNode itemSummaries = MAPPER.createArrayNode();
+        int ok = 0;
+        int failed = 0;
+        for (int i = 0; i < futures.size(); i++) {
+            MapItemOutcome outcome = harvestMapItem(futures.get(i), i);
+            itemSummaries.add(outcome.summary());
+            if (outcome.ok()) ok++; else failed++;
+        }
+
+        ObjectNode aggregate = aggregateFor(node, total, ran, ok, failed, truncated, itemSummaries, null);
+        publishMapIteration(node, map.over(), total, ran, ok, failed, truncated,
+                effectiveMaxItems, effectiveMaxConcurrency, requestId, conversationId);
+        if (ok == 0) {
+            return new NodeResult(node.nodeId(), node.agent().agentId(), node.agent().protocol(),
+                    NodeResult.Status.FAILED, null, elapsed(start),
+                    "map item fan-out failed for every item");
+        }
+        return new NodeResult(node.nodeId(), node.agent().agentId(), node.agent().protocol(),
+                NodeResult.Status.OK, aggregate, elapsed(start), null);
+    }
+
+    private MapItemOutcome invokeMapItem(PlanNode node,
+                                         AgentManifest.MapSpec map,
+                                         JsonNode rawItem,
+                                         int index,
+                                         Semaphore permits,
+                                         ExecutorService exec,
+                                         Context parentContext) {
+        try {
+            permits.acquire();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return MapItemOutcome.failed(index, "interrupted before map item dispatch");
+        }
+        Span span = tracer.spanBuilder("agent.invoke")
+                .setParent(parentContext)
+                .startSpan();
+        span.setAttribute("openinference.span.kind", "AGENT");
+        span.setAttribute("agent.id", node.agent().agentId());
+        span.setAttribute("agent.protocol", node.agent().protocol());
+        span.setAttribute("map.node_id", node.nodeId());
+        span.setAttribute("map.index", index);
+        try (Scope ignored = span.makeCurrent()) {
+            JsonNode itemInput = map.hasItemSelect()
+                    ? JMES_PATH.compile(map.itemSelect()).search(rawItem)
+                    : rawItem;
+            PlanNode itemNode = new PlanNode(
+                    node.nodeId() + "[" + index + "]",
+                    node.agent(),
+                    itemInput,
+                    node.dependsOn(),
+                    node.condition());
+            NodeResult result = harness.execute(itemNode, exec);
+            span.setAttribute("agent.status", result.status().name());
+            span.setAttribute("agent.latency_ms", result.latencyMs());
+            if (!result.isOk()) {
+                span.setStatus(StatusCode.ERROR, result.status().name());
+            }
+            return MapItemOutcome.from(index, result);
+        } catch (Exception e) {
+            span.setStatus(StatusCode.ERROR, e.getClass().getSimpleName());
+            return MapItemOutcome.failed(index, e.getMessage());
+        } finally {
+            permits.release();
+            span.end();
+        }
+    }
+
+    private MapItemOutcome harvestMapItem(CompletableFuture<MapItemOutcome> future, int index) {
+        if (future.isDone() && !future.isCompletedExceptionally()) {
+            return future.join();
+        }
+        return MapItemOutcome.failed(index, "map item did not complete before the overall deadline");
+    }
+
+    private ObjectNode aggregateFor(PlanNode node,
+                                    int total,
+                                    int ran,
+                                    int ok,
+                                    int failed,
+                                    boolean truncated,
+                                    ArrayNode items,
+                                    String error) {
+        ObjectNode aggregate = MAPPER.createObjectNode();
+        aggregate.put("_map", true);
+        aggregate.put("_items", total);
+        aggregate.put("_total", total);
+        aggregate.put("_ran", ran);
+        aggregate.put("_ok", ok);
+        aggregate.put("_failed", failed);
+        aggregate.put("_truncated", truncated);
+        aggregate.set("results", items);
+        String narrative = "Map iteration ran " + ran + " of " + total + " items; "
+                + ok + " succeeded and " + failed + " failed"
+                + (truncated ? "; remaining items were skipped because the configured cap was reached." : ".");
+        if (error != null && !error.isBlank()) {
+            narrative = narrative + " Error: " + error;
+        }
+        aggregate.put("agent_narrative", narrative);
+        aggregate.put("agent_id", node.agent().agentId());
+        return aggregate;
+    }
+
+    private void publishMapIteration(PlanNode node, String over, int total, int ran, int ok, int failed,
+                                     boolean truncated, int maxItems, int maxConcurrency,
+                                     String requestId, String conversationId) {
+        if (tracePublisher == null || requestId == null || conversationId == null) return;
+        tracePublisher.publish(TraceEvent.of("map_iteration", requestId, conversationId,
+                new MapIterationData(node.nodeId(), node.agent().agentId(), over, total, ran, ok, failed,
+                        truncated, maxItems, maxConcurrency)));
+    }
+
+    private int clampCap(Integer manifestCap, int globalCap) {
+        int requested = manifestCap == null ? globalCap : Math.max(1, manifestCap);
+        return Math.max(1, Math.min(requested, globalCap));
+    }
+
+    private long elapsed(long start) {
+        return Math.max(0, System.currentTimeMillis() - start);
     }
 
     /** Synthetic result for a node skipped because an upstream dependency did not succeed. */
@@ -346,5 +556,43 @@ public class DagPlanExecutor {
     private NodeResult composeFailure(PlanNode node, String reason) {
         return new NodeResult(node.nodeId(), node.agent().agentId(), node.agent().protocol(),
                 NodeResult.Status.FAILED, null, 0, reason);
+    }
+
+    private record MapItemOutcome(int index, boolean ok, ObjectNode summary) {
+        static MapItemOutcome from(int index, NodeResult result) {
+            boolean ok = result.isOk() && !isToolErrorPayload(result.data());
+            ObjectNode summary = MAPPER.createObjectNode();
+            summary.put("index", index);
+            summary.put("status", ok ? "ok" : "failed");
+            summary.put("latency_ms", result.latencyMs());
+            if (ok) {
+                summary.set("data", result.data());
+            } else {
+                String error = result.errorMessage();
+                if (error == null && result.data() != null) {
+                    JsonNode text = result.data().path("text");
+                    error = text.isTextual() ? text.asText() : result.data().toString();
+                }
+                summary.put("error", error == null ? result.status().name() : error);
+            }
+            return new MapItemOutcome(index, ok, summary);
+        }
+
+        static MapItemOutcome failed(int index, String error) {
+            ObjectNode summary = MAPPER.createObjectNode();
+            summary.put("index", index);
+            summary.put("status", "failed");
+            summary.put("error", error == null ? "map item failed" : error);
+            return new MapItemOutcome(index, false, summary);
+        }
+
+        private static boolean isToolErrorPayload(JsonNode data) {
+            if (data == null || data.isNull() || data.isMissingNode()) return false;
+            JsonNode error = data.path("error");
+            if (!error.isMissingNode() && !error.isNull()) return true;
+            if (data.has("error_code") || data.has("errorCode")) return true;
+            JsonNode text = data.path("text");
+            return text.isTextual() && text.asText("").startsWith("Error executing tool");
+        }
     }
 }

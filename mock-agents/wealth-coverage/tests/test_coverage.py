@@ -33,12 +33,12 @@ class TestDiscover:
     def test_rm_ken_sees_okafor(self):
         results = discover("rm_ken")
         ids = {r["id"] for r in results}
-        assert ids == {"REL-00188"}
+        assert ids == {"REL-00188", "REL-00444", "REL-00445"}
 
     def test_ops_analyst_singh_sees_okafor(self):
         results = discover("ops_analyst_singh")
         ids = {r["id"] for r in results}
-        assert ids == {"REL-00188"}
+        assert ids == {"REL-00188", "REL-00444", "REL-00445"}
 
     def test_unknown_principal_gets_empty_list(self):
         assert discover("nobody") == []
@@ -46,7 +46,7 @@ class TestDiscover:
     def test_admin_sees_all(self):
         results = discover("admin")
         ids = {r["id"] for r in results}
-        assert {"REL-00042", "REL-00099", "REL-00188", "REL-00333"}.issubset(ids)
+        assert {"REL-00042", "REL-00099", "REL-00188", "REL-00333", "REL-00444", "REL-00445"}.issubset(ids)
 
 
 class TestCheck:

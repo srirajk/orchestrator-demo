@@ -943,12 +943,22 @@ public class ChatService {
                 .filter(r -> r.nodeId().equals(node.nodeId()))
                 .findFirst()
                 .map(r -> switch (r.status()) {
-                    case OK -> "ok";
+                    case OK -> mapStatus(r);
                     case SKIPPED_CONDITION_FALSE -> "skipped_condition_false";
                     case CONDITION_ERROR -> "condition_error";
                     default -> r.status().name().toLowerCase();
                 })
                 .orElse("unknown");
+    }
+
+    private String mapStatus(NodeResult result) {
+        JsonNode data = result.data();
+        if (data != null && data.path("_map").asBoolean(false)) {
+            String status = "map: " + data.path("_ok").asInt(0) + "/" + data.path("_ran").asInt(0) + " ok";
+            if (data.path("_truncated").asBoolean(false)) status += " capped";
+            return status;
+        }
+        return "ok";
     }
 
     private String resolutionFallbackReason(DagResolution resolution) {

@@ -108,14 +108,39 @@ public record AgentManifest(
      * symbols matched by equality; none are interpreted by the gateway.
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Io(List<Consume> consumes, List<Produce> produces, String condition) {
+    public record Io(List<Consume> consumes, List<Produce> produces, String condition, MapSpec map) {
         /** Backward-compatible constructor (pre-{@code condition} arity). */
         public Io(List<Consume> consumes, List<Produce> produces) {
-            this(consumes, produces, null);
+            this(consumes, produces, null, null);
+        }
+
+        /** Backward-compatible constructor (pre-{@code map} arity). */
+        public Io(List<Consume> consumes, List<Produce> produces, String condition) {
+            this(consumes, produces, condition, null);
         }
 
         public boolean hasCondition() {
             return condition != null && !condition.isBlank();
+        }
+
+        public boolean hasMap() {
+            return map != null && map.hasOver();
+        }
+    }
+
+    /** Declared dynamic map expansion over a bound consumer input. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record MapSpec(
+            String over,
+            @JsonProperty("item_select") String itemSelect,
+            @JsonProperty("max_items") Integer maxItems,
+            @JsonProperty("max_concurrency") Integer maxConcurrency) {
+        public boolean hasOver() {
+            return over != null && !over.isBlank();
+        }
+
+        public boolean hasItemSelect() {
+            return itemSelect != null && !itemSelect.isBlank();
         }
     }
 

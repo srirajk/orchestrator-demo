@@ -205,7 +205,7 @@ public final class Blackboard {
             }
         }
 
-        if (!hasFromEdge) return null;   // entity-only consumer — untouched by this contract
+        if (!hasFromEdge || node.hasMap()) return null;   // entity-only/map carriers are checked elsewhere
 
         List<String> missing = InputContractValidator.missingFields(node.agent().inputSchema(), boundInput);
         if (!missing.isEmpty()) {
