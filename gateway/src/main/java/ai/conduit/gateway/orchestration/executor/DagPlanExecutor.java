@@ -1,5 +1,6 @@
 package ai.conduit.gateway.orchestration.executor;
 
+import ai.conduit.gateway.infrastructure.telemetry.MdcPropagation;
 import ai.conduit.gateway.orchestration.harness.AgentHarness;
 import ai.conduit.gateway.infrastructure.telemetry.TraceEvent;
 import ai.conduit.gateway.infrastructure.telemetry.TraceEventPublisher;
@@ -25,6 +26,7 @@ import io.opentelemetry.context.Context;
 import io.opentelemetry.context.Scope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -101,17 +103,26 @@ public class DagPlanExecutor {
     /**
      * Execute {@code plan} layer by layer, binding each node's input from {@code blackboard}.
      *
-     * @param plan       a resolver-produced plan with populated {@code dependsOn} edges
-     * @param blackboard seeded with available entity keys and the leaf nodes' pre-bound inputs;
-     *                   mutated as producer outputs are projected
+     * @param plan        a resolver-produced plan with populated {@code dependsOn} edges
+     * @param blackboard  seeded with available entity keys and the leaf nodes' pre-bound inputs;
+     *                    mutated as producer outputs are projected
+     * @param callerToken the calling principal's verified JWT, captured as request-scoped DATA at
+     *                    ingress and threaded here because {@code SecurityContextHolder} does not
+     *                    survive the hop onto this executor's virtual threads (F-IDENTITY). Passed
+     *                    through to every layer's {@link AgentHarness#execute} call.
      * @return one {@link NodeResult} per plan node, in plan (topological) order
      */
     public List<NodeResult> execute(Plan plan, Blackboard blackboard) {
-        return execute(plan, blackboard, null, null);
+        return execute(plan, blackboard, null, null, null);
     }
 
     public List<NodeResult> execute(Plan plan, Blackboard blackboard,
                                     String requestId, String conversationId) {
+        return execute(plan, blackboard, requestId, conversationId, null);
+    }
+
+    public List<NodeResult> execute(Plan plan, Blackboard blackboard,
+                                    String requestId, String conversationId, String callerToken) {
         if (plan == null || plan.nodes() == null || plan.nodes().isEmpty()) {
             log.warn("DagPlanExecutor received an empty plan");
             return List.of();
@@ -132,6 +143,9 @@ public class DagPlanExecutor {
         long deadline = System.currentTimeMillis() + overallDeadlineMs;
 
         final Context parentContext = Context.current();
+        // See FlatPlanExecutor's identical comment: MDC is thread-local and does not survive the
+        // hop onto `exec`'s virtual threads, so it must be captured here and re-applied per layer.
+        final Map<String, String> mdcContext = MDC.getCopyOfContextMap();
         var exec = Executors.newVirtualThreadPerTaskExecutor();
 
         try {
@@ -179,8 +193,8 @@ public class DagPlanExecutor {
                     continue;   // skips may have unblocked/blocked more — re-classify
                 }
 
-                runLayer(ready, blackboard, results, exec, parentContext, deadline,
-                        requestId, conversationId);
+                runLayer(ready, blackboard, results, exec, parentContext, mdcContext, deadline,
+                        requestId, conversationId, callerToken);
             }
         } finally {
             exec.close();
@@ -228,9 +242,11 @@ public class DagPlanExecutor {
                           Map<String, NodeResult> results,
                           ExecutorService exec,
                           Context parentContext,
+                          Map<String, String> mdcContext,
                           long deadline,
                           String requestId,
-                          String conversationId) {
+                          String conversationId,
+                          String callerToken) {
 
         // Bind + gate on the caller thread (deterministic) before releasing the layer.
         List<PlanNode> bound = new ArrayList<>();
@@ -255,7 +271,7 @@ public class DagPlanExecutor {
             // that already-filtered input rather than any raw upstream payload.
             if (candidate.hasMap()) {
                 NodeResult mapResult = executeMapNode(candidate, exec, parentContext, deadline,
-                        requestId, conversationId);
+                        requestId, conversationId, callerToken);
                 results.put(n.nodeId(), mapResult);
                 if (mapResult.isOk()) {
                     blackboard.project(candidate, mapResult.data());
@@ -267,23 +283,27 @@ public class DagPlanExecutor {
 
         List<CompletableFuture<NodeResult>> futures = bound.stream()
                 .map(node -> CompletableFuture.supplyAsync(() -> {
-                    Span span = tracer.spanBuilder("agent.invoke")
-                            .setParent(parentContext)
-                            .startSpan();
-                    span.setAttribute("openinference.span.kind", "AGENT");
-                    span.setAttribute("agent.id", node.agent().agentId());
-                    span.setAttribute("agent.protocol", node.agent().protocol());
-                    try (Scope ignored = span.makeCurrent()) {
-                        NodeResult result = harness.execute(node, exec);
-                        span.setAttribute("agent.status", result.status().name());
-                        span.setAttribute("agent.latency_ms", result.latencyMs());
-                        if (!result.isOk()) {
-                            span.setStatus(StatusCode.ERROR, result.status().name());
+                    NodeResult[] holder = new NodeResult[1];
+                    MdcPropagation.run(mdcContext, () -> {
+                        Span span = tracer.spanBuilder("agent.invoke")
+                                .setParent(parentContext)
+                                .startSpan();
+                        span.setAttribute("openinference.span.kind", "AGENT");
+                        span.setAttribute("agent.id", node.agent().agentId());
+                        span.setAttribute("agent.protocol", node.agent().protocol());
+                        try (Scope ignored = span.makeCurrent()) {
+                            NodeResult result = harness.execute(node, exec, callerToken);
+                            span.setAttribute("agent.status", result.status().name());
+                            span.setAttribute("agent.latency_ms", result.latencyMs());
+                            if (!result.isOk()) {
+                                span.setStatus(StatusCode.ERROR, result.status().name());
+                            }
+                            holder[0] = result;
+                        } finally {
+                            span.end();
                         }
-                        return result;
-                    } finally {
-                        span.end();
-                    }
+                    });
+                    return holder[0];
                 }, exec))
                 .toList();
 
@@ -319,7 +339,8 @@ public class DagPlanExecutor {
                                       Context parentContext,
                                       long deadline,
                                       String requestId,
-                                      String conversationId) {
+                                      String conversationId,
+                                      String callerToken) {
         long start = System.currentTimeMillis();
         AgentManifest.MapSpec map = node.agent().io().map();
         JsonNode collection;
@@ -369,7 +390,7 @@ public class DagPlanExecutor {
             final int index = i;
             final JsonNode rawItem = collection.get(i);
             futures.add(CompletableFuture.supplyAsync(() -> invokeMapItem(
-                    node, map, rawItem, index, permits, exec, parentContext), exec));
+                    node, map, rawItem, index, permits, exec, parentContext, callerToken), exec));
         }
 
         long remaining = Math.max(1, deadline - System.currentTimeMillis());
@@ -405,7 +426,8 @@ public class DagPlanExecutor {
                                          int index,
                                          Semaphore permits,
                                          ExecutorService exec,
-                                         Context parentContext) {
+                                         Context parentContext,
+                                         String callerToken) {
         try {
             permits.acquire();
         } catch (InterruptedException e) {
@@ -430,7 +452,7 @@ public class DagPlanExecutor {
                     itemInput,
                     node.dependsOn(),
                     node.condition());
-            NodeResult result = harness.execute(itemNode, exec);
+            NodeResult result = harness.execute(itemNode, exec, callerToken);
             span.setAttribute("agent.status", result.status().name());
             span.setAttribute("agent.latency_ms", result.latencyMs());
             if (!result.isOk()) {

@@ -4,12 +4,10 @@ import ai.conduit.gateway.adapter.ProtocolAdapter;
 import ai.conduit.gateway.registry.model.AgentManifest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -76,7 +74,7 @@ public class McpAdapter implements ProtocolAdapter {
     }
 
     @Override
-    public JsonNode invoke(AgentManifest manifest, JsonNode input) throws Exception {
+    public JsonNode invoke(AgentManifest manifest, JsonNode input, String bearerToken) throws Exception {
         String serverUrl = manifest.connection().serverUrl();
         String toolName  = manifest.connection().tool();
         int timeoutMs    = resolveTimeout(manifest);
@@ -89,16 +87,23 @@ public class McpAdapter implements ProtocolAdapter {
             throw new IllegalArgumentException(
                     "Agent " + manifest.agentId() + " has no tool name");
         }
+        // F-IDENTITY: a tools/call is a data-plane call — it must carry the caller's verified
+        // identity. bearerToken is passed explicitly by the harness (never read from
+        // SecurityContextHolder, which does not survive the hop onto the DAG/flat executor's
+        // virtual threads). A missing token here means the security context was not propagated
+        // upstream — refuse rather than silently calling the agent unauthenticated.
+        if (bearerToken == null || bearerToken.isBlank()) {
+            throw new IllegalStateException(
+                    "No caller identity available for agent " + manifest.agentId()
+                    + " — refusing to invoke without a bearer token");
+        }
 
         log.debug("McpAdapter → tool '{}' on {} for agent {}", toolName, serverUrl, manifest.agentId());
 
         // Two futures the SSE reader will complete.
         CompletableFuture<String> endpointFuture = new CompletableFuture<>();
         CompletableFuture<String> toolResponseFuture = new CompletableFuture<>();
-
-        // Capture the bearer token from the current security context before entering
-        // the virtual thread (SecurityContextHolder is not automatically propagated).
-        String bearerToken = extractBearerToken();
+        CompletableFuture<String> verifiedSubFuture = new CompletableFuture<>();
 
         // SSE request — must be HTTP/1.1; uvicorn rejects HTTP/2 with 421.
         HttpRequest.Builder sseBuilder = HttpRequest.newBuilder()
@@ -124,10 +129,13 @@ public class McpAdapter implements ProtocolAdapter {
                 if (resp.statusCode() != 200) {
                     throw new RuntimeException("SSE endpoint returned HTTP " + resp.statusCode());
                 }
+                verifiedSubFuture.complete(resp.headers()
+                        .firstValue("X-Conduit-Verified-Sub").orElse(null));
                 parseSseStream(resp.body(), endpointFuture, toolResponseFuture);
             } catch (Exception e) {
                 endpointFuture.completeExceptionally(e);
                 toolResponseFuture.completeExceptionally(e);
+                verifiedSubFuture.complete(null);
             }
         });
 
@@ -165,7 +173,7 @@ public class McpAdapter implements ProtocolAdapter {
         log.debug("McpAdapter raw response ({}): {}", manifest.agentId(),
                 rawResponse.length() > 200 ? rawResponse.substring(0, 200) + "…" : rawResponse);
 
-        return extractResult(rawResponse);
+        return withVerifiedSub(extractResult(rawResponse), verifiedSubFuture.getNow(null));
     }
 
     // ── SSE stream reader ─────────────────────────────────────────────────────
@@ -260,14 +268,6 @@ public class McpAdapter implements ProtocolAdapter {
         log.debug("POST {} → HTTP {}", url, response.statusCode());
     }
 
-    private String extractBearerToken() {
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth instanceof JwtAuthenticationToken jwtAuth) {
-            return jwtAuth.getToken().getTokenValue();
-        }
-        return null;
-    }
-
     /**
      * Builds the absolute session URL from the SSE server URL and the relative
      * session path returned by the server.
@@ -319,6 +319,16 @@ public class McpAdapter implements ProtocolAdapter {
         }
 
         return result;
+    }
+
+    private JsonNode withVerifiedSub(JsonNode data, String verifiedSub) {
+        if (verifiedSub == null || verifiedSub.isBlank() || data == null || !data.isObject()) {
+            return data;
+        }
+        ObjectNode copy = objectMapper.createObjectNode();
+        copy.put("_verified_sub", verifiedSub);
+        copy.setAll((ObjectNode) data);
+        return copy;
     }
 
     // ── Utilities ─────────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -45,12 +46,14 @@ public class CoverageClient {
      * Uses the coverage.discover_url template from the domain manifest.
      */
     public List<CoverageResource> discover(String principalId, String tenantId,
-                                            DomainManifest.Coverage coverage) {
+                                            DomainManifest.Coverage coverage,
+                                            String bearerToken) {
         String url = bindPathParams(coverage.discoverUrl(), principalId, null);
         try {
             String body = webClient.get()
                 .uri(url)
                 .header("X-Tenant-Id", tenantId)
+                .headers(headers -> applyBearer(headers, bearerToken, "coverage discover"))
                 .retrieve()
                 .onStatus(HttpStatusCode::is5xxServerError, response ->
                     Mono.error(new CoverageUnavailableException(
@@ -73,12 +76,14 @@ public class CoverageClient {
      * Checks whether {@code principalId} may access {@code resourceId} within their coverage.
      */
     public CoverageCheckResult check(String principalId, String tenantId,
-                                      String resourceId, DomainManifest.Coverage coverage) {
+                                      String resourceId, DomainManifest.Coverage coverage,
+                                      String bearerToken) {
         String url = bindPathParams(coverage.checkUrl(), principalId, resourceId);
         try {
             String body = webClient.get()
                 .uri(url)
                 .header("X-Tenant-Id", tenantId)
+                .headers(headers -> applyBearer(headers, bearerToken, "coverage check"))
                 .retrieve()
                 .onStatus(HttpStatusCode::is5xxServerError, response ->
                     Mono.error(new CoverageUnavailableException(
@@ -109,7 +114,8 @@ public class CoverageClient {
      * candidates ∩ discover intersection — never by filtering resolution.
      */
     public CoverageResolveResult resolve(String reference, String entityType,
-                                          String tenantId, DomainManifest.Coverage coverage) {
+                                          String tenantId, DomainManifest.Coverage coverage,
+                                          String bearerToken) {
         String url = coverage.resolveUrl();
         Map<String, String> requestBody = Map.of(
             "reference", reference,
@@ -120,6 +126,7 @@ public class CoverageClient {
             String responseBody = webClient.post()
                 .uri(url)
                 .header("X-Tenant-Id", tenantId)
+                .headers(headers -> applyBearer(headers, bearerToken, "coverage resolve"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(BodyInserters.fromValue(bodyJson))
                 .retrieve()
@@ -151,6 +158,14 @@ public class CoverageClient {
         if (principalId != null) result = result.replace("{principal_id}", principalId);
         if (resourceId  != null) result = result.replace("{id}", resourceId);
         return result;
+    }
+
+    private void applyBearer(HttpHeaders headers, String bearerToken, String operation) {
+        if (bearerToken == null || bearerToken.isBlank()) {
+            throw new CoverageUnavailableException(
+                "No caller identity available for " + operation + " — refusing coverage call");
+        }
+        headers.setBearerAuth(bearerToken);
     }
 
     // ── Exception ─────────────────────────────────────────────────────────────

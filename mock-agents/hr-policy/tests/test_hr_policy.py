@@ -19,9 +19,21 @@ from fastapi.testclient import TestClient
 logging.getLogger("opentelemetry").setLevel(logging.CRITICAL)
 logging.getLogger("openinference").setLevel(logging.CRITICAL)
 
+import main
 from main import app
 
 client = TestClient(app)
+
+
+def _allow_all_tokens(monkeypatch):
+    """
+    F-IDENTITY: production `verify_bearer_token` now fails CLOSED (401) with no/invalid
+    token — correct, and covered by TestJwtBypass below. The classes that use this
+    helper test DATA CONTRACTS / fault knobs, not auth, and have no real signed JWT to
+    send — patch the middleware's verify function so they can still reach the handlers.
+    This does not touch production code; it only relaxes the TEST client.
+    """
+    monkeypatch.setattr(main, "verify_bearer_token", lambda auth: (True, None, None))
 
 
 class TestHealth:
@@ -68,6 +80,10 @@ class TestOpenApi:
 
 
 class TestPolicyIndex:
+    @pytest.fixture(autouse=True)
+    def _allow(self, monkeypatch):
+        _allow_all_tokens(monkeypatch)
+
     def test_no_topic_returns_index(self):
         r = client.get("/policy-qa")
         assert r.status_code == 200
@@ -88,6 +104,10 @@ class TestPolicyIndex:
 
 
 class TestPoliciesByTopic:
+    @pytest.fixture(autouse=True)
+    def _allow(self, monkeypatch):
+        _allow_all_tokens(monkeypatch)
+
     def test_parental_leave(self):
         r = client.get("/policy-qa?topic=parental_leave")
         assert r.status_code == 200
@@ -173,6 +193,10 @@ class TestPoliciesByTopic:
 
 
 class TestFaultKnobs:
+    @pytest.fixture(autouse=True)
+    def _allow(self, monkeypatch):
+        _allow_all_tokens(monkeypatch)
+
     def test_fail_knob_returns_503(self):
         r = client.get("/policy-qa?_fail=true")
         assert r.status_code == 503

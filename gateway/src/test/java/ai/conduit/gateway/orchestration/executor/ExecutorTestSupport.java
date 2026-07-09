@@ -86,7 +86,7 @@ final class ExecutorTestSupport {
 
         @Override public String protocol() { return "http"; }
 
-        @Override public JsonNode invoke(AgentManifest m, JsonNode input) {
+        @Override public JsonNode invoke(AgentManifest m, JsonNode input, String bearerToken) {
             String id = m.agentId();
             order.add(id);
             if (input != null) inputs.put(id, input);

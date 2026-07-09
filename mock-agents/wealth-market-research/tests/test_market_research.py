@@ -20,9 +20,21 @@ from unittest.mock import patch
 logging.getLogger("opentelemetry").setLevel(logging.CRITICAL)
 logging.getLogger("openinference").setLevel(logging.CRITICAL)
 
+import main
 from main import app
 
 client = TestClient(app)
+
+
+def _allow_all_tokens(monkeypatch):
+    """
+    F-IDENTITY: production `verify_bearer_token` now fails CLOSED (401) with no/invalid
+    token — correct, and covered by TestJwtBypass below. The classes that use this
+    helper test DATA CONTRACTS / fault knobs, not auth, and have no real signed JWT to
+    send — patch the middleware's verify function so they can still reach the handlers.
+    This does not touch production code; it only relaxes the TEST client.
+    """
+    monkeypatch.setattr(main, "verify_bearer_token", lambda auth: (True, None, None))
 
 
 class TestHealth:
@@ -71,6 +83,10 @@ class TestOpenApi:
 
 
 class TestMarketResearchBroadOverview:
+    @pytest.fixture(autouse=True)
+    def _allow(self, monkeypatch):
+        _allow_all_tokens(monkeypatch)
+
     def test_no_topic_returns_broad_overview(self):
         r = client.get("/market-research")
         assert r.status_code == 200
@@ -96,6 +112,10 @@ class TestMarketResearchBroadOverview:
 
 
 class TestMarketResearchByTopic:
+    @pytest.fixture(autouse=True)
+    def _allow(self, monkeypatch):
+        _allow_all_tokens(monkeypatch)
+
     def test_equities_topic(self):
         r = client.get("/market-research?topic=equities")
         assert r.status_code == 200
@@ -155,6 +175,10 @@ class TestMarketResearchByTopic:
 
 
 class TestFaultKnobs:
+    @pytest.fixture(autouse=True)
+    def _allow(self, monkeypatch):
+        _allow_all_tokens(monkeypatch)
+
     def test_fail_knob_returns_503(self):
         r = client.get("/market-research?_fail=true")
         assert r.status_code == 503

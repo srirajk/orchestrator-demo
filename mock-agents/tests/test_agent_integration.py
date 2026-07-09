@@ -29,12 +29,24 @@ import pytest
 from fastapi.testclient import TestClient
 
 # ── Wealth HTTP service client ─────────────────────────────────────────────────
+import main as wealth_main
 from main import app as wealth_app
 
 wealth = TestClient(wealth_app, raise_server_exceptions=False)
 
 REL = "REL-00042"
 FUND = "FND-7781"
+
+
+def _allow_all_tokens(monkeypatch):
+    """
+    F-IDENTITY: production `verify_bearer_token` now fails CLOSED (401) with no/invalid
+    token — correct, and covered exhaustively by TestWealthAuth below. The classes that
+    use this helper are testing DATA CONTRACTS / fault knobs, not auth, and have no real
+    signed JWT to send — patch the middleware's verify function so they can still reach
+    the handlers. This does not touch production code; it only relaxes the TEST client.
+    """
+    monkeypatch.setattr(wealth_main, "verify_bearer_token", lambda auth: (True, None, None))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -45,27 +57,30 @@ class TestWealthAuth:
     """JWT enforcement: every /holdings,/performance etc path goes through the
     jwt_auth_middleware. These tests prove the auth layer actually runs."""
 
-    def test_no_auth_header_is_allowed(self):
-        """Gateway is the auth boundary — requests without a token come from the gateway
-        on behalf of a verified principal. Should be accepted (fail-open)."""
+    def test_no_auth_header_is_rejected(self):
+        """F-IDENTITY: fail CLOSED. The gateway always propagates a verified caller JWT
+        on every agent hop (ChatCompletionsController → AgentHarness → HttpAdapter); a
+        request with no Authorization header never comes from a legitimate gateway call
+        on behalf of a chat request, so it must be rejected."""
         r = wealth.get(f"/holdings?relationship_id={REL}")
-        assert r.status_code == 200, f"Expected 200, got {r.status_code}: {r.text}"
+        assert r.status_code == 401, f"Expected 401, got {r.status_code}: {r.text}"
 
-    def test_bearer_unused_is_allowed(self):
-        """LibreChat's placeholder API key must not be rejected."""
+    def test_bearer_unused_is_rejected(self):
+        """The historical 'Bearer unused' placeholder bypass is removed — no live caller
+        ever needs it, and it was a trivial way to bypass auth entirely."""
         r = wealth.get(
             f"/holdings?relationship_id={REL}",
             headers={"Authorization": "Bearer unused"},
         )
-        assert r.status_code == 200
+        assert r.status_code == 401
 
-    def test_empty_bearer_is_allowed(self):
-        """Empty bearer token is treated like no token."""
+    def test_empty_bearer_is_rejected(self):
+        """An empty bearer value is not a token — fail CLOSED, same as no header."""
         r = wealth.get(
             f"/holdings?relationship_id={REL}",
             headers={"Authorization": "Bearer "},
         )
-        assert r.status_code == 200
+        assert r.status_code == 401
 
     def test_malformed_token_too_many_dots_is_rejected(self):
         """Token with wrong number of dots is rejected before JWKS fetch."""
@@ -109,6 +124,10 @@ class TestWealthAuth:
 class TestWealthDataContracts:
     """Every field the gateway's synthesis prompt references must be present and typed
     correctly. If these fail, the numeric grounding check in the gateway will fail too."""
+
+    @pytest.fixture(autouse=True)
+    def _allow(self, monkeypatch):
+        _allow_all_tokens(monkeypatch)
 
     def test_holdings_structure(self):
         r = wealth.get(f"/holdings?relationship_id={REL}")
@@ -170,6 +189,10 @@ class TestWealthDataContracts:
 # ─────────────────────────────────────────────────────────────────────────────
 
 class TestWealthFaultKnobs:
+    @pytest.fixture(autouse=True)
+    def _allow(self, monkeypatch):
+        _allow_all_tokens(monkeypatch)
+
     @pytest.mark.parametrize("path", [
         "/holdings", "/performance", "/risk-profile", "/goal-planning"
     ])
@@ -338,8 +361,8 @@ class TestCrossAgentConsistency:
     These tests verify the canned data is internally consistent."""
 
     @pytest.fixture(autouse=True)
-    def _fix(self, servicing_imports):
-        pass
+    def _fix(self, servicing_imports, monkeypatch):
+        _allow_all_tokens(monkeypatch)
 
     def test_holdings_and_custody_both_have_msft(self):
         from custody.tool import get_custody_positions

@@ -1,212 +1,213 @@
 """
-Identity per hop — every data-plane call the gateway makes to an agent must carry the
-CALLER'S verified JWT, and the agent must actually verify it (not fail open). This is the
-harness's acceptance gate for the identity-propagation security fix; these are EXPECTED
-to fail (or partially fail) until that fix lands — that's the point.
+T2 per-hop identity gate.
 
-Evidence strategy (documented per CLAUDE.md's ask to explain how each detects its property):
-
-  test_hop_identity_verified — composite, three legs, all against the SAME endpoint the
-  live flow calls:
-    (a) drive a live rm_jane turn through the real BFF, then grep the gateway's own DEBUG
-        log (gateway/src/main/resources/application.yml sets `ai.conduit: DEBUG`) for the
-        HttpAdapter line that fires on every agent invocation, correlated by conversationId
-        via the logback MDC pattern (`cid=%X{conversationId}`) — proves THIS live turn
-        actually attempted to carry a bearer token to the agent.
-    (b) obtain a real signed JWT for rm_jane directly from IAM and call wealth-http's
-        /holdings DATA endpoint directly with it — must succeed (200, real data).
-    (c) take that SAME real JWT and flip one bit deep inside the signature segment, call
-        the identical endpoint — must be REJECTED (401). If the agent accepts a tampered
-        signature, verification isn't actually happening (see test_tampered_signature_
-        rejected below for the isolated, minimal repro and root-cause diagnosis).
-
-  test_no_token_rejected — direct curl, no login needed: hit the DATA endpoint with no
-  Authorization header at all (expect 401 once agents fail closed) and /health (exempt,
-  always 200). Marked xfail because the shipped agent's documented fallback for a missing
-  header is currently "allow" (mock-agents/wealth/shared/jwt_verify.py) — flip to pass once
-  that lands.
-
-  test_tampered_signature_rejected — NOT part of the original ask, added because building
-  the harness surfaced a live, more severe bug than the documented one: see its docstring.
+Every gateway data-plane hop must carry the end user's JWT, and every agent/coverage
+service must verify it fail-closed. These tests are deliberately live: direct probes hit
+the running mock services, and propagation checks drive the real BFF -> gateway path.
 """
 from __future__ import annotations
+
+import base64
+import json
+import subprocess
 import time
 
-import pytest
 import requests
 
-from lib import bff_client, config, docker_logs, iam_client
+from lib import bff_client, config, iam_client, trace_client
 from lib.evidence import evidence
 
-GATEWAY_CONTAINER = "conduit-gateway"
-WEALTH_AGENT_CONTAINER = "conduit-wealth-http"
+
+def _b64url(data: dict) -> str:
+    raw = json.dumps(data, separators=(",", ":")).encode()
+    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
 
 
 def _tamper_signature(jwt: str) -> str:
-    """Flip one character deep inside the signature segment (not the first/last char,
-    which base64's padding can occasionally leave bit-equivalent) — guarantees a byte
-    change after base64url decoding, so re-verification MUST fail if it runs at all."""
     header, payload, sig = jwt.split(".")
     mid = len(sig) // 2
-    ch = sig[mid]
-    new_ch = "A" if ch != "A" else "B"
-    return f"{header}.{payload}.{sig[:mid]}{new_ch}{sig[mid + 1:]}"
+    replacement = "A" if sig[mid] != "A" else "B"
+    return f"{header}.{payload}.{sig[:mid]}{replacement}{sig[mid + 1:]}"
 
 
-def test_hop_identity_verified(jane_session):
-    """See module docstring — composite identity-per-hop check."""
-    # ── Leg (a): live BFF turn, then confirm the gateway actually attempted to propagate
-    # a bearer token to the agent DURING this turn.
-    #
-    # NOTE: originally this correlated by conversationId via the logback MDC pattern
-    # (`cid=%X{conversationId}`), but a live run surfaced that the MDC context is EMPTY on
-    # HttpAdapter's log line (`[rid= cid= uid=] - HttpAdapter: propagating JWT to agent`)
-    # — a distinct, real gap: MDC is thread-local and, like callerToken before the
-    # F-IDENTITY fix, does not survive the hop onto AgentHarness's virtual-thread executor
-    # (see AgentHarness.java's own comment on exactly this class of bug for callerToken).
-    # RequestCorrelationFilter populates MDC on the servlet thread; nothing re-populates it
-    # on the executor thread HttpAdapter actually logs from. This means the glass-box's
-    # per-request log correlation is currently unreliable for any log line emitted from
-    # inside the agent-invocation hop — worth fixing alongside the identity work, even
-    # though it is a logging/observability gap rather than a security one.
-    #
-    # Given that, this leg uses a before/after occurrence-count delta instead of exact
-    # correlation: weaker (a concurrent request from eval-continuous could add noise) but
-    # still a real, live signal that a propagation attempt happened around this turn. ---
-    before_count = len(docker_logs.grep(GATEWAY_CONTAINER, "propagating JWT to agent", lines=3000))
-    turn = bff_client.ask(jane_session, f"Give me the {config.WHITMAN_NAME} holdings")
-    assert turn.http_status == 200, f"live turn failed: {turn.http_status}"
-    time.sleep(1.0)  # let the log line land before we tail
-    after_lines = docker_logs.grep(GATEWAY_CONTAINER, "propagating JWT to agent", lines=3000)
-    after_count = len(after_lines)
-    evidence("gateway DEBUG log — JWT propagation occurrence count around this turn", {
-        "conversation_id": turn.conversation_id,
-        "before_count": before_count,
-        "after_count": after_count,
-        "most_recent_matching_lines": after_lines[-5:],
-        "known_gap": "MDC (rid=/cid=/uid=) is empty on this log line — see docstring/comment "
-                     "above; exact per-conversation correlation is not currently possible from "
-                     "gateway logs alone for this hop.",
-    })
-    assert after_count > before_count, (
-        "No new 'propagating JWT to agent' DEBUG log line appeared after this live turn — "
-        "either ai.conduit DEBUG logging is off, or the gateway did not attempt to attach a "
-        "bearer token when calling the agent for this live turn."
-    )
+def _token_with_claims(claims: dict, kid: str = "t2-harness") -> str:
+    header = {"alg": "RS256", "typ": "JWT", "kid": kid}
+    return f"{_b64url(header)}.{_b64url(claims)}.c2lnbmF0dXJl"
 
-    # ── Legs (b) + (c): direct-to-agent probe with a real vs. tampered JWT for the same
-    # user, same endpoint the live flow above just exercised. ────────────────────────────
-    real_jwt = iam_client.get_jwt(config.USER_ENTITLED)
-    tampered_jwt = _tamper_signature(real_jwt)
 
-    real_resp = requests.get(
-        f"{config.WEALTH_HTTP_URL}/holdings",
-        params={"relationship_id": config.WHITMAN_RELATIONSHIP_ID},
-        headers={"Authorization": f"Bearer {real_jwt}"},
+def _rewrite_audience_without_resigning(jwt: str, aud: str) -> str:
+    header, payload, sig = jwt.split(".")
+    padded = payload + "=" * (-len(payload) % 4)
+    claims = json.loads(base64.urlsafe_b64decode(padded))
+    claims["aud"] = aud
+    return f"{header}.{_b64url(claims)}.{sig}"
+
+
+def _assert_status(resp: requests.Response, expected: int, label: str) -> None:
+    evidence(label, {"status": resp.status_code, "body_preview": resp.text[:240]})
+    assert resp.status_code == expected, f"{label}: expected HTTP {expected}, got {resp.status_code}: {resp.text[:240]}"
+
+
+def _mcp_tools_call(headers: dict | None = None) -> requests.Response:
+    return requests.post(
+        f"{config.SERVICING_MCP_URL}/messages",
+        json={"jsonrpc": "2.0", "id": "t2", "method": "tools/call",
+              "params": {"name": "get_settlements", "arguments": {"relationship_id": "REL-00188"}}},
+        headers=headers or {},
         timeout=15,
     )
-    tampered_resp = requests.get(
-        f"{config.WEALTH_HTTP_URL}/holdings",
-        params={"relationship_id": config.WHITMAN_RELATIONSHIP_ID},
-        headers={"Authorization": f"Bearer {tampered_jwt}"},
-        timeout=15,
-    )
-    evidence("direct wealth-http probe — real vs. tampered JWT", {
-        "real_jwt_status": real_resp.status_code,
-        "real_jwt_body_preview": real_resp.text[:200],
-        "tampered_jwt_status": tampered_resp.status_code,
-        "tampered_jwt_body_preview": tampered_resp.text[:200],
+
+
+def _agent_complete_previews(events: list[dict]) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for evt in trace_client.events_of_type(events, "agent_complete"):
+        data = evt.get("data") or {}
+        out[str(data.get("agentId"))] = str(data.get("dataPreview") or "")
+    return out
+
+
+def test_no_token_and_tampered_rejected_by_agents_mcp_and_coverage():
+    real = iam_client.get_jwt(config.USER_ENTITLED)
+    tampered = _tamper_signature(real)
+    bad_headers = {"Authorization": f"Bearer {tampered}"}
+
+    probes = [
+        ("wealth-http no token", requests.get(
+            f"{config.WEALTH_HTTP_URL}/holdings",
+            params={"relationship_id": config.WHITMAN_RELATIONSHIP_ID},
+            timeout=15)),
+        ("wealth-http tampered", requests.get(
+            f"{config.WEALTH_HTTP_URL}/holdings",
+            params={"relationship_id": config.WHITMAN_RELATIONSHIP_ID},
+            headers=bad_headers,
+            timeout=15)),
+        ("insurance-http no token", requests.get(
+            f"{config.INSURANCE_HTTP_URL}/policy-details",
+            params={"policy_id": config.CONTINENTAL_FREIGHT_POLICY_ID},
+            timeout=15)),
+        ("insurance-http tampered", requests.get(
+            f"{config.INSURANCE_HTTP_URL}/policy-details",
+            params={"policy_id": config.CONTINENTAL_FREIGHT_POLICY_ID},
+            headers=bad_headers,
+            timeout=15)),
+        ("wealth-coverage no token", requests.get(
+            f"{config.WEALTH_COVERAGE_URL}/coverage/{config.USER_ENTITLED}",
+            timeout=15)),
+        ("wealth-coverage tampered", requests.get(
+            f"{config.WEALTH_COVERAGE_URL}/coverage/{config.USER_ENTITLED}",
+            headers=bad_headers,
+            timeout=15)),
+        ("insurance-coverage no token", requests.get(
+            f"{config.INSURANCE_COVERAGE_URL}/coverage/{config.USER_INSURANCE_UNDERWRITER}",
+            timeout=15)),
+        ("insurance-coverage tampered", requests.get(
+            f"{config.INSURANCE_COVERAGE_URL}/coverage/{config.USER_INSURANCE_UNDERWRITER}",
+            headers=bad_headers,
+            timeout=15)),
+        ("servicing-mcp tools/call no token", _mcp_tools_call()),
+        ("servicing-mcp tools/call tampered", _mcp_tools_call(bad_headers)),
+    ]
+    for label, resp in probes:
+        _assert_status(resp, 401, label)
+
+
+def test_hop_carries_end_user_sub_flat_and_dag(jane_session):
+    flat = bff_client.ask(jane_session, f"Give me the {config.WHITMAN_NAME} holdings")
+    assert flat.http_status == 200, flat.answer_text
+    flat_request_id, flat_events = trace_client.trace_for_conversation(flat.conversation_id)
+    flat_previews = _agent_complete_previews(flat_events)
+    evidence("flat hop verified-sub previews", {
+        "requestId": flat_request_id,
+        "conversation_id": flat.conversation_id,
+        "previews": flat_previews,
     })
-    assert real_resp.status_code == 200, (
-        f"A genuinely valid rm_jane JWT was rejected by wealth-http: {real_resp.status_code} "
-        f"{real_resp.text[:200]}"
-    )
-    assert tampered_resp.status_code == 401, (
-        f"wealth-http ACCEPTED a JWT with a tampered signature (HTTP {tampered_resp.status_code}) "
-        f"— the agent is not actually verifying signatures on this hop. See "
-        f"test_tampered_signature_rejected for the isolated root-cause repro."
-    )
+    assert any("holdings" in aid and f'"_verified_sub":"{config.USER_ENTITLED}"' in preview
+               for aid, preview in flat_previews.items()), flat_previews
 
-
-def test_no_token_rejected():
-    """
-    Direct curl, no BFF/login involved:
-      - GET /health with no Authorization -> 200 (exempt by design, see main.py's
-        jwt_auth_middleware path allowlist).
-      - GET /holdings (a DATA endpoint) with no Authorization -> MUST be 401 once agents
-        fail closed on a missing token. Today mock-agents/wealth/shared/jwt_verify.py's
-        documented policy is "No Authorization header -> allow" (dev/startup-introspection
-        fallback) — so this currently returns 200. xfail until that lands; flip to pass then.
-    """
-    health = requests.get(f"{config.WEALTH_HTTP_URL}/health", timeout=10)
-    evidence("GET /health, no auth", {"status": health.status_code, "body": health.text[:200]})
-    assert health.status_code == 200, f"/health should be exempt and always 200, got {health.status_code}"
-
-    data_resp = requests.get(
-        f"{config.WEALTH_HTTP_URL}/holdings",
-        params={"relationship_id": config.WHITMAN_RELATIONSHIP_ID},
-        timeout=10,
+    dag = bff_client.send_message(
+        jane_session,
+        bff_client.create_conversation(jane_session, "T2 Whitman concentration"),
+        f"Is the {config.WHITMAN_NAME} over-concentrated?",
     )
-    evidence("GET /holdings, NO Authorization header", {
-        "status": data_resp.status_code,
-        "body_preview": data_resp.text[:200],
+    assert dag.http_status == 200, dag.answer_text
+    dag_request_id, dag_events = trace_client.trace_for_conversation(dag.conversation_id)
+    plan_graphs = trace_client.events_of_type(dag_events, "plan_graph")
+    dag_previews = _agent_complete_previews(dag_events)
+    evidence("DAG hop verified-sub previews", {
+        "requestId": dag_request_id,
+        "conversation_id": dag.conversation_id,
+        "plan_graph": plan_graphs[-1]["data"] if plan_graphs else None,
+        "previews": dag_previews,
     })
-    if data_resp.status_code != 401:
-        pytest.xfail(
-            f"KNOWN GAP (fail-open, not yet fixed): wealth-http allowed an unauthenticated "
-            f"DATA call (HTTP {data_resp.status_code}). Fix: mock-agents/wealth/shared/"
-            f"jwt_verify.py's 'no Authorization header' branch must return "
-            f"(False, ...) instead of (True, None, None) for data endpoints."
+    assert plan_graphs, "Expected holdings -> concentration DAG plan"
+    assert any("holdings" in aid and f'"_verified_sub":"{config.USER_ENTITLED}"' in preview
+               for aid, preview in dag_previews.items()), dag_previews
+    assert any("concentration" in aid and f'"_verified_sub":"{config.USER_ENTITLED}"' in preview
+               for aid, preview in dag_previews.items()), dag_previews
+
+
+def test_jwks_outage_fails_closed_for_uncached_key():
+    token = _token_with_claims({
+        "sub": config.USER_ENTITLED,
+        "iss": "http://iam-service:8084",
+        "aud": "conduit-gateway",
+        "exp": int(time.time()) + 300,
+    }, kid="t2-uncached-outage-key")
+    subprocess.run(["docker", "stop", "conduit-iam-service"], check=True, timeout=30)
+    try:
+        resp = requests.get(
+            f"{config.WEALTH_HTTP_URL}/holdings",
+            params={"relationship_id": config.WHITMAN_RELATIONSHIP_ID},
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=15,
         )
-    assert data_resp.status_code == 401
+        _assert_status(resp, 401, "wealth-http rejects when JWKS is unreachable")
+    finally:
+        subprocess.run(["docker", "start", "conduit-iam-service"], check=True, timeout=30)
+        for _ in range(30):
+            try:
+                if requests.get(f"{config.IAM_URL}/login", timeout=3).status_code < 500:
+                    break
+            except requests.RequestException:
+                pass
+            time.sleep(1)
 
 
-def test_tampered_signature_rejected():
-    """
-    NOT in the original ask — added because probing for test_hop_identity_verified found a
-    live bug more severe than the documented one.
-
-    Root cause (confirmed by direct inspection, see harness report): wealth-http's JWKS_URL
-    default is `http://iam-service:8084/.well-known/jwks.json`, but iam-service's real JWKS
-    endpoint (per its own OIDC discovery document, `jwks_uri`) is `/oauth2/jwks` — the
-    `.well-known` path 301-redirects there. httpx.get() does not follow redirects by
-    default, so the agent's JWKS fetch gets a 301 body, fails to parse it as JSON, and the
-    exception is classified as "JWKS unreachable" -> the code's intentional DEV FALLBACK
-    ("JWKS unreachable -> allow so local dev keeps working when iam-service is down") fires
-    on every single verification attempt. Net effect: JWT signature verification is a no-op
-    on this hop for ANY token, tampered or not — confirmed via `docker logs conduit-wealth-http`
-    showing "JWKS unreachable — allowing kid=... (dev fallback)" on every request.
-
-    This is worse than the documented "no token -> allow" gap: it means even an attacker
-    with a garbage-signed token, not just a missing one, currently gets real client data.
-
-    Fix candidates (pick one, not gateway/agent code changes made by this harness):
-      1. Correct JWKS_URL to .../oauth2/jwks (or set it via env in docker-compose.yml,
-         same as the gateway's own CONDUIT_AUTH_JWKS_URL).
-      2. And/or: stop treating "JWKS unreachable" as allow-fallback on DATA endpoints —
-         infra faults should fail closed for data-plane calls, same as an unknown kid.
-    """
-    real_jwt = iam_client.get_jwt(config.USER_ENTITLED)
-    header, payload, sig = real_jwt.split(".")
-    mid = len(sig) // 2
-    ch = sig[mid]
-    tampered_sig = sig[:mid] + ("A" if ch != "A" else "B") + sig[mid + 1:]
-    tampered_jwt = f"{header}.{payload}.{tampered_sig}"
-
+def test_wrong_audience_token_rejected():
+    real = iam_client.get_jwt(config.USER_ENTITLED)
+    wrong_aud = _rewrite_audience_without_resigning(real, "not-conduit-gateway")
     resp = requests.get(
         f"{config.WEALTH_HTTP_URL}/holdings",
         params={"relationship_id": config.WHITMAN_RELATIONSHIP_ID},
-        headers={"Authorization": f"Bearer {tampered_jwt}"},
+        headers={"Authorization": f"Bearer {wrong_aud}"},
         timeout=15,
     )
-    jwks_evidence = docker_logs.grep(WEALTH_AGENT_CONTAINER, "JWKS unreachable", lines=200)
-    evidence("tampered-signature probe + agent JWKS-fetch log", {
+    evidence("wrong-audience-shaped token rejected", {
         "status": resp.status_code,
-        "body_preview": resp.text[:200],
-        "recent_JWKS_unreachable_log_lines": jwks_evidence[-5:],
+        "body_preview": resp.text[:240],
+        "note": "IAM /auth/token does not expose an audience override; this rewrites aud "
+                "without resigning, so live rejection may occur before the audience branch.",
     })
-    assert resp.status_code == 401, (
-        f"CRITICAL: wealth-http accepted a tampered-signature JWT (HTTP {resp.status_code}). "
-        f"Likely cause: JWKS_URL misconfiguration causing the 'JWKS unreachable -> allow' dev "
-        f"fallback to fire on every request (see recent log lines in the evidence above)."
+    assert resp.status_code == 401
+
+
+def test_expired_token_rejected_before_data_access():
+    expired = _token_with_claims({
+        "sub": config.USER_ENTITLED,
+        "iss": "http://iam-service:8084",
+        "aud": "conduit-gateway",
+        "exp": int(time.time()) - 60,
+    })
+    resp = requests.get(
+        f"{config.WEALTH_HTTP_URL}/holdings",
+        params={"relationship_id": config.WHITMAN_RELATIONSHIP_ID},
+        headers={"Authorization": f"Bearer {expired}"},
+        timeout=15,
     )
+    evidence("expired token rejected before data access", {
+        "status": resp.status_code,
+        "body_preview": resp.text[:240],
+        "note": "Gateway mid-plan AUTH_EXPIRED is covered by AgentHarnessResilienceIT; "
+                "IAM does not expose a short-TTL mint knob for a live expires-between-ingress-and-hop token.",
+    })
+    assert resp.status_code == 401

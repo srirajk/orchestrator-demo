@@ -219,12 +219,73 @@ def calculate_trade_penalty(
 # ── HTTP middleware — lives at module scope so it applies whenever the app is
 #    imported or run (not only when started via __main__). ────────────────────
 
+async def _rehydrate_body(request: StarletteRequest, body: bytes) -> None:
+    """
+    Replay an already-consumed request body so the downstream ASGI app (FastMCP's
+    sse_app) can still read it. Standard Starlette workaround for peeking a POST body
+    inside BaseHTTPMiddleware: overriding `_receive` makes `request.receive()` — which
+    `call_next` feeds straight through to the mounted app — replay the cached bytes
+    instead of trying to read an already-drained stream.
+    """
+    async def receive():
+        return {"type": "http.request", "body": body, "more_body": False}
+    request._receive = receive
+
+
+def _jsonrpc_method(body: bytes) -> str | None:
+    """Best-effort extraction of the JSON-RPC `method` field from an MCP POST body."""
+    try:
+        import json
+        return json.loads(body).get("method")
+    except Exception:
+        return None
+
+
 class JwtAuthMiddleware(BaseHTTPMiddleware):
-    """Verify JWT on all endpoints except /health."""
+    """
+    Verify JWT on every DATA call (F-IDENTITY: fail CLOSED — see shared/jwt_verify.py).
+
+    Exemptions (legitimately have no caller identity):
+      - GET /health
+      - The MCP SSE channel-open handshake (GET /sse-ish routes) — opening the stream
+        discloses no data by itself; the caller identity is enforced on the JSON-RPC
+        call that follows.
+      - JSON-RPC 'initialize' / 'tools/list' over POST /messages — this is exactly the
+        gateway's boot-time McpToolIntrospector handshake (see
+        gateway/.../registry/introspection/McpToolIntrospector.java), which runs before
+        any user request exists and so never carries a caller token.
+
+    Every other call — in particular JSON-RPC 'tools/call', the actual data-plane
+    invocation the gateway's McpAdapter makes on behalf of a chat request — requires a
+    valid `Authorization: Bearer <token>` and is rejected (401) without one.
+    """
     async def dispatch(self, request: StarletteRequest, call_next):
         if request.url.path == "/health":
             return await call_next(request)
+
         auth = request.headers.get("Authorization")
+
+        if not auth and request.method == "GET":
+            # SSE channel-open — no JSON-RPC method exists yet at this step, and no data
+            # is disclosed by merely opening the stream. The tools/call gate below is
+            # what actually protects data.
+            return await call_next(request)
+
+        if not auth and request.method == "POST":
+            body = await request.body()
+            method = _jsonrpc_method(body)
+            if method in ("initialize", "tools/list"):
+                await _rehydrate_body(request, body)
+                return await call_next(request)
+            _log.warning(
+                "servicing-mcp: rejected unauthenticated JSON-RPC '%s' (path=%s)",
+                method, request.url.path,
+            )
+            return JSONResponse(
+                status_code=401,
+                content=mcp_error_dict("Missing Authorization header", "meridian.servicing.gateway", 401),
+            )
+
         allowed, error, claims = verify_bearer_token(auth)
         if not allowed:
             _log.warning("servicing-mcp: rejected — %s (path=%s)", error, request.url.path)
@@ -232,7 +293,12 @@ class JwtAuthMiddleware(BaseHTTPMiddleware):
                 status_code=401,
                 content=mcp_error_dict(error, "meridian.servicing.gateway", 401),
             )
-        return await call_next(request)
+        if claims:
+            request.state.principal = claims.get("sub")
+        response = await call_next(request)
+        if claims and claims.get("sub"):
+            response.headers["X-Conduit-Verified-Sub"] = claims["sub"]
+        return response
 
 
 async def _health(request: StarletteRequest) -> JSONResponse:

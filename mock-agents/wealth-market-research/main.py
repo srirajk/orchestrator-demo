@@ -64,7 +64,10 @@ async def jwt_auth_middleware(request: Request, call_next):
         return JSONResponse(status_code=401, content={"detail": error})
     if claims:
         request.state.principal = claims.get("sub")
-    return await call_next(request)
+    response = await call_next(request)
+    if claims and claims.get("sub"):
+        response.headers["X-Conduit-Verified-Sub"] = claims["sub"]
+    return response
 
 
 app.middleware("http")(fault_knob_middleware)

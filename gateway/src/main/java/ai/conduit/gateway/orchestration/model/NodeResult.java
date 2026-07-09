@@ -34,7 +34,9 @@ public record NodeResult(
         /** Declared node condition evaluated false; node was not applicable, not failed. */
         SKIPPED_CONDITION_FALSE,
         /** Declared node condition failed at runtime; visible failure. */
-        CONDITION_ERROR
+        CONDITION_ERROR,
+        /** Caller identity expired or was absent before this hop was dispatched. */
+        AUTH_EXPIRED
     }
 
     /** Convenience: true when the call completed successfully with data. */

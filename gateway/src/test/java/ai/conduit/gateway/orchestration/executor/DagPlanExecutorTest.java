@@ -151,7 +151,7 @@ class DagPlanExecutorTest {
 
         @Override public String protocol() { return "http"; }
 
-        @Override public JsonNode invoke(AgentManifest m, JsonNode input) {
+        @Override public JsonNode invoke(AgentManifest m, JsonNode input, String bearerToken) {
             order.add(m.agentId());
             if (input != null) inputs.put(m.agentId(), input);
             if (PRODUCER.equals(m.agentId())) {
