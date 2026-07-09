@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.0</version>
+        <version>3.5.16</version>
         <relativePath/>
     </parent>
 
@@ -18,8 +18,9 @@
     <description>Enterprise AI Gateway — OpenAI-compatible ingress, multi-protocol agent orchestration</description>
 
     <properties>
-        <!-- Java 21 for Docker image compat; virtual threads are GA here.
-             On a Java 25 JVM, JEP-491 also eliminates synchronized-block pinning. -->
+        <!-- Bytecode target stays 21; the runtime is a Java 25 JRE (see Dockerfile).
+             JEP-491 (JDK 24+) is a runtime behaviour, so running 21 bytecode on a 25 JVM
+             eliminates synchronized-block carrier pinning without a bytecode change. -->
         <java.version>21</java.version>
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>

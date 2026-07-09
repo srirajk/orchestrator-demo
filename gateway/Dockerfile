@@ -1,5 +1,5 @@
-# Stage 1 — build with Maven + JDK 21
-FROM maven:3.9-eclipse-temurin-21 AS build
+# Stage 1 — build with Maven + JDK 25 (bytecode target stays 21, see pom.xml)
+FROM maven:3.9-eclipse-temurin-25 AS build
 
 WORKDIR /build
 
@@ -11,7 +11,8 @@ COPY src ./src
 RUN mvn package -DskipTests -q
 
 # Stage 2 — lean runtime (JRE + wget for healthcheck)
-FROM eclipse-temurin:21-jre-alpine
+# Java 25: JEP-491 means `synchronized` no longer pins virtual-thread carriers.
+FROM eclipse-temurin:25-jre-alpine
 
 RUN apk add --no-cache wget
 
