@@ -144,6 +144,52 @@ flat and DAG paths. Assert:
    unchanged (assert — Phases 1/3 touch the response path).
 Capture the new load table + the pinning trace showing zero hot-path pins.
 
+## STEP 2 RESULT — measured on JDK 25 (2026-07-09). READ THIS BEFORE STEP 3.
+The re-measure was run and it **changes the plan**. Three findings:
+
+**1. The livelock is gone.** flat / 25 VUs / 60s on Java 25: **425 iterations, 0 HTTP errors, no hang**;
+gateway stayed responsive and self-healed (`/v1/models` → 200 in 4ms afterwards). Previously: 100% errors,
+unrecoverable livelock needing `docker restart`. JEP-491 did its job. (Gateway sees **12 CPUs → 12 carriers**.)
+
+**2. But "0% errors" is a FALSE GREEN — the gateway degrades silently.** The load test asserts only
+`HTTP 200`. Under 25 concurrent, **8 of 9 NAV requests returned "The data for fund FND-7781 is unavailable"**
+instead of the correct `$128.45` — as **HTTP 200**. A client cannot distinguish a real answer from a degraded
+one. The acceptance gate as originally written is therefore meaningless. → task: assert answer CONTENT +
+a `degraded_answer_rate`.
+
+**3. The real bottleneck is NOT gateway carriers — it is the MCP adapter and the LLM round trips.**
+Measured per-agent latency:
+
+| agent | proto | calls | avg |
+|---|---|---|---|
+| `meridian.servicing.nav` | mcp | 36 | **8132 ms** |
+| `meridian.servicing.corporate_actions` | mcp | 59 | **6263 ms** |
+| `meridian.wealth.market_research` | http | 108 | **2 ms** |
+| `meridian.hr.policy_qa` | http | 3 | **5 ms** |
+| `meridian.insurance.policy_details` | http | 1 | **9 ms** |
+
+MCP is **~1000× slower** than HTTP because `McpAdapter.invoke()` rebuilds a **whole MCP session per call**
+(SSE GET → wait `event: endpoint` → POST `initialize` → wait ACK → POST `tools/call` → wait → close). Under
+load it exceeds the 30s SLA → `Agent meridian.servicing.nav TIMEOUT after 30001ms` → `Circuit breaker OPEN`
+→ the silent "data unavailable" answers above.
+
+**Latency budget of one healthy request (traced, agent = 2 ms):**
+`handleChat → IntentClassifier` **1.80 s** (LLM #1) · `Resolver` (embed + vector search) **39 ms** ·
+entity extraction **skipped** (classifier returns a pre-extracted bag) · `agent` **2 ms** ·
+`AnswerSynthesizer` **~2.25 s** (LLM #2) · **total 4.12 s**.
+→ **Two sequential LLM round trips are ~98% of the latency. The gateway's own work is ~50 ms.**
+
+**Consequences for Step 3:**
+- The current load test **cannot prove or disprove carrier pinning** — carriers were never the binding
+  constraint in this run; the agents and LLM latency were. To isolate the gateway we need a **deterministic
+  stub-LLM + stub-agent mode** (fixed latency, no upstream limits). Build that before trusting any perf number.
+- The **timed-client + admission + deadline + cancellation** work still ships (untimed I/O and orphaned
+  futures are bugs on any JDK) — but its *justification* is now correctness/backpressure, not "fix the hang."
+- **Silent degradation is the top user-visible defect.** Honest signalling (503 / explicit partial-result
+  marker) matters more than raw throughput.
+- **New, highest-impact perf item: pool/reuse MCP sessions** (`adapter/mcp/`). ~1000× gap; it is what actually
+  breaks answers under load.
+
 ## PACKAGE PLACEMENT (mandatory — read `GATEWAY-PACKAGE-STRUCTURE.md` before writing any Java)
 The gateway is **package-by-feature / hexagonal** (`ai.conduit.gateway`): `api/v1/*` → `domain/*` →
 `adapter/{http,mcp}` → `infrastructure/*` → `config/` (wiring only). **Adapters depend on domain; domain never
