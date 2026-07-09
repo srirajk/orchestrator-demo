@@ -34,18 +34,14 @@
         "asset-servicing"
       ],
       "examples": [
-        "For asset servicing relationship REL-00188 Okafor, itemize failed trade CSDR cash penalty aging by failed trade.",
-        "For asset servicing relationship REL-00445 Map Empty, itemize failed trade CSDR cash penalty aging by failed trade.",
-        "For asset servicing relationship REL-00444 Map Stress, run failed settlement CSDR penalty map iteration and tell me what was skipped.",
-        "itemize failed trade CSDR penalties for this relationship",
-        "calculate each failed settlement cash penalty exposure",
-        "map iteration over failed settlement trades",
-        "per failed trade penalty aging for REL-00188",
-        "show CSDR penalty aging by failed trade",
-        "failed trade cash penalty details for the Okafor relationship",
-        "list every failed settlement with penalty exposure",
-        "run failed settlement penalty map for REL-00444",
-        "show skipped failed trades when map cap is reached"
+        "itemize failed trade rows one trade at a time",
+        "list every failed trade as separate penalty calculation rows",
+        "produce a per-trade penalty table for failed trade items",
+        "map each failed trade item into one penalty row",
+        "show skipped failed trade rows when the map cap is reached",
+        "return trade id, security, age days, and penalty amount per row",
+        "itemize per-failed-trade penalty details",
+        "row-by-row failed trade penalty listing"
       ],
       "inputModes": [
         "application/json"

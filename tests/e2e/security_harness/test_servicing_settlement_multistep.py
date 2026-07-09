@@ -18,9 +18,7 @@ def test_servicing_settlement_multistep(admin_session):
     turn = bff_client.send_message(
         admin_session,
         bff_client.create_conversation(admin_session, "Okafor settlement risk"),
-        "For asset servicing relationship REL-00188 Okafor, calculate failed trade aging "
-        "for AMZN T-9844, CSDR cash penalty exposure, and cash context from settlement "
-        "status and cash balances.",
+        "What is the settlement risk for REL-00188 (Okafor)?",
     )
     evidence("chat turn (admin, settlement_risk question)", {
         "conversation_id": turn.conversation_id,
