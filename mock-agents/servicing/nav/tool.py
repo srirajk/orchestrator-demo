@@ -3,7 +3,6 @@ import os
 import json
 import logging
 import asyncio
-import concurrent.futures
 from agents import Runner, function_tool, InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered
 from shared.canned_data import NAV
 from shared.error_schema import mcp_error_json
@@ -56,7 +55,7 @@ async def _run_nav_agent(
     return result.final_output
 
 
-def get_nav(fund_id: str) -> str:
+async def get_nav(fund_id: str) -> str:
     """Get the latest Net Asset Value for a fund. Keyed by fund_id, not relationship_id."""
     with agent_span(AGENT_ID) as span:
         maybe_fault("get_nav")
@@ -68,13 +67,7 @@ def get_nav(fund_id: str) -> str:
         span.set_attribute("result.nav_per_unit", data.get("nav", 0))
         span.set_attribute("result.total_aum", data.get("aum", 0))
         try:
-            try:
-                asyncio.get_running_loop()
-                with concurrent.futures.ThreadPoolExecutor() as pool:
-                    future = pool.submit(asyncio.run, _run_nav_agent(fund_id, data, _LLM_BASE, _LLM_KEY, _LLM_MODEL))
-                    narrative = future.result(timeout=LLM_TIMEOUT_S)
-            except RuntimeError:
-                narrative = asyncio.run(_run_nav_agent(fund_id, data, _LLM_BASE, _LLM_KEY, _LLM_MODEL))
+            narrative = await asyncio.wait_for(_run_nav_agent(fund_id, data, _LLM_BASE, _LLM_KEY, _LLM_MODEL), timeout=LLM_TIMEOUT_S)
             span.set_attribute("agent.model", _LLM_MODEL or LLM_MODEL)
             return json.dumps({**data, "agent_narrative": narrative})
         except Exception as exc:

@@ -85,7 +85,7 @@ mcp = FastMCP(
 
 
 @mcp.tool()
-def get_custody_positions(relationship_id: str) -> str:
+async def get_custody_positions(relationship_id: str) -> str:
     """
     Get assets held at each custodian for a relationship.
 
@@ -95,11 +95,11 @@ def get_custody_positions(relationship_id: str) -> str:
     Returns:
         JSON: holdings_by_custodian[], as_of_date
     """
-    return _get_custody_positions(relationship_id)
+    return await _get_custody_positions(relationship_id)
 
 
 @mcp.tool()
-def get_settlements(relationship_id: str) -> str:
+async def get_settlements(relationship_id: str) -> str:
     """
     Get pending and failed settlement trades for a relationship.
 
@@ -109,11 +109,11 @@ def get_settlements(relationship_id: str) -> str:
     Returns:
         JSON: pending[], failed[], as_of_date
     """
-    return _get_settlements(relationship_id)
+    return await _get_settlements(relationship_id)
 
 
 @mcp.tool()
-def get_corporate_actions(relationship_id: str) -> str:
+async def get_corporate_actions(relationship_id: str) -> str:
     """
     Get upcoming corporate actions (dividends, splits, rights) with regulatory context for a relationship.
 
@@ -123,11 +123,11 @@ def get_corporate_actions(relationship_id: str) -> str:
     Returns:
         JSON: upcoming_actions[], regulatory_context[], as_of_date
     """
-    return _get_corporate_actions(relationship_id)
+    return await _get_corporate_actions(relationship_id)
 
 
 @mcp.tool()
-def get_nav(fund_id: str) -> str:
+async def get_nav(fund_id: str) -> str:
     """
     Get the latest Net Asset Value (NAV) for a fund.
     Note: keyed by fund_id, NOT relationship_id — this is intentional.
@@ -138,11 +138,11 @@ def get_nav(fund_id: str) -> str:
     Returns:
         JSON: nav, as_of_date, currency, aum
     """
-    return _get_nav(fund_id)
+    return await _get_nav(fund_id)
 
 
 @mcp.tool()
-def get_cash(relationship_id: str) -> str:
+async def get_cash(relationship_id: str) -> str:
     """
     Get cash balances and projected cash position for a relationship.
 
@@ -152,7 +152,7 @@ def get_cash(relationship_id: str) -> str:
     Returns:
         JSON: balances[], projected_cash_usd, as_of_date
     """
-    return _get_cash(relationship_id)
+    return await _get_cash(relationship_id)
 
 
 @mcp.tool()

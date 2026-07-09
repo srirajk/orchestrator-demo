@@ -3,7 +3,6 @@ import os
 import json
 import logging
 import asyncio
-import concurrent.futures
 from agents import Runner, function_tool, InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered
 from shared.canned_data import SETTLEMENTS
 from shared.error_schema import mcp_error_json
@@ -56,7 +55,7 @@ async def _run_settlements_agent(
     return result.final_output
 
 
-def get_settlements(relationship_id: str) -> str:
+async def get_settlements(relationship_id: str) -> str:
     """Get pending and failed settlement trades for a relationship."""
     with agent_span(AGENT_ID, relationship_id) as span:
         maybe_fault("get_settlements")
@@ -71,13 +70,7 @@ def get_settlements(relationship_id: str) -> str:
         if failed > 0:
             span.set_attribute("alert.failed_settlements", True)
         try:
-            try:
-                asyncio.get_running_loop()
-                with concurrent.futures.ThreadPoolExecutor() as pool:
-                    future = pool.submit(asyncio.run, _run_settlements_agent(relationship_id, data, _LLM_BASE, _LLM_KEY, _LLM_MODEL))
-                    narrative = future.result(timeout=LLM_TIMEOUT_S)
-            except RuntimeError:
-                narrative = asyncio.run(_run_settlements_agent(relationship_id, data, _LLM_BASE, _LLM_KEY, _LLM_MODEL))
+            narrative = await asyncio.wait_for(_run_settlements_agent(relationship_id, data, _LLM_BASE, _LLM_KEY, _LLM_MODEL), timeout=LLM_TIMEOUT_S)
             span.set_attribute("agent.model", _LLM_MODEL or LLM_MODEL)
             return json.dumps({**data, "agent_narrative": narrative})
         except Exception as exc:
