@@ -168,10 +168,31 @@ Measured per-agent latency:
 | `meridian.hr.policy_qa` | http | 3 | **5 ms** |
 | `meridian.insurance.policy_details` | http | 1 | **9 ms** |
 
-MCP is **~1000× slower** than HTTP because `McpAdapter.invoke()` rebuilds a **whole MCP session per call**
-(SSE GET → wait `event: endpoint` → POST `initialize` → wait ACK → POST `tools/call` → wait → close). Under
-load it exceeds the 30s SLA → `Agent meridian.servicing.nav TIMEOUT after 30001ms` → `Circuit breaker OPEN`
-→ the silent "data unavailable" answers above.
+**⚠ CORRECTION (measured directly against the MCP server — the first diagnosis below was WRONG).**
+The original claim here was "MCP is ~1000× slower because `McpAdapter` rebuilds a session per call." That is
+**false**. Timed phase-by-phase against `conduit-servicing-mcp`:
+
+```
+   4ms  SSE open (HTTP 200)          6ms  -> POST initialize (202, 2ms)
+   5ms  <- event:endpoint            6ms  <- initialize ACK
+                                     8ms  -> POST tools/call (202, 1ms)
+                                  1956ms  <- TOOL RESULT      ← 1948ms inside the tool
+```
+**The entire MCP handshake costs 8 ms.** The adapter is not the problem, and the code is sound (VT-safe reader
+by design, shared `HttpClient`, try-with-resources closes the stream, HTTP/1.1 forced for uvicorn, fail-closed
+identity, trace-context injection).
+
+**The real cause: the asset-servicing tools are agentic.** `mock-agents/servicing/nav/tool.py::get_nav()` does a
+canned lookup and then runs `_run_nav_agent()` — an OpenAI Agents SDK `Agent` + `Runner.run` with a tool and four
+guardrails. **Every MCP tool call performs its own internal LLM loop** (~1.9 s idle: 1811 / 1994 ms).
+
+**The "MCP vs HTTP" comparison was apples-to-oranges.** The HTTP agents compared against
+(`market_research` 2 ms over 108 calls, `hr.policy_qa` 5 ms, `insurance.policy_details` 9 ms) return **canned
+data and never call an LLM**. The gap is **agentic vs static, not protocol.**
+
+Under 25 concurrent, those ~2 s internal LLM calls queue past the 30 s agent SLA →
+`Agent meridian.servicing.nav TIMEOUT after 30001ms` → `Circuit breaker OPEN` → the silent "data unavailable"
+answers above. **The gateway defect is the silent degradation, not the adapter.**
 
 **Latency budget of one healthy request (traced, agent = 2 ms):**
 `handleChat → IntentClassifier` **1.80 s** (LLM #1) · `Resolver` (embed + vector search) **39 ms** ·
@@ -187,8 +208,16 @@ entity extraction **skipped** (classifier returns a pre-extracted bag) · `agent
   futures are bugs on any JDK) — but its *justification* is now correctness/backpressure, not "fix the hang."
 - **Silent degradation is the top user-visible defect.** Honest signalling (503 / explicit partial-result
   marker) matters more than raw throughput.
-- **New, highest-impact perf item: pool/reuse MCP sessions** (`adapter/mcp/`). ~1000× gap; it is what actually
-  breaks answers under load.
+- **Silent degradation is OURS to fix**; the ~2 s agent latency is the domain team's agent doing real work.
+  Revisit the 30 s SLA / breaker thresholds against agents whose intrinsic latency is ~2 s.
+- **Separate, real modernization gap: we speak a deprecated MCP transport.** `McpAdapter.java:164` and
+  `McpToolIntrospector.java:132` hardcode `protocolVersion "2024-11-05"`, and the mock agent mounts
+  `mcp.sse_app()` — the **HTTP+SSE transport deprecated in spec `2025-03-26`** in favour of **Streamable HTTP**.
+  Current finalized spec is `2025-11-25`; the `2026-07-28` RC makes MCP stateless at the protocol layer and adds
+  `Mcp-Method`/`Mcp-Name` headers so gateways can route/rate-limit without inspecting the body. Enterprise
+  servers are already hard-removing SSE. A gateway that only speaks deprecated MCP cannot integrate real
+  external MCP servers — which is the whole World-B premise. Note: this does **not** fix the ~1.9 s (that is the
+  agent's own LLM); it is a compatibility, maintenance, and product-reach fix. Tracked separately.
 
 ## PACKAGE PLACEMENT (mandatory — read `GATEWAY-PACKAGE-STRUCTURE.md` before writing any Java)
 The gateway is **package-by-feature / hexagonal** (`ai.conduit.gateway`): `api/v1/*` → `domain/*` →
