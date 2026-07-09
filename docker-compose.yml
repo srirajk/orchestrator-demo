@@ -92,7 +92,6 @@ services:
   loki:
     image: grafana/loki:2.9.8
     container_name: conduit-loki
-    profiles: ["observability"]   # opt-in viewer — `--profile observability` to run
     command: ["-config.file=/etc/loki/config.yaml"]
     volumes:
       - ./infra/loki/config.yaml:/etc/loki/config.yaml:ro
@@ -110,7 +109,6 @@ services:
   promtail:
     image: grafana/promtail:2.9.8
     container_name: conduit-promtail
-    profiles: ["observability"]   # opt-in viewer — `--profile observability` to run
     command: ["-config.file=/etc/promtail/promtail.yaml"]
     volumes:
       - ./infra/promtail/promtail.yaml:/etc/promtail/promtail.yaml:ro
@@ -167,6 +165,7 @@ services:
       CONDUIT_EMBEDDING_REMOTE_URL: http://embeddings:8083/v1/embeddings
       CONDUIT_EMBEDDING_DIMENSION: 384
       # OTel export — all signals through the collector; collector fans out to Tempo + Langfuse.
+      OTEL_SERVICE_NAME: conduit-gateway
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       MANAGEMENT_OTLP_TRACING_ENDPOINT: http://otel-collector:4318/v1/traces
       MANAGEMENT_OTLP_METRICS_EXPORT_URL: http://otel-collector:4318/v1/metrics
@@ -259,6 +258,8 @@ services:
       RISK_PROFILE_LLM_BASE_URL: ${RISK_PROFILE_LLM_BASE_URL:-}
       RISK_PROFILE_LLM_API_KEY: ${RISK_PROFILE_LLM_API_KEY:-}
       RISK_PROFILE_LLM_MODEL: ${RISK_PROFILE_LLM_MODEL:-}
+      OTEL_SERVICE_NAME: conduit-wealth-http
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/health')"]
       interval: 10s
@@ -297,6 +298,8 @@ services:
       NAV_LLM_BASE_URL: ${NAV_LLM_BASE_URL:-}
       NAV_LLM_API_KEY: ${NAV_LLM_API_KEY:-}
       NAV_LLM_MODEL: ${NAV_LLM_MODEL:-}
+      OTEL_SERVICE_NAME: conduit-servicing-mcp
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8082/health')"]
       interval: 10s
@@ -314,6 +317,8 @@ services:
       - "8086:8086"
     environment:
       PYTHONUNBUFFERED: "1"
+      OTEL_SERVICE_NAME: conduit-insurance-http
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8086/health')"]
       interval: 10s

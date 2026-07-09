@@ -5,15 +5,19 @@ import ai.conduit.gateway.registry.model.AgentManifest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanContext;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.context.propagation.TextMapSetter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpEntity;
+import org.slf4j.MDC;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
@@ -42,15 +46,21 @@ import java.util.concurrent.ConcurrentHashMap;
 public class HttpAdapter implements ProtocolAdapter {
 
     private static final Logger log = LoggerFactory.getLogger(HttpAdapter.class);
+    private static final TextMapSetter<HttpHeaders> HTTP_HEADERS_SETTER =
+            (carrier, key, value) -> {
+                if (carrier != null && key != null && value != null) {
+                    carrier.set(key, value);
+                }
+            };
 
     /** Simple spec cache: base-URL → parsed OpenAPI document. */
     private final ConcurrentHashMap<String, JsonNode> specCache = new ConcurrentHashMap<>();
 
-    private final RestTemplate restTemplate;
+    private final RestClient restClient;
     private final ObjectMapper objectMapper;
 
-    public HttpAdapter(RestTemplate restTemplate, ObjectMapper objectMapper) {
-        this.restTemplate = restTemplate;
+    public HttpAdapter(RestClient agentRestClient, ObjectMapper objectMapper) {
+        this.restClient = agentRestClient;
         this.objectMapper = objectMapper;
     }
 
@@ -130,7 +140,10 @@ public class HttpAdapter implements ProtocolAdapter {
             return cached;
         }
         log.info("Fetching OpenAPI spec from {}", openapiUrl);
-        String raw = restTemplate.getForObject(openapiUrl, String.class);
+        String raw = restClient.get()
+                .uri(openapiUrl)
+                .retrieve()
+                .body(String.class);
         if (raw == null) {
             throw new IllegalStateException("Empty OpenAPI spec returned from " + openapiUrl);
         }
@@ -182,8 +195,11 @@ public class HttpAdapter implements ProtocolAdapter {
         }
         URI uri = builder.build(true).toUri();
         log.debug("GET {}", uri);
-        return restTemplate.exchange(uri, HttpMethod.GET,
-                new HttpEntity<>(agentHeaders(bearerToken)), String.class);
+        return restClient.get()
+                .uri(uri)
+                .headers(headers -> headers.addAll(agentHeaders(bearerToken)))
+                .retrieve()
+                .toEntity(String.class);
     }
 
     /** POST the input JsonNode as the request body. */
@@ -192,8 +208,12 @@ public class HttpAdapter implements ProtocolAdapter {
         String body = input != null ? objectMapper.writeValueAsString(input) : "{}";
         HttpHeaders headers = agentHeaders(bearerToken);
         headers.setContentType(MediaType.APPLICATION_JSON);
-        return restTemplate.exchange(url, HttpMethod.POST,
-                new HttpEntity<>(body, headers), String.class);
+        return restClient.post()
+                .uri(url)
+                .headers(h -> h.addAll(headers))
+                .body(body)
+                .retrieve()
+                .toEntity(String.class);
     }
 
     /**
@@ -207,8 +227,40 @@ public class HttpAdapter implements ProtocolAdapter {
     private HttpHeaders agentHeaders(String bearerToken) {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(bearerToken);
+        GlobalOpenTelemetry.getPropagators().getTextMapPropagator()
+                .inject(Context.current(), headers, HTTP_HEADERS_SETTER);
+        ensureTraceparent(headers);
         log.debug("HttpAdapter: propagating JWT to agent");
         return headers;
+    }
+
+    private void ensureTraceparent(HttpHeaders headers) {
+        SpanContext spanContext = Span.current().getSpanContext();
+        if (spanContext.isValid()) {
+            headers.set("traceparent", String.format("00-%s-%s-%02x",
+                    spanContext.getTraceId(),
+                    spanContext.getSpanId(),
+                    spanContext.getTraceFlags().asByte() & 0xff));
+            log.debug("HttpAdapter: injected traceparent traceId={} spanId={}",
+                    spanContext.getTraceId(), spanContext.getSpanId());
+            String traceState = spanContext.getTraceState().toString();
+            if (!traceState.isBlank()) {
+                headers.set("tracestate", traceState);
+            }
+            return;
+        }
+        String traceId = MDC.get("traceId");
+        String spanId = MDC.get("spanId");
+        if (isLowerHex(traceId, 32) && isLowerHex(spanId, 16)) {
+            headers.set("traceparent", "00-" + traceId + "-" + spanId + "-01");
+            log.debug("HttpAdapter: injected MDC traceparent traceId={} spanId={}", traceId, spanId);
+        } else {
+            log.debug("HttpAdapter: no valid current span or MDC trace context for traceparent injection");
+        }
+    }
+
+    private boolean isLowerHex(String value, int length) {
+        return value != null && value.length() == length && value.matches("[0-9a-f]+");
     }
 
     private JsonNode withVerifiedSub(JsonNode data, String verifiedSub) {

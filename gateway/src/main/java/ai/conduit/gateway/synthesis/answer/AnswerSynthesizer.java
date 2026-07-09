@@ -208,6 +208,7 @@ public class AnswerSynthesizer {
             } catch (Exception ignored) { /* client disconnected before synthesis */ }
 
             List<GroundedFigure> groundedFigures = figureRenderer.render(results, registry::find);
+            llmSpan.setAttribute("conduit.grounding.figure_count", groundedFigures.size());
             String userContent = buildUserContent(results, withheldDomains, groundedFigures);
             String requestBody = buildRequestBody(userContent, originalPrompt, history);
 
@@ -218,6 +219,8 @@ public class AnswerSynthesizer {
             StringBuilder synthesizedText = new StringBuilder();
             long[] tokenCounts = new long[3]; // [prompt, completion, total]
             if (groundedFigures.isEmpty()) {
+                llmSpan.setAttribute("conduit.grounding.verdict", "no-figures");
+                llmSpan.setAttribute("conduit.grounding.error_count", 0);
                 streamFromLlm(requestBody, emitter, completionId, created, synthesizedText,
                         showReasoning, tokenCounts, requestStartMillis);
             } else {
@@ -225,6 +228,9 @@ public class AnswerSynthesizer {
                 String finalText = ensureFiguresMentioned(substituteFigures(draft, groundedFigures), groundedFigures);
                 GroundedFigureValidator.ValidationResult validation =
                         figureValidator.validate(finalText, groundedFigures);
+                llmSpan.setAttribute("conduit.grounding.verdict",
+                        validation.ok() ? "all-grounded" : "failed");
+                llmSpan.setAttribute("conduit.grounding.error_count", validation.errors().size());
                 if (!validation.ok()) {
                     log.warn("Grounded figure validation failed; serving deterministic fallback: {}",
                             validation.errors());

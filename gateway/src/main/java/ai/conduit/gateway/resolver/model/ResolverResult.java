@@ -17,8 +17,18 @@ public record ResolverResult(
         List<RoutingCandidate> skipped,
         boolean fallback,
         double topScore,
-        String prompt
+        String prompt,
+        double margin,
+        boolean rerankFired
 ) {
+    public ResolverResult(List<RoutingCandidate> selected,
+                          List<RoutingCandidate> skipped,
+                          boolean fallback,
+                          double topScore,
+                          String prompt) {
+        this(selected, skipped, fallback, topScore, prompt, 0.0, false);
+    }
+
     public boolean hasAgents() {
         return selected != null && !selected.isEmpty();
     }

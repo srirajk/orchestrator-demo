@@ -16,6 +16,8 @@ WEALTH_COVERAGE_URL = os.getenv("CONDUIT_WEALTH_COVERAGE_URL", "http://localhost
 INSURANCE_HTTP_URL = os.getenv("CONDUIT_INSURANCE_HTTP_URL", "http://localhost:8087")
 INSURANCE_COVERAGE_URL = os.getenv("CONDUIT_INSURANCE_COVERAGE_URL", "http://localhost:8088")
 SERVICING_MCP_URL = os.getenv("CONDUIT_SERVICING_MCP_URL", "http://localhost:8082")
+TEMPO_URL = os.getenv("CONDUIT_TEMPO_URL", "http://localhost:3200")
+LOKI_URL = os.getenv("CONDUIT_LOKI_URL", "http://localhost:3100")
 
 DEMO_PASSWORD = os.getenv("CONDUIT_DEMO_PASSWORD", "Meridian@2024")
 

@@ -33,6 +33,7 @@ Distributed Tracing Note (MCP limitation):
 import sys
 import os
 import logging
+logging.basicConfig(level=logging.INFO)
 
 sys.path.insert(0, os.path.dirname(__file__))
 

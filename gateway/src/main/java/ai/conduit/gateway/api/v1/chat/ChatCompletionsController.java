@@ -13,6 +13,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.annotation.PreDestroy;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.context.Scope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -100,6 +102,7 @@ public class ChatCompletionsController {
         // threaded onward — otherwise every downstream log line, including the agent-hop identity
         // log, prints an empty [rid= cid= uid=].
         Map<String, String> mdcContext = MDC.getCopyOfContextMap();
+        Context otelContext = Context.current();
         String conversationId = httpRequest.getHeader("X-Conversation-Id");
 
         // OpenAI spec: `stream` omitted or false → a single chat.completion JSON object;
@@ -127,10 +130,18 @@ public class ChatCompletionsController {
         SseEmitter emitter = new SseEmitter(120_000L);
         if (chatService.isTitleRequest(request)) {
             log.debug("Detected auto-title request — short-circuiting");
-            CompletableFuture.runAsync(() -> chatService.streamTitle(emitter), pipelineExecutor);
+            CompletableFuture.runAsync(() -> {
+                try (Scope ignored = otelContext.makeCurrent()) {
+                    chatService.streamTitle(emitter);
+                }
+            }, pipelineExecutor);
         } else {
-            CompletableFuture.runAsync(() -> MdcPropagation.run(mdcContext, () ->
-                    chatService.handleChat(request, emitter, userId, principal, conversationId, callerToken)), pipelineExecutor);
+            CompletableFuture.runAsync(() -> {
+                try (Scope ignored = otelContext.makeCurrent()) {
+                    MdcPropagation.run(mdcContext, () ->
+                            chatService.handleChat(request, emitter, userId, principal, conversationId, callerToken));
+                }
+            }, pipelineExecutor);
         }
         return emitter;
     }
@@ -144,11 +155,20 @@ public class ChatCompletionsController {
                                                 Principal principal, String conversationId, String callerToken,
                                                 Map<String, String> mdcContext) {
         BufferingSseEmitter buf = new BufferingSseEmitter();
+        Context otelContext = Context.current();
         if (chatService.isTitleRequest(request)) {
-            CompletableFuture.runAsync(() -> chatService.streamTitle(buf), pipelineExecutor);
+            CompletableFuture.runAsync(() -> {
+                try (Scope ignored = otelContext.makeCurrent()) {
+                    chatService.streamTitle(buf);
+                }
+            }, pipelineExecutor);
         } else {
-            CompletableFuture.runAsync(() -> MdcPropagation.run(mdcContext, () ->
-                    chatService.handleChat(request, buf, userId, principal, conversationId, callerToken)), pipelineExecutor);
+            CompletableFuture.runAsync(() -> {
+                try (Scope ignored = otelContext.makeCurrent()) {
+                    MdcPropagation.run(mdcContext, () ->
+                            chatService.handleChat(request, buf, userId, principal, conversationId, callerToken));
+                }
+            }, pipelineExecutor);
         }
         boolean finished = buf.await(150_000L);
         if (!finished) log.warn("Non-streaming request did not complete within 150s — returning partial");

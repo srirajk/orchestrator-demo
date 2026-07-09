@@ -17,6 +17,7 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 
 import logging
+logging.basicConfig(level=logging.INFO)
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from opentelemetry import trace as otel_trace

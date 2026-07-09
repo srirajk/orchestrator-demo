@@ -5,6 +5,9 @@ import ai.conduit.gateway.registry.model.AgentManifest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.context.propagation.TextMapSetter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -54,6 +57,12 @@ public class McpAdapter implements ProtocolAdapter {
 
     private static final Logger log = LoggerFactory.getLogger(McpAdapter.class);
     private static final int DEFAULT_TIMEOUT_MS = 10_000;
+    private static final TextMapSetter<HttpRequest.Builder> REQUEST_BUILDER_SETTER =
+            (carrier, key, value) -> {
+                if (carrier != null && key != null && value != null) {
+                    carrier.header(key, value);
+                }
+            };
 
     private final ObjectMapper objectMapper;
 
@@ -115,6 +124,7 @@ public class McpAdapter implements ProtocolAdapter {
             sseBuilder.header("Authorization", "Bearer " + bearerToken);
             log.debug("McpAdapter: propagating JWT to agent SSE connection");
         }
+        injectTraceContext(sseBuilder);
         HttpRequest sseRequest = sseBuilder.GET().build();
 
         // Open SSE stream; read the response body on a virtual thread so we can
@@ -258,6 +268,7 @@ public class McpAdapter implements ProtocolAdapter {
         if (bearerToken != null) {
             builder.header("Authorization", "Bearer " + bearerToken);
         }
+        injectTraceContext(builder);
         HttpRequest request = builder.POST(HttpRequest.BodyPublishers.ofString(body)).build();
         HttpResponse<String> response =
                 httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -266,6 +277,11 @@ public class McpAdapter implements ProtocolAdapter {
                     + ": " + response.body());
         }
         log.debug("POST {} → HTTP {}", url, response.statusCode());
+    }
+
+    private void injectTraceContext(HttpRequest.Builder builder) {
+        GlobalOpenTelemetry.getPropagators().getTextMapPropagator()
+                .inject(Context.current(), builder, REQUEST_BUILDER_SETTER);
     }
 
     /**

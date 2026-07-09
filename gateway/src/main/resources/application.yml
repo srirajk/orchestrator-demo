@@ -217,8 +217,8 @@ conduit:
 
 logging:
   pattern:
-    # Include MDC keys (requestId, conversationId, userId) in every log line
-    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} [rid=%X{requestId} cid=%X{conversationId} uid=%X{userId}] - %msg%n"
+    # Include OTel trace/span IDs plus MDC keys in every log line for Tempo ↔ Loki pivots.
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} [traceId=%X{traceId} spanId=%X{spanId} rid=%X{requestId} cid=%X{conversationId} uid=%X{userId}] - %msg%n"
   level:
     ai.conduit: DEBUG
     org.springframework.web: INFO

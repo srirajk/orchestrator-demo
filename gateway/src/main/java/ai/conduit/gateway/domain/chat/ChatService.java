@@ -340,6 +340,7 @@ public class ChatService {
                                   EntityBag preExtracted, String streamId,
                                   boolean carryContext, String callerToken) throws Exception {
         Span span = tracer.spanBuilder("chat.fetch_data").startSpan();
+        Scope fetchScope = span.makeCurrent();
         // coverageRelId is set by the coverage pipeline before synthesis.
         String coverageRelId = null;
         // Deterministic CLARIFY (WORLD-B §4.2): which entity MUST resolve before fetch is a
@@ -436,6 +437,7 @@ public class ChatService {
                     .collect(Collectors.toList());
             tracePublisher.publish(TraceEvent.of("agents_resolved", requestId, conversationId,
                     new AgentsResolvedData(selectedRefs, skippedRefs)));
+            annotateRoutingDecision(span, rootSpan, resolved);
 
             if (resolved.fallback() || resolved.selected().isEmpty()) {
                 // BIAS-TO-FETCH / graceful degrade: routing abstained (a vague or aggregate ask
@@ -611,6 +613,7 @@ public class ChatService {
                                     tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
                                         new CheckDeniedData("coverage", coverageRelId, principalId,
                                             check.reason(), "coverage")));
+                                    annotateCoverageDecision(span, rootSpan, "coverage", false, check.reason());
                                     // Denial copy scoped to the routed sub-domain so an insurance denial
                                     // emits "policy" copy, not the wealth "client relationship" default (bug 238).
                                     streamTextAndComplete(emitter,
@@ -625,6 +628,7 @@ public class ChatService {
                                     GateData.allow(GateData.GATE_COVERAGE,
                                         coverageRelId + " in " + principalId + "'s book",
                                         resourceScopedAgent.agentId())));
+                                annotateCoverageDecision(span, rootSpan, "coverage", true, check.reason());
 
                             } else if (resolveResult.isAmbiguous()) {
                                 // Multiple matches — discover what's in RM's coverage and intersect.
@@ -679,6 +683,7 @@ public class ChatService {
                                     tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
                                         new CheckDeniedData("coverage", coverageRelId, principalId,
                                             check.reason(), "coverage")));
+                                    annotateCoverageDecision(span, rootSpan, "coverage", false, check.reason());
                                     streamTextAndComplete(emitter,
                                         mapDenialReason(check.reason(), em.subDomainId()), streamId);
                                     tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
@@ -691,6 +696,7 @@ public class ChatService {
                                     GateData.allow(GateData.GATE_COVERAGE,
                                         coverageRelId + " in " + principalId + "'s book",
                                         resourceScopedAgent.agentId())));
+                                annotateCoverageDecision(span, rootSpan, "coverage", true, check.reason());
                             } else {
                             // No user-authored reference in the sent conversation. Deterministic
                             // CLARIFY: do not guess or auto-select a covered resource.
@@ -779,6 +785,7 @@ public class ChatService {
                 EntitlementResult ent = entitlementService.checkRelationship(principal, resolvedRelId);
                 tracePublisher.publish(TraceEvent.of("entitlement_check", requestId, conversationId,
                         new EntitlementCheckData(resolvedRelId, userId, ent.allowed(), ent.reason(), ent.source())));
+                annotateCoverageDecision(span, rootSpan, "entitlement", ent.allowed(), ent.reason());
                 if (!ent.allowed()) {
                     emitRequestOutcome("DENIED");
                     // Explicit deny event for the glass-box trace (bug 239).
@@ -815,6 +822,8 @@ public class ChatService {
 
                 return executor.execute(new Plan(nodes), callerToken);
             });
+            span.setAttribute("conduit.plan.node_count", results.size());
+            rootSpan.setAttribute("conduit.plan.node_count", results.size());
             long fanoutElapsedMs = System.currentTimeMillis() - fanoutStart;
             Timer.builder("conduit.fanout.duration")
                     .description("Time from routing decision to all agents completing")
@@ -857,11 +866,16 @@ public class ChatService {
             tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                     new RequestCompleteData(System.currentTimeMillis() - requestStart,
                             results.size(), (int) okCount)));
-        } finally { span.end(); }
+        } finally {
+            fetchScope.close();
+            span.end();
+        }
     }
 
     private void publishGroundedFigures(String requestId, String conversationId, List<NodeResult> results) {
         List<GroundedFigure> figures = figureRenderer.render(results, registry::find);
+        Span.current().setAttribute("conduit.grounding.figure_count", figures.size());
+        Span.current().setAttribute("conduit.grounding.verdict", figures.isEmpty() ? "no-figures" : "figures-rendered");
         if (figures.isEmpty()) return;
         tracePublisher.publish(TraceEvent.of("grounded_figures", requestId, conversationId,
                 new GroundedFiguresData(figures.stream()
@@ -872,6 +886,30 @@ public class ChatService {
                                 f.format(),
                                 f.sourceAgent()))
                         .toList())));
+    }
+
+    private void annotateRoutingDecision(Span stageSpan, Span rootSpan, ResolverResult resolved) {
+        if (resolved == null) return;
+        String goalAgent = resolved.selected() != null && !resolved.selected().isEmpty()
+                ? resolved.selected().get(0).manifest().agentId()
+                : "";
+        for (Span target : List.of(stageSpan, rootSpan)) {
+            target.setAttribute("conduit.routing.top_score", resolved.topScore());
+            target.setAttribute("conduit.routing.margin", resolved.margin());
+            target.setAttribute("conduit.routing.goal_agent", goalAgent);
+            target.setAttribute("conduit.routing.rerank_fired", resolved.rerankFired());
+        }
+    }
+
+    private void annotateCoverageDecision(Span stageSpan, Span rootSpan,
+                                          String stage, boolean allowed, String reason) {
+        String decision = allowed ? "allow" : "deny";
+        String safeReason = reason == null ? "" : reason;
+        for (Span target : List.of(stageSpan, rootSpan)) {
+            target.setAttribute("conduit.coverage.stage", stage);
+            target.setAttribute("conduit.coverage.decision", decision);
+            target.setAttribute("conduit.coverage.reason", safeReason);
+        }
     }
 
     /**

@@ -182,7 +182,7 @@ public class AgentResolver {
 
         if (broad.isEmpty()) {
             meterRegistry.counter("resolver.fallback").increment();
-            return new ResolverResult(List.of(), List.of(), true, 0.0, routingText);
+            return new ResolverResult(List.of(), List.of(), true, 0.0, routingText, 0.0, false);
         }
 
         // search() returns candidates sorted by score descending → first is the leader.
@@ -216,7 +216,7 @@ public class AgentResolver {
             meterRegistry.counter("resolver.fallback").increment();
             // Empty selection + fallback → the chat path emits the deterministic clarification.
             // Broad candidates are surfaced as skipped for the glass box.
-            return new ResolverResult(List.of(), broad, true, leaderScore, routingText);
+            return new ResolverResult(List.of(), broad, true, leaderScore, routingText, margin, false);
         }
 
         ResolverResult result = select(broad, routingText);
@@ -233,7 +233,7 @@ public class AgentResolver {
      */
     private ResolverResult select(List<RoutingCandidate> candidates, String queryText) {
         if (candidates.isEmpty()) {
-            return new ResolverResult(List.of(), List.of(), true, 0.0, queryText);
+            return new ResolverResult(List.of(), List.of(), true, 0.0, queryText, 0.0, false);
         }
 
         // candidates is sorted descending by score (VectorIndex.search() contract) — get(0) is
@@ -244,7 +244,8 @@ public class AgentResolver {
         RerankApplication rerank = maybeRerank(candidates, queryText, topScore, topMargin);
         if (rerank.abstain()) {
             meterRegistry.counter("resolver.fallback").increment();
-            return new ResolverResult(List.of(), candidates, true, topScore, queryText);
+            return new ResolverResult(List.of(), candidates, true, topScore, queryText,
+                    topMargin, rerank.rerankFired());
         }
         candidates = rerank.candidates();
         topScore = candidates.get(0).score();
@@ -265,7 +266,8 @@ public class AgentResolver {
                     candidates.size() > 1 ? String.format("%.3f", topMargin) : "n/a",
                     String.format("%.3f", routingMinScore), String.format("%.3f", routingMinMargin));
             meterRegistry.counter("resolver.fallback").increment();
-            return new ResolverResult(List.of(), candidates, true, topScore, queryText);
+            return new ResolverResult(List.of(), candidates, true, topScore, queryText,
+                    topMargin, rerank.rerankFired());
         }
 
         double effectiveFloor = topScore > 0.55
@@ -288,7 +290,8 @@ public class AgentResolver {
         meterRegistry.gauge("resolver.route.confidence", topScore);
         if (fallback) meterRegistry.counter("resolver.fallback").increment();
 
-        return new ResolverResult(selected, skipped, fallback, topScore, queryText);
+        return new ResolverResult(selected, skipped, fallback, topScore, queryText,
+                topMargin, rerank.rerankFired());
     }
 
     private RerankApplication maybeRerank(List<RoutingCandidate> candidates, String queryText,
@@ -350,22 +353,23 @@ public class AgentResolver {
     private record RerankApplication(
             List<RoutingCandidate> candidates,
             boolean abstain,
-            boolean suppressMarginAbstain) {
+            boolean suppressMarginAbstain,
+            boolean rerankFired) {
 
         static RerankApplication unchanged(List<RoutingCandidate> candidates) {
-            return new RerankApplication(candidates, false, false);
+            return new RerankApplication(candidates, false, false, false);
         }
 
         static RerankApplication reordered(List<RoutingCandidate> candidates) {
-            return new RerankApplication(candidates, false, true);
+            return new RerankApplication(candidates, false, true, true);
         }
 
         static RerankApplication embeddingFallback(List<RoutingCandidate> candidates) {
-            return new RerankApplication(candidates, false, true);
+            return new RerankApplication(candidates, false, true, true);
         }
 
         static RerankApplication abstain(List<RoutingCandidate> candidates) {
-            return new RerankApplication(candidates, true, false);
+            return new RerankApplication(candidates, true, false, true);
         }
     }
 }
