@@ -1,9 +1,14 @@
 package ai.conduit.gateway.orchestration.executor;
 
 import ai.conduit.gateway.infrastructure.telemetry.MdcPropagation;
+import ai.conduit.gateway.domain.coverage.CoverageCheckResult;
+import ai.conduit.gateway.domain.coverage.CoverageClient;
+import ai.conduit.gateway.domain.manifest.DomainManifest;
+import ai.conduit.gateway.domain.manifest.EffectiveManifest;
 import ai.conduit.gateway.orchestration.harness.AgentHarness;
 import ai.conduit.gateway.infrastructure.telemetry.TraceEvent;
 import ai.conduit.gateway.infrastructure.telemetry.TraceEventPublisher;
+import ai.conduit.gateway.infrastructure.telemetry.event.CheckDeniedData;
 import ai.conduit.gateway.infrastructure.telemetry.event.MapIterationData;
 import ai.conduit.gateway.infrastructure.telemetry.event.NodeConditionData;
 import ai.conduit.gateway.orchestration.model.NodeResult;
@@ -31,14 +36,17 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 /**
  * Executes a dependency-wired {@link Plan} (populated {@code dependsOn} edges, topological order)
@@ -123,6 +131,12 @@ public class DagPlanExecutor {
 
     public List<NodeResult> execute(Plan plan, Blackboard blackboard,
                                     String requestId, String conversationId, String callerToken) {
+        return execute(plan, blackboard, requestId, conversationId, callerToken, null);
+    }
+
+    public List<NodeResult> execute(Plan plan, Blackboard blackboard,
+                                    String requestId, String conversationId, String callerToken,
+                                    CoverageContext coverageContext) {
         if (plan == null || plan.nodes() == null || plan.nodes().isEmpty()) {
             log.warn("DagPlanExecutor received an empty plan");
             return List.of();
@@ -194,7 +208,7 @@ public class DagPlanExecutor {
                 }
 
                 runLayer(ready, blackboard, results, exec, parentContext, mdcContext, deadline,
-                        requestId, conversationId, callerToken);
+                        requestId, conversationId, callerToken, coverageContext);
             }
         } finally {
             exec.close();
@@ -246,7 +260,8 @@ public class DagPlanExecutor {
                           long deadline,
                           String requestId,
                           String conversationId,
-                          String callerToken) {
+                          String callerToken,
+                          CoverageContext coverageContext) {
 
         // Bind + gate on the caller thread (deterministic) before releasing the layer.
         List<PlanNode> bound = new ArrayList<>();
@@ -259,16 +274,17 @@ public class DagPlanExecutor {
                 results.put(n.nodeId(), composeFailure(n, reason));
                 continue;
             }
-            // T4-REVERIFY: condition input must remain the post-coverage-filter bound input once
-            // per-producer coverage filtering lands, so predicates cannot observe uncovered data.
+            NodeResult coverageResult = evaluateNodeCoverage(candidate, input, coverageContext,
+                    requestId, conversationId);
+            if (coverageResult != null) {
+                results.put(n.nodeId(), coverageResult);
+                continue;
+            }
             NodeResult conditionResult = evaluateCondition(candidate, input, requestId, conversationId);
             if (conditionResult != null) {
                 results.put(n.nodeId(), conditionResult);
                 continue;
             }
-            // T4-REVERIFY: dynamic map expansion also runs on the post-bind, post-condition input.
-            // If future coverage filtering changes bind shape, item selection must remain scoped to
-            // that already-filtered input rather than any raw upstream payload.
             if (candidate.hasMap()) {
                 NodeResult mapResult = executeMapNode(candidate, exec, parentContext, deadline,
                         requestId, conversationId, callerToken);
@@ -316,6 +332,9 @@ public class DagPlanExecutor {
         for (int i = 0; i < bound.size(); i++) {
             PlanNode node = bound.get(i);
             NodeResult r = harvest(futures.get(i), node);
+            if (r.isOk()) {
+                r = applyProducedEntityCoverage(node, r, coverageContext, requestId, conversationId);
+            }
             results.put(node.nodeId(), r);
             if (r.isOk()) {
                 blackboard.project(node, r.data());   // publish for downstream layers
@@ -579,6 +598,213 @@ public class DagPlanExecutor {
         return new NodeResult(node.nodeId(), node.agent().agentId(), node.agent().protocol(),
                 NodeResult.Status.FAILED, null, 0, reason);
     }
+
+    private NodeResult evaluateNodeCoverage(PlanNode node, JsonNode input, CoverageContext ctx,
+                                            String requestId, String conversationId) {
+        if (ctx == null || node == null || node.agent() == null) return null;
+        EffectiveManifest effective = ctx.effectiveManifest(node.agent());
+        if (effective == null || !effective.resourceScoped() || effective.coverage() == null) return null;
+
+        AgentManifest.Io io = node.agent().io();
+        List<AgentManifest.Consume> consumes =
+                (io == null || io.consumes() == null) ? List.of() : io.consumes();
+        for (AgentManifest.Consume consume : consumes) {
+            if (consume == null || !consume.isEntityRef()) continue;
+            JsonNode value = input == null ? null : input.path(consume.entity());
+            List<String> ids = idsFrom(value);
+            if (ids.isEmpty()) {
+                if (!consume.isRequired()) {
+                    continue;
+                }
+                publishCoverageDeny(ctx, node, null, "blank-entity", requestId, conversationId);
+                return coverageDenied(node, "coverage denied: blank or unresolved entity id");
+            }
+            for (String id : ids) {
+                if (id == null || id.isBlank()) {
+                    publishCoverageDeny(ctx, node, id, "blank-entity", requestId, conversationId);
+                    return coverageDenied(node, "coverage denied: blank or unresolved entity id");
+                }
+                CoverageCheckResult check;
+                try {
+                    check = ctx.check(id, effective.coverage());
+                } catch (CoverageClient.CoverageUnavailableException e) {
+                    publishCoverageDeny(ctx, node, id, "coverage-unavailable", requestId, conversationId);
+                    return coverageDenied(node, "coverage denied: coverage service unavailable");
+                }
+                if (check == null || !check.allowed()) {
+                    publishCoverageDeny(ctx, node, id,
+                            check == null ? "coverage-denied" : check.reason(), requestId, conversationId);
+                    return coverageDenied(node, "coverage denied: not in coverage");
+                }
+            }
+        }
+        return null;
+    }
+
+    private NodeResult applyProducedEntityCoverage(PlanNode node, NodeResult result, CoverageContext ctx,
+                                                   String requestId, String conversationId) {
+        if (ctx == null || node == null || node.agent() == null || result.data() == null) return result;
+        AgentManifest.Io io = node.agent().io();
+        List<AgentManifest.Produce> produces =
+                (io == null || io.produces() == null) ? List.of() : io.produces();
+        JsonNode filtered = result.data();
+        for (AgentManifest.Produce produce : produces) {
+            List<AgentManifest.ProducedEntity> entities =
+                    (produce == null || produce.entities() == null) ? List.of() : produce.entities();
+            for (AgentManifest.ProducedEntity entity : entities) {
+                FilterOutcome outcome = filterOneProducedEntity(node, filtered, entity, ctx,
+                        requestId, conversationId);
+                if (outcome.deniedScalar()) {
+                    return coverageDenied(node, "coverage denied: produced entity not in coverage");
+                }
+                filtered = outcome.data();
+            }
+        }
+        return new NodeResult(result.nodeId(), result.agentId(), result.protocol(), result.status(),
+                filtered, result.latencyMs(), result.errorMessage());
+    }
+
+    private FilterOutcome filterOneProducedEntity(PlanNode node,
+                                                  JsonNode data,
+                                                  AgentManifest.ProducedEntity entity,
+                                                  CoverageContext ctx,
+                                                  String requestId,
+                                                  String conversationId) {
+        if (entity == null || entity.select() == null || entity.select().isBlank()) {
+            publishCoverageDeny(ctx, node, null, "missing-entity-selector", requestId, conversationId);
+            return new FilterOutcome(data, true);
+        }
+        JsonNode selected;
+        try {
+            selected = JMES_PATH.compile(entity.select()).search(data);
+        } catch (Exception e) {
+            publishCoverageDeny(ctx, node, null, "invalid-entity-selector", requestId, conversationId);
+            return new FilterOutcome(data, true);
+        }
+        List<String> ids = idsFrom(selected);
+        if (ids.isEmpty() && selected != null && !selected.isMissingNode() && !selected.isNull()) {
+            publishCoverageDeny(ctx, node, null, "invalid-entity-selector-result", requestId, conversationId);
+            return new FilterOutcome(data, true);
+        }
+        Set<String> allowed = new HashSet<>();
+        Set<String> denied = new HashSet<>();
+        EffectiveManifest effective = ctx.effectiveManifest(node.agent());
+        DomainManifest.Coverage coverage = effective == null ? null : effective.coverage();
+        if (coverage == null) {
+            ids.forEach(id -> publishCoverageDeny(ctx, node, id, "missing-coverage", requestId, conversationId));
+            return new FilterOutcome(data, !ids.isEmpty());
+        }
+        for (String id : ids) {
+            if (id == null || id.isBlank()) {
+                denied.add(id);
+                publishCoverageDeny(ctx, node, id, "blank-entity", requestId, conversationId);
+                continue;
+            }
+            try {
+                CoverageCheckResult check = ctx.check(id, coverage);
+                if (check != null && check.allowed()) {
+                    allowed.add(id);
+                } else {
+                    denied.add(id);
+                    publishCoverageDeny(ctx, node, id,
+                            check == null ? "coverage-denied" : check.reason(), requestId, conversationId);
+                }
+            } catch (CoverageClient.CoverageUnavailableException e) {
+                publishCoverageDeny(ctx, node, id, "coverage-unavailable", requestId, conversationId);
+                return new FilterOutcome(data, true);
+            }
+        }
+        if (denied.isEmpty()) return new FilterOutcome(data, false);
+        if (selected != null && selected.isTextual()) return new FilterOutcome(data, true);
+
+        String arrayPath = arrayPathFromSelect(entity.select());
+        if (arrayPath == null) return new FilterOutcome(data, true);
+        JsonNode pruned = pruneArrayByAllowedIds(data, arrayPath, itemSelectorFrom(entity.select()), allowed);
+        return new FilterOutcome(pruned, false);
+    }
+
+    private List<String> idsFrom(JsonNode value) {
+        if (value == null || value.isMissingNode() || value.isNull()) return List.of();
+        if (value.isTextual()) return List.of(value.asText());
+        if (!value.isArray()) return List.of();
+        List<String> ids = new ArrayList<>();
+        for (JsonNode item : value) {
+            if (item != null && item.isTextual()) ids.add(item.asText());
+        }
+        return ids;
+    }
+
+    private String arrayPathFromSelect(String select) {
+        int marker = select == null ? -1 : select.indexOf("[].");
+        if (marker <= 0) return null;
+        return select.substring(0, marker);
+    }
+
+    private String itemSelectorFrom(String select) {
+        int marker = select == null ? -1 : select.indexOf("[].");
+        if (marker < 0) return null;
+        return select.substring(marker + 3);
+    }
+
+    private JsonNode pruneArrayByAllowedIds(JsonNode data, String arrayPath, String itemSelector, Set<String> allowed) {
+        JsonNode copy = data.deepCopy();
+        JsonNode parent = copy;
+        String[] segments = arrayPath.split("\\.");
+        for (int i = 0; i < segments.length - 1; i++) {
+            parent = parent.path(segments[i]);
+        }
+        String field = segments[segments.length - 1];
+        if (!(parent instanceof ObjectNode objectParent)) return copy;
+        JsonNode array = objectParent.path(field);
+        if (!array.isArray()) return copy;
+        ArrayNode filtered = MAPPER.createArrayNode();
+        for (JsonNode item : array) {
+            try {
+                JsonNode id = JMES_PATH.compile(itemSelector).search(item);
+                if (id != null && id.isTextual() && allowed.contains(id.asText())) {
+                    filtered.add(item);
+                }
+            } catch (Exception ignored) {
+                // Invalid item projection was boot-validated for normal manifests; skip unsafe rows.
+            }
+        }
+        objectParent.set(field, filtered);
+        return copy;
+    }
+
+    private void publishCoverageDeny(CoverageContext ctx, PlanNode node, String entityId, String reason,
+                                     String requestId, String conversationId) {
+        if (tracePublisher == null || requestId == null || conversationId == null || ctx == null) return;
+        tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
+                new CheckDeniedData("coverage", entityId, ctx.principalId(), reason, "coverage")));
+    }
+
+    private NodeResult coverageDenied(PlanNode node, String reason) {
+        return new NodeResult(node.nodeId(), node.agent().agentId(), node.agent().protocol(),
+                NodeResult.Status.FAILED, null, 0, reason);
+    }
+
+    public record CoverageContext(
+            String principalId,
+            String tenantId,
+            String bearerToken,
+            Function<AgentManifest, EffectiveManifest> effectiveManifestProvider,
+            CoverageChecker checker) {
+        EffectiveManifest effectiveManifest(AgentManifest manifest) {
+            return effectiveManifestProvider == null ? null : effectiveManifestProvider.apply(manifest);
+        }
+        CoverageCheckResult check(String entityId, DomainManifest.Coverage coverage) {
+            return checker.check(principalId, tenantId, entityId, coverage, bearerToken);
+        }
+    }
+
+    @FunctionalInterface
+    public interface CoverageChecker {
+        CoverageCheckResult check(String principalId, String tenantId, String entityId,
+                                  DomainManifest.Coverage coverage, String bearerToken);
+    }
+
+    private record FilterOutcome(JsonNode data, boolean deniedScalar) {}
 
     private record MapItemOutcome(int index, boolean ok, ObjectNode summary) {
         static MapItemOutcome from(int index, NodeResult result) {

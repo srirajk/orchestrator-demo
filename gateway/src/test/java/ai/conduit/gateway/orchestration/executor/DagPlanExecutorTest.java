@@ -1,6 +1,10 @@
 package ai.conduit.gateway.orchestration.executor;
 
 import ai.conduit.gateway.adapter.ProtocolAdapter;
+import ai.conduit.gateway.domain.coverage.CoverageCheckResult;
+import ai.conduit.gateway.domain.coverage.CoverageClient;
+import ai.conduit.gateway.domain.manifest.DomainManifest;
+import ai.conduit.gateway.domain.manifest.EffectiveManifest;
 import ai.conduit.gateway.orchestration.harness.AgentHarness;
 import ai.conduit.gateway.orchestration.model.NodeResult;
 import ai.conduit.gateway.orchestration.model.Plan;
@@ -60,6 +64,13 @@ class DagPlanExecutorTest {
                 List.of(new AgentManifest.Produce("producerOut", OUT_TYPE)));
     }
 
+    private static AgentManifest.Io producerIoWithEntities(String select) {
+        return new AgentManifest.Io(
+                List.of(new AgentManifest.Consume("entity", null, true)),
+                List.of(new AgentManifest.Produce("producerOut", OUT_TYPE,
+                        List.of(new AgentManifest.ProducedEntity("entity", select)))));
+    }
+
     private static AgentManifest.Io consumerIo() {
         return new AgentManifest.Io(
                 List.of(new AgentManifest.Consume(null, OUT_TYPE, true)),
@@ -72,6 +83,13 @@ class DagPlanExecutorTest {
                 List.of(new AgentManifest.Produce("mapOut", "typeMap")),
                 null,
                 new AgentManifest.MapSpec("items", "{value: value, fail: fail}", maxItems, maxConcurrency));
+    }
+
+    private static AgentManifest.Io conditionalConsumerIo(String condition) {
+        return new AgentManifest.Io(
+                List.of(new AgentManifest.Consume(null, OUT_TYPE, true)),
+                List.of(new AgentManifest.Produce("consumerOut", "typeFinal")),
+                condition);
     }
 
     /** Two-node plan producer → consumer, in topological order, as the resolver would emit it. */
@@ -184,6 +202,28 @@ class DagPlanExecutorTest {
     private DagPlanExecutor executor(AgentHarness harness) {
         MeterRegistry meters = new SimpleMeterRegistry();
         return new DagPlanExecutor(harness, TRACER, meters, 60_000);
+    }
+
+    private static DagPlanExecutor.CoverageContext coverageAllowing(Set<String> allowed) {
+        DomainManifest.Coverage coverage = new DomainManifest.Coverage("discover", "check", "resolve", 0);
+        EffectiveManifest effective = new EffectiveManifest(null, null, null, true,
+                List.of("entity"), Map.of(), coverage, List.of(), List.of(), "template", null);
+        return new DagPlanExecutor.CoverageContext("principal", "tenant", "token",
+                ignored -> effective,
+                (principal, tenant, entityId, cov, token) ->
+                        allowed.contains(entityId) ? CoverageCheckResult.ofAllowed()
+                                : CoverageCheckResult.denied("not-covered"));
+    }
+
+    private static DagPlanExecutor.CoverageContext coverageOutage() {
+        DomainManifest.Coverage coverage = new DomainManifest.Coverage("discover", "check", "resolve", 0);
+        EffectiveManifest effective = new EffectiveManifest(null, null, null, true,
+                List.of("entity"), Map.of(), coverage, List.of(), List.of(), "template", null);
+        return new DagPlanExecutor.CoverageContext("principal", "tenant", "token",
+                ignored -> effective,
+                (principal, tenant, entityId, cov, token) -> {
+                    throw new CoverageClient.CoverageUnavailableException("down");
+                });
     }
 
     // ── happy path: producer output becomes the consumer's bound input ───────────────────────────
@@ -377,6 +417,163 @@ class DagPlanExecutorTest {
         assertThat(mapped.isOk()).isTrue();
         assertThat(mapped.data().path("_items").asInt()).isZero();
         assertThat(mapped.data().path("_ok").asInt()).isZero();
+        assertThat(adapter.order).containsExactly(PRODUCER);
+    }
+
+    @Test
+    @DisplayName("T4: blank entity id denies before dispatch")
+    void blankEntityIdDeniesBeforeDispatch() {
+        RecordingAdapter adapter = new RecordingAdapter(false);
+        DagPlanExecutor exec = executor(harness(adapter));
+        JsonNode leafInput = MAPPER.createObjectNode().put("entity", "");
+        Blackboard bb = new Blackboard(Set.of("entity"), Map.of(PRODUCER, leafInput), MAPPER);
+
+        List<NodeResult> results = exec.execute(producerConsumerPlan(), bb,
+                "req", "conv", "token", coverageAllowing(Set.of("E-1")));
+
+        assertThat(results.get(0).isOk()).isFalse();
+        assertThat(results.get(0).errorMessage()).containsIgnoringCase("coverage denied");
+        assertThat(adapter.order).isEmpty();
+    }
+
+    @Test
+    @DisplayName("T4: missing optional entity does not deny covered required entity")
+    void optionalEntityMayBeAbsentUnderCoverage() {
+        AgentManifest.Io io = new AgentManifest.Io(
+                List.of(
+                        new AgentManifest.Consume("entity", null, true),
+                        new AgentManifest.Consume("optional_entity", null, false)),
+                List.of(new AgentManifest.Produce("producerOut", OUT_TYPE)));
+        RecordingAdapter adapter = new RecordingAdapter(false);
+        DagPlanExecutor exec = executor(harness(adapter));
+        PlanNode producer = new PlanNode(PRODUCER, agent(PRODUCER, io), null, List.of());
+        JsonNode leafInput = MAPPER.createObjectNode().put("entity", "E-1");
+        Blackboard bb = new Blackboard(Set.of("entity"), Map.of(PRODUCER, leafInput), MAPPER);
+
+        List<NodeResult> results = exec.execute(new Plan(List.of(producer)), bb,
+                "req", "conv", "token", coverageAllowing(Set.of("E-1")));
+
+        assertThat(results.get(0).isOk()).isTrue();
+        assertThat(adapter.order).containsExactly(PRODUCER);
+    }
+
+    @Test
+    @DisplayName("T4: coverage outage denies before dispatch")
+    void coverageOutageDeniesBeforeDispatch() {
+        RecordingAdapter adapter = new RecordingAdapter(false);
+        DagPlanExecutor exec = executor(harness(adapter));
+        JsonNode leafInput = MAPPER.createObjectNode().put("entity", "E-1");
+        Blackboard bb = new Blackboard(Set.of("entity"), Map.of(PRODUCER, leafInput), MAPPER);
+
+        List<NodeResult> results = exec.execute(producerConsumerPlan(), bb,
+                "req", "conv", "token", coverageOutage());
+
+        assertThat(results.get(0).isOk()).isFalse();
+        assertThat(results.get(0).errorMessage()).containsIgnoringCase("unavailable");
+        assertThat(adapter.order).isEmpty();
+    }
+
+    @Test
+    @DisplayName("T4: discovered entities are filtered before downstream binding and counts")
+    void discoveredEntitiesFilteredBeforeDownstream() {
+        JsonNode producerOutput = MAPPER.createObjectNode().set("items", MAPPER.createArrayNode()
+                .add(MAPPER.createObjectNode().put("id", "E-1").put("value", "covered"))
+                .add(MAPPER.createObjectNode().put("id", "E-2").put("value", "denied")));
+        RecordingAdapter adapter = new RecordingAdapter(false, producerOutput);
+        DagPlanExecutor exec = executor(harness(adapter));
+        PlanNode producer = new PlanNode(PRODUCER, agent(PRODUCER, producerIoWithEntities("items[].id")), null, List.of());
+        PlanNode consumer = new PlanNode(CONSUMER, agent(CONSUMER, consumerIo()), null, List.of(PRODUCER));
+        Blackboard bb = new Blackboard(Set.of("entity"),
+                Map.of(PRODUCER, MAPPER.createObjectNode().put("entity", "E-1")), MAPPER);
+
+        List<NodeResult> results = exec.execute(new Plan(List.of(producer, consumer)), bb,
+                "req", "conv", "token", coverageAllowing(Set.of("E-1")));
+
+        assertThat(results).allMatch(NodeResult::isOk);
+        JsonNode consumerInput = adapter.inputs.get(CONSUMER);
+        assertThat(consumerInput.path("items")).hasSize(1);
+        assertThat(consumerInput.path("items").get(0).path("id").asText()).isEqualTo("E-1");
+        assertThat(consumerInput.toString()).doesNotContain("E-2");
+    }
+
+    @Test
+    @DisplayName("T4: condition evaluates over filtered producer data")
+    void conditionSeesOnlyFilteredData() {
+        JsonNode producerOutput = MAPPER.createObjectNode().set("items", MAPPER.createArrayNode()
+                .add(MAPPER.createObjectNode().put("id", "E-2").put("value", "denied")));
+        RecordingAdapter adapter = new RecordingAdapter(false, producerOutput);
+        DagPlanExecutor exec = executor(harness(adapter));
+        PlanNode producer = new PlanNode(PRODUCER, agent(PRODUCER, producerIoWithEntities("items[].id")), null, List.of());
+        PlanNode consumer = new PlanNode(CONSUMER,
+                agent(CONSUMER, conditionalConsumerIo("length(items) > `0`")), null, List.of(PRODUCER));
+        Blackboard bb = new Blackboard(Set.of("entity"),
+                Map.of(PRODUCER, MAPPER.createObjectNode().put("entity", "E-1")), MAPPER);
+
+        List<NodeResult> results = exec.execute(new Plan(List.of(producer, consumer)), bb,
+                "req", "conv", "token", coverageAllowing(Set.of("E-1")));
+
+        assertThat(results.get(0).isOk()).isTrue();
+        assertThat(results.get(1).status()).isEqualTo(NodeResult.Status.SKIPPED_CONDITION_FALSE);
+        assertThat(adapter.order).containsExactly(PRODUCER);
+    }
+
+    @Test
+    @DisplayName("T4: map iterates only over filtered producer data")
+    void mapSeesOnlyFilteredData() {
+        JsonNode producerOutput = MAPPER.createObjectNode().set("items", MAPPER.createArrayNode()
+                .add(MAPPER.createObjectNode().put("id", "E-1").put("value", "covered"))
+                .add(MAPPER.createObjectNode().put("id", "E-2").put("value", "denied")));
+        RecordingAdapter adapter = new RecordingAdapter(false, producerOutput);
+        DagPlanExecutor exec = executor(harness(adapter));
+        PlanNode producer = new PlanNode(PRODUCER, agent(PRODUCER, producerIoWithEntities("items[].id")), null, List.of());
+        PlanNode mapper = new PlanNode(MAPPER_AGENT,
+                agentWithSchema(MAPPER_AGENT, mapIo(10, 2), schemaRequiringString("value")),
+                null, List.of(PRODUCER));
+        Blackboard bb = new Blackboard(Set.of("entity"),
+                Map.of(PRODUCER, MAPPER.createObjectNode().put("entity", "E-1")), MAPPER);
+
+        List<NodeResult> results = exec.execute(new Plan(List.of(producer, mapper)), bb,
+                "req", "conv", "token", coverageAllowing(Set.of("E-1")));
+
+        NodeResult mapped = results.get(1);
+        assertThat(mapped.isOk()).isTrue();
+        assertThat(mapped.data().path("_items").asInt()).isEqualTo(1);
+        assertThat(mapped.data().path("_ran").asInt()).isEqualTo(1);
+        assertThat(mapped.data().toString()).doesNotContain("denied");
+    }
+
+    @Test
+    @DisplayName("T4: fan-in degrades honestly when one producer is uncovered")
+    void uncoveredProducerInFanInLeavesSurvivorAndSkipsConsumer() {
+        String producer2 = "cap.producer2";
+        String outType2 = "typeOut2";
+        AgentManifest.Io producer2Io = new AgentManifest.Io(
+                List.of(new AgentManifest.Consume("entity", null, true)),
+                List.of(new AgentManifest.Produce("producerTwoOut", outType2)));
+        AgentManifest.Io fanInIo = new AgentManifest.Io(
+                List.of(
+                        new AgentManifest.Consume(null, OUT_TYPE, true),
+                        new AgentManifest.Consume(null, outType2, true)),
+                List.of(new AgentManifest.Produce("consumerOut", "typeFinal")));
+        RecordingAdapter adapter = new RecordingAdapter(false);
+        DagPlanExecutor exec = executor(harness(adapter));
+        PlanNode first = new PlanNode(PRODUCER, agent(PRODUCER, producerIo()), null, List.of());
+        PlanNode second = new PlanNode(producer2, agent(producer2, producer2Io), null, List.of());
+        PlanNode consumer = new PlanNode(CONSUMER, agent(CONSUMER, fanInIo), null, List.of(PRODUCER, producer2));
+        Blackboard bb = new Blackboard(Set.of("entity"),
+                Map.of(
+                        PRODUCER, MAPPER.createObjectNode().put("entity", "E-1"),
+                        producer2, MAPPER.createObjectNode().put("entity", "E-2")),
+                MAPPER);
+
+        List<NodeResult> results = exec.execute(new Plan(List.of(first, second, consumer)), bb,
+                "req", "conv", "token", coverageAllowing(Set.of("E-1")));
+
+        assertThat(results.get(0).isOk()).isTrue();
+        assertThat(results.get(1).isOk()).isFalse();
+        assertThat(results.get(1).errorMessage()).containsIgnoringCase("coverage denied");
+        assertThat(results.get(2).isOk()).isFalse();
+        assertThat(results.get(2).errorMessage()).containsIgnoringCase("upstream dependency");
         assertThat(adapter.order).containsExactly(PRODUCER);
     }
 }

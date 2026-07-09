@@ -382,10 +382,29 @@ public class ChatService {
                                 new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
                             return;
                         }
+                    } else {
+                        emitRequestOutcome("DENIED");
+                        tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
+                            GateData.deny(GateData.GATE_COVERAGE,
+                                ir.id() + " could not be resolved", sub0)));
+                        tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
+                            new CheckDeniedData("coverage", ir.id(), p0.id(), "unresolved-entity", "coverage")));
+                        streamTextAndComplete(emitter, mapDenialReason("unknown-resource", sub0), streamId);
+                        tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
+                            new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                        return;
                     }
                 } catch (CoverageClient.CoverageUnavailableException e) {
-                    // Fail open to the normal pipeline — it re-attempts coverage and fails closed there.
-                    log.warn("Identifier pre-check coverage unavailable ({}), falling through", e.getMessage());
+                    log.error("Identifier pre-check coverage unavailable for principal={}: {}",
+                            p0.id(), e.getMessage());
+                    emitRequestOutcome("DENIED");
+                    tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
+                            new CheckDeniedData("coverage", ir.id(), p0.id(), "coverage-unavailable", "coverage")));
+                    streamTextAndComplete(emitter,
+                            "I am unable to verify your coverage right now, so I cannot provide that data.", streamId);
+                    tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
+                            new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                    return;
                 }
             }
 
@@ -937,7 +956,14 @@ public class ChatService {
         log.info("DAG firing: goal={} nodes={} available={}", goalId,
                 plan.nodes().stream().map(PlanNode::nodeId).collect(Collectors.toList()), availableEntities);
         emitDagPlan(goal.domain(), goalId, plan.nodes().size());
-        List<NodeResult> results = dagExecutor.execute(plan, blackboard, requestId, conversationId, callerToken);
+        DagPlanExecutor.CoverageContext coverageContext = new DagPlanExecutor.CoverageContext(
+                principal.id(),
+                principal.tenantId() == null || principal.tenantId().isBlank() ? "default" : principal.tenantId(),
+                callerToken,
+                m -> manifestStore.getEffective(m.agentId(), m.domain(), m.subDomain()),
+                coverageClient::check);
+        List<NodeResult> results = dagExecutor.execute(plan, blackboard, requestId, conversationId,
+                callerToken, coverageContext);
         tracePublisher.publish(TraceEvent.of("plan_graph", requestId, conversationId,
                 new PlanGraphData(plan.nodes().stream()
                         .map(n -> new PlanGraphData.Node(n.nodeId(), n.agent().agentId(),

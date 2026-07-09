@@ -180,6 +180,27 @@
                 "type": "string",
                 "minLength": 1,
                 "description": "Symbolic output type used to match a downstream consumer's 'from'. Manifest-declared; matched by string equality."
+              },
+              "entities": {
+                "type": "array",
+                "description": "Manifest-declared entity ids emitted by this output. Runtime filtering uses these selectors only; the gateway never scans arbitrary JSON for ids.",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["type", "select"],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Entity type whose coverage service is declared by the domain/sub-domain manifest."
+                    },
+                    "select": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "JMESPath expression over this producer output that evaluates to a string id or array of string ids."
+                    }
+                  }
+                }
               }
             }
           }

@@ -126,7 +126,57 @@ public class SelectContractValidator {
             validated = projections.size();
         }
 
+        Summary entitySummary = validateProducedEntities(consumer);
+        return new Summary(validated, unvalidated).plus(entitySummary);
+    }
+
+    private Summary validateProducedEntities(AgentManifest manifest) {
+        AgentManifest.Io io = manifest == null ? null : manifest.io();
+        List<AgentManifest.Produce> produces =
+                (io == null || io.produces() == null) ? List.of() : io.produces();
+        int validated = 0;
+        int unvalidated = 0;
+        for (AgentManifest.Produce produce : produces) {
+            List<AgentManifest.ProducedEntity> entities =
+                    (produce == null || produce.entities() == null) ? List.of() : produce.entities();
+            if (entities.isEmpty()) continue;
+            if (!hasUsableSchema(manifest.outputSchema())) {
+                log.warn("entity select validation: agentId={} produce={} UNVALIDATED (no output schema)",
+                        manifest.agentId(), produce.name());
+                unvalidated += entities.size();
+                continue;
+            }
+            JsonNode sample = sampleFromSchema(manifest.outputSchema());
+            for (AgentManifest.ProducedEntity entity : entities) {
+                if (entity == null || entity.select() == null || entity.select().isBlank()) {
+                    throw new ProducedEntityValidationException(manifest.agentId(), produce.name(), null,
+                            "select is required");
+                }
+                JsonNode selected;
+                try {
+                    selected = JMES_PATH.compile(entity.select()).search(sample);
+                } catch (Exception e) {
+                    throw new ProducedEntityValidationException(manifest.agentId(), produce.name(), entity.select(),
+                            "invalid expression: " + e.getMessage());
+                }
+                if (!isStringOrStringArray(selected)) {
+                    throw new ProducedEntityValidationException(manifest.agentId(), produce.name(), entity.select(),
+                            "must evaluate to a string or array of strings");
+                }
+                validated++;
+            }
+        }
         return new Summary(validated, unvalidated);
+    }
+
+    private boolean isStringOrStringArray(JsonNode selected) {
+        if (selected == null || selected.isMissingNode() || selected.isNull()) return false;
+        if (selected.isTextual()) return true;
+        if (!selected.isArray()) return false;
+        for (JsonNode item : selected) {
+            if (item == null || !item.isTextual()) return false;
+        }
+        return true;
     }
 
     private boolean hasCondition(AgentManifest manifest) {
@@ -389,6 +439,15 @@ public class SelectContractValidator {
             super("map validation failed: agentId=" + agentId
                     + " over=" + (map == null ? null : map.over())
                     + " item_select=" + (map == null ? null : map.itemSelect())
+                    + " reason=" + reason);
+        }
+    }
+
+    public static final class ProducedEntityValidationException extends RuntimeException {
+        public ProducedEntityValidationException(String agentId, String produce, String select, String reason) {
+            super("produced entity validation failed: agentId=" + agentId
+                    + " produce=" + produce
+                    + " select=" + select
                     + " reason=" + reason);
         }
     }

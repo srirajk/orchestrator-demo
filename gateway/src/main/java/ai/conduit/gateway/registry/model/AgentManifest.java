@@ -172,9 +172,24 @@ public record AgentManifest(
         public boolean hasSelect()     { return select != null && !select.isBlank(); }
     }
 
-    /** A named, typed output published for downstream binding via {@code from}. */
+    /**
+     * A named, typed output published for downstream binding via {@code from}.
+     *
+     * <p>{@code entities} optionally declares manifest-driven entity ids emitted by this output.
+     * Runtime coverage filtering reads only these declarations; it never scans arbitrary JSON for
+     * identifier-looking values.
+     */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record Produce(String name, String type) {}
+    public record Produce(String name, String type, List<ProducedEntity> entities) {
+        /** Backward-compatible constructor (pre-{@code entities} arity). */
+        public Produce(String name, String type) {
+            this(name, type, null);
+        }
+    }
+
+    /** Manifest-declared entity id selector for a produced output. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record ProducedEntity(String type, String select) {}
 
     /** Convenience: all example prompts across all skills (used for embedding). */
     public List<String> allExamples() {
