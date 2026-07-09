@@ -86,6 +86,14 @@ conduit:
     # eval set's thinnest LEGITIMATE margin is ~0.007, so this only catches a genuine near-tie
     # (the router truly cannot tell two candidates apart), not an honest close call.
     min-margin: 0.005
+    rerank:
+      enabled: ${CONDUIT_ROUTING_RERANK_ENABLED:true}
+      # Invoke the LLM only for near-ties; clear embedding winners stay on the fast path.
+      margin-threshold: ${CONDUIT_ROUTING_RERANK_MARGIN_THRESHOLD:0.13}
+      # Also rerank weak-but-eligible leaders close to the abstain floor, giving the model a
+      # chance to choose among the bounded candidates or strengthen abstain.
+      abstain-adjacent-band: ${CONDUIT_ROUTING_RERANK_ABSTAIN_ADJACENT_BAND:0.08}
+      max-candidates: ${CONDUIT_ROUTING_RERANK_MAX_CANDIDATES:5}
   chat:
     # Recent user turns (incl. current) concatenated into the routing query so keyword-less
     # follow-ups inherit the conversation's domain vocabulary. Bounded to limit domain drift.
@@ -109,6 +117,12 @@ conduit:
       retry-initial-delay-ms: ${CONDUIT_LLM_INTENT_CLASSIFIER_RETRY_INITIAL_DELAY_MS:200}
       retry-backoff-multiplier: ${CONDUIT_LLM_INTENT_CLASSIFIER_RETRY_BACKOFF_MULTIPLIER:2}
       request-timeout-seconds: ${CONDUIT_LLM_INTENT_CLASSIFIER_REQUEST_TIMEOUT_SECONDS:10}
+    routing-reranker:
+      base-url: ${CONDUIT_LLM_ROUTING_RERANKER_BASE_URL:${CONDUIT_LLM_INTENT_CLASSIFIER_BASE_URL:https://api.z.ai/api/paas/v4}}
+      api-key: ${CONDUIT_LLM_ROUTING_RERANKER_API_KEY:${CONDUIT_LLM_INTENT_CLASSIFIER_API_KEY:${ZAI_API_KEY:}}}
+      model: ${CONDUIT_LLM_ROUTING_RERANKER_MODEL:${CONDUIT_LLM_INTENT_CLASSIFIER_MODEL:glm-4.5-flash}}
+      temperature: ${CONDUIT_LLM_ROUTING_RERANKER_TEMPERATURE:0.0}
+      request-timeout-seconds: ${CONDUIT_LLM_ROUTING_RERANKER_REQUEST_TIMEOUT_SECONDS:8}
     # ── Entity Extractor (pull relationship/fund/ticker from user prompt) ─────
     entity-extractor:
       base-url: ${CONDUIT_LLM_ENTITY_EXTRACTOR_BASE_URL:https://api.z.ai/api/paas/v4}

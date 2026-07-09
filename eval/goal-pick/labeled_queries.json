@@ -460,6 +460,27 @@
       "query": "I need insurance renewal risk, not investment performance.",
       "expected_goal": "meridian.insurance.renewal_risk"
     },
+    {
+      "id": "confuser_risk_profile_vs_renewal_negation",
+      "category": "cross_agent_confuser",
+      "persona": "rm_jane",
+      "query": "What is the client's risk tolerance, not the insurance renewal risk?",
+      "expected_goal": "meridian.wealth.risk_profile"
+    },
+    {
+      "id": "confuser_performance_vs_renewal_negation",
+      "category": "cross_agent_confuser",
+      "persona": "rm_jane",
+      "query": "Show recent investment performance, not renewal risk.",
+      "expected_goal": "meridian.wealth.performance"
+    },
+    {
+      "id": "confuser_policy_details_vs_claims_negation",
+      "category": "cross_agent_confuser",
+      "persona": "uw_sam",
+      "query": "Pull policy terms and limits, not open claim status.",
+      "expected_goal": "meridian.insurance.policy_details"
+    },
 
     {
       "id": "out_of_scope_001",

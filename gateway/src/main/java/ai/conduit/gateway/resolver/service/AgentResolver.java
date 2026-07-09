@@ -12,7 +12,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Resolver — Stage A + Stage B from the spec.
@@ -77,14 +79,29 @@ public class AgentResolver {
     @Value("${conduit.routing.min-margin:0.005}")
     private double routingMinMargin;
 
+    @Value("${conduit.routing.rerank.enabled:true}")
+    private boolean rerankEnabled;
+
+    @Value("${conduit.routing.rerank.margin-threshold:0.13}")
+    private double rerankMarginThreshold;
+
+    @Value("${conduit.routing.rerank.abstain-adjacent-band:0.08}")
+    private double rerankAbstainAdjacentBand;
+
+    @Value("${conduit.routing.rerank.max-candidates:5}")
+    private int rerankMaxCandidates;
+
     private final VectorIndex    vectorIndex;
     private final AgentRegistry  registry;
     private final MeterRegistry  meterRegistry;
+    private final RoutingRerankerClient rerankerClient;
 
-    public AgentResolver(VectorIndex vectorIndex, AgentRegistry registry, MeterRegistry meterRegistry) {
-        this.vectorIndex   = vectorIndex;
-        this.registry      = registry;
-        this.meterRegistry = meterRegistry;
+    public AgentResolver(VectorIndex vectorIndex, AgentRegistry registry, MeterRegistry meterRegistry,
+                         RoutingRerankerClient rerankerClient) {
+        this.vectorIndex     = vectorIndex;
+        this.registry        = registry;
+        this.meterRegistry   = meterRegistry;
+        this.rerankerClient  = rerankerClient;
     }
 
     /**
@@ -222,6 +239,15 @@ public class AgentResolver {
         // candidates is sorted descending by score (VectorIndex.search() contract) — get(0) is
         // the leader.
         double topScore = candidates.get(0).score();
+        double runnerUpScore = candidates.size() > 1 ? candidates.get(1).score() : 0.0;
+        double topMargin = candidates.size() > 1 ? topScore - runnerUpScore : Double.MAX_VALUE;
+        RerankApplication rerank = maybeRerank(candidates, queryText, topScore, topMargin);
+        if (rerank.abstain()) {
+            meterRegistry.counter("resolver.fallback").increment();
+            return new ResolverResult(List.of(), candidates, true, topScore, queryText);
+        }
+        candidates = rerank.candidates();
+        topScore = candidates.get(0).score();
 
         // ── General routing abstain gate (T1.6, config-driven, World-B clean) ───────────────
         // Runs BEFORE the per-candidate floor below. Two independent, domain-agnostic checks:
@@ -229,9 +255,10 @@ public class AgentResolver {
         // are too close to call (routingMinMargin). Either ⇒ the whole query abstains — no
         // partial selection — so the caller falls through to the deterministic clarify/decline
         // path instead of trusting a guess. Pure score arithmetic; no domain literal.
-        double runnerUpScore = candidates.size() > 1 ? candidates.get(1).score() : 0.0;
-        double topMargin = candidates.size() > 1 ? topScore - runnerUpScore : Double.MAX_VALUE;
-        boolean routingAbstain = topScore < routingMinScore || topMargin < routingMinMargin;
+        runnerUpScore = candidates.size() > 1 ? candidates.get(1).score() : 0.0;
+        topMargin = candidates.size() > 1 ? topScore - runnerUpScore : Double.MAX_VALUE;
+        boolean routingAbstain = topScore < routingMinScore
+                || (!rerank.suppressMarginAbstain() && topMargin < routingMinMargin);
         if (routingAbstain) {
             log.debug("Resolver: routing abstain — leader={} topScore={} margin={} (need score>={}, margin>={})",
                     candidates.get(0).manifest().agentId(), String.format("%.3f", topScore),
@@ -262,5 +289,83 @@ public class AgentResolver {
         if (fallback) meterRegistry.counter("resolver.fallback").increment();
 
         return new ResolverResult(selected, skipped, fallback, topScore, queryText);
+    }
+
+    private RerankApplication maybeRerank(List<RoutingCandidate> candidates, String queryText,
+                                          double topScore, double topMargin) {
+        if (!shouldRerank(candidates, topScore, topMargin)) {
+            meterRegistry.counter("resolver.rerank.skipped").increment();
+            return RerankApplication.unchanged(candidates);
+        }
+
+        List<RoutingCandidate> shortlist = candidates.stream()
+                .limit(Math.max(1, rerankMaxCandidates))
+                .toList();
+        try {
+            RoutingRerankerClient.Decision decision = rerankerClient.rerank(queryText, shortlist);
+            if (decision.abstain()) {
+                log.debug("Resolver rerank abstained: {}", decision.reason());
+                meterRegistry.counter("resolver.rerank.abstain").increment();
+                return RerankApplication.abstain(candidates);
+            }
+            Optional<RoutingCandidate> picked = shortlist.stream()
+                    .filter(c -> c.manifest().agentId().equals(decision.candidateId()))
+                    .findFirst();
+            if (picked.isEmpty()) {
+                log.warn("Resolver rerank returned non-candidate id '{}'; using embedding leader",
+                        decision.candidateId());
+                meterRegistry.counter("resolver.rerank.invalid").increment();
+                return RerankApplication.embeddingFallback(candidates);
+            }
+            meterRegistry.counter("resolver.rerank.pick").increment();
+            log.debug("Resolver rerank picked {}: {}", picked.get().manifest().agentId(), decision.reason());
+            return RerankApplication.reordered(reorder(candidates, picked.get()));
+        } catch (Exception e) {
+            log.warn("Resolver rerank failed ({}); using embedding leader: {}",
+                    e.getClass().getSimpleName(), e.getMessage());
+            meterRegistry.counter("resolver.rerank.error").increment();
+            return RerankApplication.embeddingFallback(candidates);
+        }
+    }
+
+    private boolean shouldRerank(List<RoutingCandidate> candidates, double topScore, double topMargin) {
+        if (!rerankEnabled || candidates.size() < 2) {
+            return false;
+        }
+        boolean nearTie = topMargin <= rerankMarginThreshold;
+        boolean nearAbstain = topScore >= routingMinScore
+                && topScore <= routingMinScore + rerankAbstainAdjacentBand;
+        return nearTie || nearAbstain;
+    }
+
+    private static List<RoutingCandidate> reorder(List<RoutingCandidate> candidates, RoutingCandidate picked) {
+        List<RoutingCandidate> reordered = new ArrayList<>(candidates.size());
+        reordered.add(picked);
+        candidates.stream()
+                .filter(c -> !c.manifest().agentId().equals(picked.manifest().agentId()))
+                .forEach(reordered::add);
+        return List.copyOf(reordered);
+    }
+
+    private record RerankApplication(
+            List<RoutingCandidate> candidates,
+            boolean abstain,
+            boolean suppressMarginAbstain) {
+
+        static RerankApplication unchanged(List<RoutingCandidate> candidates) {
+            return new RerankApplication(candidates, false, false);
+        }
+
+        static RerankApplication reordered(List<RoutingCandidate> candidates) {
+            return new RerankApplication(candidates, false, true);
+        }
+
+        static RerankApplication embeddingFallback(List<RoutingCandidate> candidates) {
+            return new RerankApplication(candidates, false, true);
+        }
+
+        static RerankApplication abstain(List<RoutingCandidate> candidates) {
+            return new RerankApplication(candidates, true, false);
+        }
     }
 }
