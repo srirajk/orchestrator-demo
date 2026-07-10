@@ -22,9 +22,20 @@ public class RevocationChecker {
     }
 
     /**
-     * Returns true if the authorization for this principal+relationship has been revoked.
-     * Revocation is signalled by presence of key "revocation:{userId}:{relId}" in Redis.
-     * Key is set by iam-service after a book change; TTL is 60s (enough for JWT expiry).
+     * Returns true if the authorization for this principal+relationship has been revoked, signalled
+     * by the presence of key {@code revocation:{userId}:{relId}} in the gateway's Redis.
+     *
+     * <p><b>Currently inert, and architecturally wrong as designed.</b> Nothing writes this key:
+     * there is no writer in iam-service or in any seed/ops script (verified 2026-07-10), and the
+     * gateway and IAM sit on different logical Redis DBs. So this always returns {@code false}.
+     *
+     * <p>The intent — a short-lived override so a book change takes effect before a stale JWT expires
+     * — is sound, but the mechanism has the gateway reading identity-domain state through a shared
+     * Redis key. The gateway and IAM are separate bounded contexts that will run separate Redis
+     * instances; one must not read the other's namespace. The correct shape is either a short JWT TTL
+     * (drop this entirely) or a gateway-owned revocation store in the gateway's own namespace, fed by
+     * an IAM event on book-change. Do not "fix" this by tuning the fail-open branch below; it is a
+     * no-op guarding a no-op. Tracked as a bounded-context task.
      */
     public boolean isRevoked(String userId, String relationshipId) {
         if (userId == null || relationshipId == null) return false;

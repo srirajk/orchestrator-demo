@@ -421,6 +421,55 @@ test.describe('IAM service API — authorization enforced end-to-end', () => {
     expect(resp.status).toBe(403)
   })
 
+  // Identity mutation is the privilege-escalation surface. These endpoints had no guard: a 400
+  // (invalid body) rather than a 403 proved the handler ran for a chat_user. The most dangerous is
+  // role assignment — the path from chat_user to platform_admin.
+  test('rm_jane cannot assign herself a role (the escalation path)', async () => {
+    const token = await iamLogin('rm_jane', IAM_USER_PASSWORD)
+    const resp = await iamRequest(token, 'POST', '/users/rm_jane/roles', { role_id: 'platform_admin' })
+    expect(resp.status).toBe(403)
+  })
+
+  test('rm_jane cannot create a user', async () => {
+    const token = await iamLogin('rm_jane', IAM_USER_PASSWORD)
+    const resp = await iamRequest(token, 'POST', '/users', { id: 'mallory', name: 'Mallory' })
+    expect(resp.status).toBe(403)
+  })
+
+  // The payload uses a non-existent relationship id on purpose. If this guard ever regresses to
+  // let the write through, the blast radius must be an inert id — never a real one like REL-00188
+  // (Okafor), which would silently grant rm_jane coverage she must be denied and corrupt the demo.
+  test('rm_jane cannot change her own book of business', async () => {
+    const token = await iamLogin('rm_jane', IAM_USER_PASSWORD)
+    const resp = await iamRequest(token, 'PATCH', '/users/rm_jane/book', { add: ['REL-TEST-INERT'] })
+    expect(resp.status).toBe(403)
+  })
+
+  test('rm_jane cannot create a role, team, or domain', async () => {
+    const token = await iamLogin('rm_jane', IAM_USER_PASSWORD)
+    const role = await iamRequest(token, 'POST', '/roles', { id: 'super', name: 'Super' })
+    expect(role.status, 'POST /roles').toBe(403)
+    const team = await iamRequest(token, 'POST', '/teams', { id: 't1', name: 'T1' })
+    expect(team.status, 'POST /teams').toBe(403)
+    const domain = await iamRequest(token, 'POST', '/domains', { id: 'd1', name: 'D1' })
+    expect(domain.status, 'POST /domains').toBe(403)
+  })
+
+  // The guard must not over-reach: a user still reads their own profile, and an admin still manages.
+  test('rm_jane can still read her own profile after the write guards', async () => {
+    const token = await iamLogin('rm_jane', IAM_USER_PASSWORD)
+    const resp = await iamRequest(token, 'GET', '/users/rm_jane')
+    expect(resp.status).toBe(200)
+  })
+
+  test('admin can still assign a role', async () => {
+    const token = await iamLogin('admin', IAM_ADMIN_PASSWORD)
+    // A non-existent role id → the handler runs and returns 4xx (not 403): authorization passed.
+    const resp = await iamRequest(token, 'POST', '/users/rm_jane/roles', { role_id: '__does_not_exist__' })
+    expect(resp.status, 'admin passes authz on role assignment').not.toBe(403)
+    expect(resp.status, 'admin passes authz on role assignment').not.toBe(401)
+  })
+
   test('policy lifecycle: draft → approve → deploy (via API)', async () => {
     const token = await iamLogin('admin', IAM_ADMIN_PASSWORD)
 
