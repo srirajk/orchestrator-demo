@@ -18,6 +18,10 @@ INSURANCE_COVERAGE_URL = os.getenv("CONDUIT_INSURANCE_COVERAGE_URL", "http://loc
 SERVICING_MCP_URL = os.getenv("CONDUIT_SERVICING_MCP_URL", "http://localhost:8082")
 TEMPO_URL = os.getenv("CONDUIT_TEMPO_URL", "http://localhost:3200")
 LOKI_URL = os.getenv("CONDUIT_LOKI_URL", "http://localhost:3100")
+PROMETHEUS_URL = os.getenv("CONDUIT_PROMETHEUS_URL", "http://localhost:9090")
+GRAFANA_URL = os.getenv("CONDUIT_GRAFANA_URL", "http://localhost:3000")
+GRAFANA_USER = os.getenv("CONDUIT_GRAFANA_USER", "admin")
+GRAFANA_PASSWORD = os.getenv("CONDUIT_GRAFANA_PASSWORD", "changeme")
 
 DEMO_PASSWORD = os.getenv("CONDUIT_DEMO_PASSWORD", "Meridian@2024")
 
