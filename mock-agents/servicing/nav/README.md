@@ -1,6 +1,6 @@
 # NAV Agent
 
-**ID:** `acme.servicing.nav`
+**ID:** `meridian.servicing.nav`
 **Protocol:** MCP (FastMCP SSE)
 **Tool:** `get_nav(fund_id)`
 
@@ -11,7 +11,7 @@ NAV is a fund-level metric, not a relationship-level metric.
 Returns the latest Net Asset Value, AUM, shares outstanding, and daily change for a fund.
 
 ## OTel spans
-`agent.acme.servicing.nav` — `entity.fund_id`, `result.nav`, `result.aum`
+`agent.meridian.servicing.nav` — `entity.fund_id`, `result.nav`, `result.aum`
 
 ## Fault knobs
 Set `MCP_FAULT_TOOL=get_nav` to make this tool fail.

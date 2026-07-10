@@ -1,0 +1,62 @@
+{
+  "agent_id": "meridian.wealth.performance",
+  "name": "Wealth Performance",
+  "description": "Returns performance metrics, total return percentage, and P&L for a given wealth management relationship over a specified period. Accepts relationship_id as the primary key.",
+  "version": "1.0.0",
+  "provider": {
+    "organization": "Meridian Demo Bank"
+  },
+  "domain": "wealth-management",
+  "audience": "segment",
+  "sub_domain": "private-banking",
+  "max_response_tokens": 2000,
+  "protocol": "http",
+  "connection": {
+    "openapi_url": "http://wealth-http:8081/openapi.json",
+    "operation_id": "get_performance_performance_get"
+  },
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false
+  },
+  "skills": [
+    {
+      "id": "get_performance",
+      "name": "get_performance",
+      "description": "Retrieve total return percentage, P&L, and period-over-period performance data for a wealth relationship.",
+      "tags": [
+        "performance",
+        "returns",
+        "pnl",
+        "ytd",
+        "wealth-management"
+      ],
+      "examples": [
+        "how has this account performed",
+        "year-to-date returns for the client",
+        "P&L for the relationship this quarter",
+        "performance of the Whitman portfolio"
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    }
+  ],
+  "constraints": {
+    "access_mode": "read",
+    "data_classification": "confidential-pii",
+    "sla_timeout_ms": 30000
+  },
+  "io": {
+    "consumes": [
+      { "entity": "relationship_id", "required": true },
+      { "entity": "period", "required": false }
+    ],
+    "produces": [
+      { "name": "performance", "type": "wealth.performance" }
+    ]
+  }
+}

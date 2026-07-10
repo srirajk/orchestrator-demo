@@ -53,6 +53,33 @@ CUSTODY_POSITIONS: dict = {
         ],
         "as_of_date": "2026-06-22",
     },
+    "REL-00444": {
+        "relationship_id": "REL-00444",
+        "holdings_by_custodian": [
+            {
+                "custodian": "BNY Mellon",
+                "account": "ACC-44400",
+                "holdings": [
+                    {"isin": "US5949181045", "security": "MSFT", "qty": 300, "value": 139500},
+                    {"isin": "US0378331005", "security": "AAPL", "qty": 200, "value": 53000},
+                ],
+            },
+        ],
+        "as_of_date": "2026-06-22",
+    },
+    "REL-00445": {
+        "relationship_id": "REL-00445",
+        "holdings_by_custodian": [
+            {
+                "custodian": "State Street",
+                "account": "ACC-44500",
+                "holdings": [
+                    {"isin": "US46625H1005", "security": "JPM", "qty": 300, "value": 58500},
+                ],
+            },
+        ],
+        "as_of_date": "2026-06-22",
+    },
 }
 
 SETTLEMENTS: dict = {
@@ -86,12 +113,58 @@ SETTLEMENTS: dict = {
             {
                 "trade_id": "T-9844",
                 "security": "AMZN",
+                "isin": "US0231351067",
                 "settle_date": "2026-06-20",
+                "as_of_date": "2026-06-22",
                 "amount": 185000,
                 "side": "sell",
                 "reason": "insufficient securities",
             }
         ],
+        "as_of_date": "2026-06-22",
+    },
+    "REL-00444": {
+        "relationship_id": "REL-00444",
+        "pending": [],
+        "failed": [
+            {
+                "trade_id": "T-4401",
+                "security": "MSFT",
+                "isin": "US5949181045",
+                "settle_date": "2026-06-18",
+                "as_of_date": "2026-06-22",
+                "amount": 139500,
+                "side": "buy",
+                "reason": "counterparty delivery delay",
+            },
+            {
+                "trade_id": "T-4402",
+                "security": "AAPL",
+                "isin": "US0378331005",
+                "settle_date": "2026-06-19",
+                "as_of_date": "2026-06-22",
+                "amount": 53000,
+                "side": "sell",
+                "reason": "matching break",
+                "fail_item": True,
+            },
+            {
+                "trade_id": "T-4403",
+                "security": "JPM",
+                "isin": "US46625H1005",
+                "settle_date": "2026-06-20",
+                "as_of_date": "2026-06-22",
+                "amount": 87500,
+                "side": "buy",
+                "reason": "late affirmation",
+            },
+        ],
+        "as_of_date": "2026-06-22",
+    },
+    "REL-00445": {
+        "relationship_id": "REL-00445",
+        "pending": [],
+        "failed": [],
         "as_of_date": "2026-06-22",
     },
 }
@@ -197,6 +270,23 @@ CASH: dict = {
         ],
         "projected_cash_usd": 74000,
         "note": "Failed AMZN sell (T-9844) released 185K back to account",
+        "as_of_date": "2026-06-22",
+    },
+    "REL-00444": {
+        "relationship_id": "REL-00444",
+        "balances": [
+            {"currency": "USD", "settled": 91000, "unsettled": 280000, "total": 371000},
+        ],
+        "projected_cash_usd": 371000,
+        "note": "Three failed settlement records used for map iteration cap/failure coverage",
+        "as_of_date": "2026-06-22",
+    },
+    "REL-00445": {
+        "relationship_id": "REL-00445",
+        "balances": [
+            {"currency": "USD", "settled": 58500, "unsettled": 0, "total": 58500},
+        ],
+        "projected_cash_usd": 58500,
         "as_of_date": "2026-06-22",
     },
 }

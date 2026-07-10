@@ -1,0 +1,35 @@
+{
+  "fixtures": [
+    {
+      "match": {
+        "userMessage": "USER: house view?\n\n--- DATA: meridian.wealth.market_research\n{\"view\": \"neutral\"}\n--- END DATA ---",
+        "model": "gpt-4o-mini",
+        "turnIndex": 0,
+        "hasToolResult": false
+      },
+      "response": {
+        "content": "The current house view is considered \"neutral.\""
+      },
+      "recordedTimings": {
+        "ttftMs": 451,
+        "interChunkDelaysMs": [
+          39,
+          0,
+          17,
+          0,
+          15,
+          0,
+          23,
+          0,
+          9,
+          0,
+          13
+        ],
+        "totalDurationMs": 567
+      },
+      "metadata": {
+        "systemHash": "ecca3e2c"
+      }
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "agent_id": "meridian.servicing.corporate_actions",
+  "name": "Asset Servicing Corporate Actions",
+  "description": "Returns upcoming corporate actions such as dividends, splits, and elections pending for a given relationship. Accepts relationship_id as the primary key. Accessed via MCP tool over SSE transport.",
+  "version": "1.0.0",
+  "provider": {
+    "organization": "Meridian Demo Bank"
+  },
+  "domain": "asset-servicing",
+  "audience": "segment",
+  "sub_domain": "corporate-actions",
+  "max_response_tokens": 2000,
+  "protocol": "mcp",
+  "connection": {
+    "server_url": "http://servicing-mcp:8082/sse",
+    "tool": "get_corporate_actions",
+    "transport": "sse"
+  },
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false
+  },
+  "skills": [
+    {
+      "id": "get_corporate_actions",
+      "name": "get_corporate_actions",
+      "description": "Retrieve upcoming corporate actions including dividends, splits, and elections due for a given asset servicing relationship.",
+      "tags": [
+        "corporate-actions",
+        "dividends",
+        "splits",
+        "elections",
+        "asset-servicing"
+      ],
+      "examples": [
+        "upcoming corporate actions",
+        "any dividends or splits coming up",
+        "elections due on this account",
+        "corporate action calendar for the relationship",
+        "corporate action calendar for the Whitman relationship",
+        "corporate actions summary for this relationship",
+        "any corporate action activity I should know about on this account"
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    }
+  ],
+  "constraints": {
+    "access_mode": "read",
+    "data_classification": "confidential",
+    "sla_timeout_ms": 30000
+  },
+  "io": {
+    "consumes": [
+      { "entity": "fund_id", "required": true }
+    ],
+    "produces": [
+      { "name": "corporate_actions", "type": "servicing.corporate_actions" }
+    ]
+  }
+}

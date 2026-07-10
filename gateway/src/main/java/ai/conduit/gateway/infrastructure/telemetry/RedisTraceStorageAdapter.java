@@ -3,12 +3,15 @@ package ai.conduit.gateway.infrastructure.telemetry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import redis.clients.jedis.JedisPooled;
 
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -33,7 +36,7 @@ public class RedisTraceStorageAdapter implements TraceStorageAdapter {
     private final long ttlSeconds;
 
     public RedisTraceStorageAdapter(
-            JedisPooled jedis,
+            @Qualifier("telemetryJedisPooled") JedisPooled jedis,
             ObjectMapper mapper,
             @Value("${conduit.telemetry.trace-ttl-seconds:86400}") long ttlSeconds) {
         this.jedis      = jedis;
@@ -60,6 +63,56 @@ public class RedisTraceStorageAdapter implements TraceStorageAdapter {
         } catch (Exception e) {
             log.warn("TraceStorageAdapter: failed to persist event type={} requestId={}: {}",
                     event.type(), event.requestId(), e.getMessage());
+        }
+    }
+
+    /**
+     * Persist a whole request's events in a single pipelined round-trip.
+     *
+     * <p>A batch belongs to one request, so the N events become ONE variadic {@code RPUSH} plus one
+     * {@code EXPIRE}, and the conversation index costs one {@code ZADD} + one {@code EXPIRE} —
+     * 4 commands, 1 round-trip, regardless of how many events the request emitted. The per-event
+     * {@link #save} path did {@code rpush+expire} (+{@code zadd+expire} on the first) for each of the
+     * ~45 events a request publishes: ~92 round-trips.
+     *
+     * <p>Grouped by requestId defensively; today a batch is always a single request.
+     */
+    @Override
+    public void saveAll(List<TraceEvent> events) {
+        if (events == null || events.isEmpty()) return;
+        try (var pipeline = jedis.pipelined()) {
+            Map<String, List<TraceEvent>> byRequest = events.stream()
+                    .filter(e -> e.requestId() != null)
+                    .collect(Collectors.groupingBy(TraceEvent::requestId, LinkedHashMap::new, Collectors.toList()));
+
+            for (Map.Entry<String, List<TraceEvent>> entry : byRequest.entrySet()) {
+                String requestId = entry.getKey();
+                List<TraceEvent> batch = entry.getValue();
+
+                String[] payloads = new String[batch.size()];
+                for (int i = 0; i < batch.size(); i++) {
+                    payloads[i] = mapper.writeValueAsString(batch.get(i));
+                }
+                String listKey = "trace:" + requestId;
+                pipeline.rpush(listKey, payloads);
+                pipeline.expire(listKey, ttlSeconds);
+
+                // One index entry per request, scored by its first event's timestamp.
+                batch.stream()
+                        .filter(e -> e.conversationId() != null && !e.conversationId().isBlank())
+                        .findFirst()
+                        .ifPresent(first -> {
+                            String setKey = "conv_traces:" + first.conversationId();
+                            pipeline.zadd(setKey, (double) first.timestamp(), requestId);
+                            pipeline.expire(setKey, ttlSeconds);
+                        });
+            }
+            pipeline.sync();
+        } catch (Exception e) {
+            // Best-effort by contract: the panel and Insights tolerate a lost trace. An AUDIT store
+            // must not — that is a different TraceStorageAdapter with strict, fail-closed semantics.
+            log.warn("TraceStorageAdapter: failed to persist batch of {} event(s): {}",
+                    events.size(), e.getMessage());
         }
     }
 

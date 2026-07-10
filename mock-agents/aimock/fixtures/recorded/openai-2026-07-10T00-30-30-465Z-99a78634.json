@@ -1,0 +1,25 @@
+{
+  "fixtures": [
+    {
+      "match": {
+        "userMessage": "Retrieve and summarise corporate actions for relationship_id=REL-00042",
+        "model": "gpt-4o-mini",
+        "turnIndex": 0,
+        "hasToolResult": false
+      },
+      "response": {
+        "toolCalls": [
+          {
+            "name": "get_corporate_actions_data",
+            "arguments": "{\"relationship_id\":\"REL-00042\"}",
+            "id": "call_09yN1TTZwB8uKtKh58o1ytjg"
+          }
+        ]
+      },
+      "metadata": {
+        "systemHash": "d5f3ad18",
+        "toolsHash": "3adff429"
+      }
+    }
+  ]
+}

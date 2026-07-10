@@ -1,6 +1,6 @@
 # Performance Agent
 
-**ID:** `acme.wealth.performance`
+**ID:** `meridian.wealth.performance`
 **Protocol:** HTTP (FastAPI)
 **Endpoint:** `GET /performance?relationship_id=REL-XXXXX&period=YTD`
 
@@ -8,7 +8,7 @@
 Returns YTD/1Y total return, P&L, benchmark comparison, alpha, Sharpe ratio.
 
 ## OTel spans
-`agent.acme.wealth.performance` — attributes: `entity.relationship_id`, `query.period`, `result.total_return_pct`, `result.alpha`
+`agent.meridian.wealth.performance` — attributes: `entity.relationship_id`, `query.period`, `result.total_return_pct`, `result.alpha`
 
 ## Fault knobs
 | Param | Effect |

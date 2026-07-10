@@ -2,6 +2,8 @@ package ai.conduit.gateway.domain.auth;
 
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import jakarta.annotation.PostConstruct;
@@ -40,6 +42,11 @@ public class JwksClient {
     private final Map<String, RSAPublicKey> keyCache = new ConcurrentHashMap<>();
     private volatile Instant cacheExpiry = Instant.MIN;
     private final ReentrantLock refreshLock = new ReentrantLock();
+    private final MeterRegistry meterRegistry;
+
+    public JwksClient(MeterRegistry meterRegistry) {
+        this.meterRegistry = meterRegistry;
+    }
 
     @PostConstruct
     public void warmUp() {
@@ -97,6 +104,10 @@ public class JwksClient {
             }
             cacheExpiry = Instant.now().plus(CACHE_TTL);
         } catch (Exception e) {
+            Counter.builder("conduit.jwks.refresh.failures")
+                    .description("JWKS refresh failures")
+                    .register(meterRegistry)
+                    .increment();
             log.error("JwksClient: JWKS refresh failed — {}", e.getMessage());
         }
     }

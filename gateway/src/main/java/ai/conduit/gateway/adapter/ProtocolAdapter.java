@@ -21,10 +21,19 @@ public interface ProtocolAdapter {
     /**
      * Invoke the agent described by {@code manifest} with the given {@code input}.
      *
-     * @param manifest the agent's full manifest (connection details, constraints, …)
-     * @param input    the per-agent input derived by the input-synthesis layer
+     * <p><b>F-IDENTITY:</b> {@code bearerToken} is the caller's identity, captured as request-scoped
+     * DATA on the servlet thread (see {@code ChatCompletionsController}) and threaded explicitly
+     * through the executors and harness — never read from {@code SecurityContextHolder}, which is
+     * thread-local and is NOT propagated to the virtual threads this method runs on. Implementations
+     * must send it as the outbound {@code Authorization} header and must refuse to call the agent
+     * (throw) rather than silently omitting the header when it is null/blank.
+     *
+     * @param manifest    the agent's full manifest (connection details, constraints, …)
+     * @param input       the per-agent input derived by the input-synthesis layer
+     * @param bearerToken the calling principal's verified JWT, propagated to the agent for
+     *                    hop-level authentication; must not be silently dropped
      * @return the agent's raw JSON response
      * @throws Exception propagated to the harness, which converts it to a failed node result
      */
-    JsonNode invoke(AgentManifest manifest, JsonNode input) throws Exception;
+    JsonNode invoke(AgentManifest manifest, JsonNode input, String bearerToken) throws Exception;
 }

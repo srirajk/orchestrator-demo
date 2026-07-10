@@ -1,6 +1,6 @@
 # Holdings Agent
 
-**ID:** `acme.wealth.holdings`
+**ID:** `meridian.wealth.holdings`
 **Protocol:** HTTP (FastAPI)
 **Endpoint:** `GET /holdings?relationship_id=REL-XXXXX`
 
@@ -12,7 +12,7 @@ and the total allocation breakdown for a given client relationship.
 None — canned data only. Positions are deterministic per relationship.
 
 ## Observability
-- OTel span: `agent.acme.wealth.holdings` with `entity.relationship_id`, `result.position_count`, `result.total_value_usd`
+- OTel span: `agent.meridian.wealth.holdings` with `entity.relationship_id`, `result.position_count`, `result.total_value_usd`
 
 ## Fault knobs
 | Param | Effect |

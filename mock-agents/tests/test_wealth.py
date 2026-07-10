@@ -11,11 +11,24 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../wealth"))
 
 import pytest
 from fastapi.testclient import TestClient
+import main
 from main import app
 
 client = TestClient(app)
 
 REL = "REL-00042"
+
+
+@pytest.fixture(autouse=True)
+def _allow_all_tokens(monkeypatch):
+    """
+    F-IDENTITY: production `verify_bearer_token` now fails CLOSED (401) with no/invalid
+    token — this file tests data contracts and fault knobs, not auth (auth behavior itself
+    is covered exhaustively by TestWealthAuth in test_agent_integration.py), and has no
+    real signed JWT to send. Patch the middleware's verify function so these tests can
+    still reach the handlers; this only relaxes the TEST client, not production code.
+    """
+    monkeypatch.setattr(main, "verify_bearer_token", lambda auth: (True, None, None))
 
 
 class TestHealth:

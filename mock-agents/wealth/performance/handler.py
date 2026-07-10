@@ -15,7 +15,7 @@ _LLM_KEY   = os.environ.get("PERFORMANCE_LLM_API_KEY") or None
 _LLM_MODEL = os.environ.get("PERFORMANCE_LLM_MODEL") or None
 
 router = APIRouter(prefix="/performance", tags=["performance"])
-AGENT_ID = "acme.wealth.performance"
+AGENT_ID = "meridian.wealth.performance"
 log = logging.getLogger(__name__)
 
 

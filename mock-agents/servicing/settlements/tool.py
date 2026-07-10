@@ -3,10 +3,9 @@ import os
 import json
 import logging
 import asyncio
-import concurrent.futures
 from agents import Runner, function_tool, InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered
 from shared.canned_data import SETTLEMENTS
-from shared.error_schema import mcp_error_json
+from shared.error_schema import AgentToolError
 from shared.fault_knobs import maybe_fault
 from shared.telemetry import agent_span
 from shared.agent_client import make_agent, LLM_MODEL, LLM_TIMEOUT_S
@@ -17,7 +16,7 @@ _LLM_BASE  = os.environ.get("SETTLEMENTS_LLM_BASE_URL") or None
 _LLM_KEY   = os.environ.get("SETTLEMENTS_LLM_API_KEY") or None
 _LLM_MODEL = os.environ.get("SETTLEMENTS_LLM_MODEL") or None
 
-AGENT_ID = "acme.servicing.settlement_status"
+AGENT_ID = "meridian.servicing.settlement_status"
 log = logging.getLogger(__name__)
 
 
@@ -56,14 +55,14 @@ async def _run_settlements_agent(
     return result.final_output
 
 
-def get_settlements(relationship_id: str) -> str:
+async def get_settlements(relationship_id: str) -> str:
     """Get pending and failed settlement trades for a relationship."""
     with agent_span(AGENT_ID, relationship_id) as span:
         maybe_fault("get_settlements")
         data = SETTLEMENTS.get(relationship_id)
         if data is None:
             span.set_attribute("error", True)
-            return mcp_error_json(f"Relationship '{relationship_id}' not found.", AGENT_ID, 404)
+            raise AgentToolError(f"Relationship '{relationship_id}' not found.", AGENT_ID, 404)
         pending = len(data.get("pending", []))
         failed = len(data.get("failed", []))
         span.set_attribute("result.pending_count", pending)
@@ -71,15 +70,13 @@ def get_settlements(relationship_id: str) -> str:
         if failed > 0:
             span.set_attribute("alert.failed_settlements", True)
         try:
-            try:
-                asyncio.get_running_loop()
-                with concurrent.futures.ThreadPoolExecutor() as pool:
-                    future = pool.submit(asyncio.run, _run_settlements_agent(relationship_id, data, _LLM_BASE, _LLM_KEY, _LLM_MODEL))
-                    narrative = future.result(timeout=LLM_TIMEOUT_S)
-            except RuntimeError:
-                narrative = asyncio.run(_run_settlements_agent(relationship_id, data, _LLM_BASE, _LLM_KEY, _LLM_MODEL))
+            narrative = await asyncio.wait_for(_run_settlements_agent(relationship_id, data, _LLM_BASE, _LLM_KEY, _LLM_MODEL), timeout=LLM_TIMEOUT_S)
             span.set_attribute("agent.model", _LLM_MODEL or LLM_MODEL)
             return json.dumps({**data, "agent_narrative": narrative})
         except Exception as exc:
             log.error("Agent LLM call failed for %s: %s", relationship_id, exc)
-            return mcp_error_json(f"llm_unavailable: {type(exc).__name__}", AGENT_ID, 503)
+            narrative = (
+                f"Settlement status for {relationship_id}: {pending} pending settlement(s) "
+                f"and {failed} failed settlement(s)."
+            )
+            return json.dumps({**data, "agent_narrative": narrative})

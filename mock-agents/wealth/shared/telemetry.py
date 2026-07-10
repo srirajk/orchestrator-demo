@@ -81,7 +81,7 @@ def agent_span(agent_id: str, relationship_id: str = None, input_value: str = No
     agent invocations in session traces.
 
     Usage:
-        with agent_span("acme.wealth.holdings", relationship_id="REL-00042",
+        with agent_span("meridian.wealth.holdings", relationship_id="REL-00042",
                         input_value=relationship_id) as span:
             span.set_attribute("result.position_count", n)
             ...set output via span.set_attribute("output.value", json_str)...

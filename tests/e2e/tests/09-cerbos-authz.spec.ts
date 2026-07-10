@@ -395,6 +395,32 @@ test.describe('IAM service API — authorization enforced end-to-end', () => {
     expect(body.content).toBeDefined()
   })
 
+  // The suite asserted that an admin CAN reach /admin/**, never that a non-admin CANNOT.
+  // Every /admin route except UserController fell through to anyRequest().authenticated(),
+  // so rm_jane — whose only role is chat_user — could read the whole audit trail and drive
+  // the policy lifecycle. These are the assertions that keep that shut.
+  test('rm_jane cannot read the audit log — /admin/** is admin-only', async () => {
+    const token = await iamLogin('rm_jane', IAM_USER_PASSWORD)
+    const resp = await iamRequest(token, 'GET', '/admin/audit?page=0&size=5')
+    expect(resp.status).toBe(403)
+  })
+
+  test('rm_jane cannot list authorization policies', async () => {
+    const token = await iamLogin('rm_jane', IAM_USER_PASSWORD)
+    const resp = await iamRequest(token, 'GET', '/admin/policies')
+    expect(resp.status).toBe(403)
+  })
+
+  test('rm_jane cannot create an authorization policy', async () => {
+    const token = await iamLogin('rm_jane', IAM_USER_PASSWORD)
+    const resp = await iamRequest(token, 'POST', '/admin/policies', {
+      name: `unauthorized-policy-${Date.now()}`,
+      resourceType: 'agent',
+      content: 'apiVersion: api.cerbos.dev/v1\nresourcePolicy:\n  version: "default"\n  resource: agent\n  rules: []',
+    })
+    expect(resp.status).toBe(403)
+  })
+
   test('policy lifecycle: draft → approve → deploy (via API)', async () => {
     const token = await iamLogin('admin', IAM_ADMIN_PASSWORD)
 

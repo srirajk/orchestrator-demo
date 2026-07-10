@@ -29,3 +29,100 @@ groups:
             while compaction turns (attached="false") ARE occurring.
             This is the exact signal for the silent lost-update bug. Check LlmSummaryService
             and Conversation.setSummary() persistence.
+
+  - name: gateway-health-slo
+    interval: 30s
+    rules:
+      - alert: GatewaySaturationApproachingLivelock
+        expr: max(conduit_gateway_inflight_requests) >= 20
+        for: 2m
+        labels:
+          severity: critical
+          component: gateway
+        annotations:
+          summary: "Gateway in-flight requests approaching known saturation ceiling"
+          description: >
+            conduit_gateway_inflight_requests is at or above 20 for 2m. The load test
+            observed livelock around 25 concurrent requests. Check slow LLM calls,
+            agent bulkheads, and virtual-thread/carrier pressure before the gateway wedges.
+
+      - alert: GatewayErrorRateSpike
+        expr: |
+          (
+            sum(rate(conduit_gateway_requests_total{status_class=~"4xx|5xx"}[5m]))
+            /
+            clamp_min(sum(rate(conduit_gateway_requests_total[5m])), 0.001)
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: gateway
+        annotations:
+          summary: "Gateway error rate above 5%"
+          description: >
+            More than 5% of gateway chat requests are ending in denied/failed outcomes.
+            Check request outcome labels, authz/coverage denials, agent errors, and LLM failures.
+
+      - alert: GatewayLatencySLOBreach
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(conduit_gateway_request_duration_seconds_bucket[5m])) by (le)
+          ) > 30
+        for: 5m
+        labels:
+          severity: warning
+          component: gateway
+        annotations:
+          summary: "Gateway p95 request latency above 30s"
+          description: >
+            p95 gateway request duration breached 30s. Check routing, fan-out,
+            per-agent latency, synthesis latency, and in-flight saturation.
+
+      - alert: DagFallbackRateSpike
+        expr: sum(rate(conduit_dag_fallback_total[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: gateway
+        annotations:
+          summary: "DAG fallback rate spiked"
+          description: >
+            Multi-step candidates are falling back to flat orchestration. Check DAG
+            resolution errors, missing producer outputs, manifest select validation, and authz re-gate.
+
+      - alert: CoverageServiceUnavailable
+        expr: sum(increase(conduit_coverage_unavailable_total[5m])) > 0
+        for: 1m
+        labels:
+          severity: critical
+          component: gateway
+        annotations:
+          summary: "Coverage service unavailable or timing out"
+          description: >
+            The gateway failed closed because a coverage discover/check/resolve call failed.
+            Check coverage service health, network reachability, and caller-token propagation.
+
+      - alert: JwksRefreshFailure
+        expr: increase(conduit_jwks_refresh_failures_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          component: gateway
+        annotations:
+          summary: "Gateway failed to refresh JWKS"
+          description: >
+            The gateway could not refresh signing keys. Check iam-service health,
+            CONDUIT_AUTH_JWKS_URL, issuer/audience config, and network reachability.
+
+      - alert: GatewayDown
+        expr: up{job="conduit-gateway"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: gateway
+        annotations:
+          summary: "Conduit gateway scrape target is down"
+          description: >
+            Prometheus cannot scrape the gateway. Check container health, /actuator/health,
+            the gateway logs, and Prometheus target discovery.

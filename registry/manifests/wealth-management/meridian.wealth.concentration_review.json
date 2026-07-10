@@ -1,0 +1,81 @@
+{
+  "agent_id": "meridian.wealth.concentration_review",
+  "name": "Wealth Concentration Review Flag",
+  "description": "Conditional downstream node that surfaces an already-computed firm-policy concentration review flag when a concentration analysis has breaches. It reflects the analysis; it does not provide investment advice.",
+  "version": "1.0.0",
+  "provider": {
+    "organization": "Meridian Demo Bank"
+  },
+  "domain": "wealth-management",
+  "audience": "segment",
+  "sub_domain": "private-banking",
+  "max_response_tokens": 1000,
+  "protocol": "http",
+  "connection": {
+    "openapi_url": "http://wealth-http:8081/openapi.json",
+    "operation_id": "post_concentration_review"
+  },
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false
+  },
+  "skills": [
+    {
+      "id": "concentration_review_flag",
+      "name": "concentration_review_flag",
+      "description": "Surface a firm-policy review flag from an already-computed concentration analysis when breaches are present.",
+      "tags": [
+        "concentration",
+        "review",
+        "flag",
+        "firm-policy",
+        "wealth-management"
+      ],
+      "examples": [
+        "does this concentration analysis need a review flag",
+        "should this portfolio concentration breach be flagged for review",
+        "show the concentration review flag for Whitman",
+        "does the Rivera diversified trust need a concentration review flag",
+        "flag any firm policy concentration breach for review"
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    }
+  ],
+  "constraints": {
+    "access_mode": "read",
+    "data_classification": "confidential-pii",
+    "sla_timeout_ms": 15000
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "review_flag": { "type": "boolean" },
+      "flag_type": { "type": "string" },
+      "relationship_id": { "type": "string" },
+      "relationship_name": { "type": "string" },
+      "breach_count": { "type": "integer" },
+      "flags": { "type": "array", "items": { "type": "object" } },
+      "policy": { "type": "object" },
+      "agent_narrative": { "type": "string" }
+    },
+    "required": ["review_flag", "flag_type", "breach_count", "flags", "agent_narrative"]
+  },
+  "io": {
+    "consumes": [
+      {
+        "from": "wealth.concentration",
+        "required": true,
+        "select": "{relationship_id: relationship_id, relationship_name: relationship_name, breach_count: breach_count, flags: flags, policy: policy}"
+      }
+    ],
+    "condition": "breach_count > `0`",
+    "produces": [
+      { "name": "concentration_review", "type": "wealth.concentration_review" }
+    ]
+  }
+}

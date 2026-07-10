@@ -1,0 +1,14 @@
+[
+  {
+    "name": "llm",
+    "listen": "0.0.0.0:9000",
+    "upstream": "aimock:4010",
+    "enabled": true
+  },
+  {
+    "name": "embeddings",
+    "listen": "0.0.0.0:9001",
+    "upstream": "embeddings:8083",
+    "enabled": true
+  }
+]

@@ -43,11 +43,15 @@ public class McpToolIntrospector {
                 .build();
     }
 
+    public record ToolSchemas(JsonNode inputSchema, JsonNode outputSchema) {}
+
     /**
-     * Fetch the JSON Schema inputSchema for a named MCP tool.
-     * Falls back to a generic schema if introspection fails.
+     * Fetch JSON Schema contracts for a named MCP tool.
+     * Falls back only for input schema so older tools keep registering; output schema is returned
+     * as null when the tool does not declare one, allowing boot select validation to report the
+     * unvalidated edge explicitly.
      */
-    public JsonNode getToolInputSchema(String serverUrl, String toolName) {
+    public ToolSchemas getToolSchemas(String serverUrl, String toolName) {
         try {
             String baseUrl = serverUrl.contains("/sse") ? serverUrl.substring(0, serverUrl.lastIndexOf("/sse")) : serverUrl;
             JsonNode tools = fetchToolsList(baseUrl);
@@ -56,9 +60,13 @@ public class McpToolIntrospector {
                 for (JsonNode tool : tools) {
                     if (toolName.equals(tool.path("name").asText())) {
                         JsonNode schema = tool.path("inputSchema");
+                        JsonNode outputSchema = tool.path("outputSchema");
                         if (!schema.isMissingNode()) {
                             log.debug("Derived input schema for MCP tool '{}': {}", toolName, schema);
-                            return schema;
+                            if (!outputSchema.isMissingNode()) {
+                                log.debug("Derived output schema for MCP tool '{}': {}", toolName, outputSchema);
+                            }
+                            return new ToolSchemas(schema, outputSchema.isMissingNode() ? null : outputSchema);
                         }
                     }
                 }
@@ -68,7 +76,15 @@ public class McpToolIntrospector {
                     toolName, serverUrl, e.getMessage());
         }
 
-        return fallbackSchema(toolName);
+        return new ToolSchemas(fallbackSchema(toolName), null);
+    }
+
+    /**
+     * Fetch the JSON Schema inputSchema for a named MCP tool.
+     * Falls back to a generic schema if introspection fails.
+     */
+    public JsonNode getToolInputSchema(String serverUrl, String toolName) {
+        return getToolSchemas(serverUrl, toolName).inputSchema();
     }
 
     /**

@@ -42,6 +42,17 @@ class EntityBagTest {
     }
 
     @Test
+    @DisplayName("withResolvedValue overrides one resolved key, preserving extracted references")
+    void withResolvedValue() {
+        var bag = EntityBag.of(Map.of("relationship_reference", "Whitman"), Map.of())
+                .withResolvedValue("relationship_id", "REL-00042");
+
+        assertThat(bag.resolved("relationship_id")).isEqualTo("REL-00042");
+        assertThat(bag.reference("relationship_reference")).isEqualTo("Whitman");
+        assertThat(bag.needsClarification()).isFalse();
+    }
+
+    @Test
     @DisplayName("withCandidates flags clarification needed")
     void withCandidates() {
         var bag = EntityBag.of(Map.of("relationship_reference", "Acme"), Map.of())

@@ -1,0 +1,127 @@
+{
+  "agent_id": "meridian.wealth.concentration",
+  "name": "Wealth Concentration Analysis",
+  "description": "Fan-in analytics agent: consumes a portfolio holdings payload (the wealth.holdings output) and computes single-name and asset-class concentration, HHI and effective number of positions, and breach flags against firm-configured thresholds. Computes from the supplied holdings; does not fetch data and does not take a relationship_id.",
+  "version": "1.0.0",
+  "provider": {
+    "organization": "Meridian Demo Bank"
+  },
+  "domain": "wealth-management",
+  "audience": "segment",
+  "sub_domain": "private-banking",
+  "max_response_tokens": 2000,
+  "protocol": "http",
+  "connection": {
+    "openapi_url": "http://wealth-http:8081/openapi.json",
+    "operation_id": "post_concentration"
+  },
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false
+  },
+  "skills": [
+    {
+      "id": "analyze_concentration",
+      "name": "analyze_concentration",
+      "description": "Analyse portfolio concentration risk from a holdings payload: per-position weights, top single-name exposure, HHI, effective number of positions, and firm-policy breach flags.",
+      "tags": [
+        "concentration",
+        "risk",
+        "diversification",
+        "hhi",
+        "single-name",
+        "wealth-management"
+      ],
+      "examples": [
+        "is this portfolio too concentrated",
+        "how concentrated is the Whitman relationship",
+        "what is the single-name concentration risk for this client",
+        "does this account breach our concentration limits",
+        "check diversification for this portfolio",
+        "what is the largest position as a share of the portfolio",
+        "compute the HHI for this client's holdings",
+        "any overconcentration flags on this relationship",
+        "which holdings are driving issuer concentration in this book",
+        "which positions are the biggest contributors to concentration risk",
+        "are any single names making up too much of the portfolio",
+        "identify the top issuer exposures pushing concentration higher"
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    }
+  ],
+  "constraints": {
+    "access_mode": "read",
+    "data_classification": "confidential-pii",
+    "sla_timeout_ms": 15000
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "analysis": { "type": "string" },
+      "relationship_id": { "type": "string" },
+      "relationship_name": { "type": "string" },
+      "as_of_date": { "type": "string" },
+      "currency": { "type": "string" },
+      "position_count": { "type": "integer" },
+      "basis_total_value": { "type": "number" },
+      "basis_label": { "type": "string" },
+      "reported_total_value": { "type": "number" },
+      "policy": {
+        "type": "object",
+        "properties": {
+          "single_name_threshold_pct": { "type": "number" }
+        }
+      },
+      "single_name": {
+        "type": "object",
+        "properties": {
+          "top": {
+            "type": "object",
+            "properties": {
+              "weight_pct": { "type": "number" }
+            }
+          }
+        }
+      },
+      "asset_class": { "type": ["object", "null"] },
+      "sector": { "type": ["object", "null"] },
+      "diversification": {
+        "type": "object",
+        "properties": {
+          "hhi": { "type": "number" }
+        }
+      },
+      "flags": { "type": "array", "items": { "type": "object" } },
+      "breach_count": { "type": "integer" },
+      "risk_context": { "type": ["object", "null"] },
+      "notes": { "type": "array", "items": { "type": "string" } }
+    },
+    "required": ["analysis", "position_count", "policy", "single_name", "diversification", "flags", "breach_count"]
+  },
+  "io": {
+    "consumes": [
+      {
+        "from": "wealth.holdings",
+        "required": true,
+        "select": "{positions: positions, total_value: total_value, allocation_by_class: allocation_by_class, relationship_id: relationship_id, relationship_name: relationship_name, currency: currency, as_of_date: as_of_date, risk_profile: risk_profile}"
+      }
+    ],
+    "produces": [
+      {
+        "name": "concentration",
+        "type": "wealth.concentration",
+        "figures": [
+          { "label": "Top single-name concentration of invested holdings ex-cash", "path": "single_name.top.weight_pct", "format": "percent1" },
+          { "label": "Concentration breach count", "path": "breach_count", "format": "count" },
+          { "label": "Diversification HHI", "path": "diversification.hhi", "format": "plain" },
+          { "label": "Single-name threshold", "path": "policy.single_name_threshold_pct", "format": "percent1" }
+        ]
+      }
+    ]
+  }
+}

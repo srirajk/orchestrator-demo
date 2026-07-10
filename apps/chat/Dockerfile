@@ -5,8 +5,6 @@
 # Stage 3 is a slim JRE runtime that runs the jar and serves both the API and the SPA.
 #
 # Build context is ./apps/chat so both `web/` and `bff/` are available.
-# The legacy Node BFF at apps/chat/server is retained as the reference spec but is no
-# longer built here.
 
 # ── Stage 1: Build web (Vite/React → dist/) ─────────────────────────────────
 FROM node:20-alpine AS web-builder
@@ -17,7 +15,7 @@ COPY web/ ./
 RUN npm run build
 
 # ── Stage 2: Build the Spring Boot jar (with the SPA bundled as static) ──────
-FROM maven:3.9-eclipse-temurin-21 AS jar-builder
+FROM maven:3.9-eclipse-temurin-25 AS jar-builder
 WORKDIR /build/bff
 # Warm the dependency cache first.
 COPY bff/pom.xml ./
@@ -29,7 +27,7 @@ COPY --from=web-builder /build/web/dist ./src/main/resources/static
 RUN mvn -q -B -DskipTests package
 
 # ── Stage 3: Runtime ────────────────────────────────────────────────────────
-FROM eclipse-temurin:21-jre AS runtime
+FROM eclipse-temurin:25-jre AS runtime
 WORKDIR /app
 # wget is used by the compose healthcheck.
 RUN apt-get update \

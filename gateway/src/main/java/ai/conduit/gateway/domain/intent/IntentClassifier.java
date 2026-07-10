@@ -236,7 +236,12 @@ public class IntentClassifier {
 
     /**
      * Classify the intent of the latest user message given the full conversation history.
-     * Never throws — falls back to {@link IntentResult#fetchDataFallback()}.
+     *
+     * @throws IntentClassificationException if the LLM call fails after its retry budget is spent.
+     *         The gateway never substitutes canned data for an unreachable LLM (CLAUDE.md §5): a
+     *         fabricated FETCH_DATA intent carries an empty entity bag, the deterministic CLARIFY
+     *         rule then fires, and a provider outage is presented to the user as "which client did
+     *         you mean?". The caller surfaces the error instead.
      */
     public IntentResult classify(List<Message> messages) {
         Span span = tracer.spanBuilder("intent.classify").startSpan();
@@ -250,11 +255,11 @@ public class IntentClassifier {
                         result.intent(), String.format("%.2f", result.confidence()), result.reasoning());
                 return result;
             } catch (Exception e) {
-                log.warn("IntentClassifier failed ({}), falling back to FETCH_DATA: {}",
-                        e.getClass().getSimpleName(), e.getMessage());
-                span.setAttribute("intent", "FETCH_DATA");
-                span.setAttribute("fallback", true);
-                return IntentResult.fetchDataFallback();
+                log.error("IntentClassifier failed ({}): {}", e.getClass().getSimpleName(), e.getMessage());
+                span.setAttribute("error", true);
+                span.recordException(e);
+                throw new IntentClassificationException(
+                        "Intent classification failed: " + e.getMessage(), e);
             } finally {
                 span.end();
             }

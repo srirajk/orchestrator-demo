@@ -1,5 +1,6 @@
 package ai.conduit.gateway.orchestration.executor;
 
+import ai.conduit.gateway.infrastructure.telemetry.MdcPropagation;
 import ai.conduit.gateway.orchestration.harness.AgentHarness;
 import ai.conduit.gateway.orchestration.model.NodeResult;
 import ai.conduit.gateway.orchestration.model.Plan;
@@ -13,10 +14,12 @@ import io.opentelemetry.context.Context;
 import io.opentelemetry.context.Scope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -55,8 +58,15 @@ public class FlatPlanExecutor {
      *
      * <p>Nodes that haven't completed by {@code overallDeadlineMs} are represented
      * as {@link NodeResult.Status#TIMEOUT} results; no exception is ever thrown.
+     *
+     * @param callerToken the calling principal's verified JWT, captured as request-scoped DATA at
+     *                    ingress (see {@code ChatCompletionsController}) and threaded here because
+     *                    {@code SecurityContextHolder} — thread-local — does not survive the hop
+     *                    onto this executor's virtual threads (F-IDENTITY). Passed straight through
+     *                    to {@link AgentHarness#execute(PlanNode, java.util.concurrent.ExecutorService, String)}
+     *                    for every node.
      */
-    public List<NodeResult> execute(Plan plan) {
+    public List<NodeResult> execute(Plan plan, String callerToken) {
         if (plan == null || plan.nodes() == null || plan.nodes().isEmpty()) {
             log.warn("FlatPlanExecutor received an empty plan");
             return List.of();
@@ -83,29 +93,41 @@ public class FlatPlanExecutor {
         // the VT so the outbound traceparent nests the agent's own (Python) span.
         final Context parentContext = Context.current();
 
+        // Same reasoning as parentContext above, for SLF4J's MDC (requestId/conversationId/userId):
+        // it's thread-local and does not survive the hop onto `exec`'s virtual threads, so every
+        // log line from inside harness.execute() (including HttpAdapter/McpAdapter's identity-
+        // propagation log) would otherwise print an empty [rid= cid= uid=]. Captured here (this
+        // calling thread was itself re-populated by ChatService's own MdcPropagation.run) and
+        // re-applied per node below.
+        final Map<String, String> mdcContext = MDC.getCopyOfContextMap();
+
         List<CompletableFuture<NodeResult>> futures = plan.nodes().stream()
                 .map(node -> CompletableFuture.supplyAsync(() -> {
-                    log.debug("Executing node {} (agent={}, protocol={})",
-                            node.nodeId(), node.agent().agentId(), node.agent().protocol());
-                    // One `agent.invoke` span per node — completes the trace tree:
-                    // request → agent.invoke → (downstream agent span via traceparent).
-                    Span span = tracer.spanBuilder("agent.invoke")
-                            .setParent(parentContext)
-                            .startSpan();
-                    span.setAttribute("openinference.span.kind", "AGENT");
-                    span.setAttribute("agent.id", node.agent().agentId());
-                    span.setAttribute("agent.protocol", node.agent().protocol());
-                    try (Scope ignored = span.makeCurrent()) {
-                        NodeResult result = harness.execute(node, exec);
-                        span.setAttribute("agent.status", result.status().name());
-                        span.setAttribute("agent.latency_ms", result.latencyMs());
-                        if (!result.isOk()) {
-                            span.setStatus(StatusCode.ERROR, result.status().name());
+                    NodeResult[] holder = new NodeResult[1];
+                    MdcPropagation.run(mdcContext, () -> {
+                        log.debug("Executing node {} (agent={}, protocol={})",
+                                node.nodeId(), node.agent().agentId(), node.agent().protocol());
+                        // One `agent.invoke` span per node — completes the trace tree:
+                        // request → agent.invoke → (downstream agent span via traceparent).
+                        Span span = tracer.spanBuilder("agent.invoke")
+                                .setParent(parentContext)
+                                .startSpan();
+                        span.setAttribute("openinference.span.kind", "AGENT");
+                        span.setAttribute("agent.id", node.agent().agentId());
+                        span.setAttribute("agent.protocol", node.agent().protocol());
+                        try (Scope ignored = span.makeCurrent()) {
+                            NodeResult result = harness.execute(node, exec, callerToken);
+                            span.setAttribute("agent.status", result.status().name());
+                            span.setAttribute("agent.latency_ms", result.latencyMs());
+                            if (!result.isOk()) {
+                                span.setStatus(StatusCode.ERROR, result.status().name());
+                            }
+                            holder[0] = result;
+                        } finally {
+                            span.end();
                         }
-                        return result;
-                    } finally {
-                        span.end();
-                    }
+                    });
+                    return holder[0];
                 }, exec))
                 .toList();
 

@@ -4,12 +4,13 @@ import ai.conduit.gateway.adapter.ProtocolAdapter;
 import ai.conduit.gateway.registry.model.AgentManifest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.context.propagation.TextMapSetter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -24,6 +25,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -56,6 +58,12 @@ public class McpAdapter implements ProtocolAdapter {
 
     private static final Logger log = LoggerFactory.getLogger(McpAdapter.class);
     private static final int DEFAULT_TIMEOUT_MS = 10_000;
+    private static final TextMapSetter<HttpRequest.Builder> REQUEST_BUILDER_SETTER =
+            (carrier, key, value) -> {
+                if (carrier != null && key != null && value != null) {
+                    carrier.header(key, value);
+                }
+            };
 
     private final ObjectMapper objectMapper;
 
@@ -76,7 +84,7 @@ public class McpAdapter implements ProtocolAdapter {
     }
 
     @Override
-    public JsonNode invoke(AgentManifest manifest, JsonNode input) throws Exception {
+    public JsonNode invoke(AgentManifest manifest, JsonNode input, String bearerToken) throws Exception {
         String serverUrl = manifest.connection().serverUrl();
         String toolName  = manifest.connection().tool();
         int timeoutMs    = resolveTimeout(manifest);
@@ -89,16 +97,23 @@ public class McpAdapter implements ProtocolAdapter {
             throw new IllegalArgumentException(
                     "Agent " + manifest.agentId() + " has no tool name");
         }
+        // F-IDENTITY: a tools/call is a data-plane call — it must carry the caller's verified
+        // identity. bearerToken is passed explicitly by the harness (never read from
+        // SecurityContextHolder, which does not survive the hop onto the DAG/flat executor's
+        // virtual threads). A missing token here means the security context was not propagated
+        // upstream — refuse rather than silently calling the agent unauthenticated.
+        if (bearerToken == null || bearerToken.isBlank()) {
+            throw new IllegalStateException(
+                    "No caller identity available for agent " + manifest.agentId()
+                    + " — refusing to invoke without a bearer token");
+        }
 
         log.debug("McpAdapter → tool '{}' on {} for agent {}", toolName, serverUrl, manifest.agentId());
 
         // Two futures the SSE reader will complete.
         CompletableFuture<String> endpointFuture = new CompletableFuture<>();
         CompletableFuture<String> toolResponseFuture = new CompletableFuture<>();
-
-        // Capture the bearer token from the current security context before entering
-        // the virtual thread (SecurityContextHolder is not automatically propagated).
-        String bearerToken = extractBearerToken();
+        CompletableFuture<String> verifiedSubFuture = new CompletableFuture<>();
 
         // SSE request — must be HTTP/1.1; uvicorn rejects HTTP/2 with 421.
         HttpRequest.Builder sseBuilder = HttpRequest.newBuilder()
@@ -110,6 +125,7 @@ public class McpAdapter implements ProtocolAdapter {
             sseBuilder.header("Authorization", "Bearer " + bearerToken);
             log.debug("McpAdapter: propagating JWT to agent SSE connection");
         }
+        injectTraceContext(sseBuilder);
         HttpRequest sseRequest = sseBuilder.GET().build();
 
         // Open SSE stream; read the response body on a virtual thread so we can
@@ -124,10 +140,13 @@ public class McpAdapter implements ProtocolAdapter {
                 if (resp.statusCode() != 200) {
                     throw new RuntimeException("SSE endpoint returned HTTP " + resp.statusCode());
                 }
+                verifiedSubFuture.complete(resp.headers()
+                        .firstValue("X-Conduit-Verified-Sub").orElse(null));
                 parseSseStream(resp.body(), endpointFuture, toolResponseFuture);
             } catch (Exception e) {
                 endpointFuture.completeExceptionally(e);
                 toolResponseFuture.completeExceptionally(e);
+                verifiedSubFuture.complete(null);
             }
         });
 
@@ -165,7 +184,7 @@ public class McpAdapter implements ProtocolAdapter {
         log.debug("McpAdapter raw response ({}): {}", manifest.agentId(),
                 rawResponse.length() > 200 ? rawResponse.substring(0, 200) + "…" : rawResponse);
 
-        return extractResult(rawResponse);
+        return withVerifiedSub(extractResult(rawResponse), verifiedSubFuture.getNow(null));
     }
 
     // ── SSE stream reader ─────────────────────────────────────────────────────
@@ -250,6 +269,7 @@ public class McpAdapter implements ProtocolAdapter {
         if (bearerToken != null) {
             builder.header("Authorization", "Bearer " + bearerToken);
         }
+        injectTraceContext(builder);
         HttpRequest request = builder.POST(HttpRequest.BodyPublishers.ofString(body)).build();
         HttpResponse<String> response =
                 httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -260,12 +280,9 @@ public class McpAdapter implements ProtocolAdapter {
         log.debug("POST {} → HTTP {}", url, response.statusCode());
     }
 
-    private String extractBearerToken() {
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth instanceof JwtAuthenticationToken jwtAuth) {
-            return jwtAuth.getToken().getTokenValue();
-        }
-        return null;
+    private void injectTraceContext(HttpRequest.Builder builder) {
+        GlobalOpenTelemetry.getPropagators().getTextMapPropagator()
+                .inject(Context.current(), builder, REQUEST_BUILDER_SETTER);
     }
 
     /**
@@ -293,9 +310,10 @@ public class McpAdapter implements ProtocolAdapter {
      * { "jsonrpc":"2.0", "id":"...", "result":{ "content":[{"type":"text","text":"{...}"}] } }
      * </pre>
      */
-    private JsonNode extractResult(String rawResponse) throws Exception {
+    JsonNode extractResult(String rawResponse) throws Exception {
         JsonNode root = objectMapper.readTree(rawResponse);
 
+        // (1) PROTOCOL error — the JSON-RPC "error" member. Malformed request, unknown tool, etc.
         JsonNode error = root.path("error");
         if (!error.isMissingNode()) {
             throw new RuntimeException("MCP JSON-RPC error: " + error.path("message").asText(rawResponse));
@@ -306,19 +324,52 @@ public class McpAdapter implements ProtocolAdapter {
             return root;
         }
 
+        // (2) TOOL EXECUTION error — a *successful* JSON-RPC response whose result carries
+        // isError=true. This is the only signal MCP gives for "the tool ran and failed"; there is
+        // no status code as there is over HTTP. Without this check, an agent reporting
+        // "llm_unavailable" is indistinguishable from one that answered: the call is counted OK,
+        // the request is recorded ANSWERED, and the error object is handed to the synthesizer as
+        // ground truth (hard rule c — agent outputs are the only ground truth). Throwing here
+        // makes the harness record a failed node, so okCount / no_data / PARTIAL tell the truth.
+        if (isToolError(result)) {
+            throw new RuntimeException("MCP tool error: "
+                    + firstContentText(result).orElseGet(result::toString));
+        }
+
+        return firstContentText(result)
+                .map(text -> {
+                    try {
+                        return objectMapper.readTree(text);
+                    } catch (Exception e) {
+                        return (JsonNode) objectMapper.createObjectNode().put("text", text);
+                    }
+                })
+                .orElse(result);
+    }
+
+    /** True when the tool ran and reported failure (MCP {@code CallToolResult.isError}). */
+    static boolean isToolError(JsonNode result) {
+        return result.path("isError").asBoolean(false);
+    }
+
+    /** The first {@code content[].text} of an MCP tool result, if present. */
+    static Optional<String> firstContentText(JsonNode result) {
         JsonNode content = result.path("content");
         if (content.isArray() && !content.isEmpty()) {
             String text = content.get(0).path("text").asText(null);
-            if (text != null) {
-                try {
-                    return objectMapper.readTree(text);
-                } catch (Exception e) {
-                    return objectMapper.createObjectNode().put("text", text);
-                }
-            }
+            if (text != null) return Optional.of(text);
         }
+        return Optional.empty();
+    }
 
-        return result;
+    private JsonNode withVerifiedSub(JsonNode data, String verifiedSub) {
+        if (verifiedSub == null || verifiedSub.isBlank() || data == null || !data.isObject()) {
+            return data;
+        }
+        ObjectNode copy = objectMapper.createObjectNode();
+        copy.put("_verified_sub", verifiedSub);
+        copy.setAll((ObjectNode) data);
+        return copy;
     }
 
     // ── Utilities ─────────────────────────────────────────────────────────────

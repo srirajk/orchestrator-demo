@@ -3,7 +3,6 @@
   "display_name": "Private Banking",
   "parent_domain": "wealth-management",
   "resource_scoped": true,
-
   "entity_types": [
     {
       "key": "relationship_id",
@@ -41,9 +40,9 @@
       "required": false
     }
   ],
-
-  "required_context": ["relationship_id"],
-
+  "required_context": [
+    "relationship_id"
+  ],
   "denial_messages": {
     "not-covered": "That client is not in your coverage.",
     "not-in-book": "That client is not in your coverage.",
@@ -52,16 +51,14 @@
     "relationship-closed": "That client relationship is no longer active.",
     "default": "Access denied for this client relationship."
   },
-
   "messages": {
     "no_coverage": "You have no client relationships in your coverage.",
     "reference_not_found": "I could not find a client relationship matching \"{reference}\". Please provide the relationship ID or a more specific name.",
-    "needs_more_detail": "I wasn't sure which services to consult. Please mention the client name and what you need.",
+    "needs_more_detail": "Sorry \u2014 none of the services I can reach are able to answer that as asked. If you mention the client and what you'd like to know, I'll try again.",
     "specify_entity": "Please specify the client name or relationship ID.",
     "missing_entity_question": "Which client relationship are you asking about? Please provide the relationship ID or client name to continue.",
     "followup_clarification": "Could you clarify what you'd like to know about {entity}? For example: holdings, performance, settlements, or corporate actions."
   },
-
   "clarification_schema": {
     "relationship_id": {
       "question": "Which client relationship are you asking about?",
@@ -75,11 +72,10 @@
       "priority": 2
     }
   },
-
   "agents": [
-    "acme.wealth.holdings",
-    "acme.wealth.performance",
-    "acme.wealth.risk_profile",
-    "acme.wealth.goal_planning"
+    "meridian.wealth.holdings",
+    "meridian.wealth.performance",
+    "meridian.wealth.risk_profile",
+    "meridian.wealth.goal_planning"
   ]
 }

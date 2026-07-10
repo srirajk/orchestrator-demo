@@ -13,11 +13,8 @@ import ai.conduit.gateway.synthesis.input.EntityBag;
 public record IntentResult(Intent intent, double confidence, String reasoning,
                             EntityBag extractedEntities) {
 
-    /** Fallback used when the classifier itself fails. */
-    public static IntentResult fetchDataFallback() {
-        return new IntentResult(Intent.FETCH_DATA, 0.5, "classifier-fallback",
-                EntityBag.empty());
-    }
+    // No fetchDataFallback(): a classifier failure must never be papered over with a canned
+    // FETCH_DATA intent and an empty entity bag (CLAUDE.md §5). See IntentClassificationException.
 
     /** Convenience ctor without entities (for FOLLOW_UP / CHITCHAT / CLARIFY). */
     public static IntentResult of(Intent intent, double confidence, String reasoning) {

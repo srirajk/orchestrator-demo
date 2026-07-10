@@ -1,0 +1,18 @@
+{
+  "fixtures": [
+    {
+      "match": {
+        "userMessage": "{\"query\":\"Show me the Okafor relationship holdings\",\"candidates\":[{\"id\":\"meridian.wealth.holdings\",\"name\":\"Wealth Holdings\",\"description\":\"Returns the current portfolio positions and asset-class allocation for a given wealth management relationship. Accepts relationship_id as the primary key.\",\"score\":0.556484222412,\"skills\":[{\"name\":\"get_holdings\",\"description\":\"Retrieve current holdings, positions, and asset allocation breakdown for a wealth relationship.\",\"examples\":[\"current holdings for the Whitman relationship\",\"portfolio allocation for this client\"]}]},{\"id\":\"meridian.servicing.custody_positions\",\"name\":\"Asset Servicing Custody Positions\",\"description\":\"Returns custody holdings broken down by custodian for a given relationship. Accepts relationship_id as the primary key. Accessed via MCP tool over SSE transport.\",\"score\":0.540388047695,\"skills\":[{\"name\":\"get_custody_positions\",\"description\":\"Retrieve holdings broken down by custodian for a given asset servicing relationship.\",\"examples\":[\"custody holdings for the relationship\",\"what's held at the custodian\"]}]},{\"id\":\"meridian.wealth.performance\",\"name\":\"Wealth Performance\",\"description\":\"Returns performance metrics, total return percentage, and P&L for a given wealth management relationship over a specified period. Accepts relationship_id as the primary key.\",\"score\":0.46904075145699997,\"skills\":[{\"name\":\"get_performance\",\"description\":\"Retrieve total return percentage, P&L, and period-over-period performance data for a wealth relationship.\",\"examples\":[\"how has this account performed\",\"year-to-date returns for the client\"]}]},{\"id\":\"meridian.servicing.corporate_actions\",\"name\":\"Asset Servicing Corporate Actions\",\"description\":\"Returns upcoming corporate actions such as dividends, splits, and elections pending for a given relationship. Accepts relationship_id as the primary key. Accessed via MCP tool over SSE transport.\",\"score\":0.448724746704,\"skills\":[{\"name\":\"get_corporate_actions\",\"description\":\"Retrieve upcoming corporate actions including dividends, splits, and elections due for a given asset servicing relationship.\",\"examples\":[\"upcoming corporate actions\",\"any dividends or splits coming up\"]}]},{\"id\":\"meridian.servicing.cash_management\",\"name\":\"Asset Servicing Cash Management\",\"description\":\"Returns cash balances and projected cash positions for a given relationship. Accepts relationship_id as the primary key. Accessed via MCP tool over SSE transport.\",\"score\":0.44131934642799997,\"skills\":[{\"name\":\"get_cash\",\"description\":\"Retrieve cash balances and projected cash positions for a given asset servicing relationship.\",\"examples\":[\"cash position for the relationship\",\"projected cash for this account\"]}]}]}",
+        "model": "gpt-4o-mini",
+        "turnIndex": 0,
+        "hasToolResult": false
+      },
+      "response": {
+        "content": "{\"candidate_id\":\"meridian.wealth.holdings\",\"reason\":\"It directly retrieves current portfolio positions and asset-class allocation for a wealth management relationship.\"}"
+      },
+      "metadata": {
+        "systemHash": "fb9be597"
+      }
+    }
+  ]
+}

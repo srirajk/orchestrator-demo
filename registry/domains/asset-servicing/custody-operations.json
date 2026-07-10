@@ -2,9 +2,18 @@
   "sub_domain_id": "custody-operations",
   "display_name": "Custody Operations",
   "parent_domain": "asset-servicing",
-  "resource_scoped": false,
+  "resource_scoped": true,
 
   "entity_types": [
+    {
+      "key": "relationship_id",
+      "extract_as": "relationship_reference",
+      "kind": "resolvable",
+      "display": "servicing relationship",
+      "id_pattern": "REL-\\w+",
+      "resolve_type": "relationship",
+      "required": false
+    },
     {
       "key": "fund_id",
       "extract_as": "fund_reference",
@@ -32,10 +41,11 @@
     }
   ],
 
-  "required_context": [],
+  "required_context": ["relationship_id"],
 
   "agents": [
-    "acme.servicing.custody_positions",
-    "acme.servicing.settlement_status"
+    "meridian.servicing.custody_positions",
+    "meridian.servicing.settlement_status",
+    "meridian.servicing.settlement_risk"
   ]
 }

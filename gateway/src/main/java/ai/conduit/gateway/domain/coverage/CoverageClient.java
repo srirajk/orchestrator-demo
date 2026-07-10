@@ -3,8 +3,11 @@ package ai.conduit.gateway.domain.coverage;
 import ai.conduit.gateway.domain.manifest.DomainManifest;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -32,10 +35,13 @@ public class CoverageClient {
 
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
+    private final MeterRegistry meterRegistry;
 
-    public CoverageClient(WebClient.Builder webClientBuilder, ObjectMapper objectMapper) {
+    public CoverageClient(WebClient.Builder webClientBuilder, ObjectMapper objectMapper,
+                          MeterRegistry meterRegistry) {
         this.webClient = webClientBuilder.build();
         this.objectMapper = objectMapper;
+        this.meterRegistry = meterRegistry;
     }
 
     // ── DISCOVER ─────────────────────────────────────────────────────────────
@@ -45,12 +51,14 @@ public class CoverageClient {
      * Uses the coverage.discover_url template from the domain manifest.
      */
     public List<CoverageResource> discover(String principalId, String tenantId,
-                                            DomainManifest.Coverage coverage) {
+                                            DomainManifest.Coverage coverage,
+                                            String bearerToken) {
         String url = bindPathParams(coverage.discoverUrl(), principalId, null);
         try {
             String body = webClient.get()
                 .uri(url)
                 .header("X-Tenant-Id", tenantId)
+                .headers(headers -> applyBearer(headers, bearerToken, "coverage discover"))
                 .retrieve()
                 .onStatus(HttpStatusCode::is5xxServerError, response ->
                     Mono.error(new CoverageUnavailableException(
@@ -61,8 +69,10 @@ public class CoverageClient {
 
             return objectMapper.readValue(body, new TypeReference<List<CoverageResource>>() {});
         } catch (CoverageUnavailableException e) {
+            emitUnavailable("discover");
             throw e;
         } catch (Exception e) {
+            emitUnavailable("discover");
             throw new CoverageUnavailableException("Coverage discover failed: " + e.getMessage(), e);
         }
     }
@@ -73,12 +83,14 @@ public class CoverageClient {
      * Checks whether {@code principalId} may access {@code resourceId} within their coverage.
      */
     public CoverageCheckResult check(String principalId, String tenantId,
-                                      String resourceId, DomainManifest.Coverage coverage) {
+                                      String resourceId, DomainManifest.Coverage coverage,
+                                      String bearerToken) {
         String url = bindPathParams(coverage.checkUrl(), principalId, resourceId);
         try {
             String body = webClient.get()
                 .uri(url)
                 .header("X-Tenant-Id", tenantId)
+                .headers(headers -> applyBearer(headers, bearerToken, "coverage check"))
                 .retrieve()
                 .onStatus(HttpStatusCode::is5xxServerError, response ->
                     Mono.error(new CoverageUnavailableException(
@@ -89,8 +101,10 @@ public class CoverageClient {
 
             return objectMapper.readValue(body, CoverageCheckResult.class);
         } catch (CoverageUnavailableException e) {
+            emitUnavailable("check");
             throw e;
         } catch (Exception e) {
+            emitUnavailable("check");
             throw new CoverageUnavailableException("Coverage check failed: " + e.getMessage(), e);
         }
     }
@@ -109,7 +123,8 @@ public class CoverageClient {
      * candidates ∩ discover intersection — never by filtering resolution.
      */
     public CoverageResolveResult resolve(String reference, String entityType,
-                                          String tenantId, DomainManifest.Coverage coverage) {
+                                          String tenantId, DomainManifest.Coverage coverage,
+                                          String bearerToken) {
         String url = coverage.resolveUrl();
         Map<String, String> requestBody = Map.of(
             "reference", reference,
@@ -120,6 +135,7 @@ public class CoverageClient {
             String responseBody = webClient.post()
                 .uri(url)
                 .header("X-Tenant-Id", tenantId)
+                .headers(headers -> applyBearer(headers, bearerToken, "coverage resolve"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(BodyInserters.fromValue(bodyJson))
                 .retrieve()
@@ -132,10 +148,20 @@ public class CoverageClient {
 
             return objectMapper.readValue(responseBody, CoverageResolveResult.class);
         } catch (CoverageUnavailableException e) {
+            emitUnavailable("resolve");
             throw e;
         } catch (Exception e) {
+            emitUnavailable("resolve");
             throw new CoverageUnavailableException("Coverage resolve failed: " + e.getMessage(), e);
         }
+    }
+
+    private void emitUnavailable(String operation) {
+        Counter.builder("conduit.coverage.unavailable")
+                .description("Coverage service unavailable, failed, or timed out")
+                .tag("operation", operation)
+                .register(meterRegistry)
+                .increment();
     }
 
     // ── URL binding ───────────────────────────────────────────────────────────
@@ -151,6 +177,14 @@ public class CoverageClient {
         if (principalId != null) result = result.replace("{principal_id}", principalId);
         if (resourceId  != null) result = result.replace("{id}", resourceId);
         return result;
+    }
+
+    private void applyBearer(HttpHeaders headers, String bearerToken, String operation) {
+        if (bearerToken == null || bearerToken.isBlank()) {
+            throw new CoverageUnavailableException(
+                "No caller identity available for " + operation + " — refusing coverage call");
+        }
+        headers.setBearerAuth(bearerToken);
     }
 
     // ── Exception ─────────────────────────────────────────────────────────────

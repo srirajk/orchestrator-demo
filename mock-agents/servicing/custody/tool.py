@@ -3,10 +3,9 @@ import os
 import json
 import logging
 import asyncio
-import concurrent.futures
 from agents import Runner, function_tool, InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered
 from shared.canned_data import CUSTODY_POSITIONS
-from shared.error_schema import mcp_error_json
+from shared.error_schema import AgentToolError
 from shared.fault_knobs import maybe_fault
 from shared.telemetry import agent_span
 from shared.agent_client import make_agent, LLM_MODEL, LLM_TIMEOUT_S
@@ -17,7 +16,7 @@ _LLM_BASE  = os.environ.get("CUSTODY_LLM_BASE_URL") or None
 _LLM_KEY   = os.environ.get("CUSTODY_LLM_API_KEY") or None
 _LLM_MODEL = os.environ.get("CUSTODY_LLM_MODEL") or None
 
-AGENT_ID = "acme.servicing.custody_positions"
+AGENT_ID = "meridian.servicing.custody_positions"
 log = logging.getLogger(__name__)
 
 
@@ -56,29 +55,23 @@ async def _run_custody_agent(
     return result.final_output
 
 
-def get_custody_positions(relationship_id: str) -> str:
+async def get_custody_positions(relationship_id: str) -> str:
     """Get assets held at each custodian for a relationship."""
     with agent_span(AGENT_ID, relationship_id) as span:
         maybe_fault("get_custody_positions")
         data = CUSTODY_POSITIONS.get(relationship_id)
         if data is None:
             span.set_attribute("error", True)
-            return mcp_error_json(f"Relationship '{relationship_id}' not found.", AGENT_ID, 404)
+            raise AgentToolError(f"Relationship '{relationship_id}' not found.", AGENT_ID, 404)
         custodians = data.get("holdings_by_custodian", [])
         custodian_count = len(custodians)
         total_positions = sum(len(c.get("holdings", [])) for c in custodians)
         span.set_attribute("result.custodian_count", custodian_count)
         span.set_attribute("result.total_positions", total_positions)
         try:
-            try:
-                asyncio.get_running_loop()
-                with concurrent.futures.ThreadPoolExecutor() as pool:
-                    future = pool.submit(asyncio.run, _run_custody_agent(relationship_id, data, _LLM_BASE, _LLM_KEY, _LLM_MODEL))
-                    narrative = future.result(timeout=LLM_TIMEOUT_S)
-            except RuntimeError:
-                narrative = asyncio.run(_run_custody_agent(relationship_id, data, _LLM_BASE, _LLM_KEY, _LLM_MODEL))
+            narrative = await asyncio.wait_for(_run_custody_agent(relationship_id, data, _LLM_BASE, _LLM_KEY, _LLM_MODEL), timeout=LLM_TIMEOUT_S)
             span.set_attribute("agent.model", _LLM_MODEL or LLM_MODEL)
             return json.dumps({**data, "agent_narrative": narrative})
         except Exception as exc:
             log.error("Agent LLM call failed for %s: %s", relationship_id, exc)
-            return mcp_error_json(f"llm_unavailable: {type(exc).__name__}", AGENT_ID, 503)
+            raise AgentToolError(f"llm_unavailable: {type(exc).__name__}", AGENT_ID, 503) from exc

@@ -22,10 +22,10 @@ protocol so the hero prompt fans across HTTP **and** MCP live.*
 
 | agent_id | skill | input | output (key fields) | data class |
 |---|---|---|---|---|
-| `acme.wealth.holdings` | `get_holdings` | `relationship_id` | `positions[]`, `allocation_by_class[]` | confidential-pii |
-| `acme.wealth.performance` | `get_performance` | `relationship_id`, `period` | `total_return_pct`, `pnl`, `period` | confidential-pii |
-| `acme.wealth.goal_planning` | `get_goal_status` | `relationship_id` | `goals[]`, `on_track` | confidential-pii |
-| `acme.wealth.risk_profile` | `get_risk_profile` | `relationship_id` | `risk_tolerance`, `concentration_flags[]` | confidential-pii |
+| `meridian.wealth.holdings` | `get_holdings` | `relationship_id` | `positions[]`, `allocation_by_class[]` | confidential-pii |
+| `meridian.wealth.performance` | `get_performance` | `relationship_id`, `period` | `total_return_pct`, `pnl`, `period` | confidential-pii |
+| `meridian.wealth.goal_planning` | `get_goal_status` | `relationship_id` | `goals[]`, `on_track` | confidential-pii |
+| `meridian.wealth.risk_profile` | `get_risk_profile` | `relationship_id` | `risk_tolerance`, `concentration_flags[]` | confidential-pii |
 
 **Example prompts (≥4 each, for routing):**
 - holdings: "current holdings for the Whitman relationship" · "portfolio allocation for this client" · "what is this account invested in" · "position breakdown for the relationship"
@@ -51,11 +51,11 @@ protocol so the hero prompt fans across HTTP **and** MCP live.*
 
 | agent_id | tool (skill) | input | output (key fields) | data class |
 |---|---|---|---|---|
-| `acme.servicing.custody_positions` | `get_custody_positions` | `relationship_id` | `holdings_by_custodian[]` | confidential |
-| `acme.servicing.settlement_status` | `get_settlements` | `relationship_id` | `pending[]`, `failed[]` | confidential |
-| `acme.servicing.corporate_actions` | `get_corporate_actions` | `relationship_id` | `upcoming_actions[]` | confidential |
-| `acme.servicing.nav` | `get_nav` | **`fund_id`** | `nav`, `as_of_date` | internal |
-| `acme.servicing.cash_management` | `get_cash` | `relationship_id` | `balances[]`, `projected_cash` | confidential |
+| `meridian.servicing.custody_positions` | `get_custody_positions` | `relationship_id` | `holdings_by_custodian[]` | confidential |
+| `meridian.servicing.settlement_status` | `get_settlements` | `relationship_id` | `pending[]`, `failed[]` | confidential |
+| `meridian.servicing.corporate_actions` | `get_corporate_actions` | `relationship_id` | `upcoming_actions[]` | confidential |
+| `meridian.servicing.nav` | `get_nav` | **`fund_id`** | `nav`, `as_of_date` | internal |
+| `meridian.servicing.cash_management` | `get_cash` | `relationship_id` | `balances[]`, `projected_cash` | confidential |
 
 **Example prompts (≥4 each):**
 - custody_positions: "custody holdings for the relationship" · "what's held at the custodian" · "custody positions for this account" · "where are these assets custodied"

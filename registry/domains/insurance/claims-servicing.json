@@ -3,7 +3,6 @@
   "display_name": "Claims Servicing",
   "parent_domain": "insurance",
   "resource_scoped": true,
-
   "entity_types": [
     {
       "key": "policy_id",
@@ -33,9 +32,9 @@
       "default": "YTD"
     }
   ],
-
-  "required_context": ["policy_id"],
-
+  "required_context": [
+    "policy_id"
+  ],
   "denial_messages": {
     "not-covered": "That policy is not in your book of business.",
     "not-in-book": "That policy is not in your book of business.",
@@ -44,16 +43,14 @@
     "policy-closed": "That policy is no longer active.",
     "default": "Access denied for this policy."
   },
-
   "messages": {
     "no_coverage": "You have no policies in your book of business.",
     "reference_not_found": "I could not find a policy matching \"{reference}\". Please provide the policy ID or a more specific name.",
-    "needs_more_detail": "I wasn't sure which services to consult. Please mention the policy and what you need.",
+    "needs_more_detail": "Sorry \u2014 none of the services I can reach are able to answer that as asked. If you mention the policy and what you'd like to know, I'll try again.",
     "specify_entity": "Please specify the policy name or policy ID.",
     "missing_entity_question": "Which policy are you asking about? Please provide the policy ID or insured name to continue.",
     "followup_clarification": "Could you clarify what you'd like to know about {entity}? For example: policy details, premium, coverage limit, or claim status."
   },
-
   "clarification_schema": {
     "policy_id": {
       "question": "Which policy are you asking about?",
@@ -66,9 +63,8 @@
       "priority": 2
     }
   },
-
   "agents": [
-    "acme.insurance.policy_details",
-    "acme.insurance.claim_status"
+    "meridian.insurance.policy_details",
+    "meridian.insurance.claim_status"
   ]
 }

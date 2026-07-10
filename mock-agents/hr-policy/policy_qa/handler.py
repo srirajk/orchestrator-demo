@@ -16,7 +16,7 @@ from shared.telemetry import agent_span
 from shared.error_schema import error_response
 
 router = APIRouter(prefix="/policy-qa", tags=["policy_qa"])
-AGENT_ID = "acme.hr.policy_qa"
+AGENT_ID = "meridian.hr.policy_qa"
 log = logging.getLogger(__name__)
 
 

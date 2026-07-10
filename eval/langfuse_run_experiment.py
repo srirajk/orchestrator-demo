@@ -66,24 +66,24 @@ LANGFUSE_HOST: str = os.environ.get("LANGFUSE_HOST", "http://localhost:3030")
 # dedicated /v1/routing-decision endpoint if the gateway exposes one.
 
 ALL_AGENT_IDS: list[str] = [
-    "acme.wealth.holdings",
-    "acme.wealth.performance",
-    "acme.wealth.risk_profile",
-    "acme.wealth.goal_planning",
-    "acme.servicing.settlement_status",
-    "acme.servicing.cash_management",
-    "acme.servicing.corporate_actions",
-    "acme.servicing.custody_positions",
-    "acme.servicing.nav",
+    "meridian.wealth.holdings",
+    "meridian.wealth.performance",
+    "meridian.wealth.risk_profile",
+    "meridian.wealth.goal_planning",
+    "meridian.servicing.settlement_status",
+    "meridian.servicing.cash_management",
+    "meridian.servicing.corporate_actions",
+    "meridian.servicing.custody_positions",
+    "meridian.servicing.nav",
 ]
 
 # ── Dry-run mock: simulates a perfect-routing response ────────────────────────
 
 DRY_RUN_MOCK_CONTENT = (
     "DRY RUN — gateway call skipped. "
-    "Mock agents resolved: acme.wealth.holdings acme.wealth.performance "
-    "acme.wealth.risk_profile acme.servicing.settlement_status "
-    "acme.servicing.cash_management acme.wealth.goal_planning"
+    "Mock agents resolved: meridian.wealth.holdings meridian.wealth.performance "
+    "meridian.wealth.risk_profile meridian.servicing.settlement_status "
+    "meridian.servicing.cash_management meridian.wealth.goal_planning"
 )
 
 
@@ -118,7 +118,7 @@ def extract_resolved_agents(content: str) -> set[str]:
     """
     Extract agent IDs from the gateway's synthesized response text.
 
-    Agent IDs follow the pattern acme.<domain>.<capability> and may appear in
+    Agent IDs follow the pattern meridian.<domain>.<capability> and may appear in
     the response when the gateway embeds routing metadata or mentions sources.
     """
     found = set()

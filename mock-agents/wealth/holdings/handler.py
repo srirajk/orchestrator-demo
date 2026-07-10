@@ -15,7 +15,7 @@ _LLM_KEY   = os.environ.get("HOLDINGS_LLM_API_KEY") or None
 _LLM_MODEL = os.environ.get("HOLDINGS_LLM_MODEL") or None
 
 router = APIRouter(prefix="/holdings", tags=["holdings"])
-AGENT_ID = "acme.wealth.holdings"
+AGENT_ID = "meridian.wealth.holdings"
 log = logging.getLogger(__name__)
 
 

@@ -1,0 +1,25 @@
+{
+  "fixtures": [
+    {
+      "match": {
+        "userMessage": "Retrieve and summarise settlements for relationship_id=REL-00042",
+        "model": "gpt-4o-mini",
+        "turnIndex": 0,
+        "hasToolResult": false
+      },
+      "response": {
+        "toolCalls": [
+          {
+            "name": "get_settlements_data",
+            "arguments": "{\"relationship_id\":\"REL-00042\"}",
+            "id": "call_GD4y6O4lp3JpS7ohGefSoagV"
+          }
+        ]
+      },
+      "metadata": {
+        "systemHash": "4da31e6d",
+        "toolsHash": "a6be8a84"
+      }
+    }
+  ]
+}

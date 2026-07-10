@@ -75,9 +75,9 @@
   },
 
   "agents": [
-    "acme.wealth.holdings",
-    "acme.wealth.performance",
-    "acme.wealth.risk_profile",
-    "acme.wealth.goal_planning"
+    "meridian.wealth.holdings",
+    "meridian.wealth.performance",
+    "meridian.wealth.risk_profile",
+    "meridian.wealth.goal_planning"
   ]
 }

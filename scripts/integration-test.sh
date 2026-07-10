@@ -80,7 +80,9 @@ else
   fail "No stop chunk found"
 fi
 
-if echo "$SSE" | grep -q 'data:\[DONE\]'; then
+# OpenAI's wire shape is "data: [DONE]" (space after the colon). Assert it exactly —
+# this is the byte-contract, so a missing/extra space must fail.
+if echo "$SSE" | grep -q 'data: \[DONE\]'; then
   ok "Stream ends with [DONE]"
 else
   fail "Stream missing [DONE] terminator"
@@ -102,7 +104,7 @@ TITLE_SSE=$(curl -sf -X POST "${GATEWAY}/v1/chat/completions" \
   -d '{"model":"conduit-assistant","messages":[{"role":"user","content":"Generate a concise title for this conversation"}],"stream":true}' \
   --max-time 10)
 
-if echo "$TITLE_SSE" | grep -q 'data:\[DONE\]'; then
+if echo "$TITLE_SSE" | grep -q 'data: \[DONE\]'; then
   ok "Title request returns SSE stream ending with [DONE]"
 else
   fail "Title request did not return a proper SSE stream"

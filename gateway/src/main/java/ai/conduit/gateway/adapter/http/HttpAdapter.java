@@ -4,16 +4,20 @@ import ai.conduit.gateway.adapter.ProtocolAdapter;
 import ai.conduit.gateway.registry.model.AgentManifest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanContext;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.context.propagation.TextMapSetter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpEntity;
+import org.slf4j.MDC;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
@@ -42,15 +46,21 @@ import java.util.concurrent.ConcurrentHashMap;
 public class HttpAdapter implements ProtocolAdapter {
 
     private static final Logger log = LoggerFactory.getLogger(HttpAdapter.class);
+    private static final TextMapSetter<HttpHeaders> HTTP_HEADERS_SETTER =
+            (carrier, key, value) -> {
+                if (carrier != null && key != null && value != null) {
+                    carrier.set(key, value);
+                }
+            };
 
     /** Simple spec cache: base-URL → parsed OpenAPI document. */
     private final ConcurrentHashMap<String, JsonNode> specCache = new ConcurrentHashMap<>();
 
-    private final RestTemplate restTemplate;
+    private final RestClient restClient;
     private final ObjectMapper objectMapper;
 
-    public HttpAdapter(RestTemplate restTemplate, ObjectMapper objectMapper) {
-        this.restTemplate = restTemplate;
+    public HttpAdapter(RestClient agentRestClient, ObjectMapper objectMapper) {
+        this.restClient = agentRestClient;
         this.objectMapper = objectMapper;
     }
 
@@ -60,7 +70,7 @@ public class HttpAdapter implements ProtocolAdapter {
     }
 
     @Override
-    public JsonNode invoke(AgentManifest manifest, JsonNode input) throws Exception {
+    public JsonNode invoke(AgentManifest manifest, JsonNode input, String bearerToken) throws Exception {
         String openapiUrl = manifest.connection().openapiUrl();
         if (openapiUrl == null || openapiUrl.isBlank()) {
             throw new IllegalArgumentException(
@@ -68,6 +78,8 @@ public class HttpAdapter implements ProtocolAdapter {
         }
 
         String baseUrl = deriveBaseUrl(openapiUrl);
+        // Spec fetch is unauthenticated introspection (agents exempt /openapi.json from
+        // jwt_verify) — only the actual data call below requires the caller's identity.
         JsonNode spec = fetchSpec(baseUrl, openapiUrl);
 
         OperationInfo op = findOperation(spec, manifest.connection().operationId());
@@ -77,17 +89,28 @@ public class HttpAdapter implements ProtocolAdapter {
                     + "' not found in OpenAPI spec at " + openapiUrl);
         }
 
+        // F-IDENTITY: this is a data-plane call — it must carry the caller's verified identity.
+        // Never silently invoke without it; a missing token here means the security context was
+        // not propagated (a bug upstream), not a green light to call anonymously.
+        if (bearerToken == null || bearerToken.isBlank()) {
+            throw new IllegalStateException(
+                    "No caller identity available for agent " + manifest.agentId()
+                    + " — refusing to invoke without a bearer token");
+        }
+
         String fullPath = baseUrl + op.path();
         log.debug("HttpAdapter → {} {} for agent {}", op.method(), fullPath, manifest.agentId());
 
-        String responseBody;
+        ResponseEntity<String> response;
         if ("get".equalsIgnoreCase(op.method())) {
-            responseBody = invokeGet(fullPath, input);
+            response = invokeGet(fullPath, input, bearerToken);
         } else {
-            responseBody = invokePost(fullPath, input);
+            response = invokePost(fullPath, input, bearerToken);
         }
 
-        return objectMapper.readTree(responseBody);
+        String responseBody = response.getBody() != null ? response.getBody() : "{}";
+        return withVerifiedSub(objectMapper.readTree(responseBody),
+                response.getHeaders().getFirst("X-Conduit-Verified-Sub"));
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -117,7 +140,10 @@ public class HttpAdapter implements ProtocolAdapter {
             return cached;
         }
         log.info("Fetching OpenAPI spec from {}", openapiUrl);
-        String raw = restTemplate.getForObject(openapiUrl, String.class);
+        String raw = restClient.get()
+                .uri(openapiUrl)
+                .retrieve()
+                .body(String.class);
         if (raw == null) {
             throw new IllegalStateException("Empty OpenAPI spec returned from " + openapiUrl);
         }
@@ -155,7 +181,7 @@ public class HttpAdapter implements ProtocolAdapter {
     }
 
     /** Build a GET request by appending all input fields as query parameters. */
-    private String invokeGet(String url, JsonNode input) {
+    private ResponseEntity<String> invokeGet(String url, JsonNode input, String bearerToken) {
         UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url);
         if (input != null) {
             Iterator<Map.Entry<String, JsonNode>> fields = input.fields();
@@ -169,42 +195,82 @@ public class HttpAdapter implements ProtocolAdapter {
         }
         URI uri = builder.build(true).toUri();
         log.debug("GET {}", uri);
-        var response = restTemplate.exchange(uri, HttpMethod.GET,
-                new HttpEntity<>(agentHeaders()), String.class);
-        return response.getBody() != null ? response.getBody() : "{}";
+        return restClient.get()
+                .uri(uri)
+                .headers(headers -> headers.addAll(agentHeaders(bearerToken)))
+                .retrieve()
+                .toEntity(String.class);
     }
 
     /** POST the input JsonNode as the request body. */
-    private String invokePost(String url, JsonNode input) throws Exception {
+    private ResponseEntity<String> invokePost(String url, JsonNode input, String bearerToken) throws Exception {
         log.debug("POST {} body={}", url, input);
         String body = input != null ? objectMapper.writeValueAsString(input) : "{}";
-        HttpHeaders headers = agentHeaders();
+        HttpHeaders headers = agentHeaders(bearerToken);
         headers.setContentType(MediaType.APPLICATION_JSON);
-        var response = restTemplate.exchange(url, HttpMethod.POST,
-                new HttpEntity<>(body, headers), String.class);
-        return response.getBody() != null ? response.getBody() : "{}";
+        return restClient.post()
+                .uri(url)
+                .headers(h -> h.addAll(headers))
+                .body(body)
+                .retrieve()
+                .toEntity(String.class);
     }
 
     /**
-     * Build outbound headers, propagating the caller's JWT when present.
-     * Agents verify the signature themselves — no implicit gateway trust.
+     * Build outbound headers, propagating the caller's JWT.
+     *
+     * <p>F-IDENTITY: {@code bearerToken} is passed explicitly by the caller (harness → adapter) —
+     * never read from {@code SecurityContextHolder}, which is thread-local and does not survive the
+     * hop onto the pipeline/DAG virtual-thread executors. Callers (see {@link #invoke}) already
+     * guarantee non-null/blank before reaching here for data-plane calls.
      */
-    private HttpHeaders agentHeaders() {
+    private HttpHeaders agentHeaders(String bearerToken) {
         HttpHeaders headers = new HttpHeaders();
-        String token = extractBearerToken();
-        if (token != null) {
-            headers.setBearerAuth(token);
-            log.debug("HttpAdapter: propagating JWT to agent");
-        }
+        headers.setBearerAuth(bearerToken);
+        GlobalOpenTelemetry.getPropagators().getTextMapPropagator()
+                .inject(Context.current(), headers, HTTP_HEADERS_SETTER);
+        ensureTraceparent(headers);
+        log.debug("HttpAdapter: propagating JWT to agent");
         return headers;
     }
 
-    private String extractBearerToken() {
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth instanceof JwtAuthenticationToken jwtAuth) {
-            return jwtAuth.getToken().getTokenValue();
+    private void ensureTraceparent(HttpHeaders headers) {
+        SpanContext spanContext = Span.current().getSpanContext();
+        if (spanContext.isValid()) {
+            headers.set("traceparent", String.format("00-%s-%s-%02x",
+                    spanContext.getTraceId(),
+                    spanContext.getSpanId(),
+                    spanContext.getTraceFlags().asByte() & 0xff));
+            log.debug("HttpAdapter: injected traceparent traceId={} spanId={}",
+                    spanContext.getTraceId(), spanContext.getSpanId());
+            String traceState = spanContext.getTraceState().toString();
+            if (!traceState.isBlank()) {
+                headers.set("tracestate", traceState);
+            }
+            return;
         }
-        return null;
+        String traceId = MDC.get("traceId");
+        String spanId = MDC.get("spanId");
+        if (isLowerHex(traceId, 32) && isLowerHex(spanId, 16)) {
+            headers.set("traceparent", "00-" + traceId + "-" + spanId + "-01");
+            log.debug("HttpAdapter: injected MDC traceparent traceId={} spanId={}", traceId, spanId);
+        } else {
+            log.debug("HttpAdapter: no valid current span or MDC trace context for traceparent injection");
+        }
+    }
+
+    private boolean isLowerHex(String value, int length) {
+        return value != null && value.length() == length && value.matches("[0-9a-f]+");
+    }
+
+    private JsonNode withVerifiedSub(JsonNode data, String verifiedSub) {
+        if (verifiedSub == null || verifiedSub.isBlank() || data == null || !data.isObject()) {
+            return data;
+        }
+        ObjectNode copy = objectMapper.createObjectNode();
+        copy.put("_verified_sub", verifiedSub);
+        copy.setAll((ObjectNode) data);
+        return copy;
     }
 
     /** Lightweight value type for a matched OpenAPI operation. */

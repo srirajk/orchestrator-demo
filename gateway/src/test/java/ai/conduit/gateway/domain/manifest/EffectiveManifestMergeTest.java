@@ -21,7 +21,7 @@ class EffectiveManifestMergeTest {
         var sub = new SubDomainManifest("private-banking", "Private Banking",
             "wealth-management", List.of("relationship_id"), true, Map.of(), List.of());
 
-        var effective = EffectiveManifest.merge(domain, sub, "acme.wealth.holdings");
+        var effective = EffectiveManifest.merge(domain, sub, "meridian.wealth.holdings");
 
         assertThat(effective.resourceScoped()).isTrue();
         assertThat(effective.requiresContext()).isTrue();
@@ -38,7 +38,7 @@ class EffectiveManifestMergeTest {
         var sub = new SubDomainManifest("private-banking", "PB", "wealth-management",
             List.of("relationship_id"), true, Map.of(), List.of());
 
-        var effective = EffectiveManifest.merge(domain, sub, "acme.wealth.holdings");
+        var effective = EffectiveManifest.merge(domain, sub, "meridian.wealth.holdings");
 
         assertThat(effective.coverage()).isNotNull();
         assertThat(effective.coverage().discoverUrl()).isEqualTo("http://coverage/discover/{principal_id}");
@@ -54,7 +54,7 @@ class EffectiveManifestMergeTest {
         var sub = new SubDomainManifest("private-banking", "PB", "wealth-management",
             List.of("relationship_id"), false, Map.of(), List.of());
 
-        var effective = EffectiveManifest.merge(domain, sub, "acme.wealth.holdings");
+        var effective = EffectiveManifest.merge(domain, sub, "meridian.wealth.holdings");
 
         assertThat(effective.mustPreserve()).contains("relationship_id", "client_name");
         assertThat(effective.canDrop()).contains("raw_agent_outputs");
@@ -67,7 +67,7 @@ class EffectiveManifestMergeTest {
             List.of("relationship_id", "time_period"), false,
             Map.of(), List.of());
 
-        var effective = EffectiveManifest.merge(domain, sub, "acme.wealth.holdings");
+        var effective = EffectiveManifest.merge(domain, sub, "meridian.wealth.holdings");
 
         assertThat(effective.requiredContext()).containsExactly("relationship_id", "time_period");
     }
@@ -81,7 +81,7 @@ class EffectiveManifestMergeTest {
             List.of("relationship_id"), false,
             Map.of("relationship_id", schema), List.of());
 
-        var effective = EffectiveManifest.merge(domain, sub, "acme.wealth.holdings");
+        var effective = EffectiveManifest.merge(domain, sub, "meridian.wealth.holdings");
 
         assertThat(effective.clarificationFor("relationship_id")).isNotNull();
         assertThat(effective.clarificationFor("relationship_id").question()).isEqualTo("Which client relationship?");
@@ -104,7 +104,7 @@ class EffectiveManifestMergeTest {
             new DomainManifest.Coverage("http://x/discover", "http://x/check", "http://x/resolve", 60),
             null, null, null);
 
-        var effective = EffectiveManifest.merge(domain, null, "acme.wealth.holdings");
+        var effective = EffectiveManifest.merge(domain, null, "meridian.wealth.holdings");
 
         assertThat(effective.resourceScoped()).isFalse();
         assertThat(effective.coverage()).isNotNull();

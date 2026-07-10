@@ -34,9 +34,9 @@ class EffectiveManifestTest {
                 List.of("relationship_id"), true,
                 Map.of("relationship_id",
                         new ClarificationSchema("Which client?", "principal_book", 1, null)),
-                List.of("acme.wealth.holdings"));
+                List.of("meridian.wealth.holdings"));
 
-        var em = EffectiveManifest.merge(domain, sub, "acme.wealth.holdings");
+        var em = EffectiveManifest.merge(domain, sub, "meridian.wealth.holdings");
 
         assertThat(em.resourceScoped()).isTrue();
         assertThat(em.coverage()).isNotNull();
@@ -53,9 +53,9 @@ class EffectiveManifestTest {
         var domain = new DomainManifest("asset-servicing", "Asset Servicing", null, null, null, null);
         var sub = new SubDomainManifest(
                 "nav", "NAV", "asset-servicing",
-                List.of(), false, Map.of(), List.of("acme.servicing.nav"));
+                List.of(), false, Map.of(), List.of("meridian.servicing.nav"));
 
-        var em = EffectiveManifest.merge(domain, sub, "acme.servicing.nav");
+        var em = EffectiveManifest.merge(domain, sub, "meridian.servicing.nav");
 
         assertThat(em.resourceScoped()).isFalse();
         assertThat(em.requiresContext()).isFalse();

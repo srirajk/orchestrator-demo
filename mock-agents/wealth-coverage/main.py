@@ -16,10 +16,12 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from data import check, discover, resolve
+from jwt_verify import verify_bearer_token
 
 log = logging.getLogger("wealth-coverage")
 logging.basicConfig(level=logging.INFO)
@@ -29,6 +31,20 @@ app = FastAPI(
     description="DISCOVER / CHECK / RESOLVE pipeline for wealth-domain relationships",
     version="1.0.0",
 )
+
+
+@app.middleware("http")
+async def jwt_auth_middleware(request: Request, call_next):
+    if request.url.path in ("/health", "/openapi.json", "/docs", "/redoc"):
+        return await call_next(request)
+    allowed, error, claims = verify_bearer_token(request.headers.get("Authorization"))
+    if not allowed:
+        log.warning("wealth-coverage: rejected request — %s (path=%s)", error, request.url.path)
+        return JSONResponse(status_code=401, content={"detail": error})
+    response = await call_next(request)
+    if claims and claims.get("sub"):
+        response.headers["X-Conduit-Verified-Sub"] = claims["sub"]
+    return response
 
 
 # ── response models ──────────────────────────────────────────────────────────

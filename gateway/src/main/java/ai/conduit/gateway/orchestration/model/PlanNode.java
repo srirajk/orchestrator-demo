@@ -16,5 +16,24 @@ public record PlanNode(
         String nodeId,
         AgentManifest agent,
         JsonNode input,
-        List<String> dependsOn   // empty for flat fan-out (Phase 4)
-) {}
+        List<String> dependsOn,  // empty for flat fan-out (Phase 4)
+        String condition
+) {
+    public PlanNode(String nodeId, AgentManifest agent, JsonNode input, List<String> dependsOn) {
+        this(nodeId, agent, input, dependsOn, conditionOf(agent));
+    }
+
+    private static String conditionOf(AgentManifest agent) {
+        AgentManifest.Io io = agent == null ? null : agent.io();
+        return io != null && io.hasCondition() ? io.condition() : null;
+    }
+
+    public boolean hasCondition() {
+        return condition != null && !condition.isBlank();
+    }
+
+    public boolean hasMap() {
+        AgentManifest.Io io = agent == null ? null : agent.io();
+        return io != null && io.hasMap();
+    }
+}

@@ -3,10 +3,9 @@ import os
 import json
 import logging
 import asyncio
-import concurrent.futures
 from agents import Runner, function_tool, InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered
 from shared.canned_data import NAV
-from shared.error_schema import mcp_error_json
+from shared.error_schema import AgentToolError
 from shared.fault_knobs import maybe_fault
 from shared.telemetry import agent_span
 from shared.agent_client import make_agent, LLM_MODEL, LLM_TIMEOUT_S
@@ -17,7 +16,7 @@ _LLM_BASE  = os.environ.get("NAV_LLM_BASE_URL") or None
 _LLM_KEY   = os.environ.get("NAV_LLM_API_KEY") or None
 _LLM_MODEL = os.environ.get("NAV_LLM_MODEL") or None
 
-AGENT_ID = "acme.servicing.nav"
+AGENT_ID = "meridian.servicing.nav"
 log = logging.getLogger(__name__)
 
 
@@ -56,7 +55,7 @@ async def _run_nav_agent(
     return result.final_output
 
 
-def get_nav(fund_id: str) -> str:
+async def get_nav(fund_id: str) -> str:
     """Get the latest Net Asset Value for a fund. Keyed by fund_id, not relationship_id."""
     with agent_span(AGENT_ID) as span:
         maybe_fault("get_nav")
@@ -64,19 +63,13 @@ def get_nav(fund_id: str) -> str:
         data = NAV.get(fund_id)
         if data is None:
             span.set_attribute("error", True)
-            return mcp_error_json(f"Fund '{fund_id}' not found. Known funds: {list(NAV)}", AGENT_ID, 404)
+            raise AgentToolError(f"Fund '{fund_id}' not found", AGENT_ID, 404)
         span.set_attribute("result.nav_per_unit", data.get("nav", 0))
         span.set_attribute("result.total_aum", data.get("aum", 0))
         try:
-            try:
-                asyncio.get_running_loop()
-                with concurrent.futures.ThreadPoolExecutor() as pool:
-                    future = pool.submit(asyncio.run, _run_nav_agent(fund_id, data, _LLM_BASE, _LLM_KEY, _LLM_MODEL))
-                    narrative = future.result(timeout=LLM_TIMEOUT_S)
-            except RuntimeError:
-                narrative = asyncio.run(_run_nav_agent(fund_id, data, _LLM_BASE, _LLM_KEY, _LLM_MODEL))
+            narrative = await asyncio.wait_for(_run_nav_agent(fund_id, data, _LLM_BASE, _LLM_KEY, _LLM_MODEL), timeout=LLM_TIMEOUT_S)
             span.set_attribute("agent.model", _LLM_MODEL or LLM_MODEL)
             return json.dumps({**data, "agent_narrative": narrative})
         except Exception as exc:
             log.error("Agent LLM call failed for %s: %s", fund_id, exc)
-            return mcp_error_json(f"llm_unavailable: {type(exc).__name__}", AGENT_ID, 503)
+            raise AgentToolError(f"llm_unavailable: {type(exc).__name__}", AGENT_ID, 503) from exc

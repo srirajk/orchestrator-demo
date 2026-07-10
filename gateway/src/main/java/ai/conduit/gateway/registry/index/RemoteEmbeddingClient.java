@@ -11,6 +11,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import java.time.Duration;
+import java.net.http.HttpClient;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 
 /**
  * EmbeddingClient that delegates to an OpenAI-compatible /v1/embeddings endpoint.
@@ -33,11 +36,38 @@ public class RemoteEmbeddingClient implements EmbeddingClient {
     @Value("${conduit.embedding.model:all-MiniLM-L6-v2}")
     private String modelName;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    /**
+     * Connect/read timeouts for the embedding hop, which sits on the routing path of EVERY request.
+     *
+     * <p>This client used to be a bare {@code new RestTemplate()} — {@code HttpURLConnection} with a
+     * read timeout of {@code -1}, i.e. infinite. Proven with Toxiproxy: hang the embeddings service
+     * and the request parks forever. The client gives up at its own deadline; the gateway keeps
+     * holding the request, never erroring, never completing, still reporting itself healthy.
+     *
+     * <p>Note this instance is built here rather than injected: it is deliberately *not* the shared
+     * {@code AppConfig.restTemplate()} bean, because the embedding hop should fail far faster than an
+     * LLM call. A fix that only touched the shared bean would have missed this site entirely.
+     */
+    @Value("${conduit.embedding.connect-timeout-ms:2000}")
+    private long connectTimeoutMs;
+
+    @Value("${conduit.embedding.read-timeout-ms:5000}")
+    private long readTimeoutMs;
+
+    private RestTemplate restTemplate;
     private final ObjectMapper mapper = new ObjectMapper();
 
     @PostConstruct
     public void probe() {
+        // HTTP/1.1 like every other outbound client here; JDK HttpClient rather than
+        // HttpURLConnection (whose getInputStream0() is synchronized and pins a carrier pre-JEP-491).
+        HttpClient httpClient = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofMillis(connectTimeoutMs))
+                .build();
+        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
+        factory.setReadTimeout(Duration.ofMillis(readTimeoutMs));
+        this.restTemplate = new RestTemplate(factory);
         log.info("RemoteEmbeddingClient → {} (dim={}, model={})", endpointUrl, dimension, modelName);
         try {
             float[] probe = embed("probe");

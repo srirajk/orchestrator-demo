@@ -32,7 +32,7 @@ def sub_domain_paths():
 
 
 def agent_paths():
-    return sorted((REGISTRY / "manifests").glob("*.json"))
+    return sorted((REGISTRY / "manifests").rglob("*.json"))
 
 
 def test_all_registry_schemas_are_valid_json_schema():
@@ -119,7 +119,7 @@ def test_context_envelope_contract_accepts_manifest_driven_domain_keys():
         "scope": {
             "domains": ["wealth-management"],
             "sub_domains": ["private-banking"],
-            "agents": ["acme.wealth.holdings"],
+            "agents": ["meridian.wealth.holdings"],
         },
         "context": {
             "entities": {

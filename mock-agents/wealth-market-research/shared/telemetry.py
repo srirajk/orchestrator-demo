@@ -72,7 +72,7 @@ def agent_span(agent_id: str, input_value: str = None):
     Context manager that creates an OpenInference AGENT span.
 
     Usage:
-        with agent_span("acme.wealth.market_research", input_value=topic) as span:
+        with agent_span("meridian.wealth.market_research", input_value=topic) as span:
             span.set_attribute("result.section_count", n)
     """
     @contextlib.contextmanager

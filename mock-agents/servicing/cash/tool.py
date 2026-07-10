@@ -3,10 +3,9 @@ import os
 import json
 import logging
 import asyncio
-import concurrent.futures
 from agents import Runner, function_tool, InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered
 from shared.canned_data import CASH
-from shared.error_schema import mcp_error_json
+from shared.error_schema import AgentToolError
 from shared.fault_knobs import maybe_fault
 from shared.telemetry import agent_span
 from shared.agent_client import make_agent, LLM_MODEL, LLM_TIMEOUT_S
@@ -17,7 +16,7 @@ _LLM_BASE  = os.environ.get("CASH_LLM_BASE_URL") or None
 _LLM_KEY   = os.environ.get("CASH_LLM_API_KEY") or None
 _LLM_MODEL = os.environ.get("CASH_LLM_MODEL") or None
 
-AGENT_ID = "acme.servicing.cash"
+AGENT_ID = "meridian.servicing.cash"
 log = logging.getLogger(__name__)
 
 
@@ -56,27 +55,21 @@ async def _run_cash_agent(
     return result.final_output
 
 
-def get_cash(relationship_id: str) -> str:
+async def get_cash(relationship_id: str) -> str:
     """Get cash balances and projected cash position for a relationship."""
     with agent_span(AGENT_ID, relationship_id) as span:
         maybe_fault("get_cash")
         data = CASH.get(relationship_id)
         if data is None:
             span.set_attribute("error", True)
-            return mcp_error_json(f"Relationship '{relationship_id}' not found.", AGENT_ID, 404)
+            raise AgentToolError(f"Relationship '{relationship_id}' not found.", AGENT_ID, 404)
         projected_usd = data.get("projected_cash_usd", 0)
         span.set_attribute("result.total_available_usd", projected_usd)
         span.set_attribute("result.currency_count", len(data.get("balances", [])))
         try:
-            try:
-                asyncio.get_running_loop()
-                with concurrent.futures.ThreadPoolExecutor() as pool:
-                    future = pool.submit(asyncio.run, _run_cash_agent(relationship_id, data, _LLM_BASE, _LLM_KEY, _LLM_MODEL))
-                    narrative = future.result(timeout=LLM_TIMEOUT_S)
-            except RuntimeError:
-                narrative = asyncio.run(_run_cash_agent(relationship_id, data, _LLM_BASE, _LLM_KEY, _LLM_MODEL))
+            narrative = await asyncio.wait_for(_run_cash_agent(relationship_id, data, _LLM_BASE, _LLM_KEY, _LLM_MODEL), timeout=LLM_TIMEOUT_S)
             span.set_attribute("agent.model", _LLM_MODEL or LLM_MODEL)
             return json.dumps({**data, "agent_narrative": narrative})
         except Exception as exc:
             log.error("Agent LLM call failed for %s: %s", relationship_id, exc)
-            return mcp_error_json(f"llm_unavailable: {type(exc).__name__}", AGENT_ID, 503)
+            raise AgentToolError(f"llm_unavailable: {type(exc).__name__}", AGENT_ID, 503) from exc

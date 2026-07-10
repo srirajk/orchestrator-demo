@@ -15,6 +15,18 @@ public interface TraceStorageAdapter {
     void save(TraceEvent event);
 
     /**
+     * Persist a batch of events for one request, in order. Never throws.
+     *
+     * <p>This is the path the gateway actually uses: a request's events are buffered in memory and
+     * flushed once, off the request thread. Implementations should collapse the batch into as few
+     * round-trips as possible — the naive per-event default below is what made the write ~92 Redis
+     * round-trips per request, on the hot path, through the pool that routing depends on.
+     */
+    default void saveAll(List<TraceEvent> events) {
+        if (events != null) events.forEach(this::save);
+    }
+
+    /**
      * Returns all events stored for {@code requestId} in insertion order.
      * Returns an empty list if the requestId is unknown or expired.
      */

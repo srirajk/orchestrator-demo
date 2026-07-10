@@ -1,0 +1,54 @@
+{
+  "agent_id": "meridian.servicing.cash_management",
+  "name": "Asset Servicing Cash Management",
+  "description": "Returns cash balances and projected cash positions for a given relationship. Accepts relationship_id as the primary key. Accessed via MCP tool over SSE transport.",
+  "version": "1.0.0",
+  "provider": {
+    "organization": "Meridian Demo Bank"
+  },
+  "domain": "asset-servicing",
+  "audience": "segment",
+  "sub_domain": "cash-management",
+  "max_response_tokens": 2000,
+  "protocol": "mcp",
+  "connection": {
+    "server_url": "http://servicing-mcp:8082/sse",
+    "tool": "get_cash",
+    "transport": "sse"
+  },
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false
+  },
+  "skills": [
+    {
+      "id": "get_cash",
+      "name": "get_cash",
+      "description": "Retrieve cash balances and projected cash positions for a given asset servicing relationship.",
+      "tags": [
+        "cash",
+        "liquidity",
+        "balances",
+        "projected-cash",
+        "asset-servicing"
+      ],
+      "examples": [
+        "cash position for the relationship",
+        "projected cash for this account",
+        "available cash balances",
+        "liquidity on the Whitman account"
+      ],
+      "inputModes": [
+        "application/json"
+      ],
+      "outputModes": [
+        "application/json"
+      ]
+    }
+  ],
+  "constraints": {
+    "access_mode": "read",
+    "data_classification": "confidential",
+    "sla_timeout_ms": 30000
+  }
+}
