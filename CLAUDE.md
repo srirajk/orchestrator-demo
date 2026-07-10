@@ -156,8 +156,10 @@ No gateway Java changes. That's the whole point.
   timeout can't kill them mid-recreate. The `backend-*` project in another folder is unrelated —
   never touch it.
 - **Tests:** JUnit + Testcontainers (gateway), pytest (agents), Playwright (`tests/e2e/`), k6 (`tests/load/`).
-  Caveat: some gateway `@SpringBootTest` context tests currently reach a live Redis — keep them
-  hermetic (a bare `mvn test` must never mutate a running demo's routing data).
+  The gateway `@SpringBootTest` context tests extend `RedisContainerTest`, which starts an isolated
+  Redis Stack container — so `mvn test` requires Docker and can never touch a running demo's Redis
+  (verified: the live index is byte-identical before and after a run). Any new full-context test
+  must extend `RedisContainerTest`.
 - Full URLs, logins, and the demo script are in [`docs/OPERATOR-RUNBOOK.md`](docs/OPERATOR-RUNBOOK.md).
 
 ## 8. Working agreement

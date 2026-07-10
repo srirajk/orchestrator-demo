@@ -1,5 +1,7 @@
 package ai.conduit.gateway;
 
+import ai.conduit.gateway.testsupport.RedisContainerTest;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -21,7 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         // Keeps the context hermetic: no embedding sidecar required, nothing written to its cache.
         "conduit.embedding.provider=hash"
 })
-class GatewayApplicationTests {
+class GatewayApplicationTests extends RedisContainerTest {
 
     @Autowired
     MockMvc mvc;

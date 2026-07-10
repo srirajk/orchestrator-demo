@@ -1,5 +1,7 @@
 package ai.conduit.gateway.domain.auth;
 
+import ai.conduit.gateway.testsupport.RedisContainerTest;
+
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.crypto.RSASSASigner;
@@ -59,7 +61,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         // Keeps the context hermetic: no embedding sidecar required, nothing written to its cache.
         "conduit.embedding.provider=hash"
 })
-class RoleAuthorizationTest {
+class RoleAuthorizationTest extends RedisContainerTest {
 
     static KeyPair keyPair;
 

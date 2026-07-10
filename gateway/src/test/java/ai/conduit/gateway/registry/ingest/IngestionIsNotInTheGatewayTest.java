@@ -1,5 +1,7 @@
 package ai.conduit.gateway.registry.ingest;
 
+import ai.conduit.gateway.testsupport.RedisContainerTest;
+
 import ai.conduit.gateway.registry.embedding.ManifestEmbedder;
 import ai.conduit.gateway.registry.embedding.QueryEmbedder;
 import ai.conduit.gateway.registry.index.VectorIndexWriter;
@@ -31,7 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         "conduit.registry.readiness.enabled=false",
         "conduit.embedding.provider=hash"
 })
-class IngestionIsNotInTheGatewayTest {
+class IngestionIsNotInTheGatewayTest extends RedisContainerTest {
 
     @Autowired
     private ApplicationContext context;
