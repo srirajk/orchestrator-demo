@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
@@ -209,6 +210,41 @@ public class SecurityConfig {
                         // @RequestMapping under /admin cannot silently arrive unguarded.
                         .requestMatchers("/admin/**")
                         .hasAnyRole("platform_admin", "tenant_admin", "domain_admin")
+
+                        // Identity mutation is administrative. Only UserController#listUsers and
+                        // AuthController#impersonate carried a guard; every write below fell through
+                        // to anyRequest().authenticated(), so a relationship manager whose only role
+                        // is chat_user could create users, change coverage books, grant resource
+                        // access — and, the escalation that matters, assign roles. Verified live:
+                        // rm_jane POST /roles, /teams, /domains all returned 400 (body invalid) rather
+                        // than 403 (guard) — i.e. the handler ran.
+                        //
+                        // Ordered most-specific-first; Spring Security takes the first match. Role
+                        // assignment is the narrowest gate: granting a role is how a lesser admin
+                        // would climb to platform_admin, so it is platform_admin only — a domain_admin
+                        // must not be able to make themselves a platform_admin.
+                        .requestMatchers(HttpMethod.POST, "/users/*/roles")
+                        .hasRole("platform_admin")
+                        .requestMatchers(HttpMethod.DELETE, "/users/*/roles/**")
+                        .hasRole("platform_admin")
+
+                        // All other user mutations — create, update, delete, change book, grant
+                        // resource access. GET /users/{id} stays reachable (a user reads their own
+                        // profile); GET /users (list) keeps its method-level @PreAuthorize.
+                        .requestMatchers(HttpMethod.POST, "/users/**").hasAnyRole("platform_admin", "tenant_admin", "domain_admin")
+                        .requestMatchers(HttpMethod.PUT, "/users/**").hasAnyRole("platform_admin", "tenant_admin", "domain_admin")
+                        .requestMatchers(HttpMethod.PATCH, "/users/**").hasAnyRole("platform_admin", "tenant_admin", "domain_admin")
+                        .requestMatchers(HttpMethod.DELETE, "/users/**").hasAnyRole("platform_admin", "tenant_admin", "domain_admin")
+
+                        // Org-structure mutation: roles, teams, domains. Reads stay authenticated;
+                        // only the writes are gated.
+                        .requestMatchers(HttpMethod.POST, "/roles/**", "/teams/**", "/domains/**").hasAnyRole("platform_admin", "tenant_admin", "domain_admin")
+                        .requestMatchers(HttpMethod.PUT, "/roles/**", "/teams/**", "/domains/**").hasAnyRole("platform_admin", "tenant_admin", "domain_admin")
+                        .requestMatchers(HttpMethod.DELETE, "/roles/**", "/teams/**", "/domains/**").hasAnyRole("platform_admin", "tenant_admin", "domain_admin")
+
+                        // The stats dashboard is an admin surface (admin-ui only).
+                        .requestMatchers("/stats").hasAnyRole("platform_admin", "tenant_admin", "domain_admin")
+
                         // Everything else requires a valid JWT
                         .anyRequest().authenticated()
                 )
