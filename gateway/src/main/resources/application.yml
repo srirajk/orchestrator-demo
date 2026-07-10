@@ -46,6 +46,12 @@ management:
         url: ${MANAGEMENT_OTLP_METRICS_EXPORT_URL:http://localhost:4318/v1/metrics}
 
 conduit:
+  # End-to-end deadline for ONE chat turn. The SSE emitter times out here AND the pipeline
+  # future is cancelled — so a turn can neither run forever, nor keep running (and keep
+  # spending) for a client that has already disconnected. Was a hardcoded 120_000L.
+  request:
+    deadline-ms: ${CONDUIT_REQUEST_DEADLINE_MS:90000}
+
   # ── Assistant framing (World B) ───────────────────────────────────────────────
   # Domain-neutral defaults. A domain deployment overrides these to reskin the
   # assistant; the gateway carries no hardcoded domain copy. domain-context feeds the

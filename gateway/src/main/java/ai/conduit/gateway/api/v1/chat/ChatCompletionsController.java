@@ -15,6 +15,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.context.Scope;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.beans.factory.annotation.Value;
+import java.util.concurrent.Future;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -54,11 +58,59 @@ public class ChatCompletionsController {
     // run gets its own cheap virtual thread instead.
     private final ExecutorService pipelineExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
+    /**
+     * End-to-end deadline for a single chat turn. Configuration, never a constant — the emitter
+     * timeout used to be a hardcoded {@code 120_000L}.
+     */
+    private final long requestDeadlineMs;
+    private final Counter cancelledOnDeadline;
+    private final Counter cancelledOnDisconnect;
+
     public ChatCompletionsController(ChatService chatService, IdentityExtractor identityExtractor,
-                                     ObjectMapper mapper) {
+                                     ObjectMapper mapper, MeterRegistry meterRegistry,
+                                     @Value("${conduit.request.deadline-ms:90000}") long requestDeadlineMs) {
         this.chatService = chatService;
         this.identityExtractor = identityExtractor;
         this.mapper = mapper;
+        this.requestDeadlineMs = requestDeadlineMs;
+        this.cancelledOnDeadline = Counter.builder("conduit.request.cancelled")
+                .description("Chat pipelines cancelled before completing")
+                .tag("reason", "deadline")
+                .register(meterRegistry);
+        this.cancelledOnDisconnect = Counter.builder("conduit.request.cancelled")
+                .description("Chat pipelines cancelled before completing")
+                .tag("reason", "client_disconnect")
+                .register(meterRegistry);
+        log.info("Chat request deadline: {}ms", requestDeadlineMs);
+    }
+
+    /**
+     * Bind the pipeline's lifetime to the client's.
+     *
+     * <p>The future used to be discarded, so nothing could ever stop the work: when the emitter
+     * timed out or the browser tab closed, the pipeline carried on calling the LLM and the agents —
+     * spending money and holding connections — for a person who would never see the answer. Proven
+     * with a hung dependency: twenty seconds after both clients had disconnected, the gateway was
+     * still holding both requests.
+     *
+     * <p>{@code CompletableFuture.cancel()} does NOT interrupt a running task; only a
+     * {@link java.util.concurrent.Future} from {@code ExecutorService.submit} does. That is why the
+     * pipeline is submitted rather than {@code runAsync}'d.
+     */
+    private void bindLifecycle(SseEmitter emitter, Future<?> pipeline, String kind) {
+        emitter.onTimeout(() -> {
+            log.warn("{} exceeded the {}ms deadline — cancelling the pipeline", kind, requestDeadlineMs);
+            cancelledOnDeadline.increment();
+            pipeline.cancel(true);
+            emitter.complete();
+        });
+        emitter.onError(e -> {
+            log.debug("{} client disconnected ({}) — cancelling the pipeline", kind, e.getMessage());
+            cancelledOnDisconnect.increment();
+            pipeline.cancel(true);
+        });
+        // Normal completion: cancel(false) is a no-op on an already-finished task.
+        emitter.onCompletion(() -> pipeline.cancel(false));
     }
 
     @PreDestroy
@@ -127,22 +179,24 @@ public class ChatCompletionsController {
         response.setHeader("X-Accel-Buffering", "no");
         response.setHeader("Connection", "keep-alive");
 
-        SseEmitter emitter = new SseEmitter(120_000L);
+        SseEmitter emitter = new SseEmitter(requestDeadlineMs);
+        final Future<?> pipeline;
         if (chatService.isTitleRequest(request)) {
             log.debug("Detected auto-title request — short-circuiting");
-            CompletableFuture.runAsync(() -> {
+            pipeline = pipelineExecutor.submit(() -> {
                 try (Scope ignored = otelContext.makeCurrent()) {
                     chatService.streamTitle(emitter);
                 }
-            }, pipelineExecutor);
+            });
         } else {
-            CompletableFuture.runAsync(() -> {
+            pipeline = pipelineExecutor.submit(() -> {
                 try (Scope ignored = otelContext.makeCurrent()) {
                     MdcPropagation.run(mdcContext, () ->
                             chatService.handleChat(request, emitter, userId, principal, conversationId, callerToken));
                 }
-            }, pipelineExecutor);
+            });
         }
+        bindLifecycle(emitter, pipeline, "chat request");
         return emitter;
     }
 
