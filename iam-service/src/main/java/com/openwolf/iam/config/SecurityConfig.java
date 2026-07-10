@@ -199,6 +199,16 @@ public class SecurityConfig {
                                 "/images/**",
                                 "/default-ui.css"
                         ).permitAll()
+                        // The /admin/** surface — the audit trail and the Cerbos policy lifecycle —
+                        // is administrative, not merely authenticated. Before this rule, any principal
+                        // holding a valid token (e.g. a relationship manager whose only role is
+                        // chat_user) could read the entire audit log and create, approve, or deploy
+                        // authorization policies, because only UserController and AuthController#impersonate
+                        // carried a @PreAuthorize and every other admin route fell through to
+                        // anyRequest().authenticated(). Enforced here rather than per-method so a new
+                        // @RequestMapping under /admin cannot silently arrive unguarded.
+                        .requestMatchers("/admin/**")
+                        .hasAnyRole("platform_admin", "tenant_admin", "domain_admin")
                         // Everything else requires a valid JWT
                         .anyRequest().authenticated()
                 )
