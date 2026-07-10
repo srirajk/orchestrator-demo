@@ -1,4 +1,4 @@
-package ai.conduit.gateway.admin;
+package ai.conduit.gateway.api.v1.admin;
 
 import ai.conduit.gateway.registry.model.AgentManifest;
 import ai.conduit.gateway.registry.service.AgentRegistry;

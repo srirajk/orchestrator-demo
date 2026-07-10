@@ -1,11 +1,14 @@
-package ai.conduit.gateway.insights;
+package ai.conduit.gateway.api.v1.insights;
+
+import ai.conduit.gateway.domain.insights.*;
+import ai.conduit.gateway.domain.insights.model.*;
 
 import ai.conduit.gateway.domain.auth.Principal;
 import ai.conduit.gateway.domain.auth.RequestContext;
 import ai.conduit.gateway.infrastructure.telemetry.TraceEvent;
 import ai.conduit.gateway.infrastructure.telemetry.TraceStorageAdapter;
-import ai.conduit.gateway.insights.LangfuseMetricsSource.CostSlice;
-import ai.conduit.gateway.insights.model.Board;
+import ai.conduit.gateway.domain.insights.LangfuseMetricsSource.CostSlice;
+import ai.conduit.gateway.domain.insights.model.Board;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;

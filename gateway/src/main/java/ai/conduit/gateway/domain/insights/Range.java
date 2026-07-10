@@ -1,4 +1,4 @@
-package ai.conduit.gateway.insights;
+package ai.conduit.gateway.domain.insights;
 
 /**
  * Selectable analytics time-range for an Insights board — the three windows the UI's timeframe

@@ -1,7 +1,7 @@
-package ai.conduit.gateway.insights;
+package ai.conduit.gateway.domain.insights;
 
-import ai.conduit.gateway.insights.model.LabeledValue;
-import ai.conduit.gateway.insights.model.Point;
+import ai.conduit.gateway.domain.insights.model.LabeledValue;
+import ai.conduit.gateway.domain.insights.model.Point;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;

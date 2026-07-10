@@ -1,4 +1,4 @@
-package ai.conduit.gateway.admin;
+package ai.conduit.gateway.api.v1.admin;
 
 import ai.conduit.gateway.registry.model.RoutingCandidate;
 import ai.conduit.gateway.resolver.model.ResolverResult;

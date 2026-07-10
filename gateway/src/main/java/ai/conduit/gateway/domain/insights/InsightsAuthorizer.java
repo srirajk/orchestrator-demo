@@ -1,4 +1,4 @@
-package ai.conduit.gateway.insights;
+package ai.conduit.gateway.domain.insights;
 
 import ai.conduit.gateway.domain.auth.CerbosEntitlementAdapter;
 import ai.conduit.gateway.domain.auth.Principal;

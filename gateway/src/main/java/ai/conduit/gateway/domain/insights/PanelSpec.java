@@ -1,6 +1,6 @@
-package ai.conduit.gateway.insights;
+package ai.conduit.gateway.domain.insights;
 
-import ai.conduit.gateway.insights.model.Panel;
+import ai.conduit.gateway.domain.insights.model.Panel;
 
 import java.util.function.Function;
 

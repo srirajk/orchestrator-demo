@@ -1,4 +1,4 @@
-package ai.conduit.gateway.insights.model;
+package ai.conduit.gateway.domain.insights.model;
 
 /**
  * One point in a time series: {@code t} = epoch-seconds, {@code v} = value.

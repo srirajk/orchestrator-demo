@@ -1,7 +1,7 @@
-package ai.conduit.gateway.insights;
+package ai.conduit.gateway.domain.insights;
 
-import ai.conduit.gateway.insights.model.Board;
-import ai.conduit.gateway.insights.model.Panel;
+import ai.conduit.gateway.domain.insights.model.Board;
+import ai.conduit.gateway.domain.insights.model.Panel;
 import io.github.resilience4j.timelimiter.TimeLimiter;
 import io.github.resilience4j.timelimiter.TimeLimiterConfig;
 import io.micrometer.core.instrument.MeterRegistry;

@@ -1,4 +1,4 @@
-package ai.conduit.gateway.insights.model;
+package ai.conduit.gateway.domain.insights.model;
 
 /**
  * A labelled scalar: {@code {"label":...,"value":...}}.

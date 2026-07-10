@@ -1,4 +1,4 @@
-package ai.conduit.gateway.insights;
+package ai.conduit.gateway.domain.insights;
 
 /**
  * Seam over a queryable metrics backend (hard-rule g: build the simple path, leave the

@@ -1,8 +1,8 @@
-package ai.conduit.gateway.insights;
+package ai.conduit.gateway.domain.insights;
 
-import ai.conduit.gateway.insights.model.LabeledValue;
-import ai.conduit.gateway.insights.model.Panel;
-import ai.conduit.gateway.insights.model.Point;
+import ai.conduit.gateway.domain.insights.model.LabeledValue;
+import ai.conduit.gateway.domain.insights.model.Panel;
+import ai.conduit.gateway.domain.insights.model.Point;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;

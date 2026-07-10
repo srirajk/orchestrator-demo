@@ -28,9 +28,7 @@ or `insurance/` package and there never will be. Business domains are onboarded 
 
 ```
 ai.conduit.gateway
-├── api/v1/{chat,models,trace}/     HTTP entry points, versioned; each may have dto/
-├── admin/                          admin controllers            ⚠ see Known inconsistencies
-├── insights/  (+ model/)           insights feature module      ⚠ see Known inconsistencies
+├── api/v1/{chat,models,trace,admin,insights}/  all HTTP entry points, versioned
 ├── domain/                         gateway capabilities, framework-light
 │   ├── auth/  chat/  clarify/  coverage/  intent/  manifest/
 ├── orchestration/{planner,executor,harness,model}/   the DAG engine
@@ -58,17 +56,22 @@ ai.conduit.gateway
 7. **Prefer package-private.** If a class is only used inside its package, do not make it `public`.
 8. **Every gateway spec must name the target package for each new class**, and the reviewer checks it.
 
-## Known inconsistencies (real; fix as a SEPARATE cleanup task — do NOT fold into feature work)
+## Known inconsistencies — RESOLVED (pure package move, no behavior change)
 
-1. **Controllers live in three places.** `api/v1/{chat,models,trace}` (correct), plus 3 flat controllers in
-   `admin/`, plus `insights/InsightsController`. Target: all HTTP entry points under `api/`.
-2. **`insights/` is a flat 11-class module** mixing controller + services + `model/`; it doesn't follow the
-   `domain/` capability convention. Target: `domain/insights/` (logic) + `api/v1/insights/` (controller).
-3. **`admin/` is neither versioned nor under `api/`.** Target: `api/v1/admin/` (or `api/admin/` if
-   deliberately unversioned — decide, then be consistent).
+All three were fixed together as their own change (the convention the project already follows for the
+public API — controller in `api/v1/*`, logic in `domain/*` — applied consistently). URLs are unchanged;
+only Java packages moved.
 
-These are structural warts, not bugs. They are logged so they get fixed **on purpose, in their own change**,
-where the diff is reviewable — not smuggled into a performance or security fix.
+1. ~~Controllers live in three places.~~ **Fixed.** Every HTTP entry point is now under `api/v1/`:
+   `api/v1/{chat,models,trace,admin,insights}`. The one deliberate exception is
+   `registry/api/AgentRegistrationController` — it belongs with the registry feature and exists only in
+   the `registry` Spring profile, not the gateway.
+2. ~~`insights/` is a flat top-level module.~~ **Fixed.** Its logic moved to `domain/insights/` (+ `model/`),
+   its controller to `api/v1/insights/` — matching how `domain/chat` + `api/v1/chat` are split.
+3. ~~`admin/` is neither versioned nor under `api/`.~~ **Fixed.** Moved to `api/v1/admin/`.
+
+Verified after the move: `mvn` 192/192, world-b CRITICAL 0, and the moved endpoints respond at their
+unchanged URLs (`GET /admin/agents`, `/v1/insights/cost`, `/v1/models` → 200; integration 13/13).
 
 ## Where the PERF fix's new code goes (mandatory placement)
 
