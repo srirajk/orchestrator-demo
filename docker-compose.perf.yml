@@ -55,6 +55,25 @@ services:
         condition: service_healthy
 
   gateway:
+    # ── CPU: two different knobs, two different questions ─────────────────────────
+    # CPUS (cgroup quota) is the PRODUCTION question — "does it run on a 2-vCPU box?". The JVM's
+    # container support reads the quota via availableProcessors(), so it also caps carriers, GC
+    # threads, the ForkJoin common pool and Netty loops. Faithful, but it is a quota over a 100ms
+    # period, so bursty requests get CFS-throttled and you see latency spikes that are an artifact of
+    # the accounting, not of the code.
+    #   CPUS=2 docker compose ... up -d gateway
+    #
+    # CPUSET pins dedicated cores instead — same core count, no quota throttling. Use it when the
+    # number you care about is LATENCY rather than capacity.
+    #   CPUSET=0,1 docker compose ... up -d gateway
+    #
+    # CARRIERS (below) is the surgical tool: it caps the virtual-thread scheduler ONLY, leaving
+    # compute abundant. That isolates carrier exhaustion / pinning from CPU starvation — few seats,
+    # plenty of CPU. Leave it at the CPU count unless you are specifically hunting a pinning bug.
+    #
+    # Default: unset -> no limit (the container sees all 12 host CPUs, Effective CPU Count: 12).
+    cpus: ${CPUS:-0}
+    cpuset: ${CPUSET:-}
     environment:
       # All four gateway call sites through the proxy. Keys stay set: aimock forwards them upstream
       # in record mode and ignores them in replay.
@@ -63,9 +82,8 @@ services:
       CONDUIT_LLM_SYNTHESIZER_BASE_URL: http://toxiproxy:9000/v1
       CONDUIT_LLM_CLARIFICATION_COMPOSER_BASE_URL: http://toxiproxy:9000/v1
       # The gateway Dockerfile's ENTRYPOINT is `java -jar app.jar` with no JAVA_OPTS, so
-      # JAVA_TOOL_OPTIONS is the clean lever. Pin carriers so saturation is reproducible: the
-      # container otherwise sees all 12 host CPUs. The JVM logs "Picked up JAVA_TOOL_OPTIONS" —
-      # assert that, do not assume it.
+      # JAVA_TOOL_OPTIONS is the clean lever. The JVM logs "Picked up JAVA_TOOL_OPTIONS" — assert
+      # that, and assert the Effective CPU Count, rather than assuming either took effect.
       JAVA_TOOL_OPTIONS: -Djdk.virtualThreadScheduler.parallelism=${CARRIERS:-12} -Djdk.virtualThreadScheduler.maxPoolSize=${CARRIERS:-12}
     depends_on:
       toxiproxy:
