@@ -1,5 +1,5 @@
-# Stage 1 — build with Maven + JDK 21 (source build inside Docker; no prebuilt jar needed)
-FROM maven:3.9-eclipse-temurin-21 AS build
+# Stage 1 — build with Maven + JDK 25 (source build inside Docker; no prebuilt jar needed)
+FROM maven:3.9-eclipse-temurin-25 AS build
 
 WORKDIR /build
 
@@ -11,7 +11,7 @@ COPY src ./src
 RUN mvn package -DskipTests -q
 
 # Stage 2 — lean runtime (JRE + wget for healthcheck)
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 
 LABEL maintainer="Meridian Platform"
 LABEL description="OpenWolf IAM Service — OIDC provider, user management, entitlements"
@@ -23,9 +23,10 @@ COPY --from=build /build/target/iam-service-*.jar app.jar
 
 EXPOSE 8084
 
+# -XX:+ZGenerational was removed in JDK 24; passing it to a 25 JVM aborts startup.
+# ZGC is generational by default from 23 onward, so -XX:+UseZGC alone is equivalent.
 ENTRYPOINT ["java", \
     "-XX:+UseZGC", \
-    "-XX:+ZGenerational", \
     "-Djava.security.egd=file:/dev/./urandom", \
     "-jar", \
     "app.jar"]

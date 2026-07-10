@@ -9,9 +9,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
+import java.net.http.HttpClient;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -51,6 +54,8 @@ public class LlmPolicyGenerationService {
     public LlmPolicyGenerationService(
             @Value("${iam.policy-generation.base-url:https://api.z.ai/api/paas/v4}") String baseUrl,
             @Value("${iam.policy-generation.api-key:${ZAI_API_KEY:}}") String apiKey,
+            @Value("${iam.policy-generation.connect-timeout-ms:5000}") long connectTimeoutMs,
+            @Value("${iam.policy-generation.read-timeout-ms:30000}") long readTimeoutMs,
             ObjectMapper objectMapper,
             RoleRepository roleRepository,
             TenantRepository tenantRepository) {
@@ -59,7 +64,18 @@ public class LlmPolicyGenerationService {
         this.roleRepository = roleRepository;
         this.tenantRepository = tenantRepository;
 
+        // A bare RestClient.builder() uses the default request factory, whose read timeout is
+        // infinite. An LLM peer that accepts the connection and then stalls would park the calling
+        // thread for the lifetime of the process. Both timeouts are bounded and config-driven.
+        HttpClient httpClient = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofMillis(connectTimeoutMs))
+                .build();
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
+        requestFactory.setReadTimeout(Duration.ofMillis(readTimeoutMs));
+
         this.restClient = RestClient.builder()
+                .requestFactory(requestFactory)
                 .baseUrl(baseUrl)
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
