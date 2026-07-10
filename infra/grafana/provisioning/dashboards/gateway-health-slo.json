@@ -1,5 +1,7 @@
 {
-  "annotations": {"list": []},
+  "annotations": {
+    "list": []
+  },
   "description": "Operator SLO dashboard for Conduit Gateway RED metrics, saturation, stage latency, failures, and runtime health.",
   "editable": true,
   "fiscalYearStartMonth": 0,
@@ -19,124 +21,727 @@
   ],
   "panels": [
     {
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {"defaults": {"unit": "reqps"}, "overrides": []},
-      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
       "id": 1,
-      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
-      "targets": [{"expr": "sum(rate(conduit_gateway_requests_total[$__rate_interval]))", "legendFormat": "req/s", "refId": "A"}],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(conduit_gateway_requests_total[$__rate_interval]))",
+          "legendFormat": "req/s",
+          "refId": "A"
+        }
+      ],
       "title": "Request Rate",
       "type": "stat"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {"defaults": {"max": 100, "min": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 2}, {"color": "red", "value": 5}]}, "unit": "percent"}, "overrides": []},
-      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 0},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 2
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
       "id": 2,
-      "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
-      "targets": [{"expr": "100 * sum(rate(conduit_gateway_requests_total{status_class=~\"4xx|5xx\"}[$__rate_interval])) / clamp_min(sum(rate(conduit_gateway_requests_total[$__rate_interval])), 0.001)", "legendFormat": "error %", "refId": "A"}],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "100 * sum(rate(conduit_gateway_requests_total{status_class=~\"4xx|5xx\"}[$__rate_interval])) / clamp_min(sum(rate(conduit_gateway_requests_total[$__rate_interval])), 0.001)",
+          "legendFormat": "error %",
+          "refId": "A"
+        }
+      ],
       "title": "Error Rate",
       "type": "stat"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {"defaults": {"thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 20}, {"color": "red", "value": 25}]}, "unit": "short"}, "overrides": []},
-      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 0},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 20
+              },
+              {
+                "color": "red",
+                "value": 25
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
       "id": 3,
-      "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
-      "targets": [{"expr": "max(conduit_gateway_inflight_requests)", "legendFormat": "in-flight", "refId": "A"}],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "max(conduit_gateway_inflight_requests)",
+          "legendFormat": "in-flight",
+          "refId": "A"
+        }
+      ],
       "title": "Saturation: In-flight Requests",
       "type": "stat"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {"defaults": {"unit": "ms"}, "overrides": []},
-      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 0},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
       "id": 4,
-      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
-      "targets": [{"expr": "histogram_quantile(0.95, sum(rate(conduit_gateway_request_duration_seconds_bucket[$__rate_interval])) by (le)) * 1000", "legendFormat": "p95", "refId": "A"}],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(conduit_gateway_request_duration_seconds_bucket[$__rate_interval])) by (le)) * 1000",
+          "legendFormat": "p95",
+          "refId": "A"
+        }
+      ],
       "title": "Request Latency p95",
       "type": "stat"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {"defaults": {"unit": "reqps"}, "overrides": []},
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 5
+      },
       "id": 5,
-      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "none"}},
-      "targets": [{"expr": "sum(rate(conduit_gateway_requests_total[$__rate_interval])) by (path, outcome)", "legendFormat": "{{path}} / {{outcome}}", "refId": "A"}],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(conduit_gateway_requests_total[$__rate_interval])) by (path, outcome)",
+          "legendFormat": "{{path}} / {{outcome}}",
+          "refId": "A"
+        }
+      ],
       "title": "RED Rate by Flat vs DAG",
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {"defaults": {"unit": "ms"}, "overrides": []},
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 5
+      },
       "id": 6,
-      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "none"}},
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
       "targets": [
-        {"expr": "histogram_quantile(0.50, sum(rate(conduit_gateway_request_duration_seconds_bucket[$__rate_interval])) by (le, path)) * 1000", "legendFormat": "p50 {{path}}", "refId": "A"},
-        {"expr": "histogram_quantile(0.95, sum(rate(conduit_gateway_request_duration_seconds_bucket[$__rate_interval])) by (le, path)) * 1000", "legendFormat": "p95 {{path}}", "refId": "B"},
-        {"expr": "histogram_quantile(0.99, sum(rate(conduit_gateway_request_duration_seconds_bucket[$__rate_interval])) by (le, path)) * 1000", "legendFormat": "p99 {{path}}", "refId": "C"}
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(conduit_gateway_request_duration_seconds_bucket[$__rate_interval])) by (le, path)) * 1000",
+          "legendFormat": "p50 {{path}}",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(conduit_gateway_request_duration_seconds_bucket[$__rate_interval])) by (le, path)) * 1000",
+          "legendFormat": "p95 {{path}}",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(conduit_gateway_request_duration_seconds_bucket[$__rate_interval])) by (le, path)) * 1000",
+          "legendFormat": "p99 {{path}}",
+          "refId": "C"
+        }
       ],
       "title": "Latency Percentiles by Path",
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {"defaults": {"thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 20}, {"color": "red", "value": 25}]}, "unit": "short"}, "overrides": []},
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 13},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 20
+              },
+              {
+                "color": "red",
+                "value": 25
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 13
+      },
       "id": 7,
-      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "single", "sort": "none"}},
-      "targets": [{"expr": "max(conduit_gateway_inflight_requests)", "legendFormat": "in-flight; alert at 20, known ceiling near 25", "refId": "A"}],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "max(conduit_gateway_inflight_requests)",
+          "legendFormat": "in-flight; alert at 20, known ceiling near 25",
+          "refId": "A"
+        }
+      ],
       "title": "Saturation Trend",
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {"defaults": {"unit": "ms"}, "overrides": []},
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 13},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 13
+      },
       "id": 8,
-      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "none"}},
-      "targets": [{"expr": "histogram_quantile(0.95, sum(rate(conduit_gateway_stage_duration_seconds_bucket[$__rate_interval])) by (le, stage, path)) * 1000", "legendFormat": "{{stage}} / {{path}}", "refId": "A"}],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(conduit_gateway_stage_duration_seconds_bucket[$__rate_interval])) by (le, stage, path)) * 1000",
+          "legendFormat": "{{stage}} / {{path}}",
+          "refId": "A"
+        }
+      ],
       "title": "Per-stage Latency p95",
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 21},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 21
+      },
       "id": 9,
-      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "none"}},
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
       "targets": [
-        {"expr": "sum(rate(conduit_dag_fallback_total[$__rate_interval])) by (reason)", "legendFormat": "dag fallback {{reason}}", "refId": "A"},
-        {"expr": "sum(rate(conduit_coverage_unavailable_total[$__rate_interval])) by (operation)", "legendFormat": "coverage unavailable {{operation}}", "refId": "B"},
-        {"expr": "sum(rate(conduit_jwks_refresh_failures_total[$__rate_interval]))", "legendFormat": "jwks failures", "refId": "C"},
-        {"expr": "sum(rate(conduit_agent_calls_total{status=~\"TIMEOUT|FAILED|BREAKER_OPEN|QUEUE_FULL\"}[$__rate_interval])) by (status)", "legendFormat": "agent {{status}}", "refId": "D"}
+        {
+          "expr": "sum(rate(conduit_dag_fallback_total[$__rate_interval])) by (reason)",
+          "legendFormat": "dag fallback {{reason}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(conduit_coverage_unavailable_total[$__rate_interval])) by (operation)",
+          "legendFormat": "coverage unavailable {{operation}}",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(conduit_jwks_refresh_failures_total[$__rate_interval]))",
+          "legendFormat": "jwks failures",
+          "refId": "C"
+        },
+        {
+          "expr": "sum(rate(conduit_agent_calls_total{status=~\"TIMEOUT|FAILED|BREAKER_OPEN|QUEUE_FULL\"}[$__rate_interval])) by (status)",
+          "legendFormat": "agent {{status}}",
+          "refId": "D"
+        }
       ],
       "title": "Failure and Degradation Signals",
       "type": "timeseries"
     },
     {
-      "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {"defaults": {"unit": "decbytes"}, "overrides": []},
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 21},
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "decbytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 21
+      },
       "id": 10,
-      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "none"}},
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
       "targets": [
-        {"expr": "jvm_memory_used_bytes{area=\"heap\"}", "legendFormat": "heap used {{id}}", "refId": "A"},
-        {"expr": "jvm_threads_live_threads", "legendFormat": "live threads", "refId": "B"},
-        {"expr": "rate(jvm_gc_pause_seconds_sum[$__rate_interval])", "legendFormat": "gc pause seconds/s", "refId": "C"}
+        {
+          "expr": "jvm_memory_used_bytes{area=\"heap\"}",
+          "legendFormat": "heap used {{id}}",
+          "refId": "A"
+        },
+        {
+          "expr": "jvm_threads_live_threads",
+          "legendFormat": "live threads",
+          "refId": "B"
+        },
+        {
+          "expr": "rate(jvm_gc_pause_seconds_sum[$__rate_interval])",
+          "legendFormat": "gc pause seconds/s",
+          "refId": "C"
+        }
       ],
       "title": "JVM Runtime",
       "type": "timeseries"
+    },
+    {
+      "id": 11,
+      "type": "row",
+      "title": "Resilience \u2014 deadline, cancellation, honest outcomes",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 29
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Resilience: Cancellations",
+      "description": "A request that exceeds conduit.request.deadline-ms, or whose client disconnects, is now CANCELLED \u2014 the pipeline stops calling the LLM and the agents. Before this existed, both kept running for a client that would never see the answer. A non-zero client_disconnect rate is normal (users close tabs); a rising deadline rate means requests are too slow.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 30
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(conduit_request_cancelled_total[$__rate_interval])) by (reason)",
+          "legendFormat": "{{reason}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Request Outcomes (honest)",
+      "description": "ANSWERED / CLARIFIED / DENIED / FAILED / ERROR. FAILED means agents were dispatched and none succeeded \u2014 such a request used to be recorded as ANSWERED, so this board (and eval, and audit) reported success for a request that returned zero data.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 30
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(conduit_request_outcome_total[$__rate_interval])) by (outcome)",
+          "legendFormat": "{{outcome}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Zero-data + Partial answers",
+      "description": "no_data is the metric to alert on: the user got prose, but not one byte of domain data.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 38
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(conduit_request_no_data_total[$__rate_interval]))",
+          "legendFormat": "no_data (every agent failed)",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(conduit_request_partial_total[$__rate_interval]))",
+          "legendFormat": "partial (a sibling agent failed)",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "Trace write (off the request path)",
+      "description": "Trace events are buffered per request and flushed once, asynchronously, on a bounded queue. A non-zero dropped rate means the queue overflowed \u2014 a silent drop would be a lie, so it is counted. Queue depth persistently > 0 means the writer cannot keep up.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 38
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(conduit_trace_flushed_total[$__rate_interval]))",
+          "legendFormat": "flushed/s",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "sum(rate(conduit_trace_dropped_total[$__rate_interval]))",
+          "legendFormat": "DROPPED/s",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "max(conduit_trace_queue_depth)",
+          "legendFormat": "queue depth",
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ]
     }
   ],
   "refresh": "10s",
   "schemaVersion": 40,
-  "tags": ["conduit", "gateway", "slo", "operations"],
-  "templating": {"list": []},
-  "time": {"from": "now-30m", "to": "now"},
+  "tags": [
+    "conduit",
+    "gateway",
+    "slo",
+    "operations"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
   "timezone": "browser",
   "title": "Gateway Health / SLO",
   "uid": "gateway-health-slo",
