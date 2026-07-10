@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Toggle Toxiproxy toxics on the `llm` proxy — the latency knob and the only true hang.
 #
-#   scripts/perf-toxic.sh <profile>
+#   [PROXY=llm|embeddings] scripts/perf-toxic.sh <profile>
 #
 #   gateway-only   no toxics. Total latency ≈ the gateway's own cost.
 #   realistic      latency 1800ms ± 400  (the measured p50 of a real request)
@@ -22,7 +22,8 @@
 set -euo pipefail
 
 ADMIN=${TOXIPROXY_ADMIN:-http://localhost:8474}
-P=llm
+# Which upstream to disturb: llm (aimock) or embeddings (the sentence-transformers sidecar).
+P=${PROXY:-llm}
 
 api() { curl -sS "$@"; }
 clear_toxics() {
@@ -36,6 +37,13 @@ case "${1:-show}" in
   gateway-only|clear) clear_toxics ;;
   realistic) clear_toxics; add '{"name":"lat","type":"latency","stream":"downstream","attributes":{"latency":1800,"jitter":400}}' ;;
   slow)      clear_toxics; add '{"name":"lat","type":"latency","stream":"downstream","attributes":{"latency":4000,"jitter":800}}' ;;
+  # stream=upstream on purpose. A TRUE hang means the request never reaches the server, so no
+  # server ever holds connection state that can time out. With stream=downstream the request
+  # DOES arrive: uvicorn answers, toxiproxy holds the bytes, and uvicorn then closes the idle
+  # keep-alive connection after its default timeout_keep_alive=5s -> the client sees EOF at 5s,
+  # which looks like a working read timeout but is the SERVER hanging up. Verified both ways.
+  # NOTE: toxics apply to NEW connections. A pooled keep-alive socket opened before the toxic
+  # dies with "Unexpected end of file" on first use — drive a second request for the real test.
   hang)      clear_toxics; add '{"name":"hang","type":"timeout","stream":"upstream","attributes":{"timeout":0}}' ;;
   slow-body) clear_toxics; add '{"name":"bw","type":"bandwidth","stream":"downstream","attributes":{"rate":4}}' ;;
   truncate)  clear_toxics; add '{"name":"cut","type":"limit_data","stream":"downstream","attributes":{"bytes":512}}' ;;

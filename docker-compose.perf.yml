@@ -50,6 +50,7 @@ services:
     ports:
       - "8474:8474"          # admin API — scripts/perf-toxic.sh drives this
       - "9113:9000"          # the proxied LLM endpoint, for host-side debugging
+      - "9114:9001"          # the proxied embeddings endpoint
     depends_on:
       aimock:
         condition: service_healthy
@@ -81,6 +82,10 @@ services:
       CONDUIT_LLM_ENTITY_EXTRACTOR_BASE_URL: http://toxiproxy:9000/v1
       CONDUIT_LLM_SYNTHESIZER_BASE_URL: http://toxiproxy:9000/v1
       CONDUIT_LLM_CLARIFICATION_COMPOSER_BASE_URL: http://toxiproxy:9000/v1
+      # Through the proxy too, so Phase 3b can HANG it. RemoteEmbeddingClient builds its own
+      # `new RestTemplate()` (registry/index/RemoteEmbeddingClient.java:36) whose read timeout
+      # defaults to -1 = infinite. This is how we prove that, rather than assert it.
+      CONDUIT_EMBEDDING_REMOTE_URL: http://toxiproxy:9001/v1/embeddings
       # The gateway Dockerfile's ENTRYPOINT is `java -jar app.jar` with no JAVA_OPTS, so
       # JAVA_TOOL_OPTIONS is the clean lever. The JVM logs "Picked up JAVA_TOOL_OPTIONS" — assert
       # that, and assert the Effective CPU Count, rather than assuming either took effect.
