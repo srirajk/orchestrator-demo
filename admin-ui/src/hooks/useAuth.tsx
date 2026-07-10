@@ -1,6 +1,13 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react'
 import type { User } from '../api/client'
+import { normalizeSegments } from '../api/client'
 import { AUTH_LOGOUT_EVENT, clearAdminToken, readAdminToken, writeAdminToken } from '../auth/tokenStorage'
+
+/** Roles that may enter the admin console — mirrors the backend /admin/** guard. */
+export const ADMIN_ROLES = ['platform_admin', 'tenant_admin', 'domain_admin']
+export function hasAdminRole(user: User | null): boolean {
+  return user?.roles?.some((r) => ADMIN_ROLES.includes(r)) ?? false
+}
 
 interface AuthCtx {
   user: User | null
@@ -34,7 +41,7 @@ export function decodePayload(token: string): User | null {
       email: p.email || '',
       roles: p.roles || [],
       book: p.book || [],
-      segments: p.segments || [],
+      segments: normalizeSegments(p.segments),
       clearance: p.clearance || 1,
       classification: p.classification || 'public',
       team: p.team || '',

@@ -2,6 +2,22 @@ import { clearAdminToken, notifyAuthLogout, readAdminToken } from '../auth/token
 
 const BASE = '/api'
 
+/**
+ * ABAC segments arrive from the backend as a {segment: data_classification} MAP
+ * (e.g. {"platform":"internal"}), not an array — the UI models them as string[]. Coerce to the
+ * list of segment names so `.map`/`.length` never blow up on an object. The per-segment
+ * classification is carried separately on `classification`.
+ */
+export function normalizeSegments(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw as string[]
+  if (raw && typeof raw === 'object') return Object.keys(raw as Record<string, unknown>)
+  return []
+}
+
+function withNormalizedSegments<T extends { segments?: unknown }>(entity: T): T {
+  return { ...entity, segments: normalizeSegments(entity.segments) }
+}
+
 function token(): string {
   return readAdminToken()
 }
@@ -179,9 +195,9 @@ export const usersApi = {
   listPage: (page = 0, size = 100) => req<PageResponse<User>>('GET', `/users?page=${page}&size=${size}`),
   list: async () => {
     const page = await usersApi.listPage(0, 100)
-    return page.content
+    return page.content.map(withNormalizedSegments)
   },
-  get: (id: string) => req<User>('GET', `/users/${id}`),
+  get: async (id: string) => withNormalizedSegments(await req<User>('GET', `/users/${id}`)),
   create: (data: CreateUserInput) =>
     req<User>('POST', '/users', data),
   update: (id: string, data: UpdateUserInput) =>
@@ -203,8 +219,8 @@ export const usersApi = {
 
 // ── Teams ─────────────────────────────────────────────────────────────────────
 export const teamsApi = {
-  list: () => req<Team[]>('GET', '/teams'),
-  get: (id: string) => req<Team>('GET', `/teams/${id}`),
+  list: async () => (await req<Team[]>('GET', '/teams')).map(withNormalizedSegments),
+  get: async (id: string) => withNormalizedSegments(await req<Team>('GET', `/teams/${id}`)),
   create: (data: Omit<Team, 'memberCount'>) =>
     req<Team>('POST', '/teams', {
       name: data.name,

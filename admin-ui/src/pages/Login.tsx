@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { authApi } from '../api/client'
-import { useAuth } from '../hooks/useAuth'
+import { useAuth, hasAdminRole } from '../hooks/useAuth'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { LockKeyhole, ShieldCheck } from 'lucide-react'
@@ -20,6 +20,12 @@ export function Login() {
     setLoading(true)
     try {
       const res = await authApi.login(username, password)
+      // Credentials can be valid without being authorized for the admin console (e.g. a
+      // relationship manager). Reject non-admins here rather than admitting them to the shell.
+      if (!hasAdminRole(res.user)) {
+        setError('This account is not authorized for the admin console.')
+        return
+      }
       login(res.accessToken, res.user)
       navigate('/')
     } catch (err: unknown) {
