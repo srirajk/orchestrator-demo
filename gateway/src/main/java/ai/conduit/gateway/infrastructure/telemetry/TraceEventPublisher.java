@@ -1,13 +1,19 @@
 package ai.conduit.gateway.infrastructure.telemetry;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -38,14 +44,35 @@ public class TraceEventPublisher {
 
     private record Subscriber(SseEmitter emitter, Predicate<TraceEvent> filter) {}
 
+    /**
+     * Event type that terminates a request. ChatService emits it on every exit path — answered,
+     * clarified, denied and errored — so a buffer is always handed off, not leaked.
+     */
+    private static final String TERMINAL_EVENT = "request_complete";
+
     private final ConcurrentHashMap<String, Subscriber> subscribers = new ConcurrentHashMap<>();
     private final ObjectMapper mapper;
-    private final TraceStorageAdapter storage;
+    private final AsyncTraceWriter traceWriter;
+    /** In-flight per-request event buffers, flushed once when the request completes. */
+    private final ConcurrentHashMap<String, List<TraceEvent>> buffers = new ConcurrentHashMap<>();
+    private final int maxEventsPerRequest;
+    private final int maxOpenRequests;
+    private final Counter bufferOverflow;
     private ScheduledExecutorService heartbeat;
 
-    public TraceEventPublisher(ObjectMapper mapper, TraceStorageAdapter storage) {
-        this.mapper  = mapper;
-        this.storage = storage;
+    public TraceEventPublisher(
+            ObjectMapper mapper,
+            AsyncTraceWriter traceWriter,
+            MeterRegistry meterRegistry,
+            @Value("${conduit.telemetry.buffer.max-events-per-request:512}") int maxEventsPerRequest,
+            @Value("${conduit.telemetry.buffer.max-open-requests:10000}") int maxOpenRequests) {
+        this.mapper              = mapper;
+        this.traceWriter         = traceWriter;
+        this.maxEventsPerRequest = Math.max(1, maxEventsPerRequest);
+        this.maxOpenRequests     = Math.max(1, maxOpenRequests);
+        this.bufferOverflow = Counter.builder("conduit.trace.buffer.overflow")
+                .description("Trace events dropped because a request's buffer or the buffer table was full")
+                .register(meterRegistry);
     }
 
     @PostConstruct
@@ -105,6 +132,60 @@ public class TraceEventPublisher {
         return emitter;
     }
 
+    /**
+     * Append to this request's buffer; flush the whole buffer once the request terminates.
+     *
+     * <p>Two bounds, both counted rather than silent:
+     * <ul>
+     *   <li><b>per request</b> — a runaway request cannot grow its buffer without limit;</li>
+     *   <li><b>table-wide</b> — if a request somehow never emits {@link #TERMINAL_EVENT} (an
+     *       out-of-band kill), its buffer would leak. Past {@code maxOpenRequests} we flush the
+     *       oldest buffer rather than accumulate. Bounded beats tidy.</li>
+     * </ul>
+     */
+    private void buffer(TraceEvent event) {
+        String requestId = event.requestId();
+        if (requestId == null || requestId.isBlank()) return;
+
+        if (buffers.size() >= maxOpenRequests && !buffers.containsKey(requestId)) {
+            evictOldestBuffer();
+        }
+
+        List<TraceEvent> batch = buffers.computeIfAbsent(
+                requestId, k -> Collections.synchronizedList(new ArrayList<>()));
+        synchronized (batch) {
+            if (batch.size() < maxEventsPerRequest) {
+                batch.add(event);
+            } else {
+                bufferOverflow.increment();
+            }
+        }
+
+        if (TERMINAL_EVENT.equals(event.type())) {
+            List<TraceEvent> completed = buffers.remove(requestId);
+            if (completed != null) {
+                synchronized (completed) {
+                    traceWriter.submit(new ArrayList<>(completed));   // copy: the writer outlives this thread
+                }
+            }
+        }
+    }
+
+    /** Flush an arbitrary in-flight buffer so the table stays bounded. Its request never completed. */
+    private void evictOldestBuffer() {
+        var it = buffers.entrySet().iterator();
+        if (!it.hasNext()) return;
+        var entry = it.next();
+        List<TraceEvent> orphan = buffers.remove(entry.getKey());
+        if (orphan != null) {
+            log.warn("Trace buffer table full ({}), flushing orphaned buffer for requestId={}",
+                    maxOpenRequests, entry.getKey());
+            synchronized (orphan) {
+                traceWriter.submit(new ArrayList<>(orphan));
+            }
+        }
+    }
+
     /** Remove a subscriber on disconnect or timeout. */
     public void unsubscribe(String clientId) {
         subscribers.remove(clientId);
@@ -117,12 +198,16 @@ public class TraceEventPublisher {
     }
 
     /**
-     * Publish {@code event} to all connected glass-box clients and persist it to Redis.
-     * Never throws — dead subscribers are silently pruned; storage errors are logged.
+     * Publish {@code event} to all connected glass-box clients and buffer it for persistence.
+     * Never throws — dead subscribers are silently pruned; storage errors are handled downstream.
+     *
+     * <p>Persistence does <b>not</b> happen here. The event is appended to this request's buffer and
+     * the whole buffer is handed to {@link AsyncTraceWriter} once, when the request completes — one
+     * pipelined round-trip instead of ~92, and none of it on the request thread. The live panel is
+     * unaffected: it reads the in-memory fan-out below, never Redis.
      */
     public void publish(TraceEvent event) {
-        // Persist regardless of whether any SSE clients are connected
-        storage.save(event);
+        buffer(event);
 
         if (subscribers.isEmpty()) return;
 

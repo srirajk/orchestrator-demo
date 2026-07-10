@@ -94,3 +94,46 @@ Phase 2 (`realistic` 1.8s, `slow` 4s latency), Phase 3 (429 storm; **hang**; mid
 malformed SSE), Phase 4 (agents isolated), and the **canary** against the real provider — which is mandatory,
 because AIMock is three months old, ships ~4 releases/week, and is now our measurement instrument. If its SSE
 framing regresses, our conformance test passes against a lie.
+
+---
+
+# Phase 1d — after taking the trace write off the request path
+
+Same harness, `CPUS=2 CARRIERS=2`, deterministic LLM. Change: per-request buffering + one pipelined
+flush on a bounded async queue, telemetry on its own Jedis pool.
+
+| VUs | req/s before | req/s after | p50 before | p50 after | degraded before | degraded after |
+|---|---|---|---|---|---|---|
+| 50 | 38.0 | 38.4 | 1.07s | 1.06s | 0.00 | 0.00 |
+| 100 | 70.0 | 71.2 | 1.18s | 1.16s | 0.43 | 0.26 |
+| 200 | 69.3 | 73.2 | 2.61s | 2.46s | 5.31 | 4.75 |
+
+**The ceiling barely moved (~2–5 %). Say it plainly: the trace write was not the binding constraint
+at this load.** The spec required reporting this rather than quietly shipping.
+
+The async path itself works exactly as designed: **43,394 events flushed, 0 dropped, queue depth 0**,
+and zero Redis pool-starvation errors. The errors at the knee are unchanged and unrelated — still
+`Embedding call to http://embeddings:8083/v1/embeddings failed` (93 × HTTP 500, 8 × connection reset).
+
+## A measured correction to the diagnosis
+
+The expert review said "~45 publish sites × up to 4 Jedis ops ⇒ ~92 Redis round-trips per request",
+and I repeated it without counting. **Measured: 43,394 events ÷ 4,911 requests ≈ 8.8 events per request.**
+The 45 was a count of *code call sites*, not of events emitted per request. A flat request emits ~10
+trace events, so the real cost was **~20 round-trips per request, not ~92** — now collapsed to one
+pipelined round-trip (4 commands).
+
+That is exactly why the throughput gain is small, and it is the honest reason to keep the change anyway:
+
+- ~20 → 1 round-trip per request, and none of it on the request thread.
+- The queue is **bounded** and drops are **counted** (`conduit.trace.dropped`); an unbounded `@Async`
+  queue is a slower way to fall over.
+- Telemetry no longer shares the pool that routing depends on, and both pools now have a **finite
+  `maxWait`** — the Jedis default of `-1` meant a starved caller blocked forever. That latent failure
+  mode is gone whether or not it was today's bottleneck.
+
+Verified no behaviour change: the live glass-box stream and the persisted replay return the **identical
+10 events in the identical order** for the same request; `/trace/{requestId}` still works.
+
+**The bottleneck remains the embeddings sidecar.** It is the next thing to fix, and the routing embedding
+should be cached (same query text ⇒ same 384-dim vector) rather than recomputed per request.
