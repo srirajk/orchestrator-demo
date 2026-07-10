@@ -12,9 +12,9 @@
   "max_response_tokens": 2500,
   "protocol": "mcp",
   "connection": {
-    "server_url": "http://servicing-mcp:8082/sse",
+    "server_url": "http://servicing-mcp:8082/mcp",
     "tool": "analyze_settlement_risk",
-    "transport": "sse"
+    "transport": "streamable"
   },
   "capabilities": {
     "streaming": false,

@@ -291,7 +291,7 @@
             "properties": {
               "server_url": { "type": "string" },
               "tool": { "type": "string" },
-              "transport": { "type": "string", "enum": ["sse", "stdio"], "default": "sse" }
+              "transport": { "type": "string", "enum": ["streamable", "sse", "stdio"], "default": "streamable", "description": "MCP HTTP transport. 'streamable' = Streamable HTTP (single /mcp endpoint, current spec); 'sse' = legacy, deprecated HTTP+SSE two-channel handshake. Absent = streamable." }, "protocol_version": { "type": "string", "description": "Optional per-agent MCP protocol version override negotiated on initialize. When absent, the gateway uses conduit.mcp.protocol-version (streamable) / conduit.mcp.legacy-protocol-version (sse)." }
             }
           }
         }

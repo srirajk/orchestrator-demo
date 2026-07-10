@@ -245,7 +245,10 @@ public class AgentIntrospector {
 
         log.debug("Introspecting MCP agent '{}' from {}", submission.agentId(), serverUrl);
 
-        McpToolIntrospector.ToolSchemas schemas = mcpIntrospector.getToolSchemas(serverUrl, toolName);
+        McpToolIntrospector.ToolSchemas schemas = mcpIntrospector.getToolSchemas(
+                serverUrl, toolName,
+                submission.connection().isLegacySse(),
+                submission.connection().protocolVersion());
         JsonNode inputSchema = schemas.inputSchema();
         JsonNode outputSchema = chooseOutputSchema(schemas.outputSchema(), submission.outputSchema());
 

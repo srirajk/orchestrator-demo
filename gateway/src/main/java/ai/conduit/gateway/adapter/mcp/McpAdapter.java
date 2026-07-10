@@ -10,6 +10,8 @@ import io.opentelemetry.context.Context;
 import io.opentelemetry.context.propagation.TextMapSetter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
@@ -29,29 +31,50 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
- * ProtocolAdapter for MCP/SSE agents (Asset Servicing domain).
+ * ProtocolAdapter for MCP agents (Asset Servicing domain).
  *
- * <p>MCP SSE handshake per invocation:
+ * <p>Speaks two MCP HTTP transports, selected per agent by {@code connection.transport}:
+ *
+ * <p><b>Streamable HTTP</b> (default — spec {@code 2025-11-25}). A single endpoint
+ * ({@code connection.server_url}, e.g. {@code /mcp}) handles the whole exchange:
  * <ol>
- *   <li>GET {@code serverUrl} with {@code Accept: text/event-stream} →
- *       server sends {@code event: endpoint} with session path.</li>
- *   <li>POST session path with JSON-RPC {@code initialize} →
- *       server sends {@code event: message} with initialize ACK.</li>
- *   <li>POST session path with JSON-RPC {@code tools/call} →
- *       server sends {@code event: message} with tool result.</li>
+ *   <li>{@code POST} JSON-RPC {@code initialize} with
+ *       {@code Accept: application/json, text/event-stream} → the response carries an
+ *       {@code Mcp-Session-Id} header and a negotiated {@code result.protocolVersion}.</li>
+ *   <li>{@code POST} JSON-RPC {@code tools/call}, echoing the {@code Mcp-Session-Id} and
+ *       {@code MCP-Protocol-Version} headers → tool result.</li>
  * </ol>
+ * Each response body may be either a plain JSON object or an SSE-upgraded stream; both are
+ * handled.
  *
- * <p><b>Implementation notes:</b>
+ * <p><b>Legacy HTTP+SSE</b> (deprecated — reachable only when a manifest explicitly declares
+ * {@code transport: "sse"}). Two-channel handshake: {@code GET} opens an SSE stream that first
+ * emits an {@code endpoint} event with a session path, then JSON-RPC calls are {@code POST}ed to
+ * that path and their results arrive back as {@code message} SSE events.
+ *
+ * <p><b>Invariants (all preserved across both transports):</b>
  * <ul>
- *   <li>Forces {@code HTTP_1_1} — FastMCP/uvicorn does not support HTTP/2 and
- *       returns 421 Misdirected Request when the client upgrades.</li>
- *   <li>SSE reading runs on a virtual thread (blocking I/O) using two
- *       {@link CompletableFuture}s: one for the endpoint path, one for the
- *       tools/call result.  The initialize ACK (first message event) is counted
- *       and skipped; the second message event is the actual tool result.</li>
+ *   <li><b>HTTP/1.1</b> is forced on the shared client AND every request — FastMCP/uvicorn
+ *       returns 421 on an HTTP/2 upgrade, and an h2c upgrade over cleartext 404s.</li>
+ *   <li><b>Bearer token is propagated fail-closed</b>: a blank token aborts the invocation
+ *       (the caller identity was never propagated upstream — refuse rather than call
+ *       unauthenticated).</li>
+ *   <li><b>W3C trace context</b> ({@code traceparent}) is injected on every outbound request.</li>
+ *   <li><b>Tool-execution errors are failures</b>: a JSON-RPC {@code error} member (protocol
+ *       error) OR a successful {@code result.isError == true} (tool ran and failed) both throw.</li>
  * </ul>
+ *
+ * <p>The MCP protocol version is never a Java string literal: it comes from
+ * {@code connection.protocol_version} (per-agent) else {@code conduit.mcp.protocol-version}
+ * (streamable) / {@code conduit.mcp.legacy-protocol-version} (sse).
+ *
+ * <p><b>Forward compatibility (MCP 2.0, spec {@code 2026-07-28}):</b> that spec is a Release
+ * Candidate and the Python SDK v2 is pre-release only, so it is designed-for but not adopted here.
+ * Adoption is a config change (bump {@code conduit.mcp.protocol-version}) plus any additive
+ * headers — no code fork on this path.
  */
 @Service
 public class McpAdapter implements ProtocolAdapter {
@@ -67,15 +90,33 @@ public class McpAdapter implements ProtocolAdapter {
 
     private final ObjectMapper objectMapper;
 
+    // Negotiated MCP protocol versions — sourced from config, overridable per-agent by the
+    // manifest. No Java literal default (World B): resolved via resolveProtocolVersion().
+    private final String protocolVersion;        // streamable HTTP
+    private final String legacyProtocolVersion;  // legacy HTTP+SSE
+
     // Force HTTP/1.1: FastMCP/uvicorn returns 421 on HTTP/2 upgrade attempts.
     private final HttpClient httpClient;
 
-    public McpAdapter(ObjectMapper objectMapper) {
+    @Autowired
+    public McpAdapter(ObjectMapper objectMapper,
+                      @Value("${conduit.mcp.protocol-version}") String protocolVersion,
+                      @Value("${conduit.mcp.legacy-protocol-version}") String legacyProtocolVersion) {
         this.objectMapper = objectMapper;
+        this.protocolVersion = protocolVersion;
+        this.legacyProtocolVersion = legacyProtocolVersion;
         this.httpClient = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1)
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
+    }
+
+    /**
+     * Test-only convenience constructor. Protocol versions come from configuration in production;
+     * unit tests that exercise only response parsing ({@link #extractResult}) do not need them.
+     */
+    McpAdapter(ObjectMapper objectMapper) {
+        this(objectMapper, null, null);
     }
 
     @Override
@@ -108,7 +149,165 @@ public class McpAdapter implements ProtocolAdapter {
                     + " — refusing to invoke without a bearer token");
         }
 
-        log.debug("McpAdapter → tool '{}' on {} for agent {}", toolName, serverUrl, manifest.agentId());
+        if (manifest.connection().isLegacySse()) {
+            log.debug("McpAdapter → tool '{}' on {} (legacy SSE) for agent {}",
+                    toolName, serverUrl, manifest.agentId());
+            return invokeSse(manifest, input, toolName, serverUrl, bearerToken, timeoutMs);
+        }
+
+        log.debug("McpAdapter → tool '{}' on {} (streamable HTTP) for agent {}",
+                toolName, serverUrl, manifest.agentId());
+        return invokeStreamable(manifest, input, toolName, serverUrl, bearerToken, timeoutMs);
+    }
+
+    // ── Streamable HTTP transport (default) ────────────────────────────────────
+
+    private JsonNode invokeStreamable(AgentManifest manifest, JsonNode input, String toolName,
+                                      String serverUrl, String bearerToken, int timeoutMs)
+            throws Exception {
+
+        String requestedVersion = resolveProtocolVersion(manifest, false);
+
+        // 1) initialize — capture Mcp-Session-Id and the negotiated protocolVersion.
+        String initBody = objectMapper.writeValueAsString(Map.of(
+                "jsonrpc", "2.0",
+                "id",      UUID.randomUUID().toString(),
+                "method",  "initialize",
+                "params",  Map.of(
+                        "protocolVersion", requestedVersion,
+                        "capabilities",   Map.of(),
+                        "clientInfo",     Map.of("name", "conduit-gateway", "version", "1.0")
+                )
+        ));
+        HttpResponse<String> initResp =
+                postStreamable(serverUrl, initBody, bearerToken, null, null, timeoutMs);
+        if (initResp.statusCode() >= 400) {
+            throw new RuntimeException("MCP initialize on " + serverUrl + " returned HTTP "
+                    + initResp.statusCode() + ": " + initResp.body());
+        }
+        String sessionId = initResp.headers().firstValue("Mcp-Session-Id").orElse(null);
+        JsonNode initResult = parseStreamableBody(initResp);
+        String negotiatedVersion = initResult.path("result").path("protocolVersion")
+                .asText(requestedVersion);
+        String verifiedSub = initResp.headers().firstValue("X-Conduit-Verified-Sub").orElse(null);
+        log.debug("McpAdapter streamable init: session={}, negotiated protocolVersion={}",
+                sessionId, negotiatedVersion);
+
+        // 2) tools/call — echo Mcp-Session-Id and MCP-Protocol-Version.
+        String callBody = objectMapper.writeValueAsString(Map.of(
+                "jsonrpc", "2.0",
+                "id",      UUID.randomUUID().toString(),
+                "method",  "tools/call",
+                "params",  Map.of("name", toolName, "arguments", jsonNodeToMap(input))
+        ));
+        HttpResponse<String> callResp =
+                postStreamable(serverUrl, callBody, bearerToken, sessionId, negotiatedVersion, timeoutMs);
+        if (callResp.statusCode() >= 400) {
+            throw new RuntimeException("MCP tools/call on " + serverUrl + " returned HTTP "
+                    + callResp.statusCode() + ": " + callResp.body());
+        }
+        if (verifiedSub == null) {
+            verifiedSub = callResp.headers().firstValue("X-Conduit-Verified-Sub").orElse(null);
+        }
+        JsonNode callRoot = parseStreamableBody(callResp);
+        log.debug("McpAdapter streamable raw response ({}): {}", manifest.agentId(),
+                truncate(callRoot.toString()));
+
+        return withVerifiedSub(extractResult(callRoot), verifiedSub);
+    }
+
+    /**
+     * POSTs one JSON-RPC message on the Streamable HTTP endpoint. Sets {@code Accept} for a
+     * JSON-or-SSE response, propagates the bearer token and W3C trace context, and echoes the
+     * session id / protocol version when known.
+     */
+    private HttpResponse<String> postStreamable(String url, String body, String bearerToken,
+                                                String sessionId, String protoVersion, int timeoutMs)
+            throws Exception {
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .version(HttpClient.Version.HTTP_1_1)
+                .header("Content-Type", "application/json")
+                .header("Accept", "application/json, text/event-stream");
+        if (bearerToken != null && !bearerToken.isBlank()) {
+            builder.header("Authorization", "Bearer " + bearerToken);
+        }
+        if (sessionId != null && !sessionId.isBlank()) {
+            builder.header("Mcp-Session-Id", sessionId);
+        }
+        if (protoVersion != null && !protoVersion.isBlank()) {
+            builder.header("MCP-Protocol-Version", protoVersion);
+        }
+        injectTraceContext(builder);
+        HttpRequest request = builder.POST(HttpRequest.BodyPublishers.ofString(body)).build();
+        return sendWithTimeout(request, timeoutMs);
+    }
+
+    /**
+     * Parses a Streamable HTTP response body, which may be a plain JSON object OR an
+     * SSE-upgraded stream (the SDK's default when {@code json_response} is off). For SSE, the
+     * JSON-RPC message is the concatenated {@code data:} lines of the (last) event.
+     */
+    private JsonNode parseStreamableBody(HttpResponse<String> resp) throws Exception {
+        String contentType = resp.headers().firstValue("Content-Type").orElse("");
+        String body = resp.body();
+        String json = contentType.toLowerCase().contains("text/event-stream")
+                ? extractSseJson(body)
+                : body;
+        return objectMapper.readTree(json);
+    }
+
+    /**
+     * Extracts the JSON-RPC payload from an SSE body: the {@code data:} lines of the last
+     * complete event, concatenated. MCP sends exactly one JSON-RPC response per POST.
+     */
+    static String extractSseJson(String sseBody) {
+        StringBuilder current = new StringBuilder();
+        String last = null;
+        for (String rawLine : sseBody.split("\n", -1)) {
+            String line = rawLine.stripTrailing();
+            if (line.startsWith("data:")) {
+                String part = line.substring("data:".length()).strip();
+                if (current.length() > 0) current.append('\n');
+                current.append(part);
+            } else if (line.isBlank()) {
+                if (current.length() > 0) {
+                    last = current.toString();
+                    current.setLength(0);
+                }
+            }
+        }
+        if (current.length() > 0) {
+            last = current.toString();   // final event with no trailing blank line
+        }
+        if (last == null) {
+            throw new RuntimeException("SSE response contained no data payload: " + sseBody);
+        }
+        return last;
+    }
+
+    /**
+     * Sends a request and waits up to {@code timeoutMs}. On timeout the in-flight exchange is
+     * cancelled ({@code future.cancel(true)}) rather than left running against a caller that has
+     * already given up.
+     */
+    private HttpResponse<String> sendWithTimeout(HttpRequest request, int timeoutMs) throws Exception {
+        CompletableFuture<HttpResponse<String>> future =
+                httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+        try {
+            return future.get(timeoutMs, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException te) {
+            future.cancel(true);
+            throw te;
+        }
+    }
+
+    // ── Legacy HTTP+SSE transport (only when transport: "sse") ─────────────────
+
+    private JsonNode invokeSse(AgentManifest manifest, JsonNode input, String toolName,
+                               String serverUrl, String bearerToken, int timeoutMs) throws Exception {
+
+        String requestedVersion = resolveProtocolVersion(manifest, true);
 
         // Two futures the SSE reader will complete.
         CompletableFuture<String> endpointFuture = new CompletableFuture<>();
@@ -151,18 +350,23 @@ public class McpAdapter implements ProtocolAdapter {
         });
 
         // Wait for the session endpoint path.
-        String sessionPath = endpointFuture.get(timeoutMs, TimeUnit.MILLISECONDS);
-        String sessionUrl  = buildSessionUrl(serverUrl, sessionPath);
+        String sessionPath;
+        try {
+            sessionPath = endpointFuture.get(timeoutMs, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException te) {
+            sseConn.cancel(true);   // cancel the in-flight SSE exchange
+            throw te;
+        }
+        String sessionUrl = buildSessionUrl(serverUrl, sessionPath);
         log.debug("McpAdapter session URL: {}", sessionUrl);
 
         // Send initialize.
-        String initId = UUID.randomUUID().toString();
         String initBody = objectMapper.writeValueAsString(Map.of(
                 "jsonrpc", "2.0",
-                "id",      initId,
+                "id",      UUID.randomUUID().toString(),
                 "method",  "initialize",
                 "params",  Map.of(
-                        "protocolVersion", "2024-11-05",
+                        "protocolVersion", requestedVersion,
                         "capabilities",   Map.of(),
                         "clientInfo",     Map.of("name", "conduit-gateway", "version", "1.0")
                 )
@@ -170,27 +374,29 @@ public class McpAdapter implements ProtocolAdapter {
         postJson(sessionUrl, initBody, bearerToken);
 
         // Send tools/call — SSE reader skips the initialize ACK and waits for this result.
-        String callId = UUID.randomUUID().toString();
         String callBody = objectMapper.writeValueAsString(Map.of(
                 "jsonrpc", "2.0",
-                "id",      callId,
+                "id",      UUID.randomUUID().toString(),
                 "method",  "tools/call",
                 "params",  Map.of("name", toolName, "arguments", jsonNodeToMap(input))
         ));
         postJson(sessionUrl, callBody, bearerToken);
 
         // Wait for the tool-call SSE response (second message event).
-        String rawResponse = toolResponseFuture.get(timeoutMs, TimeUnit.MILLISECONDS);
-        log.debug("McpAdapter raw response ({}): {}", manifest.agentId(),
-                rawResponse.length() > 200 ? rawResponse.substring(0, 200) + "…" : rawResponse);
+        String rawResponse;
+        try {
+            rawResponse = toolResponseFuture.get(timeoutMs, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException te) {
+            sseConn.cancel(true);   // cancel the in-flight SSE exchange
+            throw te;
+        }
+        log.debug("McpAdapter raw response ({}): {}", manifest.agentId(), truncate(rawResponse));
 
         return withVerifiedSub(extractResult(rawResponse), verifiedSubFuture.getNow(null));
     }
 
-    // ── SSE stream reader ─────────────────────────────────────────────────────
-
     /**
-     * Reads the SSE stream line by line.
+     * Reads the legacy SSE stream line by line.
      *
      * <p>The server sends exactly three events per invocation:
      * <ol>
@@ -300,7 +506,35 @@ public class McpAdapter implements ProtocolAdapter {
                 : serverUrl.substring(0, serverUrl.lastIndexOf('/') + 1) + sessionPath;
     }
 
+    /**
+     * Resolves the MCP protocol version to negotiate.
+     *
+     * <p>Precedence: {@code connection.protocol_version} (per-agent manifest override) →
+     * {@code conduit.mcp.protocol-version} (streamable) / {@code conduit.mcp.legacy-protocol-version}
+     * (sse). No Java literal default — an unconfigured version is a boot/config error, not a
+     * silent fallback.
+     */
+    private String resolveProtocolVersion(AgentManifest manifest, boolean legacy) {
+        String override = manifest.connection().protocolVersion();
+        if (override != null && !override.isBlank()) {
+            return override.strip();
+        }
+        String configured = legacy ? legacyProtocolVersion : protocolVersion;
+        if (configured == null || configured.isBlank()) {
+            throw new IllegalStateException("No MCP protocol version configured (conduit.mcp."
+                    + (legacy ? "legacy-protocol-version" : "protocol-version") + ")");
+        }
+        return configured.strip();
+    }
+
     // ── Response extraction ───────────────────────────────────────────────────
+
+    /**
+     * Parses the JSON-RPC tool response from its raw string form.
+     */
+    JsonNode extractResult(String rawResponse) throws Exception {
+        return extractResult(objectMapper.readTree(rawResponse));
+    }
 
     /**
      * Parses the JSON-RPC tool response.
@@ -310,13 +544,12 @@ public class McpAdapter implements ProtocolAdapter {
      * { "jsonrpc":"2.0", "id":"...", "result":{ "content":[{"type":"text","text":"{...}"}] } }
      * </pre>
      */
-    JsonNode extractResult(String rawResponse) throws Exception {
-        JsonNode root = objectMapper.readTree(rawResponse);
-
+    JsonNode extractResult(JsonNode root) {
         // (1) PROTOCOL error — the JSON-RPC "error" member. Malformed request, unknown tool, etc.
         JsonNode error = root.path("error");
         if (!error.isMissingNode()) {
-            throw new RuntimeException("MCP JSON-RPC error: " + error.path("message").asText(rawResponse));
+            throw new RuntimeException("MCP JSON-RPC error: "
+                    + error.path("message").asText(root.toString()));
         }
 
         JsonNode result = root.path("result");
@@ -373,6 +606,10 @@ public class McpAdapter implements ProtocolAdapter {
     }
 
     // ── Utilities ─────────────────────────────────────────────────────────────
+
+    private static String truncate(String s) {
+        return s.length() > 200 ? s.substring(0, 200) + "…" : s;
+    }
 
     private Map<String, Object> jsonNodeToMap(JsonNode node) {
         if (node == null || node.isNull() || node.isMissingNode()) return Map.of();

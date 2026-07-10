@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.BufferedReader;
@@ -19,12 +20,16 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
- * Fetches tool input schema from an MCP server via SSE + JSON-RPC.
+ * Fetches tool input/output schemas from an MCP server via JSON-RPC {@code tools/list}.
  *
- * <p>Uses the same virtual-thread + CompletableFuture pattern as {@link ai.conduit.gateway.adapter.mcp.McpAdapter}:
- * keeps the SSE connection open for the full exchange (endpoint → initialize → tools/list).
+ * <p>Mirrors {@link ai.conduit.gateway.adapter.mcp.McpAdapter}'s transport handling: Streamable
+ * HTTP by default (single {@code /mcp} endpoint: initialize → tools/list, JSON-or-SSE body),
+ * falling back to the legacy HTTP+SSE two-channel handshake only for agents that declare
+ * {@code transport: "sse"}. The MCP protocol version is config/manifest-driven, never a Java
+ * literal.
  */
 @Component
 public class McpToolIntrospector {
@@ -34,9 +39,16 @@ public class McpToolIntrospector {
 
     private final HttpClient httpClient;
     private final ObjectMapper mapper;
+    private final String protocolVersion;        // streamable HTTP
+    private final String legacyProtocolVersion;  // legacy HTTP+SSE
 
-    public McpToolIntrospector(ObjectMapper mapper) {
+    public McpToolIntrospector(
+            ObjectMapper mapper,
+            @Value("${conduit.mcp.protocol-version}") String protocolVersion,
+            @Value("${conduit.mcp.legacy-protocol-version}") String legacyProtocolVersion) {
         this.mapper = mapper;
+        this.protocolVersion = protocolVersion;
+        this.legacyProtocolVersion = legacyProtocolVersion;
         this.httpClient = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1)
                 .connectTimeout(Duration.ofSeconds(10))
@@ -50,11 +62,22 @@ public class McpToolIntrospector {
      * Falls back only for input schema so older tools keep registering; output schema is returned
      * as null when the tool does not declare one, allowing boot select validation to report the
      * unvalidated edge explicitly.
+     *
+     * @param legacySse      when true, use the legacy HTTP+SSE handshake; otherwise Streamable HTTP.
+     * @param protoOverride  per-agent {@code connection.protocol_version} override (nullable → config).
      */
-    public ToolSchemas getToolSchemas(String serverUrl, String toolName) {
+    public ToolSchemas getToolSchemas(String serverUrl, String toolName,
+                                      boolean legacySse, String protoOverride) {
         try {
-            String baseUrl = serverUrl.contains("/sse") ? serverUrl.substring(0, serverUrl.lastIndexOf("/sse")) : serverUrl;
-            JsonNode tools = fetchToolsList(baseUrl);
+            String version = resolveProtocolVersion(protoOverride, legacySse);
+            JsonNode tools;
+            if (legacySse) {
+                String baseUrl = serverUrl.contains("/sse")
+                        ? serverUrl.substring(0, serverUrl.lastIndexOf("/sse")) : serverUrl;
+                tools = fetchToolsListSse(baseUrl, version);
+            } else {
+                tools = fetchToolsListStreamable(serverUrl, version);
+            }
 
             if (tools != null && tools.isArray()) {
                 for (JsonNode tool : tools) {
@@ -80,18 +103,121 @@ public class McpToolIntrospector {
     }
 
     /**
-     * Fetch the JSON Schema inputSchema for a named MCP tool.
-     * Falls back to a generic schema if introspection fails.
+     * Fetch the JSON Schema inputSchema for a named MCP tool over Streamable HTTP (default
+     * transport). Falls back to a generic schema if introspection fails.
      */
     public JsonNode getToolInputSchema(String serverUrl, String toolName) {
-        return getToolSchemas(serverUrl, toolName).inputSchema();
+        return getToolSchemas(serverUrl, toolName, false, null).inputSchema();
     }
 
+    // ── Streamable HTTP (default) ──────────────────────────────────────────────
+
     /**
-     * Runs the full MCP SSE handshake: connect → initialize → tools/list → result.
-     * The SSE connection stays open throughout (same pattern as McpAdapter).
+     * Runs the Streamable HTTP handshake against the single endpoint: initialize (capture
+     * {@code Mcp-Session-Id} + negotiated version) → tools/list (echo them). The response body of
+     * each POST may be plain JSON or an SSE-upgraded stream.
      */
-    private JsonNode fetchToolsList(String baseUrl) throws Exception {
+    private JsonNode fetchToolsListStreamable(String serverUrl, String version) throws Exception {
+        String initBody = mapper.writeValueAsString(Map.of(
+                "jsonrpc", "2.0",
+                "id", UUID.randomUUID().toString(),
+                "method", "initialize",
+                "params", Map.of(
+                        "protocolVersion", version,
+                        "capabilities", Map.of(),
+                        "clientInfo", Map.of("name", "conduit-gateway-introspector", "version", "1.0")
+                )
+        ));
+        HttpResponse<String> initResp = postStreamable(serverUrl, initBody, null, null);
+        if (initResp.statusCode() >= 400) {
+            throw new RuntimeException("MCP initialize on " + serverUrl + " returned HTTP "
+                    + initResp.statusCode() + ": " + initResp.body());
+        }
+        String sessionId = initResp.headers().firstValue("Mcp-Session-Id").orElse(null);
+        JsonNode initResult = parseStreamableBody(initResp);
+        String negotiated = initResult.path("result").path("protocolVersion").asText(version);
+        log.debug("McpToolIntrospector streamable init: session={}, protocolVersion={}",
+                sessionId, negotiated);
+
+        String listBody = mapper.writeValueAsString(Map.of(
+                "jsonrpc", "2.0",
+                "id", UUID.randomUUID().toString(),
+                "method", "tools/list",
+                "params", Map.of()
+        ));
+        HttpResponse<String> listResp = postStreamable(serverUrl, listBody, sessionId, negotiated);
+        if (listResp.statusCode() >= 400) {
+            throw new RuntimeException("MCP tools/list on " + serverUrl + " returned HTTP "
+                    + listResp.statusCode() + ": " + listResp.body());
+        }
+        return parseStreamableBody(listResp).path("result").path("tools");
+    }
+
+    private HttpResponse<String> postStreamable(String url, String body,
+                                                String sessionId, String protoVersion) throws Exception {
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .version(HttpClient.Version.HTTP_1_1)
+                .header("Content-Type", "application/json")
+                .header("Accept", "application/json, text/event-stream")
+                .timeout(Duration.ofMillis(TIMEOUT_MS));
+        if (sessionId != null && !sessionId.isBlank()) {
+            builder.header("Mcp-Session-Id", sessionId);
+        }
+        if (protoVersion != null && !protoVersion.isBlank()) {
+            builder.header("MCP-Protocol-Version", protoVersion);
+        }
+        HttpRequest request = builder.POST(HttpRequest.BodyPublishers.ofString(body)).build();
+        CompletableFuture<HttpResponse<String>> future =
+                httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+        try {
+            return future.get(TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException te) {
+            future.cancel(true);   // cancel the in-flight exchange
+            throw te;
+        }
+    }
+
+    /** Parses a Streamable HTTP body that may be plain JSON or an SSE-upgraded stream. */
+    private JsonNode parseStreamableBody(HttpResponse<String> resp) throws Exception {
+        String contentType = resp.headers().firstValue("Content-Type").orElse("");
+        String body = resp.body();
+        String json = contentType.toLowerCase().contains("text/event-stream")
+                ? extractSseJson(body) : body;
+        return mapper.readTree(json);
+    }
+
+    /** The JSON-RPC payload of the last SSE event: its concatenated {@code data:} lines. */
+    private static String extractSseJson(String sseBody) {
+        StringBuilder current = new StringBuilder();
+        String last = null;
+        for (String rawLine : sseBody.split("\n", -1)) {
+            String line = rawLine.stripTrailing();
+            if (line.startsWith("data:")) {
+                String part = line.substring("data:".length()).strip();
+                if (current.length() > 0) current.append('\n');
+                current.append(part);
+            } else if (line.isBlank()) {
+                if (current.length() > 0) {
+                    last = current.toString();
+                    current.setLength(0);
+                }
+            }
+        }
+        if (current.length() > 0) last = current.toString();
+        if (last == null) {
+            throw new RuntimeException("SSE response contained no data payload: " + sseBody);
+        }
+        return last;
+    }
+
+    // ── Legacy HTTP+SSE (only when transport: "sse") ───────────────────────────
+
+    /**
+     * Runs the legacy MCP SSE handshake: connect → initialize → tools/list → result.
+     * The SSE connection stays open throughout (same pattern as McpAdapter's legacy path).
+     */
+    private JsonNode fetchToolsListSse(String baseUrl, String version) throws Exception {
         CompletableFuture<String> endpointFuture = new CompletableFuture<>();
         CompletableFuture<String> toolsResponseFuture = new CompletableFuture<>();
 
@@ -119,7 +245,13 @@ public class McpToolIntrospector {
             }
         });
 
-        String sessionPath = endpointFuture.get(TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        String sessionPath;
+        try {
+            sessionPath = endpointFuture.get(TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException te) {
+            sseConn.cancel(true);
+            throw te;
+        }
         String sessionUrl  = buildSessionUrl(baseUrl + "/sse", sessionPath);
         log.debug("McpToolIntrospector session URL: {}", sessionUrl);
 
@@ -129,7 +261,7 @@ public class McpToolIntrospector {
                 "id", UUID.randomUUID().toString(),
                 "method", "initialize",
                 "params", Map.of(
-                        "protocolVersion", "2024-11-05",
+                        "protocolVersion", version,
                         "capabilities", Map.of(),
                         "clientInfo", Map.of("name", "conduit-gateway-introspector", "version", "1.0")
                 )
@@ -145,9 +277,30 @@ public class McpToolIntrospector {
         ));
         postJson(sessionUrl, listBody);
 
-        String rawResponse = toolsResponseFuture.get(TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        String rawResponse;
+        try {
+            rawResponse = toolsResponseFuture.get(TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException te) {
+            sseConn.cancel(true);
+            throw te;
+        }
         JsonNode root = mapper.readTree(rawResponse);
         return root.path("result").path("tools");
+    }
+
+    /**
+     * Resolves the MCP protocol version for introspection. Precedence: per-agent manifest override
+     * → config ({@code conduit.mcp.protocol-version} / {@code legacy-protocol-version}). No Java
+     * literal default.
+     */
+    private String resolveProtocolVersion(String override, boolean legacy) {
+        if (override != null && !override.isBlank()) return override.strip();
+        String configured = legacy ? legacyProtocolVersion : protocolVersion;
+        if (configured == null || configured.isBlank()) {
+            throw new IllegalStateException("No MCP protocol version configured (conduit.mcp."
+                    + (legacy ? "legacy-protocol-version" : "protocol-version") + ")");
+        }
+        return configured.strip();
     }
 
     /**

@@ -66,6 +66,14 @@ conduit:
     # Includes the Axiom (iam-service) issuer URL variants used in dev/docker.
     required-issuers: ${CONDUIT_AUTH_REQUIRED_ISSUERS:http://host.docker.internal:8084,http://iam-service:8084,http://localhost:8084}
     required-audience: conduit-gateway
+  # ── MCP transport (World B: version comes from config/manifest, never Java) ────
+  # Conduit's MCP client speaks Streamable HTTP (single /mcp endpoint) by default. The
+  # negotiated protocol version is sent on `initialize` and echoed on every `tools/call`.
+  # A manifest may override per-agent via connection.protocol_version. The legacy HTTP+SSE
+  # transport is only used for agents that explicitly declare connection.transport: "sse".
+  mcp:
+    protocol-version: ${CONDUIT_MCP_PROTOCOL_VERSION:2025-11-25}
+    legacy-protocol-version: ${CONDUIT_MCP_LEGACY_PROTOCOL_VERSION:2024-11-05}
   embedding:
     provider: ${CONDUIT_EMBEDDING_PROVIDER:hash}   # hash | remote
     dimension: ${CONDUIT_EMBEDDING_DIMENSION:384}

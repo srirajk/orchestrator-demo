@@ -12,9 +12,9 @@
   "max_response_tokens": 2000,
   "protocol": "mcp",
   "connection": {
-    "server_url": "http://servicing-mcp:8082/sse",
+    "server_url": "http://servicing-mcp:8082/mcp",
     "tool": "get_custody_positions",
-    "transport": "sse"
+    "transport": "streamable"
   },
   "capabilities": {
     "streaming": false,

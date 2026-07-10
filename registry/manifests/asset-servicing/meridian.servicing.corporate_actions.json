@@ -1,7 +1,7 @@
 {
   "agent_id": "meridian.servicing.corporate_actions",
   "name": "Asset Servicing Corporate Actions",
-  "description": "Returns upcoming corporate actions such as dividends, splits, and elections pending for a given relationship. Accepts relationship_id as the primary key. Accessed via MCP tool over SSE transport.",
+  "description": "Returns upcoming corporate actions such as dividends, splits, and elections pending for a given relationship. Accepts relationship_id as the primary key. Accessed via MCP tool over Streamable HTTP transport.",
   "version": "1.0.0",
   "provider": {
     "organization": "Meridian Demo Bank"
@@ -12,9 +12,9 @@
   "max_response_tokens": 2000,
   "protocol": "mcp",
   "connection": {
-    "server_url": "http://servicing-mcp:8082/sse",
+    "server_url": "http://servicing-mcp:8082/mcp",
     "tool": "get_corporate_actions",
-    "transport": "sse"
+    "transport": "streamable"
   },
   "capabilities": {
     "streaming": false,

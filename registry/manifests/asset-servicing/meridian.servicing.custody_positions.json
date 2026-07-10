@@ -1,7 +1,7 @@
 {
   "agent_id": "meridian.servicing.custody_positions",
   "name": "Asset Servicing Custody Positions",
-  "description": "Returns custody holdings broken down by custodian for a given relationship. Accepts relationship_id as the primary key. Accessed via MCP tool over SSE transport.",
+  "description": "Returns custody holdings broken down by custodian for a given relationship. Accepts relationship_id as the primary key. Accessed via MCP tool over Streamable HTTP transport.",
   "version": "1.0.0",
   "provider": {
     "organization": "Meridian Demo Bank"
@@ -12,9 +12,9 @@
   "max_response_tokens": 2000,
   "protocol": "mcp",
   "connection": {
-    "server_url": "http://servicing-mcp:8082/sse",
+    "server_url": "http://servicing-mcp:8082/mcp",
     "tool": "get_custody_positions",
-    "transport": "sse"
+    "transport": "streamable"
   },
   "capabilities": {
     "streaming": false,

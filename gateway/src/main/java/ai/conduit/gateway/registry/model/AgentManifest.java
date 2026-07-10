@@ -77,8 +77,26 @@ public record AgentManifest(
             @JsonProperty("operation_id") String operationId,
             // MCP
             @JsonProperty("server_url")   String serverUrl,
-            String tool
-    ) {}
+            String tool,
+            // MCP transport selector: "streamable" (default, Streamable HTTP single /mcp endpoint)
+            // or "sse" (legacy, deprecated HTTP+SSE two-channel handshake). The gateway carries no
+            // hardcoded transport default — an absent value is treated as streamable by the adapter.
+            String transport,
+            // OPTIONAL per-agent override of the negotiated MCP protocol version. When absent, the
+            // adapter falls back to conduit.mcp.protocol-version (streamable) /
+            // conduit.mcp.legacy-protocol-version (sse). Never a Java string literal.
+            @JsonProperty("protocol_version") String protocolVersion
+    ) {
+        /** Backward-compatible constructor (pre-{@code transport}/{@code protocol_version} arity). */
+        public Connection(String openapiUrl, String operationId, String serverUrl, String tool) {
+            this(openapiUrl, operationId, serverUrl, tool, null, null);
+        }
+
+        /** True only when the manifest explicitly pins the legacy HTTP+SSE transport. */
+        public boolean isLegacySse() {
+            return transport != null && "sse".equalsIgnoreCase(transport.strip());
+        }
+    }
 
     public record Skill(
             String id,

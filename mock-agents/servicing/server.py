@@ -1,6 +1,6 @@
 """
 Asset Servicing MCP server — Domain 2 mock agents.
-Exposes 6 tools over SSE transport via FastMCP.
+Exposes the tools over MCP Streamable HTTP transport via FastMCP (single POST /mcp endpoint).
 
 Agent layout (each agent in its own top-level subfolder):
   servicing/settlements/          → get_settlements
@@ -16,18 +16,19 @@ Fault knobs (env vars, set in docker-compose for resilience tests):
   MCP_FAULT_ALL=true               → all tools fail
   MCP_FAULT_DELAY_MS=500           → inject latency (ms) to every call
 
-The gateway's McpAdapter connects to: http://servicing:8082/sse
+The gateway's McpAdapter connects to: http://servicing-mcp:8082/mcp
 
-Distributed Tracing Note (MCP limitation):
-  The MCP protocol (JSON-RPC over SSE) does not carry HTTP headers per-tool-call,
-  so the W3C traceparent / tracestate headers that the gateway sends are not
-  available inside individual tool handlers.  This means MCP tool spans are
-  NOT automatically linked to the gateway's root OTel span.
+Distributed Tracing Note (Streamable HTTP):
+  Over Streamable HTTP each JSON-RPC call is a real HTTP POST, so the W3C
+  traceparent / tracestate headers the gateway injects DO now arrive at this
+  server (unlike the legacy SSE transport, where per-tool-call headers were not
+  available). FastMCP still does not automatically open a child span from that
+  header inside individual tool handlers, so MCP tool spans are not yet linked
+  to the gateway root span in Tempo.
 
-  Future path: pass {"_traceId": "<trace-id>"} as a metadata key in tool
-  arguments, then extract it here to manually create a linked child span.
-  Until then, MCP spans appear as independent traces in Tempo (not as children
-  of the gateway root).  A warning is emitted at startup to make this visible.
+  Future path: read the incoming traceparent (or an {"_traceId": ...} arg) in a
+  handler and manually create a linked child span. A warning is emitted at
+  startup to keep this visible.
 """
 
 import sys
@@ -39,14 +40,14 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 _log = logging.getLogger(__name__)
 
-# MCP does not propagate W3C traceparent headers to individual tool calls.
-# Agent spans will not be linked to the gateway's OTel root span.
-# To get linked spans, callers should include {"_traceId": "<id>"} in tool
-# args metadata; individual tools should extract it and log it explicitly.
+# Over Streamable HTTP the gateway's W3C traceparent header DOES reach this server on
+# each POST /mcp, but FastMCP does not auto-open a linked child span inside tool handlers.
+# So agent tool spans still won't appear as children of the gateway root span in Tempo
+# until a handler reads the header (or an {"_traceId": ...} arg) and links a span manually.
 _log.warning(
-    "servicing-mcp: MCP protocol does not support native trace propagation. "
-    "Agent tool spans will NOT appear as children of the gateway root span in Tempo. "
-    "Pass _traceId in tool metadata to correlate manually."
+    "servicing-mcp: Streamable HTTP delivers traceparent per call, but FastMCP does not "
+    "auto-link tool spans. Agent tool spans will NOT appear as children of the gateway root "
+    "span in Tempo until handlers read traceparent/_traceId and link a span manually."
 )
 
 from mcp.server.fastmcp import FastMCP
@@ -56,7 +57,7 @@ from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
 from starlette.responses import JSONResponse, Response
-from starlette.routing import Route, Mount
+from starlette.routing import Route
 
 from settlements.tool import get_settlements as _get_settlements
 from corporate_actions.tool import get_corporate_actions as _get_corporate_actions
@@ -81,6 +82,13 @@ mcp = FastMCP(
         "Fault knobs are controlled via env vars."
     ),
     transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
+    # Return each Streamable HTTP response as a single application/json body rather than an
+    # SSE-upgraded stream. We wrap the app in a BaseHTTPMiddleware (JwtAuthMiddleware) to enforce
+    # F-IDENTITY, and Starlette's BaseHTTPMiddleware is incompatible with streaming SSE response
+    # bodies (it raises "Unexpected message received: http.request" and drops the body). A plain
+    # JSON response is valid Streamable HTTP and is what the gateway's McpAdapter expects first;
+    # the adapter still handles an SSE-upgraded body from any other server.
+    json_response=True,
 )
 
 
@@ -248,13 +256,14 @@ class JwtAuthMiddleware(BaseHTTPMiddleware):
 
     Exemptions (legitimately have no caller identity):
       - GET /health
-      - The MCP SSE channel-open handshake (GET /sse-ish routes) — opening the stream
-        discloses no data by itself; the caller identity is enforced on the JSON-RPC
-        call that follows.
-      - JSON-RPC 'initialize' / 'tools/list' over POST /messages — this is exactly the
-        gateway's boot-time McpToolIntrospector handshake (see
-        gateway/.../registry/introspection/McpToolIntrospector.java), which runs before
-        any user request exists and so never carries a caller token.
+      - An MCP channel-open GET (legacy SSE stream open, or an optional Streamable HTTP
+        server-to-client GET /mcp) — opening a stream discloses no data by itself; caller
+        identity is enforced on the JSON-RPC call that follows.
+      - JSON-RPC 'initialize' / 'tools/list' over POST (POST /mcp for Streamable HTTP; POST
+        /messages for legacy SSE) — this is exactly the gateway's boot-time
+        McpToolIntrospector handshake (see
+        gateway/.../registry/introspection/McpToolIntrospector.java), which runs before any
+        user request exists and so never carries a caller token.
 
     Every other call — in particular JSON-RPC 'tools/call', the actual data-plane
     invocation the gateway's McpAdapter makes on behalf of a chat request — requires a
@@ -323,17 +332,23 @@ def create_app() -> Starlette:
     """
     Create and return the ASGI application (importable for testing and ASGI runners).
 
-    The JWT middleware is always applied — regardless of whether the server is
-    started via __main__ (uvicorn directly) or imported by a test harness / ASGI
-    server like gunicorn.
+    Streamable HTTP transport: the whole exchange (initialize → tools/call) happens on a single
+    endpoint, ``POST /mcp``. We build ON FastMCP's ``streamable_http_app()`` rather than mounting
+    it under a parent Starlette, because that app carries a REQUIRED lifespan
+    (``self.session_manager.run()``) and Starlette does NOT run a *mounted* sub-app's lifespan —
+    mounting it would leave the StreamableHTTP session manager un-started and every request would
+    fail. Building on it keeps that lifespan intact.
+
+    We then:
+      * insert ``GET /health`` ahead of the ``/mcp`` route (health is JWT-exempt), and
+      * wrap the whole app in JwtAuthMiddleware (F-IDENTITY: fail CLOSED) via ``add_middleware`` —
+        applied whether the server is started via __main__ (uvicorn) or imported by a test
+        harness / ASGI runner.
     """
-    return Starlette(
-        routes=[
-            Route("/health", _health),
-            Mount("/", app=mcp.sse_app()),
-        ],
-        middleware=[Middleware(JwtAuthMiddleware)],
-    )
+    app = mcp.streamable_http_app()          # Starlette with lifespan = session_manager.run()
+    app.router.routes.insert(0, Route("/health", _health))
+    app.add_middleware(JwtAuthMiddleware)    # outermost — runs before the /mcp handler
+    return app
 
 
 # Module-scope app — importable by tests, ASGI runners, and __main__.

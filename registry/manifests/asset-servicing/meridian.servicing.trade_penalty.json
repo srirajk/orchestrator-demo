@@ -12,9 +12,9 @@
   "max_response_tokens": 2000,
   "protocol": "mcp",
   "connection": {
-    "server_url": "http://servicing-mcp:8082/sse",
+    "server_url": "http://servicing-mcp:8082/mcp",
     "tool": "calculate_trade_penalty",
-    "transport": "sse"
+    "transport": "streamable"
   },
   "capabilities": {
     "streaming": false,
