@@ -75,11 +75,20 @@ conduit:
     protocol-version: ${CONDUIT_MCP_PROTOCOL_VERSION:2025-11-25}
     legacy-protocol-version: ${CONDUIT_MCP_LEGACY_PROTOCOL_VERSION:2024-11-05}
   embedding:
-    provider: ${CONDUIT_EMBEDDING_PROVIDER:hash}   # hash | remote
+    # 'remote' is the real semantic model; 'hash' is a non-semantic stand-in for tests and offline
+    # work. The default used to be 'hash', so a deployment that forgot CONDUIT_EMBEDDING_PROVIDER
+    # booted on hashed n-grams and routed on them — self-consistently, and silently wrongly. The
+    # default is now the real model: a missing embedding service fails loudly instead.
+    provider: ${CONDUIT_EMBEDDING_PROVIDER:remote}   # remote | hash
     dimension: ${CONDUIT_EMBEDDING_DIMENSION:384}
     model: ${CONDUIT_EMBEDDING_MODEL:all-MiniLM-L6-v2}
     remote:
       url: ${CONDUIT_EMBEDDING_REMOTE_URL:http://localhost:8083/v1/embeddings}
+    cache:
+      # Corpus (manifest example) vectors only — content-addressed by model id + text digest.
+      # Never the query path: user questions do not repeat, so caching them buys nothing.
+      enabled: ${CONDUIT_EMBEDDING_CACHE_ENABLED:true}
+      ttl-seconds: ${CONDUIT_EMBEDDING_CACHE_TTL_SECONDS:2592000}
   resolver:
     confidence-floor: 0.30       # absolute cosine similarity floor
     relative-floor-factor: 0.65  # dynamic floor = max(absolute, topScore * factor); prunes long-tail matches

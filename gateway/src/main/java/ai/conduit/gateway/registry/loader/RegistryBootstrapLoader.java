@@ -1,6 +1,6 @@
 package ai.conduit.gateway.registry.loader;
 
-import ai.conduit.gateway.registry.index.EmbeddingClient;
+import ai.conduit.gateway.registry.embedding.TextEmbedder;
 import ai.conduit.gateway.registry.index.VectorIndex;
 import ai.conduit.gateway.registry.model.AgentManifest;
 import ai.conduit.gateway.registry.service.SelectContractValidator;
@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.io.Resource;
@@ -31,8 +32,18 @@ import java.util.List;
  * <p>Uses the same registration pipeline as the live POST /admin/agents endpoint —
  * no special bootstrap code path. Waits for the embedding service to be ready before
  * registration. Invalid manifests are logged and skipped; they do not abort startup.
+ *
+ * <p><b>Must be disabled in tests.</b> This runs on {@code ApplicationReadyEvent} and writes the
+ * routing index into whatever Redis the context resolves — which for a {@code @SpringBootTest} on
+ * a developer machine is {@code localhost:6379}, the running demo's Redis. The context tests were
+ * silently re-indexing live routing data on every {@code mvn test}. Once {@link VectorIndex}
+ * learned to rebuild an index whose embedding model does not match its stamp, that silent
+ * overwrite became a silent <em>drop</em>: one test run replaced the eighteen registered agents
+ * with the five bundled test manifests. Hence the switch — safer than trusting every future test
+ * not to boot a context.
  */
 @Component
+@ConditionalOnProperty(name = "conduit.registry.bootstrap.enabled", havingValue = "true", matchIfMissing = true)
 public class RegistryBootstrapLoader {
 
     private static final Logger log = LoggerFactory.getLogger(RegistryBootstrapLoader.class);
@@ -42,12 +53,12 @@ public class RegistryBootstrapLoader {
 
     private final AgentRegistry  registry;
     private final VectorIndex    vectorIndex;
-    private final EmbeddingClient embedding;
+    private final TextEmbedder embedding;
     private final ObjectMapper   mapper;
     private final String         registryLocation;
 
     public RegistryBootstrapLoader(AgentRegistry registry, VectorIndex vectorIndex,
-                                   EmbeddingClient embedding, ObjectMapper mapper,
+                                   TextEmbedder embedding, ObjectMapper mapper,
                                    @Value("${conduit.registry.location:classpath:}") String registryLocation) {
         this.registry  = registry;
         this.vectorIndex = vectorIndex;
@@ -112,7 +123,13 @@ public class RegistryBootstrapLoader {
             try {
                 float[] probe = embedding.embed("probe");
                 if (probe.length > 0) {
-                    log.info("Embedding service ready (dim={})", probe.length);
+                    // A vector of the wrong width is not a slow start, it is a misconfiguration:
+                    // the index would be built in one space and searched in another. Fail loudly.
+                    if (probe.length != embedding.dimension()) {
+                        throw new IllegalStateException("Embedding service returned " + probe.length
+                                + "-dim vectors but conduit.embedding.dimension is " + embedding.dimension());
+                    }
+                    log.info("Embedding service ready (model={}, dim={})", embedding.id(), probe.length);
                     return;
                 }
             } catch (Exception e) {

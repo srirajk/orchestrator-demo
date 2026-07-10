@@ -1,4 +1,4 @@
-package ai.conduit.gateway.registry.index;
+package ai.conduit.gateway.registry.embedding;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -6,28 +6,37 @@ import org.springframework.stereotype.Component;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
 
 /**
- * Deterministic 384-dim embedding via SHA-256 hashing of token n-grams.
+ * Deterministic 384-dim vectors from SHA-256 hashing of token n-grams. A structural stand-in that
+ * needs no model download, useful for tests and offline development.
  *
- * This is a structural stand-in for Phase 3: it produces consistent vectors for
- * identical text and reasonable cosine-similarity for overlapping vocabulary.
- * It is NOT a real semantic model — replace with DJL all-MiniLM-L6-v2 or a
- * hosted endpoint in Phase 4 by providing an alternative EmbeddingClient bean.
+ * <p><b>This is not a semantic model.</b> It gives consistent vectors for identical text and some
+ * cosine similarity for overlapping vocabulary — nothing more. Two questions that mean the same
+ * thing in different words are unrelated to it.
  *
- * Why it works well enough for the demo:
- *   - Agents are registered with diverse, domain-specific example prompts.
- *   - Query prompts overlap heavily with those examples (same words).
- *   - The confidence floor filters low-similarity hits.
- *   - The nav agent naturally separates because its prompts share no vocabulary
- *     with relationship-level queries.
+ * <p>It must be selected explicitly. It used to carry {@code matchIfMissing = true}, so a
+ * deployment that simply forgot {@code CONDUIT_EMBEDDING_PROVIDER} would boot on it and route on
+ * hashed n-grams. Nothing failed: the corpus and the query were embedded by the same function, so
+ * the vectors were mutually consistent and the index was internally coherent. The system was
+ * confidently, silently wrong — the worst failure mode available to it. Absent configuration now
+ * yields no {@link TextEmbedder} bean and the context refuses to start.
  */
 @Component
-@ConditionalOnProperty(name = "conduit.embedding.provider", havingValue = "hash", matchIfMissing = true)
-public class HashEmbeddingClient implements EmbeddingClient {
+@ConditionalOnProperty(name = "conduit.embedding.provider", havingValue = "hash")
+public class HashEmbedder implements TextEmbedder {
 
     private static final int DIM = 384;
+
+    @Override
+    public String id() {
+        return "hash:sha256-ngram:" + DIM;
+    }
+
+    @Override
+    public int dimension() {
+        return DIM;
+    }
 
     @Override
     public float[] embed(String text) {
@@ -62,11 +71,6 @@ public class HashEmbeddingClient implements EmbeddingClient {
         }
 
         return l2Normalize(vector);
-    }
-
-    @Override
-    public int dimension() {
-        return DIM;
     }
 
     private static String normalize(String text) {

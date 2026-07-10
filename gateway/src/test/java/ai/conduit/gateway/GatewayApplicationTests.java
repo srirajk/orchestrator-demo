@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -13,6 +14,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@TestPropertySource(properties = {
+        // The bootstrap loader writes the routing index into the resolved Redis, which on a
+        // developer machine is the running demo's. A test must never re-index live routing data.
+        "conduit.registry.bootstrap.enabled=false",
+        // Keeps the context hermetic: no embedding sidecar required, nothing written to its cache.
+        "conduit.embedding.provider=hash"
+})
 class GatewayApplicationTests {
 
     @Autowired

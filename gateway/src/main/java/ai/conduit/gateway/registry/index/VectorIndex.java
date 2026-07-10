@@ -1,5 +1,7 @@
 package ai.conduit.gateway.registry.index;
 
+import ai.conduit.gateway.registry.embedding.ManifestEmbedder;
+import ai.conduit.gateway.registry.embedding.QueryEmbedder;
 import ai.conduit.gateway.registry.model.AgentManifest;
 import ai.conduit.gateway.registry.model.RoutingCandidate;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -44,39 +46,112 @@ public class VectorIndex {
 
     private static final String INDEX_NAME  = "intent_idx";
     private static final String KEY_PREFIX  = "vec:";
+    /** Records which embedding model produced the vectors currently in the index. */
+    private static final String MODEL_STAMP_KEY = "intent_idx:model";
     private static final int    TOP_K       = 20;  // fetch more, deduplicate later
 
     private final JedisPooled jedis;
-    private final EmbeddingClient embedding;
+    private final ManifestEmbedder manifestEmbedder;
+    private final QueryEmbedder queryEmbedder;
     private final MeterRegistry meterRegistry;
 
-    public VectorIndex(JedisPooled jedis, EmbeddingClient embedding, MeterRegistry meterRegistry) {
-        this.jedis         = jedis;
-        this.embedding     = embedding;
-        this.meterRegistry = meterRegistry;
+    public VectorIndex(JedisPooled jedis,
+                       ManifestEmbedder manifestEmbedder,
+                       QueryEmbedder queryEmbedder,
+                       MeterRegistry meterRegistry) {
+        this.jedis            = jedis;
+        this.manifestEmbedder = manifestEmbedder;
+        this.queryEmbedder    = queryEmbedder;
+        this.meterRegistry    = meterRegistry;
     }
 
+    /**
+     * Create the index if absent, and rebuild it whenever it was built by a different embedding
+     * model than the one now configured.
+     *
+     * <p>Cosine similarity between vectors from two different models is arithmetic without meaning.
+     * Previously nothing recorded which model built the index, so the only structural change this
+     * method could detect was a missing {@code sub_domain} field; a change of provider, model, or
+     * dimension passed unnoticed. The index now carries the model's identity, and a mismatch drops
+     * both the index and its documents so they are rebuilt in one coherent space.
+     */
     public void ensureIndex() {
+        String currentModel = manifestEmbedder.modelId();
+        if (!currentModel.equals(queryEmbedder.modelId())) {
+            throw new IllegalStateException("Corpus and query embedders disagree on the model: '"
+                    + currentModel + "' vs '" + queryEmbedder.modelId()
+                    + "'. Documents and queries would occupy different vector spaces.");
+        }
+
+        String stampedModel = readStamp();
+        boolean exists;
+        boolean hasSubDomain;
         try {
             var info = jedis.ftInfo(INDEX_NAME);
-            // Check if sub_domain field exists in the index
-            boolean hasSubDomain = info.values().stream()
+            exists = true;
+            hasSubDomain = info.values().stream()
                     .anyMatch(v -> v != null && v.toString().contains("sub_domain"));
-            if (!hasSubDomain) {
-                log.info("Vector index '{}' missing sub_domain field — recreating", INDEX_NAME);
-                try { jedis.ftDropIndex(INDEX_NAME); } catch (Exception ignored) {}
-                createIndex();
-            } else {
-                log.info("Vector index '{}' already exists with sub_domain field", INDEX_NAME);
-            }
         } catch (Exception e) {
-            createIndex();
+            exists = false;
+            hasSubDomain = false;
+        }
+
+        if (exists && hasSubDomain && currentModel.equals(stampedModel)) {
+            log.info("Vector index '{}' is current (model={})", INDEX_NAME, currentModel);
+            return;
+        }
+
+        if (exists) {
+            String why = !hasSubDomain
+                    ? "missing sub_domain field"
+                    : "built by embedding model '" + stampedModel + "' but '" + currentModel + "' is configured";
+            log.warn("Rebuilding vector index '{}' — {}", INDEX_NAME, why);
+            dropIndexAndDocuments();
+        }
+        createIndex();
+        writeStamp(currentModel);
+    }
+
+    private String readStamp() {
+        try {
+            return jedis.get(MODEL_STAMP_KEY);
+        } catch (Exception e) {
+            return null;
         }
     }
 
+    private void writeStamp(String modelId) {
+        try {
+            jedis.set(MODEL_STAMP_KEY, modelId);
+        } catch (Exception e) {
+            log.warn("Could not stamp the vector index with model '{}': {}", modelId, e.getMessage());
+        }
+    }
+
+    /**
+     * Drop the index and the documents it indexed. Dropping the index alone would leave the old
+     * vectors behind under the same keys, to be silently re-indexed into the new schema.
+     */
+    private void dropIndexAndDocuments() {
+        try { jedis.ftDropIndex(INDEX_NAME); } catch (Exception ignored) { }
+        var cursor = redis.clients.jedis.params.ScanParams.SCAN_POINTER_START;
+        var scanParams = new redis.clients.jedis.params.ScanParams().match(KEY_PREFIX + "*").count(500);
+        int deleted = 0;
+        do {
+            var result = jedis.scan(cursor, scanParams);
+            for (String key : result.getResult()) {
+                jedis.del(key);
+                deleted++;
+            }
+            cursor = result.getCursor();
+        } while (!cursor.equals(redis.clients.jedis.params.ScanParams.SCAN_POINTER_START));
+        log.info("Dropped vector index '{}' and {} stale document(s)", INDEX_NAME, deleted);
+    }
+
     private void createIndex() {
-        int dim = embedding.dimension();
-        log.info("Creating HNSW vector index '{}' (dim={})", INDEX_NAME, dim);
+        int dim = manifestEmbedder.dimension();
+        log.info("Creating HNSW vector index '{}' (dim={}, model={})",
+                INDEX_NAME, dim, manifestEmbedder.modelId());
 
         Map<String, Object> attrs = new HashMap<>();
         attrs.put("TYPE", "FLOAT32");
@@ -115,9 +190,13 @@ public class VectorIndex {
         removeAgent(manifest.agentId());
 
         List<String> examples = manifest.allExamples();
+        // One batched, content-addressed call for the agent's whole corpus rather than a round trip
+        // per example. Unchanged examples are served from cache and never reach the model.
+        List<float[]> vectors = manifestEmbedder.embedCorpus(examples);
+
         for (int i = 0; i < examples.size(); i++) {
             String key = KEY_PREFIX + manifest.agentId() + ":" + i;
-            float[] vec = embedding.embed(examples.get(i));
+            float[] vec = vectors.get(i);
 
             // Store metadata fields as strings
             Map<String, String> stringFields = new HashMap<>();
@@ -161,7 +240,7 @@ public class VectorIndex {
                                           java.util.function.Function<String, AgentManifest> manifestLoader) {
         Timer.Sample sample = Timer.start(meterRegistry);
         try {
-            float[] queryVec = embedding.embed(queryText);
+            float[] queryVec = queryEmbedder.embed(queryText);
             byte[] queryBytes = floatsToBytes(queryVec);
 
             String filterClause = "@is_mutating:[0 0]";
