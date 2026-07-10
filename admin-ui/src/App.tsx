@@ -1,4 +1,3 @@
-import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth, hasAdminRole } from './hooks/useAuth'
 import { ToastProvider } from './components/ui/Toast'
@@ -12,8 +11,6 @@ import { Roles } from './pages/Roles'
 import { Policies } from './pages/Policies'
 import { AuditLog } from './pages/AuditLog'
 
-const Workbench = lazy(() => import('./pages/Workbench').then((module) => ({ default: module.Workbench })))
-
 function Protected({ children }: { children: React.ReactNode }) {
   const { token, user, logout } = useAuth()
   // Authenticated is not enough — the admin console requires an admin role. A relationship manager
@@ -25,15 +22,6 @@ function Protected({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace state={{ denied: true }} />
   }
   return <>{children}</>
-}
-
-function RouteFallback() {
-  return (
-    <div className="px-8 py-8">
-      <div className="h-5 w-40 rounded bg-slate-200 animate-pulse" />
-      <div className="mt-4 h-32 max-w-3xl rounded-lg border border-slate-200 bg-white" />
-    </div>
-  )
 }
 
 function PageBoundary({ children }: { children: React.ReactNode }) {
@@ -54,7 +42,6 @@ function App() {
               <Route path="roles"    element={<PageBoundary><Roles /></PageBoundary>} />
               <Route path="policies" element={<PageBoundary><Policies /></PageBoundary>} />
               <Route path="audit"    element={<PageBoundary><AuditLog /></PageBoundary>} />
-              <Route path="workbench" element={<PageBoundary><Suspense fallback={<RouteFallback />}><Workbench /></Suspense></PageBoundary>} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

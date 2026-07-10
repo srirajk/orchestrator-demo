@@ -30,8 +30,8 @@ async function loginAdmin(page: Page) {
 // to settle and give React a beat to render (or crash) BEFORE asserting. Without this the checks
 // race the data load and pass on a page that is about to crash (the original false green).
 async function assertNoCrash(page: Page, errors: string[]) {
-  // NOT networkidle — the Workbench holds a live SSE/trace connection that never goes idle. A fixed
-  // settle is enough for react-query to resolve and the table to render (or crash).
+  // A fixed settle (not networkidle) is enough for react-query to resolve and the table to render
+  // (or crash) — and robust to pages that hold a long-lived connection.
   await page.waitForTimeout(3000)
   await expect(page.getByText(/this view could not render/i)).toHaveCount(0)
   expect(errors, `page threw: ${errors.join(' | ')}`).toEqual([])
@@ -110,14 +110,4 @@ test.describe('Admin UI', () => {
     await assertNoCrash(page, errors)
   })
 
-  test('Workbench renders with persona selector (no crash)', async ({ page }) => {
-    const errors = watchForCrashes(page)
-    await loginAdmin(page)
-    await page.getByRole('link', { name: /workbench/i }).click()
-    await page.waitForURL(`${BASE}/workbench`)
-    await expect(page.getByRole('heading', { name: /conduit workbench/i })).toBeVisible()
-    await expect(page.getByLabel(/workbench persona/i)).toBeVisible()
-    await page.waitForTimeout(1000)
-    await assertNoCrash(page, errors)
-  })
 })
