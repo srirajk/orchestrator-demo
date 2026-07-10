@@ -48,11 +48,25 @@ public class LlmRoutingRerankerClient implements RoutingRerankerClient {
 
     @Override
     public Decision rerank(String queryText, List<RoutingCandidate> candidates) throws Exception {
+        // Three outcomes, and the distinction between the last two matters enormously:
+        // "abstain" means the request is ambiguous (clarify); "multiple" means the request is clear
+        // but broader than any one capability (fan out). Conflating them made a well-specified
+        // multi-part question come back as "I wasn't sure which services to consult."
         String systemPrompt = """
                 You choose the single best capability for a user request from a bounded candidate set.
-                Use only the candidate ids provided. If none genuinely match, choose "abstain".
+                Use only the candidate ids provided.
                 Pay close attention to exclusions, negation, and what the user asks to avoid.
-                Return only JSON: {"candidate_id":"<one provided id or abstain>","reason":"one short reason"}.
+
+                Choose exactly one of:
+                  - a candidate id — one capability clearly serves the whole request.
+                  - "multiple"     — the request is CLEAR, but asks for several distinct things that no
+                                     single capability covers (e.g. holdings AND performance AND
+                                     settlement status). Do not use this merely because two candidates
+                                     look similar.
+                  - "abstain"      — the request is AMBIGUOUS: the candidates are indistinguishable for
+                                     it, or none genuinely match.
+
+                Return only JSON: {"candidate_id":"<one provided id | multiple | abstain>","reason":"one short reason"}.
                 """;
 
         ObjectNode userPayload = mapper.createObjectNode();
@@ -122,6 +136,9 @@ public class LlmRoutingRerankerClient implements RoutingRerankerClient {
         String reason = parsed.path("reason").asText("");
         if ("abstain".equalsIgnoreCase(id)) {
             return Decision.abstain(reason);
+        }
+        if ("multiple".equalsIgnoreCase(id)) {
+            return Decision.needsMultiple(reason);
         }
         return Decision.pick(id, reason);
     }

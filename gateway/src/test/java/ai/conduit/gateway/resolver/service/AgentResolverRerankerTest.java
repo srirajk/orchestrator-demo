@@ -97,6 +97,37 @@ class AgentResolverRerankerTest {
         assertThat(result.skipped()).containsExactly(alpha, beta);
     }
 
+    /**
+     * A re-ranker that declines to pick a single winner because the request needs SEVERAL capabilities
+     * must not collapse the fan-out to nothing.
+     *
+     * <p>This is the hero prompt: "a full portfolio review — holdings, YTD performance, risk profile,
+     * settlement status, corporate actions". The embedding search found ten strong candidates and a
+     * confident leader; the re-ranker replied "no single candidate can provide a full portfolio
+     * review"; the gateway threw all ten away and told the user to be more specific. Two different
+     * outcomes — "these are indistinguishable" (clarify) and "one agent cannot serve this" (fan out) —
+     * were the same boolean.
+     */
+    @Test
+    void rerankerNeedsMultipleKeepsTheCandidatesAndFansOut() throws Exception {
+        RoutingRerankerClient reranker = mock(RoutingRerankerClient.class);
+        var alpha = candidate("cap.alpha", "first capability", 0.600);
+        var beta = candidate("cap.beta", "second capability", 0.590);
+        AgentResolver resolver = resolver(List.of(alpha, beta), reranker);
+        when(reranker.rerank(anyString(), any())).thenReturn(
+                RoutingRerankerClient.Decision.needsMultiple("no single candidate covers all requested elements"));
+
+        ResolverResult result = resolver.resolve("holdings and performance and settlement status");
+
+        assertThat(result.fallback())
+                .as("a multi-capability request is not ambiguous — it must not fall back to clarify")
+                .isFalse();
+        assertThat(result.selected())
+                .as("the embedding candidates survive so the request can fan out")
+                .isNotEmpty();
+        assertThat(result.rerankFired()).isTrue();
+    }
+
     @SuppressWarnings("unchecked")
     private static AgentResolver resolver(List<RoutingCandidate> candidates, RoutingRerankerClient reranker) {
         VectorIndex vectorIndex = mock(VectorIndex.class);

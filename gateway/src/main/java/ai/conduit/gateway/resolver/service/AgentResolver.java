@@ -306,7 +306,17 @@ public class AgentResolver {
                 .toList();
         try {
             RoutingRerankerClient.Decision decision = rerankerClient.rerank(queryText, shortlist);
+            if (decision.needsMultiple()) {
+                // The query is CLEAR but broader than any one capability. The re-ranker only exists to
+                // break a near-tie by picking a single winner; that it cannot is not a reason to throw
+                // away the embedding search's candidates. Keep them and let the confidence floor and
+                // margin gates below decide — which is exactly what happens when the re-ranker errors.
+                log.debug("Resolver rerank: multi-capability request, keeping candidates: {}", decision.reason());
+                meterRegistry.counter("resolver.rerank.needs_multiple").increment();
+                return RerankApplication.noOpinion(candidates);
+            }
             if (decision.abstain()) {
+                // Genuinely ambiguous: indistinguishable candidates, or none fit. Clarify.
                 log.debug("Resolver rerank abstained: {}", decision.reason());
                 meterRegistry.counter("resolver.rerank.abstain").increment();
                 return RerankApplication.abstain(candidates);
@@ -366,6 +376,16 @@ public class AgentResolver {
 
         static RerankApplication embeddingFallback(List<RoutingCandidate> candidates) {
             return new RerankApplication(candidates, false, true, true);
+        }
+
+        /**
+         * The re-ranker ran and declined to pick a single winner because the request needs several
+         * capabilities. Keep the embedding candidates and let the ordinary confidence gates decide —
+         * the re-ranker simply has no opinion to add. Unlike {@link #embeddingFallback}, the margin
+         * abstain gate is NOT suppressed: a genuinely weak or too-close leader must still abstain.
+         */
+        static RerankApplication noOpinion(List<RoutingCandidate> candidates) {
+            return new RerankApplication(candidates, false, false, true);
         }
 
         static RerankApplication abstain(List<RoutingCandidate> candidates) {

@@ -470,8 +470,11 @@ public class ChatService {
                     return;
                 }
                 emitRequestOutcome("FAILED");
+                // Own the limitation, do not blame the user: routing could not match the request to a
+                // capability we actually have. Domain-specific wording comes from the manifest.
                 streamTextAndComplete(emitter, msg("needs_more_detail",
-                        "I wasn't sure which services to consult. Please add more detail about what you need."), streamId);
+                        "Sorry — none of the services I can reach are able to answer that as asked. "
+                        + "If you add a little detail about what you need, I'll try again."), streamId);
                 tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                         new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
                 return;
