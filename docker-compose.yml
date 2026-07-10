@@ -523,6 +523,10 @@ services:
       IAM_POLICY_GENERATION_MODEL: ${IAM_POLICY_GENERATION_MODEL:-glm-4.6}
       # OAuth2 client registration — must match LibreChat's OPENID_CLIENT_ID/SECRET
       IAM_LIBRECHAT_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-meridian-client-secret-dev}
+      # Secrets have NO in-source default (IAM fails fast if unset); the demo values live here.
+      IAM_ADMIN_UI_CLIENT_SECRET: ${IAM_ADMIN_UI_CLIENT_SECRET:-admin-ui-secret}
+      IAM_GATEWAY_CLIENT_SECRET: ${IAM_GATEWAY_CLIENT_SECRET:-gateway-secret}
+      IAM_CONDUIT_CHAT_CLIENT_SECRET: ${IAM_CONDUIT_CHAT_CLIENT_SECRET:-conduit-chat-secret}
       IAM_LIBRECHAT_REDIRECT_URI: ${IAM_LIBRECHAT_REDIRECT_URI:-http://localhost:3080/oauth/openid/callback}
       IAM_CONDUIT_CHAT_POST_LOGOUT_REDIRECT_URI: ${IAM_CONDUIT_CHAT_POST_LOGOUT_REDIRECT_URI:-http://localhost:8099/}
       IAM_CONDUIT_INSIGHTS_REDIRECT_URI: ${IAM_CONDUIT_INSIGHTS_REDIRECT_URI:-http://localhost:5175/callback}

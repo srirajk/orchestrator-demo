@@ -98,7 +98,7 @@ public class SecurityConfig {
     @Value("${iam.oauth2.librechat.client-id:librechat}")
     private String librechatClientId;
 
-    @Value("${iam.oauth2.librechat.client-secret:librechat-secret}")
+    @Value("${iam.oauth2.librechat.client-secret}")
     private String librechatClientSecret;
 
     @Value("${iam.oauth2.librechat.redirect-uri:http://localhost:3080/oauth/openid/callback}")
@@ -107,7 +107,7 @@ public class SecurityConfig {
     @Value("${iam.oauth2.conduit-chat.client-id:conduit-chat}")
     private String conduitChatClientId;
 
-    @Value("${iam.oauth2.conduit-chat.client-secret:conduit-chat-secret}")
+    @Value("${iam.oauth2.conduit-chat.client-secret}")
     private String conduitChatClientSecret;
 
     @Value("${iam.oauth2.conduit-chat.redirect-uri:http://localhost:8099/api/auth/callback}")
@@ -128,13 +128,13 @@ public class SecurityConfig {
     @Value("${iam.oauth2.admin-ui.client-id:admin-ui-client}")
     private String adminUiClientId;
 
-    @Value("${iam.oauth2.admin-ui.client-secret:admin-ui-secret}")
+    @Value("${iam.oauth2.admin-ui.client-secret}")
     private String adminUiClientSecret;
 
     @Value("${iam.oauth2.gateway.client-id:gateway-client}")
     private String gatewayClientId;
 
-    @Value("${iam.oauth2.gateway.client-secret:gateway-secret}")
+    @Value("${iam.oauth2.gateway.client-secret}")
     private String gatewayClientSecret;
 
     // =========================================================

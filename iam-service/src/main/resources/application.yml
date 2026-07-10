@@ -16,7 +16,7 @@ spring:
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/meridian}
     username: ${SPRING_DATASOURCE_USERNAME:meridian}
-    password: ${SPRING_DATASOURCE_PASSWORD:meridian_dev}
+    password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 20
@@ -57,7 +57,7 @@ spring:
 
 iam:
   admin:
-    password: ${IAM_ADMIN_PASSWORD:Meridian@2024}
+    password: ${IAM_ADMIN_PASSWORD}
   seed:
     enabled: ${IAM_SEED_ENABLED:true}
   cerbos:
@@ -75,9 +75,10 @@ iam:
         key-prefix: ${IAM_OAUTH2_AUTHORIZATION_STORE_REDIS_KEY_PREFIX:iam:oauth2}
     librechat:
       client-id: ${IAM_LIBRECHAT_CLIENT_ID:meridian-librechat}
-      client-secret: ${IAM_LIBRECHAT_CLIENT_SECRET:meridian-client-secret-dev}
+      client-secret: ${IAM_LIBRECHAT_CLIENT_SECRET}
       redirect-uri: ${IAM_LIBRECHAT_REDIRECT_URI:http://localhost:3080/oauth/openid/callback}
     conduit-chat:
+      client-secret: ${IAM_CONDUIT_CHAT_CLIENT_SECRET}
       post-logout-redirect-uri: ${IAM_CONDUIT_CHAT_POST_LOGOUT_REDIRECT_URI:http://localhost:8099/}
     conduit-insights:
       client-id: ${IAM_CONDUIT_INSIGHTS_CLIENT_ID:conduit-insights}
@@ -85,10 +86,10 @@ iam:
       post-logout-redirect-uri: ${IAM_CONDUIT_INSIGHTS_POST_LOGOUT_REDIRECT_URI:http://localhost:5175/}
     admin-ui:
       client-id: ${IAM_ADMIN_UI_CLIENT_ID:admin-ui-client}
-      client-secret: ${IAM_ADMIN_UI_CLIENT_SECRET:admin-ui-secret}
+      client-secret: ${IAM_ADMIN_UI_CLIENT_SECRET}
     gateway:
       client-id: ${IAM_GATEWAY_CLIENT_ID:gateway-client}
-      client-secret: ${IAM_GATEWAY_CLIENT_SECRET:gateway-secret}
+      client-secret: ${IAM_GATEWAY_CLIENT_SECRET}
       audience: ${IAM_GATEWAY_AUDIENCE:conduit-gateway}
 
 management:
