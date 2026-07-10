@@ -46,6 +46,24 @@ management:
         url: ${MANAGEMENT_OTLP_METRICS_EXPORT_URL:http://localhost:4318/v1/metrics}
 
 conduit:
+  # Regulator-facing audit: one immutable record per request to WORM object storage, off the
+  # request path (see docs/specs/AUDIT-RECORD-SPEC.md). Disabled by default; the demo enables it
+  # via env pointing at MinIO. Analytics (Iceberg/ClickHouse) read these objects later.
+  audit:
+    enabled: ${CONDUIT_AUDIT_ENABLED:false}
+    retention-days: ${CONDUIT_AUDIT_RETENTION_DAYS:2555}
+    object-lock-mode: ${CONDUIT_AUDIT_OBJECT_LOCK_MODE:COMPLIANCE}   # COMPLIANCE | GOVERNANCE | none
+    store:
+      type: ${CONDUIT_AUDIT_STORE_TYPE:s3}                          # s3-family (MinIO/S3/R2) | adls-gen2 (later)
+      bucket: ${CONDUIT_AUDIT_BUCKET:conduit-audit}
+      prefix: ${CONDUIT_AUDIT_PREFIX:audit}
+      endpoint: ${CONDUIT_AUDIT_S3_ENDPOINT:}                       # blank = real AWS
+      region: ${CONDUIT_AUDIT_S3_REGION:us-east-1}
+      path-style: ${CONDUIT_AUDIT_S3_PATH_STYLE:true}               # true for MinIO
+      access-key: ${CONDUIT_AUDIT_S3_ACCESS_KEY:}
+      secret-key: ${CONDUIT_AUDIT_S3_SECRET_KEY:}
+  gateway:
+    version: ${CONDUIT_GATEWAY_VERSION:0.1.0}
   # End-to-end deadline for ONE chat turn. The SSE emitter times out here AND the pipeline
   # future is cancelled — so a turn can neither run forever, nor keep running (and keep
   # spending) for a client that has already disconnected. Was a hardcoded 120_000L.

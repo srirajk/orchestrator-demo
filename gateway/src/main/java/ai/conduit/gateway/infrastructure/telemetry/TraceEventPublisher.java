@@ -53,6 +53,8 @@ public class TraceEventPublisher {
     private final ConcurrentHashMap<String, Subscriber> subscribers = new ConcurrentHashMap<>();
     private final ObjectMapper mapper;
     private final AsyncTraceWriter traceWriter;
+    /** Present only when audit is enabled ({@code conduit.audit.enabled=true}); null otherwise. */
+    private final ai.conduit.gateway.infrastructure.audit.AsyncAuditWriter auditWriter;
     /** In-flight per-request event buffers, flushed once when the request completes. */
     private final ConcurrentHashMap<String, List<TraceEvent>> buffers = new ConcurrentHashMap<>();
     private final int maxEventsPerRequest;
@@ -63,11 +65,13 @@ public class TraceEventPublisher {
     public TraceEventPublisher(
             ObjectMapper mapper,
             AsyncTraceWriter traceWriter,
+            org.springframework.beans.factory.ObjectProvider<ai.conduit.gateway.infrastructure.audit.AsyncAuditWriter> auditWriterProvider,
             MeterRegistry meterRegistry,
             @Value("${conduit.telemetry.buffer.max-events-per-request:512}") int maxEventsPerRequest,
             @Value("${conduit.telemetry.buffer.max-open-requests:10000}") int maxOpenRequests) {
         this.mapper              = mapper;
         this.traceWriter         = traceWriter;
+        this.auditWriter         = auditWriterProvider.getIfAvailable();
         this.maxEventsPerRequest = Math.max(1, maxEventsPerRequest);
         this.maxOpenRequests     = Math.max(1, maxOpenRequests);
         this.bufferOverflow = Counter.builder("conduit.trace.buffer.overflow")
@@ -164,8 +168,15 @@ public class TraceEventPublisher {
         if (TERMINAL_EVENT.equals(event.type())) {
             List<TraceEvent> completed = buffers.remove(requestId);
             if (completed != null) {
+                List<TraceEvent> copy;
                 synchronized (completed) {
-                    traceWriter.submit(new ArrayList<>(completed));   // copy: the writer outlives this thread
+                    copy = new ArrayList<>(completed);   // copy: the writers outlive this thread
+                }
+                traceWriter.submit(copy);
+                // The audit record is built and written entirely off this thread — a non-blocking
+                // hand-off, never the request path (audit spec, Invariant 0). No-op when audit is off.
+                if (auditWriter != null) {
+                    auditWriter.submit(copy);
                 }
             }
         }

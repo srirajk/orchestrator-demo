@@ -1,6 +1,8 @@
 package ai.conduit.gateway.infrastructure.telemetry;
 
+import ai.conduit.gateway.infrastructure.audit.AsyncAuditWriter;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.ObjectProvider;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 
@@ -51,7 +53,7 @@ class AsyncTraceWriteTest {
     }
 
     private TraceEventPublisher publisher(AsyncTraceWriter writer) {
-        return new TraceEventPublisher(new ObjectMapper(), writer, new SimpleMeterRegistry(), 512, 1000);
+        return new TraceEventPublisher(new ObjectMapper(), writer, noAudit(), new SimpleMeterRegistry(), 512, 1000);
     }
 
     @Test
@@ -114,7 +116,7 @@ class AsyncTraceWriteTest {
         AsyncTraceWriter writer = new AsyncTraceWriter(storage, new SimpleMeterRegistry(), 64, 1);
         // maxOpenRequests = 1: the second in-flight request must evict and flush the first.
         TraceEventPublisher pub =
-                new TraceEventPublisher(new ObjectMapper(), writer, new SimpleMeterRegistry(), 512, 1);
+                new TraceEventPublisher(new ObjectMapper(), writer, noAudit(), new SimpleMeterRegistry(), 512, 1);
 
         pub.publish(event("never-completes", "request_start"));   // no request_complete
         pub.publish(event("req-2", "request_start"));             // forces eviction of the orphan
@@ -122,5 +124,15 @@ class AsyncTraceWriteTest {
         assertThat(storage.latch.await(3, TimeUnit.SECONDS)).isTrue();
         assertThat(storage.batches.get(0).get(0).requestId()).isEqualTo("never-completes");
         writer.shutdown();
+    }
+
+    /** An ObjectProvider that yields no audit writer — audit is off in these trace tests. */
+    private static ObjectProvider<AsyncAuditWriter> noAudit() {
+        return new ObjectProvider<>() {
+            @Override public AsyncAuditWriter getObject() { return null; }
+            @Override public AsyncAuditWriter getObject(Object... args) { return null; }
+            @Override public AsyncAuditWriter getIfAvailable() { return null; }
+            @Override public AsyncAuditWriter getIfUnique() { return null; }
+        };
     }
 }
