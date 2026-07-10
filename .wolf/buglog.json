@@ -4253,5 +4253,62 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-07-09T18:30:00-04:00"
+  },
+  {
+    "id": "bug-253",
+    "timestamp": "2026-07-10T00:00:00Z",
+    "error_message": "Registry bootstrap complete: 11 loaded, 7 failed \u2014 $.connection.transport: does not have a value in the enumeration [\"sse\", \"stdio\"]",
+    "file": "gateway/src/main/resources/agent-manifest.schema.json",
+    "root_cause": "agent-manifest.schema.json exists in three places (repo root, registry/, gateway classpath). Only the gateway classpath copy is loaded by ManifestValidator at runtime. The MCP Streamable HTTP migration widened the transport enum in registry/ alone, so 152 unit tests and world-b-check stayed green while the running gateway rejected all 7 asset-servicing manifests.",
+    "fix": "Synced all three copies; added ManifestSchemaCopiesInSyncTest which parses all three and fails the build if they are not semantically identical. Verified red when one copy is reverted.",
+    "tags": [
+      "mcp",
+      "schema",
+      "registry",
+      "drift",
+      "manifest",
+      "silent-failure"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-10T00:00:00Z"
+  },
+  {
+    "id": "bug-254",
+    "timestamp": "2026-07-10T00:00:00Z",
+    "error_message": "RuntimeError: Unexpected message received: http.request \u2014 /mcp returned HTTP 200 with an empty body",
+    "file": "mock-agents/servicing/server.py",
+    "root_cause": "FastMCP's streamable_http_app() defaults to json_response=False, returning an SSE-upgraded POST body. The fail-closed JwtAuthMiddleware is a Starlette BaseHTTPMiddleware, which cannot stream: it drops the SSE body and raises. Also, streamable_http_app() carries a REQUIRED lifespan (session_manager.run()) that never runs if the app is mounted as a sub-app.",
+    "fix": "Set json_response=True (still valid Streamable HTTP) so the single JSON-RPC body survives the middleware; build ON the streamable app (insert /health, add_middleware) rather than mounting it, so its lifespan runs. The gateway client still accepts an SSE body from any other server.",
+    "tags": [
+      "mcp",
+      "fastmcp",
+      "starlette",
+      "middleware",
+      "sse",
+      "streamable-http"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-10T00:00:00Z"
+  },
+  {
+    "id": "bug-255",
+    "timestamp": "2026-07-10T00:00:00Z",
+    "error_message": "Running `mvn test` in gateway/ silently re-indexed the LIVE demo Redis; after adding the model stamp it DROPPED the live index, leaving 24 vectors from 5 test manifests instead of 131 from 18 agents",
+    "file": "gateway/src/main/java/ai/conduit/gateway/registry/loader/RegistryBootstrapLoader.java",
+    "root_cause": "RegistryBootstrapLoader runs on ApplicationReadyEvent. The four @SpringBootTest classes boot a full context, and RedisConfig resolves spring.data.redis.host default 'localhost:6379' \u2014 the running demo's Redis. There is no database index property, so tests share db 0 with the demo. Pre-existing (tests always overwrote); the new VectorIndex model-stamp rebuild turned the silent overwrite into a silent drop.",
+    "fix": "Gated the loader on conduit.registry.bootstrap.enabled (matchIfMissing=true); the four context tests set it false plus conduit.embedding.provider=hash via @TestPropertySource so they are hermetic. Verified: live index holds 131 docs before `mvn test` and 131 after. Proper fix is Testcontainers Redis for the context tests.",
+    "tags": [
+      "testing",
+      "redis",
+      "isolation",
+      "spring-boot-test",
+      "destructive",
+      "vector-index"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-10T00:00:00Z"
   }
 ]
