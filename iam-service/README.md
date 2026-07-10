@@ -109,7 +109,7 @@ Every write emits an audit row. The log is filterable by date, actor, action, an
     └────────────┘
 ```
 
-**Auth flow:** Admin UI → `POST /auth/login` → RS256 JWT with `roles` claim → every subsequent request carries the token → Spring Security maps `roles` claim to `ROLE_` authorities → `@PreAuthorize` gates controllers → `CerbosAuthzService` does fine-grained resource-level check via Cerbos PDP.
+**Auth flow:** Admin UI → `POST /auth/login` → RS256 JWT with `roles` claim → every subsequent request carries the token → Spring Security maps `roles` claim to `ROLE_` authorities → `@PreAuthorize` gates controllers. (IAM authorizes its own API with `@PreAuthorize` only — it has no Cerbos dependency; structural resource-level authz is the gateway's concern.)
 
 **Policy generation flow:** Form → `POST /admin/policies/generate` → `LlmPolicyGenerationService` builds system prompt with live context → Z.AI GLM-5.2 → YAML returned → saved as `DRAFT` → promoted to `ACTIVE` by a `policy_approver`.
 
@@ -225,7 +225,6 @@ iam-service/
 │   ├── service/
 │   │   ├── LlmPolicyGenerationService.java   # Z.AI GLM-5.2 call + system prompt
 │   │   └── PolicyService.java                # draft/approve/deploy lifecycle
-│   ├── security/CerbosAuthzService.java      # Cerbos PDP client
 │   └── entity/                               # Principal, Role, Team, Policy, AuditLog
 ├── src/main/resources/application.yml
 └── README.md                                 # this file

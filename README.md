@@ -234,7 +234,7 @@ here, never in the gateway.
 |---|---|
 | Gateway runtime | Java 21+, Spring Boot 3.5, **virtual threads** (fan-out concurrency without pool exhaustion) |
 | Routing + state | Redis Stack (RediSearch HNSW vector index + RedisJSON) |
-| Embeddings | DJL + all-MiniLM-L6-v2 (in-JVM, 384-dim) |
+| Embeddings | Python sentence-transformers sidecar (all-MiniLM-L6-v2, 384-dim) over HTTP via `RemoteEmbedder` |
 | LLM (gateway + agents) | OpenAI-compatible, provider-swappable per call site (`CONDUIT_LLM_*`) |
 | Resilience | Resilience4j (circuit breakers, timeouts, partial join) |
 | Authorization | Cerbos PDP (structural) + coverage services (data-aware) |
