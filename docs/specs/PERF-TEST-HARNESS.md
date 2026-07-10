@@ -56,23 +56,41 @@ these are the facts.
 - ✅ `POST /v1/chat/completions`, non-streaming: correct OpenAI envelope.
 - ✅ **Streaming SSE is byte-correct**: role delta → content deltas with `object:"chat.completion.chunk"` →
   `data: [DONE]` **with a space after the colon**. This satisfies hard rule (a). *Verified on the wire.*
-- ✅ **Unmatched request → `HTTP 404 {"code":"no_fixture_match"}` by default**, even without `--strict`. It
-  fails loudly rather than fabricating. This is the single most important property.
+- ✅ **An unmatched request fails loudly, never fabricates.** Non-strict → `HTTP 404 {"code":"no_fixture_match"}`
+  (observed on the wire); `--strict` → `HTTP 503 "No fixture matched"` (`server.ts:655`). Either way it is a
+  hard failure. This is the single most important property.
 - ✅ `toolCalls` in fixtures (`fixtures/example-tool-call.json`), matched on `toolName` / `userMessage` /
-  `toolCallId` — so `EntityExtractor`'s function-calling path is servable.
-- ✅ CLI: `--record` (proxy unmatched + save), `--strict`, `--proxy-only`, `--latency <ms>`,
-  `--chunk-size <chars>`, `--metrics` (Prometheus at `/metrics`), `--validate-on-load`, `--watch`,
-  `--upstream-timeout-ms`, and `--provider-openai` / `--provider-ollama` / others.
-- ✅ Chaos config (`llm.chaos`): `dropRate`, `malformedRate`, `disconnectRate` — **mid-stream disconnect and
-  malformed SSE**, which we would never have written ourselves and which directly test hard rule (a).
-- ✅ Record config: `llm.record.providers.{openai,anthropic}` + `fixturePath`.
+  `toolCallId`. Source-verified: streaming emits `delta.tool_calls[{index,function:{arguments:slice}}]` with
+  `finish_reason:"tool_calls"` (`helpers.ts:742,764`); non-streaming emits `message.tool_calls`
+  (`helpers.ts:850`). Arguments are split across deltas the way real OpenAI does — the part most likely to be
+  subtly wrong if hand-written. `EntityExtractor` is servable.
+- ✅ **Settable TTFT and rate** (`sse-writer.ts:43-53`): `ttft` applies only to the first chunk, `tps`
+  governs the rest (`delay = 1000/tps`), `jitter` is a uniform ± multiplier. **So TTFT is independently
+  settable from total duration.** (The `--latency` CLI flag is only inter-chunk delay — do not confuse them.)
+- ✅ **`429` with `Retry-After` + `x-ratelimit-*` headers** when a fixture pins status 429
+  (`sse-writer.ts:128-149`).
+- ✅ Deterministic interruption: `truncateAfterChunks`, `disconnectAfterMs` (`interruption.ts`).
+- ✅ Probabilistic chaos (`chaos.ts`, also per-request via `x-aimock-chaos-*` headers): `dropRate` → HTTP 500,
+  `malformedRate` → HTTP 200 with invalid JSON, `disconnectRate` → `res.destroy()`. **Mid-stream disconnect and
+  malformed SSE** — which we would never have written ourselves, and which directly test hard rule (a).
+- ✅ `response_format:{type:"json_object"}` is a **match key** (`router.ts:374`) — it routes on it, it does
+  not validate the body is real JSON.
+- ✅ CLI: `--record`, `--strict`, `--proxy-only`, `--latency`, `--chunk-size`, `--metrics` (Prometheus),
+  `--validate-on-load`, `--watch`, `--upstream-timeout-ms`, `--provider-openai` / `--provider-ollama`.
+- ✅ Record: stores the **response only** (so a request `Authorization` header is not persisted — safe *by
+  omission*, not by an explicit scrubber). The strict-mode journal does hold raw request headers in memory.
+  **Still assert no keys land in a committed fixture.**
+- ✅ MCP handler exists (`mcp-handler.ts`, `jsonrpc.ts`, session state). **Transport (HTTP+SSE vs Streamable
+  HTTP) is UNVERIFIED** — investigate before relying on it for Phase 4.
 
 **AIMock gaps — the reason Toxiproxy exists in this design:**
-- ❌ `--latency` is **inter-SSE-chunk delay only**. There is **no total-latency knob, no independent TTFT,
-  no distribution**.
-- ❌ **No hang** (accept and never respond).
-- ❌ No `429` + `Retry-After` / `x-ratelimit-*` / stateful quota simulation. (A fixture `status` key exists;
-  whether it can serve a 429 with headers is **UNVERIFIED** — check before relying on it.)
+- ❌ **No hang** (accept and never respond). `disconnectAfterMs` aborts; a large `ttft` merely delays, then
+  completes. **Only Toxiproxy's `timeout{timeout:0}` gives a true hang** — and that is the single thing that
+  proves our infinite read timeout.
+- ❌ **No probabilistic 429.** Chaos injects HTTP 500 only; a 429 must be a pinned fixture status.
+- ❌ **No stateful quota** (N requests → 429). Neither tool has it; script around it if needed.
+- ❌ **No latency distribution.** AIMock is `ttft` + `tps` + *uniform* jitter; Toxiproxy is fixed + jitter.
+  Neither offers log-normal. Sweep discrete points; never report one as a distribution.
 
 **Toxiproxy** (`ghcr.io/shopify/toxiproxy`, **v2.12.0**, admin API on **8474**), all verified live:
 - ✅ baseline pass-through: **2 ms**.
@@ -226,7 +244,10 @@ TTFT p50/p95 · total p50/p95 · error % · degraded % · outcomes · **gateway 
 - Replay is deterministic: two identical runs → identical outcome counts, **zero `no_fixture_match`**.
 - `PROFILE=gateway-only`, VUs ≤ knee: **`conduit_degraded_rate == 0` and `conduit_error_rate == 0`.** With a
   deterministic LLM there is no excuse for a degraded answer.
-- AIMock's SSE is byte-identical in shape to a recorded real stream (role delta, `finish_reason`, `data: [DONE]`).
+- **Golden-bytes canary.** Keep one recorded `curl -N` capture of a *real* provider stream, and assert AIMock's
+  stream matches its shape (role delta, `object`, `finish_reason:"stop"`, `data: [DONE]`). This canary must be
+  independent of AIMock's own tests: if a patch release regresses its SSE framing, our gateway's SSE
+  conformance test would otherwise pass **against a lie**. `@copilotkit/aimock` ships ~4 releases/week.
 - No API keys in any committed fixture (asserted).
 - The AIMock image is **pinned by digest**; the canary (§8.6) passes.
 - Without the overlay the real-LLM path is untouched: `integration-test.sh` 13/13, `e2e-matrix.sh` 12/12.

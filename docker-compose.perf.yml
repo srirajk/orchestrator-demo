@@ -1,0 +1,81 @@
+# Performance-testing overlay — see docs/specs/PERF-TEST-HARNESS.md
+#
+#   docker compose -p orchestrator-demo -f docker-compose.yml -f docker-compose.perf.yml up -d
+#
+# Puts a deterministic LLM behind a controllable network, so that only the system under test is real:
+#
+#   gateway ──► toxiproxy ──► aimock ──► (record mode only) OpenAI | Ollama
+#               latency,hang   SSE, tool_calls, record/replay, strict-miss
+#
+# Nothing in docker-compose.yml changes, and no gateway Java changes: every call site is already
+# CONDUIT_LLM_<SITE>_BASE_URL. That is the World-B seam doing its job.
+#
+# Record once, then replay for free:
+#   scripts/perf-record-fixtures.sh          # proxies misses upstream and saves fixtures
+#   docker compose ... up -d aimock          # default: --strict replay
+#
+# Latency and faults are Toxiproxy toxics, toggled at runtime:  scripts/perf-toxic.sh <profile>
+
+services:
+  # ── LLM semantics ─────────────────────────────────────────────────────────────
+  # Pinned by digest on purpose: @copilotkit/aimock shipped 2026-04-03 and is already at 1.35.1
+  # (55 versions in ~3 months). This is a measurement instrument; it must not move under us.
+  # Verify with the §8.6 canary before trusting any number it produces.
+  aimock:
+    image: ghcr.io/copilotkit/aimock@sha256:70cc93861e9d7bb544db36838b9a853ac249ad5fb3a621c83ff2369600336047
+    container_name: conduit-aimock
+    # An unmatched request returns HTTP 404 no_fixture_match *by default* — it never fabricates.
+    # AIMOCK_ARGS is overridden by scripts/perf-record-fixtures.sh to add --record.
+    command: ${AIMOCK_ARGS:---fixtures /fixtures --host 0.0.0.0 --metrics --strict}
+    volumes:
+      - ./mock-agents/aimock/fixtures:/fixtures
+    ports:
+      - "9111:4010"          # host access for debugging / metrics scraping
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:4010/v1/models',r=>process.exit(0)).on('error',()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  # ── Network chaos: the latency knob and the only true hang ────────────────────
+  # aimock's --latency is inter-SSE-chunk delay only; it has no total-latency knob and no hang.
+  # Toxiproxy supplies both. Verified: latency{1800,jitter 400} -> 1.98s; timeout{0} -> never answers.
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy
+    container_name: conduit-toxiproxy
+    command: ["-host=0.0.0.0", "-config=/config/proxies.json", "-proxy-metrics", "-runtime-metrics"]
+    volumes:
+      - ./infra/toxiproxy:/config:ro
+    ports:
+      - "8474:8474"          # admin API — scripts/perf-toxic.sh drives this
+      - "9113:9000"          # the proxied LLM endpoint, for host-side debugging
+    depends_on:
+      aimock:
+        condition: service_healthy
+
+  gateway:
+    environment:
+      # All four gateway call sites through the proxy. Keys stay set: aimock forwards them upstream
+      # in record mode and ignores them in replay.
+      CONDUIT_LLM_INTENT_CLASSIFIER_BASE_URL: http://toxiproxy:9000/v1
+      CONDUIT_LLM_ENTITY_EXTRACTOR_BASE_URL: http://toxiproxy:9000/v1
+      CONDUIT_LLM_SYNTHESIZER_BASE_URL: http://toxiproxy:9000/v1
+      CONDUIT_LLM_CLARIFICATION_COMPOSER_BASE_URL: http://toxiproxy:9000/v1
+      # The gateway Dockerfile's ENTRYPOINT is `java -jar app.jar` with no JAVA_OPTS, so
+      # JAVA_TOOL_OPTIONS is the clean lever. Pin carriers so saturation is reproducible: the
+      # container otherwise sees all 12 host CPUs. The JVM logs "Picked up JAVA_TOOL_OPTIONS" —
+      # assert that, do not assume it.
+      JAVA_TOOL_OPTIONS: -Djdk.virtualThreadScheduler.parallelism=${CARRIERS:-12} -Djdk.virtualThreadScheduler.maxPoolSize=${CARRIERS:-12}
+    depends_on:
+      toxiproxy:
+        condition: service_started
+
+  # The servicing agents each run their own internal LLM loop (~1.9s). Route them through the
+  # same proxy so an agent's LLM is deterministic too.
+  servicing-mcp:
+    environment:
+      SERVICING_AGENT_LLM_BASE_URL: http://toxiproxy:9000/v1
+    depends_on:
+      toxiproxy:
+        condition: service_started

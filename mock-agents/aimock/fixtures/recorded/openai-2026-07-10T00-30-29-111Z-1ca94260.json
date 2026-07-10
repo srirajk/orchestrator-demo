@@ -1,0 +1,18 @@
+{
+  "fixtures": [
+    {
+      "match": {
+        "userMessage": "USER: Any upcoming corporate actions — dividends or splits — for REL-00042?\n\n--- LATEST USER MESSAGE (classify THIS; if it names an entity, that mention wins) ---\nAny upcoming corporate actions — dividends or splits — for REL-00042?",
+        "model": "gpt-4o-mini",
+        "turnIndex": 0,
+        "hasToolResult": false
+      },
+      "response": {
+        "content": "{\n  \"intent\": \"FETCH_DATA\",\n  \"confidence\": 0.95,\n  \"reasoning\": \"The user explicitly requests information about corporate actions for a specific client relationship ID.\",\n  \"research_topic\": null,\n  \"relationship_reference\": \"REL-00042\",\n  \"fund_reference\": null,\n  \"period\": \"QTD\",\n  \"ticker_references\": [],\n  \"policy_topic\": null,\n  \"account_id\": null,\n  \"currency\": null,\n  \"security_id\": null,\n  \"valuation_date\": \"latest available\",\n  \"policy_reference\": null,\n  \"claim_reference\": null,\n  \"settlement_id\": null\n}"
+      },
+      "metadata": {
+        "systemHash": "8ec40b4b"
+      }
+    }
+  ]
+}

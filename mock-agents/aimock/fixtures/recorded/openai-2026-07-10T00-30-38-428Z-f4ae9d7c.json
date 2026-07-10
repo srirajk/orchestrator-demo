@@ -1,0 +1,18 @@
+{
+  "fixtures": [
+    {
+      "match": {
+        "userMessage": "{\"query\":\"Show me pending settlements and custody positions for REL-00042.\",\"candidates\":[{\"id\":\"meridian.servicing.settlement_status\",\"name\":\"Asset Servicing Settlement Status\",\"description\":\"Returns pending and failed settlement records for a given relationship. Accepts relationship_id as the primary key. Accessed via MCP tool over SSE transport.\",\"score\":0.645895600319,\"skills\":[{\"name\":\"get_settlements\",\"description\":\"Retrieve pending and failed trade settlements for a given asset servicing relationship.\",\"examples\":[\"any pending settlements on this account\",\"failed trades for the relationship\"]}]},{\"id\":\"meridian.servicing.custody_positions\",\"name\":\"Asset Servicing Custody Positions\",\"description\":\"Returns custody holdings broken down by custodian for a given relationship. Accepts relationship_id as the primary key. Accessed via MCP tool over SSE transport.\",\"score\":0.525628745556,\"skills\":[{\"name\":\"get_custody_positions\",\"description\":\"Retrieve holdings broken down by custodian for a given asset servicing relationship.\",\"examples\":[\"custody holdings for the relationship\",\"what's held at the custodian\"]}]},{\"id\":\"meridian.servicing.settlement_risk\",\"name\":\"Asset Servicing Settlement Risk Analysis\",\"description\":\"Fan-in analytics agent: consumes settlement status, custody positions, and cash position outputs to compute failed-settlement aging, CSDR cash-penalty exposure basis, and firm-policy settlement-risk flags. Computes from supplied producer data; does not fetch data and does not claim mandatory buy-in is active.\",\"score\":0.51108944416,\"skills\":[{\"name\":\"analyze_settlement_risk\",\"description\":\"Analyse settlement risk from settlement, custody, and cash data: failed-trade aging, failed amount exposure, CSDR cash-penalty exposure basis, and firm-policy flags without asserting that mandatory buy-in is active.\",\"examples\":[\"what is the settlement risk on this servicing relationship\",\"assess settlement risk with custody holdings and cash balance context\"]}]},{\"id\":\"meridian.insurance.claim_status\",\"name\":\"Insurance Claim Status\",\"description\":\"Returns the status of an insurance claim: claim amount, status, incident date, and adjuster. Looks up a single claim by claim_id, or all claims filed against a policy by policy_id.\",\"score\":0.44683778286,\"skills\":[{\"name\":\"get_claim_status\",\"description\":\"Retrieve the status of an insurance claim — amount, status, incident date, and adjuster — by claim ID, or list all claims on a policy.\",\"examples\":[\"what is the claim status for CLM-5501\",\"show me the status of the claim\"]}]},{\"id\":\"meridian.servicing.corporate_actions\",\"name\":\"Asset Servicing Corporate Actions\",\"description\":\"Returns upcoming corporate actions such as dividends, splits, and elections pending for a given relationship. Accepts relationship_id as the primary key. Accessed via MCP tool over SSE transport.\",\"score\":0.356949806213,\"skills\":[{\"name\":\"get_corporate_actions\",\"description\":\"Retrieve upcoming corporate actions including dividends, splits, and elections due for a given asset servicing relationship.\",\"examples\":[\"upcoming corporate actions\",\"any dividends or splits coming up\"]}]}]}",
+        "model": "gpt-4o-mini",
+        "turnIndex": 0,
+        "hasToolResult": false
+      },
+      "response": {
+        "content": "{\"candidate_id\":\"meridian.servicing.settlement_status\",\"reason\":\"It directly addresses pending settlements for the specified relationship.\"}"
+      },
+      "metadata": {
+        "systemHash": "fb9be597"
+      }
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "fixtures": [
+    {
+      "match": {
+        "userMessage": "Retrieve and summarise custody positions for relationship_id=REL-00042",
+        "model": "gpt-4o-mini",
+        "turnIndex": 0,
+        "hasToolResult": false
+      },
+      "response": {
+        "toolCalls": [
+          {
+            "name": "get_custody_positions_data",
+            "arguments": "{\"relationship_id\":\"REL-00042\"}",
+            "id": "call_Btw4GKaUHeaL7VmbU04PV0u9"
+          }
+        ]
+      },
+      "metadata": {
+        "systemHash": "eceaa25b",
+        "toolsHash": "6d4f946c"
+      }
+    }
+  ]
+}

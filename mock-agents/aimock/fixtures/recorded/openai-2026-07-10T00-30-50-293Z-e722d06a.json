@@ -1,0 +1,18 @@
+{
+  "fixtures": [
+    {
+      "match": {
+        "userMessage": "{\"query\":\"Give me a full overview of the Whitman relationship REL-00042.\",\"candidates\":[{\"id\":\"meridian.wealth.concentration\",\"name\":\"Wealth Concentration Analysis\",\"description\":\"Fan-in analytics agent: consumes a portfolio holdings payload (the wealth.holdings output) and computes single-name and asset-class concentration, HHI and effective number of positions, and breach flags against firm-configured thresholds. Computes from the supplied holdings; does not fetch data and does not take a relationship_id.\",\"score\":0.778482496738,\"skills\":[{\"name\":\"analyze_concentration\",\"description\":\"Analyse portfolio concentration risk from a holdings payload: per-position weights, top single-name exposure, HHI, effective number of positions, and firm-policy breach flags.\",\"examples\":[\"is this portfolio too concentrated\",\"how concentrated is the Whitman relationship\"]}]},{\"id\":\"meridian.wealth.risk_profile\",\"name\":\"Wealth Risk Profile\",\"description\":\"Returns risk tolerance assessment and concentration flags for a given wealth management relationship. Accepts relationship_id as the primary key.\",\"score\":0.724444508553,\"skills\":[{\"name\":\"get_risk_profile\",\"description\":\"Retrieve risk tolerance rating and concentration flags indicating portfolio risk exposures for a wealth relationship.\",\"examples\":[\"risk profile for this client\",\"how concentrated is this portfolio\"]}]},{\"id\":\"meridian.servicing.settlement_status\",\"name\":\"Asset Servicing Settlement Status\",\"description\":\"Returns pending and failed settlement records for a given relationship. Accepts relationship_id as the primary key. Accessed via MCP tool over SSE transport.\",\"score\":0.669703960419,\"skills\":[{\"name\":\"get_settlements\",\"description\":\"Retrieve pending and failed trade settlements for a given asset servicing relationship.\",\"examples\":[\"any pending settlements on this account\",\"failed trades for the relationship\"]}]},{\"id\":\"meridian.wealth.holdings\",\"name\":\"Wealth Holdings\",\"description\":\"Returns the current portfolio positions and asset-class allocation for a given wealth management relationship. Accepts relationship_id as the primary key.\",\"score\":0.663770139217,\"skills\":[{\"name\":\"get_holdings\",\"description\":\"Retrieve current holdings, positions, and asset allocation breakdown for a wealth relationship.\",\"examples\":[\"current holdings for the Whitman relationship\",\"portfolio allocation for this client\"]}]},{\"id\":\"meridian.servicing.cash_management\",\"name\":\"Asset Servicing Cash Management\",\"description\":\"Returns cash balances and projected cash positions for a given relationship. Accepts relationship_id as the primary key. Accessed via MCP tool over SSE transport.\",\"score\":0.66314458847,\"skills\":[{\"name\":\"get_cash\",\"description\":\"Retrieve cash balances and projected cash positions for a given asset servicing relationship.\",\"examples\":[\"cash position for the relationship\",\"projected cash for this account\"]}]}]}",
+        "model": "gpt-4o-mini",
+        "turnIndex": 0,
+        "hasToolResult": false
+      },
+      "response": {
+        "content": "{\"candidate_id\":\"meridian.wealth.risk_profile\",\"reason\":\"It provides a risk tolerance assessment and concentration flags for the specified relationship.\"}"
+      },
+      "metadata": {
+        "systemHash": "fb9be597"
+      }
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "fixtures": [
+    {
+      "match": {
+        "userMessage": "Retrieve and summarise NAV for fund_id=FND-7781",
+        "model": "gpt-4o-mini",
+        "turnIndex": 1,
+        "hasToolResult": true
+      },
+      "response": {
+        "content": "The Meridian Global Equity Fund has a NAV per unit of $128.45 and total assets under management (AUM) of $4.5 billion as of June 22, 2026. The day's NAV change percentage is 0.82%."
+      },
+      "metadata": {
+        "systemHash": "7fa2364d",
+        "toolsHash": "d6c9ea86"
+      }
+    }
+  ]
+}

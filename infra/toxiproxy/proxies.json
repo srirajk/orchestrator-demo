@@ -1,0 +1,8 @@
+[
+  {
+    "name": "llm",
+    "listen": "0.0.0.0:9000",
+    "upstream": "aimock:4010",
+    "enabled": true
+  }
+]
