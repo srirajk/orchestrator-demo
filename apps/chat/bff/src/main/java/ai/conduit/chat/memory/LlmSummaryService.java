@@ -92,7 +92,10 @@ public class LlmSummaryService implements SummaryService {
         this.messageService = messageService;
         this.mongoTemplate = mongoTemplate;
         this.objectMapper = objectMapper;
+        // Pinned to HTTP/1.1: the base URL is configurable to any OpenAI-compatible endpoint,
+        // including a cleartext local one, where an h2c upgrade attempt would 404.
         this.httpClient = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
                 .connectTimeout(Duration.ofSeconds(5))
                 .build();
 

@@ -36,10 +36,27 @@ public class GatewayClient {
     public GatewayClient(AppProperties appProperties, ObjectMapper objectMapper, ExecutorService backgroundExecutor) {
         this.config = appProperties.gateway();
         this.objectMapper = objectMapper;
+        // HTTP/1.1 is pinned deliberately. The gateway is reached over cleartext http://, and an
+        // HTTP/2-preferring client sends `Upgrade: h2c` on the first request; a server that does not
+        // negotiate the upgrade answers 404 with an empty body, which surfaces here as an
+        // unexplained gateway failure rather than a protocol error.
         this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(10))
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofMillis(config.connectTimeoutMs()))
                 .executor(backgroundExecutor)
                 .build();
+    }
+
+    /**
+     * Bounds the wait for response <em>headers</em>, not the body. With
+     * {@link HttpResponse.BodyHandlers#ofInputStream()} the request timeout expires only while we are
+     * still waiting for the status line, so a long-lived SSE body is never cut short — but a gateway
+     * that accepts the socket and then stalls before responding can no longer park the caller forever.
+     */
+    private HttpRequest.Builder request(URI uri) {
+        return HttpRequest.newBuilder(uri)
+                .version(HttpClient.Version.HTTP_1_1)
+                .timeout(Duration.ofMillis(config.requestTimeoutMs()));
     }
 
     /**
@@ -51,7 +68,7 @@ public class GatewayClient {
      */
     public GatewayStream openChatStream(String accessToken, String conversationId, List<ChatMessage> messages) {
         String payload = serialize(messages);
-        HttpRequest request = HttpRequest.newBuilder(URI.create(config.baseUrl() + "/v1/chat/completions"))
+        HttpRequest request = request(URI.create(config.baseUrl() + "/v1/chat/completions"))
                 .header("Content-Type", "application/json")
                 .header("Authorization", "Bearer " + accessToken)
                 .header("X-Conversation-Id", conversationId)
@@ -83,7 +100,7 @@ public class GatewayClient {
         String uri = config.baseUrl() + "/trace/stream"
                 + "?conversationId=" + java.net.URLEncoder.encode(
                         conversationId == null ? "" : conversationId, java.nio.charset.StandardCharsets.UTF_8);
-        HttpRequest request = HttpRequest.newBuilder(URI.create(uri))
+        HttpRequest request = request(URI.create(uri))
                 .header("Accept", "text/event-stream")
                 .GET()
                 .build();

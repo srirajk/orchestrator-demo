@@ -83,6 +83,11 @@ conduit:
       # Upper bound on the assistant reply text accumulated in memory for persistence
       # (the client still receives the full stream; only the retained copy is capped).
       max-reply-chars: ${CHAT_MAX_REPLY_CHARS:262144}
+      connect-timeout-ms: ${GATEWAY_CONNECT_TIMEOUT_MS:10000}
+      # Bounds the wait for gateway response headers only; the SSE body streams unbounded.
+      # Must exceed the gateway's own request deadline (CONDUIT_REQUEST_DEADLINE_MS, 90s) so a
+      # slow-but-working answer is never cut off here before the gateway itself gives up.
+      request-timeout-ms: ${GATEWAY_REQUEST_TIMEOUT_MS:95000}
     context:
       # Token-budget driven compaction (not message count).
       # Window token budget sent to the gateway each turn.

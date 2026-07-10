@@ -32,7 +32,9 @@ public record AppProperties(
     public record Gateway(
             @NotBlank String baseUrl,
             @NotBlank String model,
-            @Min(1) int maxReplyChars
+            @Min(1) int maxReplyChars,
+            @Min(1) long connectTimeoutMs,
+            @Min(1) long requestTimeoutMs
     ) {}
 
     /**
