@@ -586,7 +586,7 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  # ── Conduit Chat — Node BFF serving built React SPA + /api/* routes ──────────
+  # ── Conduit Chat — Java/Spring Boot BFF serving built React SPA + /api/* routes ──
   conduit-chat:
     build:
       context: ./apps/chat
@@ -969,27 +969,6 @@ services:
     environment:
       K6_OUT: "experimental-prometheus-rw=http://prometheus:9090/api/v1/write"
     command: run /scripts/load-test.js
-
-  # ── Axiom admin console (apps/admin — split target; supersedes the legacy admin-ui) ──
-  admin-console:
-    build:
-      context: ./apps/admin
-      dockerfile: Dockerfile
-      args:
-        VITE_API_URL: http://localhost:8084
-    container_name: axiom-admin-console
-    ports:
-      - "5182:80"
-    depends_on:
-      iam-service:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    restart: unless-stopped
 
 volumes:
   redis-data:

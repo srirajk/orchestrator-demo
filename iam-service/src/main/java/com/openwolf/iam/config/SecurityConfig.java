@@ -90,9 +90,8 @@ public class SecurityConfig {
 
     // Browser origins allowed to call this IAM cross-origin (Axiom's own admin/chat UIs).
     // Comma-separated, env-overridable. Adding an origin here is CORS allowlist config only,
-    // not a change to auth logic. Default covers: legacy admin-ui (5180), Axiom admin console
-    // (5182), and LibreChat (3080).
-    @Value("${iam.cors.allowed-origins:http://localhost:5180,http://localhost:5182,http://localhost:3080}")
+    // not a change to auth logic. Default covers: Axiom admin-ui (5180) and LibreChat (3080).
+    @Value("${iam.cors.allowed-origins:http://localhost:5180,http://localhost:3080}")
     private List<String> corsAllowedOrigins;
 
     @Value("${iam.oauth2.librechat.client-id:librechat}")
