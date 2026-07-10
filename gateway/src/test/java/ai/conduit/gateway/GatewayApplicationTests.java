@@ -15,9 +15,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @TestPropertySource(properties = {
-        // The bootstrap loader writes the routing index into the resolved Redis, which on a
-        // developer machine is the running demo's. A test must never re-index live routing data.
-        "conduit.registry.bootstrap.enabled=false",
+        // The gateway refuses to start without an ingested registry. A context test has no
+        // ingestion job and must not depend on the developer's live Redis holding one.
+        "conduit.registry.readiness.enabled=false",
         // Keeps the context hermetic: no embedding sidecar required, nothing written to its cache.
         "conduit.embedding.provider=hash"
 })

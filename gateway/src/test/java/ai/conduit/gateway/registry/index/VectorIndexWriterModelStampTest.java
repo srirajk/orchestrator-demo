@@ -2,7 +2,6 @@ package ai.conduit.gateway.registry.index;
 
 import ai.conduit.gateway.registry.embedding.ManifestEmbedder;
 import ai.conduit.gateway.registry.embedding.QueryEmbedder;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import redis.clients.jedis.JedisPooled;
 import redis.clients.jedis.resps.ScanResult;
@@ -29,7 +28,7 @@ import static org.mockito.Mockito.when;
  *
  * <p>The index now carries the model's identity. These tests pin what that stamp buys.
  */
-class VectorIndexModelStampTest {
+class VectorIndexWriterModelStampTest {
 
     private static final String INDEX = "intent_idx";
     private static final String STAMP = "intent_idx:model";
@@ -65,7 +64,7 @@ class VectorIndexModelStampTest {
         noKeysToScan(jedis);
 
         String current = "remote:all-MiniLM-L6-v2:384";
-        new VectorIndex(jedis, manifestEmbedder(current), queryEmbedder(current), new SimpleMeterRegistry())
+        new VectorIndexWriter(jedis, manifestEmbedder(current), queryEmbedder(current))
                 .ensureIndex();
 
         verify(jedis).ftDropIndex(INDEX);
@@ -79,7 +78,7 @@ class VectorIndexModelStampTest {
         String current = "remote:all-MiniLM-L6-v2:384";
         indexExistsWithStamp(jedis, current);
 
-        new VectorIndex(jedis, manifestEmbedder(current), queryEmbedder(current), new SimpleMeterRegistry())
+        new VectorIndexWriter(jedis, manifestEmbedder(current), queryEmbedder(current))
                 .ensureIndex();
 
         verify(jedis, never()).ftDropIndex(anyString());
@@ -97,7 +96,7 @@ class VectorIndexModelStampTest {
         noKeysToScan(jedis);
 
         String current = "remote:all-MiniLM-L6-v2:768";
-        new VectorIndex(jedis, manifestEmbedder(current), queryEmbedder(current), new SimpleMeterRegistry())
+        new VectorIndexWriter(jedis, manifestEmbedder(current), queryEmbedder(current))
                 .ensureIndex();
 
         verify(jedis).ftDropIndex(INDEX);
@@ -116,7 +115,7 @@ class VectorIndexModelStampTest {
                 .thenReturn(new ScanResult<>("0", List.of("vec:agent.a:0", "vec:agent.a:1")));
 
         String current = "remote:all-MiniLM-L6-v2:384";
-        new VectorIndex(jedis, manifestEmbedder(current), queryEmbedder(current), new SimpleMeterRegistry())
+        new VectorIndexWriter(jedis, manifestEmbedder(current), queryEmbedder(current))
                 .ensureIndex();
 
         verify(jedis).del("vec:agent.a:0");
@@ -131,7 +130,7 @@ class VectorIndexModelStampTest {
         noKeysToScan(jedis);
 
         String current = "remote:all-MiniLM-L6-v2:384";
-        new VectorIndex(jedis, manifestEmbedder(current), queryEmbedder(current), new SimpleMeterRegistry())
+        new VectorIndexWriter(jedis, manifestEmbedder(current), queryEmbedder(current))
                 .ensureIndex();
 
         verify(jedis).ftDropIndex(INDEX);
@@ -146,10 +145,9 @@ class VectorIndexModelStampTest {
     void corpusAndQueryEmbeddersDisagreeingOnTheModelIsFatal() {
         JedisPooled jedis = mock(JedisPooled.class);
 
-        VectorIndex index = new VectorIndex(jedis,
+        VectorIndexWriter index = new VectorIndexWriter(jedis,
                 manifestEmbedder("remote:all-MiniLM-L6-v2:384"),
-                queryEmbedder("hash:sha256-ngram:384"),
-                new SimpleMeterRegistry());
+                queryEmbedder("hash:sha256-ngram:384"));
 
         assertThatThrownBy(index::ensureIndex)
                 .isInstanceOf(IllegalStateException.class)

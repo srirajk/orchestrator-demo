@@ -1,134 +1,49 @@
 package ai.conduit.gateway.registry.service;
 
-import ai.conduit.gateway.registry.index.VectorIndex;
-import ai.conduit.gateway.registry.introspection.AgentIntrospector;
 import ai.conduit.gateway.registry.model.AgentManifest;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import redis.clients.jedis.JedisPooled;
 
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
 /**
- * Core registry service.
+ * Read-only view of the agent registry.
  *
- * Storage layout (Redis):
- *   agent:{id}       → RedisJSON full manifest
- *   registry:agents  → Redis set of registered agent_ids
+ * <p>Storage layout (Redis):
+ * <pre>
+ *   agent:{id}       → the full manifest as JSON
+ *   registry:agents  → set of registered agent_ids
+ * </pre>
  *
- * The registration pipeline mirrors the spec:
- *   1. Validate against schema
- *   2. Introspect (derive input/output schemas)
- *   3. Persist as RedisJSON
- *   4. Index example prompts in the HNSW vector index
+ * <p><b>This class cannot write.</b> Producing the registry — validating manifests, introspecting
+ * live agents, embedding their example prompts, and writing both the manifests and the vector
+ * index — is {@link AgentRegistrar}, which exists only in the {@code registry} profile.
+ *
+ * <p>The gateway resolves against registry data; it does not create it. Ingestion used to run
+ * inside the gateway on {@code ApplicationReadyEvent}, which meant every gateway start re-embedded
+ * the entire agent corpus, and any process that booted a gateway context — including the test
+ * suite — rewrote live routing data. Separating the producer from the consumer removes both.
  */
 @Service
 public class AgentRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(AgentRegistry.class);
 
-    private static final String KEY_PREFIX    = "agent:";
-    private static final String AGENTS_SET    = "registry:agents";
+    static final String KEY_PREFIX = "agent:";
+    static final String AGENTS_SET = "registry:agents";
 
-    private final JedisPooled      jedis;
-    private final ObjectMapper     mapper;
-    private final ManifestValidator validator;
-    private final AgentIntrospector introspector;
-    private final SelectContractValidator selectValidator;
-    private final VectorIndex       vectorIndex;
-    private final MeterRegistry     meterRegistry;
+    private final JedisPooled jedis;
+    private final ObjectMapper mapper;
 
-    public AgentRegistry(
-            JedisPooled jedis,
-            ObjectMapper mapper,
-            ManifestValidator validator,
-            AgentIntrospector introspector,
-            SelectContractValidator selectValidator,
-            VectorIndex vectorIndex,
-            MeterRegistry meterRegistry) {
-        this.jedis         = jedis;
-        this.mapper        = mapper;
-        this.validator     = validator;
-        this.introspector  = introspector;
-        this.selectValidator = selectValidator;
-        this.vectorIndex   = vectorIndex;
-        this.meterRegistry = meterRegistry;
-    }
-
-    /**
-     * Full registration pipeline: validate → introspect → persist → index.
-     *
-     * @param submissionNode raw JSON from the domain team
-     * @return the fully-derived manifest stored in Redis
-     */
-    public AgentManifest register(JsonNode submissionNode) {
-        AgentManifest derived = derive(submissionNode);
-        List<AgentManifest> context = new ArrayList<>(listAll());
-        context.removeIf(m -> m.agentId().equals(derived.agentId()));
-        context.add(derived);
-        SelectContractValidator.Summary summary = validateSelectContracts(derived, context);
-        log.info("select validation: {} validated, {} UNVALIDATED (no output schema)",
-                summary.validated(), summary.unvalidated());
-
-        // 3. Stamp and persist
-        return storeAndIndex(derived);
-    }
-
-    /**
-     * Re-register an existing agent (update + re-introspect).
-     */
-    public AgentManifest update(String agentId, JsonNode submissionNode) {
-        if (!exists(agentId)) {
-            throw new IllegalArgumentException("Agent '" + agentId + "' not found");
-        }
-        return register(submissionNode);
-    }
-
-    public AgentManifest derive(JsonNode submissionNode) {
-        validator.validate(submissionNode);
-
-        AgentManifest submission;
-        try {
-            submission = mapper.treeToValue(submissionNode, AgentManifest.class);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to parse manifest: " + e.getMessage(), e);
-        }
-
-        return introspector.introspect(submission);
-    }
-
-    public SelectContractValidator.Summary validateSelectContracts(
-            AgentManifest manifest,
-            List<AgentManifest> allManifests) {
-        return selectValidator.validateOne(manifest, allManifests);
-    }
-
-    public AgentManifest storeAndIndex(AgentManifest derived) {
-        AgentManifest stored = stampAndStore(derived);
-        vectorIndex.index(stored);
-
-        meterRegistry.counter("registry.registrations", "protocol", stored.protocol()).increment();
-        log.info("Registered agent '{}' (protocol={}, domain={})",
-                stored.agentId(), stored.protocol(), stored.domain());
-        return stored;
-    }
-
-    /**
-     * Remove an agent from the registry and vector index.
-     */
-    public void deregister(String agentId) {
-        jedis.del(KEY_PREFIX + agentId);
-        jedis.srem(AGENTS_SET, agentId);
-        vectorIndex.removeAgent(agentId);
-        log.info("Deregistered agent '{}'", agentId);
+    public AgentRegistry(JedisPooled jedis, ObjectMapper mapper) {
+        this.jedis  = jedis;
+        this.mapper = mapper;
     }
 
     public Optional<AgentManifest> find(String agentId) {
@@ -155,40 +70,12 @@ public class AgentRegistry {
         return jedis.exists(KEY_PREFIX + agentId);
     }
 
-    // ── helpers ──────────────────────────────────────────────────────────────
-
-    private AgentManifest stampAndStore(AgentManifest manifest) {
-        AgentManifest stamped = new AgentManifest(
-                manifest.agentId(),
-                manifest.name(),
-                manifest.description(),
-                manifest.version(),
-                manifest.provider(),
-                manifest.domain(),
-                manifest.audience(),
-                manifest.subDomain(),
-                manifest.maxResponseTokens(),
-                manifest.protocol(),
-                manifest.connection(),
-                manifest.capabilities(),
-                manifest.skills(),
-                manifest.constraints(),
-                manifest.io(),
-                manifest.inputSchema(),
-                manifest.outputSchema(),
-                manifest.resolvedConnection(),
-                true,
-                Instant.now()
-        );
-
+    /** How many agents are registered. Used by the gateway's startup readiness check. */
+    public long count() {
         try {
-            String json = mapper.writeValueAsString(stamped);
-            jedis.set(KEY_PREFIX + stamped.agentId(), json);
-            jedis.sadd(AGENTS_SET, stamped.agentId());
+            return jedis.scard(AGENTS_SET);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to persist manifest: " + e.getMessage(), e);
+            return 0;
         }
-
-        return stamped;
     }
 }

@@ -74,6 +74,23 @@ conduit:
   mcp:
     protocol-version: ${CONDUIT_MCP_PROTOCOL_VERSION:2025-11-25}
     legacy-protocol-version: ${CONDUIT_MCP_LEGACY_PROTOCOL_VERSION:2024-11-05}
+  registry:
+    # Where the agent manifests live. Owned by the registry service; the gateway reads only the
+    # domain manifests from here, never the agent ones (those it reads from Redis).
+    location: ${CONDUIT_REGISTRY_LOCATION:classpath:}
+    ingest:
+      # The registry service ingests on startup. Never enable this in the gateway: the gateway has
+      # no registrar, no corpus embedder and no index writer, and must not acquire them.
+      enabled: ${CONDUIT_REGISTRY_INGEST_ENABLED:true}
+      # A registry that does not fully load is not a degraded registry, it is an unknown one.
+      fail-on-invalid: ${CONDUIT_REGISTRY_INGEST_FAIL_ON_INVALID:true}
+      # The folder is the source of truth. An agent it no longer describes is deregistered,
+      # rather than lingering in Redis, visible to the catalogue and the planner, forever.
+      prune-orphans: ${CONDUIT_REGISTRY_INGEST_PRUNE_ORPHANS:true}
+    readiness:
+      # The gateway refuses to start unless the index exists, holds agents, and was built by the
+      # same embedding model it uses for queries.
+      enabled: ${CONDUIT_REGISTRY_READINESS_ENABLED:true}
   embedding:
     # 'remote' is the real semantic model; 'hash' is a non-semantic stand-in for tests and offline
     # work. The default used to be 'hash', so a deployment that forgot CONDUIT_EMBEDDING_PROVIDER
