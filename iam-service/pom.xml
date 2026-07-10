@@ -20,7 +20,6 @@
 
     <properties>
         <java.version>25</java.version>
-        <cerbos-sdk.version>0.12.0</cerbos-sdk.version>
     </properties>
 
     <dependencies>
@@ -102,11 +101,6 @@
         </dependency>
 
         <!-- Cerbos Java SDK (IAM uses Cerbos to authorize its own API operations) -->
-        <dependency>
-            <groupId>dev.cerbos</groupId>
-            <artifactId>cerbos-sdk-java</artifactId>
-            <version>${cerbos-sdk.version}</version>
-        </dependency>
 
         <!-- Test dependencies -->
         <dependency>

@@ -77,14 +77,6 @@ public class GlobalExceptionHandler {
     // 403 Forbidden
     // -------------------------------------------------------
 
-    @ExceptionHandler(AuthzDeniedException.class)
-    public ResponseEntity<ErrorResponse> handleAuthzDenied(
-            AuthzDeniedException ex, HttpServletRequest req) {
-        log.warn("Authorization denied on {}: {}", req.getRequestURI(), ex.getMessage());
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
-                ErrorResponse.of("Forbidden", ex.getMessage(), 403, req.getRequestURI()));
-    }
-
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied(
             AccessDeniedException ex, HttpServletRequest req) {
