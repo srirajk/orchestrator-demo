@@ -4310,5 +4310,24 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-07-10T00:00:00Z"
+  },
+  {
+    "id": "bug-256",
+    "timestamp": "2026-07-10T00:00:00Z",
+    "error_message": "Gateway reported 'Registry ready \u2014 23 agent(s)' while the registry folder describes only 18",
+    "file": "gateway/src/main/java/ai/conduit/gateway/registry/ingest/RegistryIngestor.java",
+    "root_cause": "Registry ingestion was append-only. AgentRegistry.storeAndIndex() added agents to Redis; deleting a manifest from the folder removed nothing. Five agents from an earlier naming generation (acme.servicing.*) stayed registered indefinitely, carrying transport='streamable-http' which the current schema enum rejects \u2014 so they could never be re-ingested, and nothing removed them. They had no vectors (unroutable by semantic search) but were still returned by registry.listAll(), i.e. by GET /admin/agents and to the DAG planner.",
+    "fix": "RegistryIngestor.reconcile(): after a successful ingest, deregister every agent id present in Redis but absent from the folder. Config: conduit.registry.ingest.prune-orphans (default true). Covered by RegistryReconciliationTest. Verified live: 23 -> 18 agents, exactly the 5 acme.* orphans pruned.",
+    "tags": [
+      "registry",
+      "ingestion",
+      "reconciliation",
+      "orphans",
+      "drift",
+      "world-b"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-10T00:00:00Z"
   }
 ]
