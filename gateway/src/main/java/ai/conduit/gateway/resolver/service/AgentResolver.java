@@ -91,6 +91,17 @@ public class AgentResolver {
     @Value("${conduit.routing.rerank.max-candidates:5}")
     private int rerankMaxCandidates;
 
+    /**
+     * When the re-ranker has confidently PICKED a single agent, how far below {@link #routingMinScore}
+     * the raw embedding leader may sit and still be trusted. The LLM re-ranker read the query and the
+     * candidate descriptions and verified the match, so a leader a hair under the floor should not be
+     * vetoed by score arithmetic — otherwise a trivial phrasing change ("Okafor's holdings" scoring
+     * 0.398 vs "Okafor holdings" scoring 0.418, floor 0.400) flips a would-be coverage denial into an
+     * unhelpful "no service can answer." A leader FAR below the floor still abstains.
+     */
+    @Value("${conduit.routing.rerank.pick-score-tolerance:0.05}")
+    private double rerankPickScoreTolerance;
+
     private final VectorIndex    vectorIndex;
     private final AgentRegistry  registry;
     private final MeterRegistry  meterRegistry;
@@ -258,7 +269,15 @@ public class AgentResolver {
         // path instead of trusting a guess. Pure score arithmetic; no domain literal.
         runnerUpScore = candidates.size() > 1 ? candidates.get(1).score() : 0.0;
         topMargin = candidates.size() > 1 ? topScore - runnerUpScore : Double.MAX_VALUE;
-        boolean routingAbstain = topScore < routingMinScore
+        // A confident re-ranker pick (suppressMarginAbstain) means the LLM verified this agent serves
+        // the query — trust it over a raw score that is only marginally below the floor, so the route
+        // reaches entity resolution + the coverage CHECK (and a named-but-unentitled client gets an
+        // explicit denial) instead of a phrasing-sensitive "no service." A leader far below the floor
+        // still abstains.
+        double effectiveMinScore = rerank.suppressMarginAbstain()
+                ? routingMinScore - rerankPickScoreTolerance
+                : routingMinScore;
+        boolean routingAbstain = topScore < effectiveMinScore
                 || (!rerank.suppressMarginAbstain() && topMargin < routingMinMargin);
         if (routingAbstain) {
             log.debug("Resolver: routing abstain — leader={} topScore={} margin={} (need score>={}, margin>={})",

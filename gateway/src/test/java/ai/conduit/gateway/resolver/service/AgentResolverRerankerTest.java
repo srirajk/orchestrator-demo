@@ -128,6 +128,49 @@ class AgentResolverRerankerTest {
         assertThat(result.rerankFired()).isTrue();
     }
 
+    /**
+     * A confident re-ranker pick whose raw embedding score sits a hair below the routing floor must
+     * still route — the LLM verified the agent. This is the "Okafor's holdings" (0.398) vs "Okafor
+     * holdings" (0.418) case: a trivial phrasing change dropped 0.02 under the 0.40 floor and turned a
+     * would-be coverage denial into an unhelpful "no service can answer." The pick is trusted within a
+     * tolerance so the route reaches the coverage CHECK.
+     */
+    @Test
+    void aConfidentRerankPickIsTrustedJustBelowTheScoreFloor() throws Exception {
+        RoutingRerankerClient reranker = mock(RoutingRerankerClient.class);
+        var alpha = candidate("cap.alpha", "holdings capability", 0.398);   // just under the 0.40 floor
+        var beta = candidate("cap.beta", "second capability", 0.376);        // near-tie → re-ranker fires
+        AgentResolver resolver = resolver(List.of(alpha, beta), reranker);
+        ReflectionTestUtils.setField(resolver, "rerankPickScoreTolerance", 0.05);
+        when(reranker.rerank(anyString(), any()))
+                .thenReturn(RoutingRerankerClient.Decision.pick("cap.alpha", "clear match"));
+
+        ResolverResult result = resolver.resolve("give me the holdings");
+
+        assertThat(result.fallback())
+                .as("a confident pick a hair below the floor must route, not abstain into 'no service'")
+                .isFalse();
+        assertThat(result.selected().get(0).manifest().agentId()).isEqualTo("cap.alpha");
+    }
+
+    /** But a leader FAR below the floor still abstains, even with a pick — the tolerance is small. */
+    @Test
+    void aLeaderFarBelowTheFloorStillAbstainsDespiteAPick() throws Exception {
+        RoutingRerankerClient reranker = mock(RoutingRerankerClient.class);
+        var alpha = candidate("cap.alpha", "weak capability", 0.300);        // well under 0.40 - 0.05
+        var beta = candidate("cap.beta", "second capability", 0.280);
+        AgentResolver resolver = resolver(List.of(alpha, beta), reranker);
+        ReflectionTestUtils.setField(resolver, "rerankPickScoreTolerance", 0.05);
+        when(reranker.rerank(anyString(), any()))
+                .thenReturn(RoutingRerankerClient.Decision.pick("cap.alpha", "best of a weak set"));
+
+        ResolverResult result = resolver.resolve("something only weakly related");
+
+        assertThat(result.fallback())
+                .as("a genuinely weak leader must still abstain — the pick tolerance is narrow")
+                .isTrue();
+    }
+
     @SuppressWarnings("unchecked")
     private static AgentResolver resolver(List<RoutingCandidate> candidates, RoutingRerankerClient reranker) {
         VectorIndex vectorIndex = mock(VectorIndex.class);
