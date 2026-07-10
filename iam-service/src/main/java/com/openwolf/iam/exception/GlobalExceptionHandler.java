@@ -11,6 +11,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -129,6 +131,27 @@ public class GlobalExceptionHandler {
     // -------------------------------------------------------
     // 500 Internal Server Error (catch-all)
     // -------------------------------------------------------
+
+    // Spring framework request errors are client faults, not server faults. Without these two
+    // handlers the catch-all below turned an unsupported method into a 500 (e.g. PUT on a path that
+    // only serves POST/DELETE) and a malformed body into a 500. Map them to their correct 4xx so the
+    // catch-all only ever fires on a genuine server error.
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMethodNotSupported(
+            HttpRequestMethodNotSupportedException ex, HttpServletRequest req) {
+        log.warn("Method not supported on {}: {}", req.getRequestURI(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(
+                ErrorResponse.of("Method Not Allowed", ex.getMessage(), 405, req.getRequestURI()));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleNotReadable(
+            HttpMessageNotReadableException ex, HttpServletRequest req) {
+        log.warn("Malformed request body on {}: {}", req.getRequestURI(), ex.getMessage());
+        return ResponseEntity.badRequest().body(
+                ErrorResponse.of("Bad Request", "Malformed request body", 400, req.getRequestURI()));
+    }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(
