@@ -91,16 +91,13 @@ public class AgentResolver {
     @Value("${conduit.routing.rerank.max-candidates:5}")
     private int rerankMaxCandidates;
 
-    /**
-     * When the re-ranker has confidently PICKED a single agent, how far below {@link #routingMinScore}
-     * the raw embedding leader may sit and still be trusted. The LLM re-ranker read the query and the
-     * candidate descriptions and verified the match, so a leader a hair under the floor should not be
-     * vetoed by score arithmetic — otherwise a trivial phrasing change ("Okafor's holdings" scoring
-     * 0.398 vs "Okafor holdings" scoring 0.418, floor 0.400) flips a would-be coverage denial into an
-     * unhelpful "no service can answer." A leader FAR below the floor still abstains.
-     */
-    @Value("${conduit.routing.rerank.pick-score-tolerance:0.05}")
-    private double rerankPickScoreTolerance;
+    // The former `rerank.pick-score-tolerance` band-aid — which let a rerank-picked leader a hair
+    // below the routing floor still route so a phrasing-sensitive score ("Okafor's holdings" 0.398 vs
+    // "Okafor holdings" 0.418) would not flip a would-be coverage denial into "no service" — has been
+    // RETIRED. That disposition is now handled deterministically BEFORE routing by
+    // ReferenceGroundingService (a grounded out-of-book reference denies at any score), so the routing
+    // score no longer sits between the user and a denial. The `entityKnown` signal (below) replaces the
+    // tolerance for the legitimate case: a grounded reference keeps a near-floor query routable.
 
     private final VectorIndex    vectorIndex;
     private final AgentRegistry  registry;
@@ -125,7 +122,7 @@ public class AgentResolver {
     public ResolverResult resolve(String prompt, String domain) {
         List<RoutingCandidate> candidates = vectorIndex.search(
                 prompt, domain, topK, id -> registry.find(id).orElse(null));
-        return select(candidates, prompt);
+        return select(candidates, prompt, false);
     }
 
     /** Convenience overload — no domain filter. */
@@ -230,7 +227,7 @@ public class AgentResolver {
             return new ResolverResult(List.of(), broad, true, leaderScore, routingText, margin, false);
         }
 
-        ResolverResult result = select(broad, routingText);
+        ResolverResult result = select(broad, routingText, entityKnown);
         log.debug("Resolver(contextual): leader={} domain={} margin={} → {} selected",
                 leader.manifest().agentId(), domain, String.format("%.3f", margin),
                 result.selected().size());
@@ -242,7 +239,7 @@ public class AgentResolver {
      * ({@code topScore * relativeFloorFactor}) once the top score is decisive, else the absolute
      * {@code confidenceFloor}. Prunes long-tail matches for focused queries.
      */
-    private ResolverResult select(List<RoutingCandidate> candidates, String queryText) {
+    private ResolverResult select(List<RoutingCandidate> candidates, String queryText, boolean entityKnown) {
         if (candidates.isEmpty()) {
             return new ResolverResult(List.of(), List.of(), true, 0.0, queryText, 0.0, false);
         }
@@ -269,16 +266,16 @@ public class AgentResolver {
         // path instead of trusting a guess. Pure score arithmetic; no domain literal.
         runnerUpScore = candidates.size() > 1 ? candidates.get(1).score() : 0.0;
         topMargin = candidates.size() > 1 ? topScore - runnerUpScore : Double.MAX_VALUE;
-        // A confident re-ranker pick (suppressMarginAbstain) means the LLM verified this agent serves
-        // the query — trust it over a raw score that is only marginally below the floor, so the route
-        // reaches entity resolution + the coverage CHECK (and a named-but-unentitled client gets an
-        // explicit denial) instead of a phrasing-sensitive "no service." A leader far below the floor
-        // still abstains.
-        double effectiveMinScore = rerank.suppressMarginAbstain()
-                ? routingMinScore - rerankPickScoreTolerance
-                : routingMinScore;
-        boolean routingAbstain = topScore < effectiveMinScore
-                || (!rerank.suppressMarginAbstain() && topMargin < routingMinMargin);
+        // A turn carrying an explicit GROUNDED reference (entityKnown) is not under-specified — its
+        // subject was RESOLVED + coverage-CHECKED pre-routing; only which agents/facet to consult is
+        // muddy. So it must not abstain on a phrasing-sensitive score just below the floor (the case
+        // the retired pick-score-tolerance band-aid used to catch). The abstain gate is bypassed for
+        // such turns; the per-candidate floor below still prunes long-tail noise. When the reference is
+        // NOT grounded, the ordinary absolute-floor + margin abstain applies unchanged, so a genuinely
+        // vague ask still falls through to the deterministic clarify/decline path.
+        boolean routingAbstain = !entityKnown
+                && (topScore < routingMinScore
+                    || (!rerank.suppressMarginAbstain() && topMargin < routingMinMargin));
         if (routingAbstain) {
             log.debug("Resolver: routing abstain — leader={} topScore={} margin={} (need score>={}, margin>={})",
                     candidates.get(0).manifest().agentId(), String.format("%.3f", topScore),

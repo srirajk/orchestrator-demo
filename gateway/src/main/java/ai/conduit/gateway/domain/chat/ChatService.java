@@ -10,6 +10,8 @@ import ai.conduit.gateway.domain.coverage.CoverageCheckResult;
 import ai.conduit.gateway.domain.coverage.CoverageClient;
 import ai.conduit.gateway.domain.coverage.CoverageResolveResult;
 import ai.conduit.gateway.domain.coverage.CoverageResource;
+import ai.conduit.gateway.domain.coverage.ReferenceGroundingService;
+import ai.conduit.gateway.domain.coverage.ReferenceGroundingService.GroundingResult;
 import ai.conduit.gateway.domain.intent.Intent;
 import ai.conduit.gateway.domain.intent.IntentClassifier;
 import ai.conduit.gateway.domain.intent.IntentResult;
@@ -97,6 +99,14 @@ public class ChatService {
     @org.springframework.beans.factory.annotation.Value("${conduit.chat.routing-context-turns:4}")
     private int routingContextTurns;
 
+    /**
+     * The abstain-triage required-entity CLARIFY (Stage 3) only proposes a candidate whose routing
+     * score cleared this floor — REUSED from {@code conduit.resolver.confidence-floor} (the resolver's
+     * per-candidate long-tail prune), not a new knob. Config, not a constant (CLAUDE.md §5).
+     */
+    @org.springframework.beans.factory.annotation.Value("${conduit.resolver.confidence-floor:0.35}")
+    private double confidenceFloor;
+
     private static final List<String> TITLE_TRIGGERS = List.of(
             "generate a concise", "generate a short", "provide a title",
             "name this conversation", "title for this"
@@ -112,6 +122,7 @@ public class ChatService {
     private final EntitlementService       entitlementService;
     private final TraceEventPublisher      tracePublisher;
     private final CoverageClient           coverageClient;
+    private final ReferenceGroundingService referenceGrounding;
     private final DomainManifestStore      manifestStore;
     private final ai.conduit.gateway.domain.clarify.ClarificationComposer clarificationComposer;
     private final Tracer                   tracer;
@@ -147,6 +158,7 @@ public class ChatService {
                        EntitlementService entitlementService,
                        TraceEventPublisher tracePublisher,
                        CoverageClient coverageClient,
+                       ReferenceGroundingService referenceGrounding,
                        DomainManifestStore manifestStore,
                        ai.conduit.gateway.domain.clarify.ClarificationComposer clarificationComposer,
                        Tracer tracer,
@@ -166,6 +178,7 @@ public class ChatService {
         this.entitlementService  = entitlementService;
         this.tracePublisher      = tracePublisher;
         this.coverageClient      = coverageClient;
+        this.referenceGrounding  = referenceGrounding;
         this.manifestStore       = manifestStore;
         this.clarificationComposer = clarificationComposer;
         this.tracer              = tracer;
@@ -350,7 +363,7 @@ public class ChatService {
                                   boolean carryContext, String callerToken) throws Exception {
         Span span = tracer.spanBuilder("chat.fetch_data").startSpan();
         Scope fetchScope = span.makeCurrent();
-        // coverageRelId is set by the coverage pipeline before synthesis.
+        // coverageRelId is set by the coverage pipeline (or the Stage-1 grounding memo) before synthesis.
         String coverageRelId = null;
         // Deterministic CLARIFY (WORLD-B §4.2): which entity MUST resolve before fetch is a
         // manifest declaration (sub-domain required_context), NOT a Java rule. The coverage
@@ -363,65 +376,59 @@ public class ChatService {
         // entity (e.g. the insurance required entity for an insurance query) rather than the
         // union's first key. They are plain locals (captured by no lambda) so reassignment is safe.
         EntityType coverageEntity = coverageEntityType();
+        // Identity comes ONLY from the verified JWT; an unauthenticated caller is anonymous with no
+        // coverage, so every entity check denies. Hoisted above routing because Stage-1 grounding
+        // needs it (the coverage CHECK) and the abstain triage re-uses it. (Was computed post-route.)
+        Principal principal = (jwtPrincipal != null) ? jwtPrincipal : Principal.anonymous();
+        String tenantId = jwtPrincipal != null ? jwtPrincipal.tenantId() : "default";
         try {
-            // ── DETERMINISTIC IDENTIFIER PRE-CHECK ───────────────────────────────────
-            // A bare identifier ("REL-00188?") carries no domain vocabulary, so embedding routing
-            // scores it at noise level and can pick an unrelated domain — surfacing the WRONG
-            // domain's copy ("which policy?" for a wealth id). But the id's manifest id_pattern names
-            // its entity type — and hence its domain — exactly. When such an id RESOLVES
-            // (principal-agnostically, World-B rule f) and the caller is NOT entitled, deny with THAT
-            // domain's own copy, deterministically, before routing. Only a resolved-then-denied
-            // verdict short-circuits; not-found (fake id), ambiguous, or allowed all fall through to
-            // the normal pipeline unchanged. Manifest-driven (id_pattern + resolve_type + coverage) —
-            // no id prefix or domain literal in the gateway.
-            java.util.Optional<ai.conduit.gateway.domain.manifest.DomainManifestStore.IdentifiedReference>
-                    idRef = manifestStore.identifyByIdPattern(latestPrompt);
-            if (idRef.isPresent() && idRef.get().coverage() != null) {
-                var ir = idRef.get();
-                Principal p0 = (jwtPrincipal != null) ? jwtPrincipal : Principal.anonymous();
-                String t0 = jwtPrincipal != null ? jwtPrincipal.tenantId() : "default";
-                String sub0 = ir.subDomain().subDomainId();
-                try {
-                    CoverageResolveResult rr = coverageClient.resolve(
-                        ir.id(), ir.entityType().resolveType(), t0, ir.coverage(), callerToken);
-                    if (rr.resolved() && rr.id() != null) {
-                        CoverageCheckResult check = coverageClient.check(p0.id(), t0, rr.id(), ir.coverage(), callerToken);
-                        if (!check.allowed()) {
-                            emitRequestOutcome("DENIED");
-                            tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
-                                GateData.deny(GateData.GATE_COVERAGE,
-                                    rr.id() + " not in " + p0.id() + "'s book", sub0)));
-                            tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
-                                new CheckDeniedData("coverage", rr.id(), p0.id(), check.reason(), "coverage")));
-                            streamTextAndComplete(emitter, mapDenialReason(check.reason(), sub0), streamId);
-                            tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
-                                new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
-                            return;
-                        }
-                    } else {
-                        emitRequestOutcome("DENIED");
-                        tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
-                            GateData.deny(GateData.GATE_COVERAGE,
-                                ir.id() + " could not be resolved", sub0)));
-                        tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
-                            new CheckDeniedData("coverage", ir.id(), p0.id(), "unresolved-entity", "coverage")));
-                        streamTextAndComplete(emitter, mapDenialReason("unknown-resource", sub0), streamId);
-                        tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
-                            new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
-                        return;
-                    }
-                } catch (CoverageClient.CoverageUnavailableException e) {
-                    log.error("Identifier pre-check coverage unavailable for principal={}: {}",
-                            p0.id(), e.getMessage());
+            // ── STAGE 1: DETERMINISTIC REFERENCE GROUNDING (pre-routing) ──────────────
+            // A security-relevant disposition (coverage DENY) and its inputs — the extracted entity
+            // reference, the manifest required entity, the coverage service — do not depend on routing
+            // at all. So we RESOLVE + CHECK the turn's reference BEFORE the semantic router runs: a
+            // grounded, out-of-book reference denies at ANY embedding score, and injection prose (which
+            // only dilutes the embedding) can never dodge it. Generalizes the old typed-id pre-check to
+            // every reference source (typed id + LLM-extracted name), per manifest resolvable entity.
+            // The four-way verdict lattice (see ReferenceGroundingService): RESOLVED→denied ⇒ terminal
+            // DENY here; RESOLVED→allowed ⇒ memoize + route entityKnown; AMBIGUOUS ⇒ fall through to the
+            // existing discover∩candidates clarify; NOT_FOUND ⇒ demote to content (never a denial).
+            // RESOLVE is principal-agnostic; CHECK only ever sees a resolved id; fails closed.
+            GroundingResult grounding = referenceGrounding.ground(
+                    preExtracted, latestPrompt, principal, tenantId, callerToken);
+            GroundingResult groundedMemo = null;
+            switch (grounding.verdict()) {
+                case DENIED -> {
                     emitRequestOutcome("DENIED");
+                    tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
+                        GateData.deny(GateData.GATE_COVERAGE,
+                            grounding.resolvedId() + " not in " + principal.id() + "'s book",
+                            grounding.subDomainId())));
                     tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
-                            new CheckDeniedData("coverage", ir.id(), p0.id(), "coverage-unavailable", "coverage")));
+                        new CheckDeniedData("coverage", grounding.resolvedId(), principal.id(),
+                            grounding.denialReason(), "coverage")));
                     streamTextAndComplete(emitter,
-                            "I am unable to verify your coverage right now, so I cannot provide that data.", streamId);
+                        mapDenialReason(grounding.denialReason(), grounding.subDomainId()), streamId);
                     tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
-                            new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                        new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
                     return;
                 }
+                case UNAVAILABLE -> {
+                    // FAIL CLOSED — never grant access when coverage can't be verified.
+                    emitRequestOutcome("DENIED");
+                    tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
+                        new CheckDeniedData("coverage", grounding.resolvedId(), principal.id(),
+                            "coverage-unavailable", "coverage")));
+                    streamTextAndComplete(emitter,
+                        "I am unable to verify your coverage right now, so I cannot provide that data.", streamId);
+                    tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
+                        new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                    return;
+                }
+                case RESOLVED_ALLOWED ->
+                    // Memoize the resolved+covered id so the coverage pipeline consumes it instead of
+                    // re-resolving/re-checking, and route with entityKnown=true (subject is known).
+                    groundedMemo = grounding;
+                default -> { /* AMBIGUOUS / NOT_FOUND / NONE — normal pipeline runs unchanged. */ }
             }
 
             // ── CONTEXT-AWARE ROUTING ────────────────────────────────────────────────
@@ -432,7 +439,12 @@ public class ChatService {
             // the current turn so terse overrides can inherit the prior facet without stale facets.
             // CLARIFY turns route on the bare message so an under-specified ask cannot inherit a
             // confident domain.
-            boolean entityKnown = carryContext && hasGroundedResolvableReference(preExtracted, latestPrompt);
+            // A grounded+allowed reference makes the subject known regardless of carryContext (a
+            // CLARIFY-classified turn that nonetheless resolved+covered is really a FETCH). Otherwise
+            // the original signal applies: an explicit grounded resolvable reference on a
+            // context-carrying turn.
+            boolean entityKnown = groundedMemo != null
+                    || (carryContext && hasGroundedResolvableReference(preExtracted, latestPrompt));
             String routingText = routingTextForFetch(request, latestPrompt, carryContext, entityKnown);
             long routingStart = System.nanoTime();
             ResolverResult resolved = resolver.resolveContextual(routingText, entityKnown);
@@ -461,12 +473,22 @@ public class ChatService {
                 // asks for detail only if it genuinely cannot. CLARIFY-intent turns (carryContext
                 // false) keep the deterministic clarification so a bare under-specified ask still
                 // clarifies (bug-232 behaviour preserved).
+                // ── STAGE 3: ABSTAIN TRIAGE (routing produced no route) ───────────────
+                // Routing abstained — but that is now a ROUTING outcome, not a request disposition.
+                // Triage in order: (1) answer from prior context if this turn carries data to reuse;
+                // (2) a DETERMINISTIC required-entity CLARIFY built from the broad candidate list, so a
+                // vague-but-in-domain ask ("show me holdings") clarifies WITH the caller's in-book
+                // options instead of a bare "no service"; (3) only then the clean no-service message.
                 if (carryContext && hasPriorAssistantData(request)) {
                     String answer = answerSynthesizer.synthesizeFromHistory(request.messages(), latestPrompt, emitter, streamId, requestStart);
                     setTraceOutput(rootSpan, answer);
                     emitRequestOutcome("ANSWERED");
                     tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                             new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                    return;
+                }
+                if (attemptRequiredEntityClarify(resolved, preExtracted, principal, tenantId, callerToken,
+                        emitter, streamId, requestId, conversationId, requestStart, request)) {
                     return;
                 }
                 emitRequestOutcome("FAILED");
@@ -479,13 +501,6 @@ public class ChatService {
                         new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
                 return;
             }
-
-            // Identity comes ONLY from the verified JWT. The legacy X-User-Id → Redis
-            // PrincipalStore fallback was removed (identity-spoofing hole); an unauthenticated
-            // caller is anonymous with no coverage, so every entity check denies.
-            Principal principal = (jwtPrincipal != null)
-                    ? jwtPrincipal
-                    : Principal.anonymous();
 
             // Prune agents the principal is not permitted to invoke (domain + classification).
             // Must happen BEFORE input synthesis so we never synthesize inputs for denied agents.
@@ -591,7 +606,7 @@ public class ChatService {
                 // entitlement) uses these re-scoped values. Manifest-declared, domain-agnostic.
                 coverageEntity = coverageEntityType(em);
                 DomainManifest.Coverage coverage = em.coverage();
-                String tenantId = jwtPrincipal != null ? jwtPrincipal.tenantId() : "default";
+                // tenantId is the request-scoped value hoisted above (used by Stage-1 grounding too).
                 String principalId = principal.id();
 
                 if (coverage != null) {
@@ -601,8 +616,20 @@ public class ChatService {
                         // There is no server-side carry-forward path here.
                         boolean hasConversationReference = coverageEntity != null && preExtracted != null
                                 && preExtracted.reference(coverageEntity.extractAs()) != null;
+                        boolean memoApplies = consumeGroundingMemo(groundedMemo, em, coverageEntity);
 
-                        if (hasConversationReference) {
+                        if (memoApplies) {
+                            // Stage-1 grounding already RESOLVED + CHECK-allowed this exact id for this
+                            // turn and routed sub-domain — consume the memo instead of re-resolving
+                            // (the "+1 resolve/turn" the grounding step spent is repaid here). Emit the
+                            // passing gate so the trace still shows a green coverage row.
+                            coverageRelId = groundedMemo.resolvedId();
+                            tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
+                                GateData.allow(GateData.GATE_COVERAGE,
+                                    coverageRelId + " in " + principalId + "'s book",
+                                    resourceScopedAgent.agentId())));
+                            annotateCoverageDecision(span, rootSpan, "coverage", true, "grounded");
+                        } else if (hasConversationReference) {
                             // Resolve the client reference from the client-sent messages to a
                             // canonical relationship ID. Pivots re-resolve and re-authorize.
                             // RESOLVE is principal-agnostic (World-B invariant 5): scope by tenant,
@@ -1444,6 +1471,108 @@ public class ChatService {
                 .filter(EntityType::isResolvable)
                 .filter(et -> requiredKeys != null && requiredKeys.contains(et.key()))
                 .findFirst().orElse(null);
+    }
+
+    /**
+     * True when the Stage-1 grounding memo is a RESOLVED+allowed reference for EXACTLY the routed
+     * sub-domain and its coverage entity — so the coverage pipeline may reuse the already-checked id
+     * instead of re-resolving. Guarded on both sub-domain and entity key so a memo grounded in one
+     * sub-domain can never bypass a different routed sub-domain's coverage check.
+     */
+    private boolean consumeGroundingMemo(GroundingResult memo, EffectiveManifest em, EntityType coverageEntity) {
+        return memo != null
+                && memo.isAllowed()
+                && memo.resolvedId() != null
+                && memo.subDomainId() != null
+                && em != null && memo.subDomainId().equals(em.subDomainId())
+                && coverageEntity != null && memo.entityType() != null
+                && coverageEntity.key().equals(memo.entityType().key());
+    }
+
+    /**
+     * Stage-3 abstain triage — the DETERMINISTIC required-entity CLARIFY. Routing abstained, so this
+     * asks: is there an allowed, resource-scoped capability among the broad (below-floor) candidates
+     * whose declared {@code required_context} the turn did NOT satisfy? If so, a vague-but-in-domain
+     * ask ("show me holdings") is a missing-entity CLARIFY, not a "no service" — so we DISCOVER the
+     * caller's book and pose the manifest-declared clarification with in-book options.
+     *
+     * <p>Order preserved (candidates are score-descending); floor is the reused
+     * {@code conduit.resolver.confidence-floor}; the CLARIFY decision stays the same Java
+     * set-intersection ({@code required ∩ extracted = ∅}) decided here, never LLM-judged. FAIL-CLOSED:
+     * candidates pass through {@link EntitlementService#filterAgents} (Cerbos) first, and a coverage
+     * outage while discovering the book abandons the clarify (→ clean no-service) rather than guessing.
+     *
+     * @return true if a clarification (or empty-book denial) was streamed and the request is complete
+     */
+    private boolean attemptRequiredEntityClarify(ResolverResult resolved, EntityBag preExtracted,
+                                                 Principal principal, String tenantId, String callerToken,
+                                                 SseEmitter emitter, String streamId, String requestId,
+                                                 String conversationId, long requestStart,
+                                                 ChatRequest request) throws Exception {
+        if (resolved == null || resolved.skipped() == null || resolved.skipped().isEmpty()) return false;
+        List<AgentManifest> candidateManifests = resolved.skipped().stream()
+                .filter(c -> c.score() >= confidenceFloor)
+                .map(c -> c.manifest())
+                .collect(Collectors.toList());
+        if (candidateManifests.isEmpty()) return false;
+
+        // FAIL-CLOSED: only ever clarify over capabilities the principal may actually invoke.
+        List<AgentManifest> allowed = entitlementService.filterAgents(principal, candidateManifests);
+        for (AgentManifest m : allowed) {
+            if (!entitlementService.requiresCoverage(m)) continue;
+            EffectiveManifest em = manifestStore.getEffective(m.agentId(), m.domain(), m.subDomain());
+            if (em == null || !em.resourceScoped() || !em.requiresContext()) continue;
+            if (!requiredIntersectionEmpty(em, preExtracted)) continue;   // entity WAS provided → not a clarify
+            DomainManifest.Coverage coverage = em.coverage();
+            if (coverage == null) continue;
+            try {
+                List<CoverageResource> discovered =
+                        coverageClient.discover(principal.id(), tenantId, coverage, callerToken);
+                if (discovered.isEmpty()) {
+                    emitRequestOutcome("DENIED");
+                    tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
+                            new CheckDeniedData("coverage", null, principal.id(), "empty-coverage", "coverage")));
+                    streamTextAndComplete(emitter, msg("no_coverage",
+                            "Your coverage set is empty.", em.subDomainId()), streamId);
+                    tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
+                            new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                    return true;
+                }
+                String question = buildClarificationQuestion(em, List.of(), discovered, request);
+                emitRequestOutcome("CLARIFIED");
+                streamTextAndComplete(emitter, question, streamId);
+                tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
+                        new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                return true;
+            } catch (CoverageClient.CoverageUnavailableException e) {
+                // Fail closed: cannot build a grounded clarify → let the caller emit clean no-service.
+                log.warn("Abstain-triage clarify: coverage discover unavailable for principal={}: {}",
+                        principal.id(), e.getMessage());
+                return false;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The deterministic CLARIFY predicate ({@code required ∩ extracted = ∅}) for one effective
+     * manifest: true when NONE of the sub-domain's declared required entity keys is satisfied by the
+     * extracted bag (a reference under its {@code extract_as}, or an already-resolved value under its
+     * {@code key}). Pure Java set-intersection over manifest data — never an LLM judgment.
+     */
+    private boolean requiredIntersectionEmpty(EffectiveManifest em, EntityBag bag) {
+        List<String> required = em.requiredContext();
+        if (required == null || required.isEmpty()) return false;   // nothing required → not a missing-entity case
+        List<EntityType> ets = manifestStore.entityTypesFor(em.subDomainId());
+        for (String key : required) {
+            EntityType et = ets.stream().filter(e -> key.equals(e.key())).findFirst().orElse(null);
+            if (et == null) continue;
+            boolean satisfied = bag != null
+                    && ((et.extractAs() != null && bag.reference(et.extractAs()) != null)
+                        || bag.resolved(et.key()) != null);
+            if (satisfied) return false;   // at least one required entity present → intersection non-empty
+        }
+        return true;   // no required entity present → empty intersection → clarify
     }
 
     /**

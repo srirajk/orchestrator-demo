@@ -610,19 +610,21 @@ public class DagPlanExecutor {
                 (io == null || io.consumes() == null) ? List.of() : io.consumes();
         for (AgentManifest.Consume consume : consumes) {
             if (consume == null || !consume.isEntityRef()) continue;
+            // An entity-ref consume slot may only bind from a resolved value. A blank/absent value is
+            // an UNRESOLVED REFERENCE, not an access verdict — so it becomes a BIND FAILURE routed to
+            // the flat-fallback/partial path, never a coverage denial. (Denying it made synthesis
+            // render "outside your access" for an entity that is not a client at all.)
             JsonNode value = input == null ? null : input.path(consume.entity());
             List<String> ids = idsFrom(value);
             if (ids.isEmpty()) {
                 if (!consume.isRequired()) {
                     continue;
                 }
-                publishCoverageDeny(ctx, node, null, "blank-entity", requestId, conversationId);
-                return coverageDenied(node, "coverage denied: blank or unresolved entity id");
+                return bindFailure(node);
             }
             for (String id : ids) {
                 if (id == null || id.isBlank()) {
-                    publishCoverageDeny(ctx, node, id, "blank-entity", requestId, conversationId);
-                    return coverageDenied(node, "coverage denied: blank or unresolved entity id");
+                    return bindFailure(node);
                 }
                 CoverageCheckResult check;
                 try {
@@ -782,6 +784,20 @@ public class DagPlanExecutor {
     private NodeResult coverageDenied(PlanNode node, String reason) {
         return new NodeResult(node.nodeId(), node.agent().agentId(), node.agent().protocol(),
                 NodeResult.Status.FAILED, null, 0, reason);
+    }
+
+    /**
+     * Synthetic FAILED result for a required entity-ref that never bound to a resolved value
+     * (blank/absent). Distinct from {@link #coverageDenied}: it publishes NO coverage-deny event and
+     * carries a neutral bind-failure message, so an unresolved reference degrades as a MISSING gap
+     * (the flat-fallback / partial-failure path — dependents skip, synthesis states what's missing)
+     * rather than being rendered as a coverage access verdict ("outside your access"). This is the
+     * fix for a wrong-type entity (e.g. an instrument name) inside an entitled portfolio.
+     */
+    private NodeResult bindFailure(PlanNode node) {
+        return new NodeResult(node.nodeId(), node.agent().agentId(), node.agent().protocol(),
+                NodeResult.Status.FAILED, null, 0,
+                "bind failure: required entity reference did not resolve to a value");
     }
 
     public record CoverageContext(

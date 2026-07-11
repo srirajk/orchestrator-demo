@@ -348,6 +348,42 @@ public class DomainManifestStore {
         return Optional.empty();
     }
 
+    /**
+     * The reference-grounding counterpart to {@link #identifyByIdPattern(String)}: identifies an
+     * LLM-EXTRACTED human reference (a name like "the Okafor account", not a typed id) to its owning
+     * sub-domain, sourced from the {@code extract_as} slot of a resolvable, required entity type on a
+     * resource-scoped sub-domain with a coverage-backed parent. Returns the raw extracted value as the
+     * reference {@code id} (RESOLVE turns it into a canonical id) plus the entity type, sub-domain and
+     * coverage — everything the grounder needs to RESOLVE/CHECK the reference in the RIGHT domain,
+     * pre-routing. Manifest-driven: the gateway embeds no entity-type literal or domain name.
+     *
+     * <p>Scans required resolvable entity types in declaration order and returns the first one the
+     * bag carries a non-blank {@code extract_as} value for, or empty when the bag names none. The
+     * {@code latestPrompt} is unused today (the reference already lives in the bag) but is part of the
+     * signature so a future keyword-fallback source can be added without changing callers.
+     */
+    public Optional<IdentifiedReference> identifyByReference(
+            ai.conduit.gateway.synthesis.input.EntityBag bag, String latestPrompt) {
+        if (bag == null) return Optional.empty();
+        for (SubDomainManifest sd : subDomains.values()) {
+            if (!sd.resourceScoped()) continue;
+            DomainManifest parent = sd.parentDomain() != null ? domains.get(sd.parentDomain()) : null;
+            if (parent == null || parent.coverage() == null) continue;
+            List<String> required = sd.requiredContext();
+            for (EntityType et : sd.entityTypes()) {
+                if (!et.isResolvable()) continue;
+                if (required == null || !required.contains(et.key())) continue;
+                String extractAs = et.extractAs();
+                if (extractAs == null || extractAs.isBlank()) continue;
+                String ref = bag.reference(extractAs);
+                if (ref != null && !ref.isBlank()) {
+                    return Optional.of(new IdentifiedReference(ref, et, sd, parent.coverage()));
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
     public Map<String, DomainManifest> allDomains() {
         return Map.copyOf(domains);
     }

@@ -421,8 +421,11 @@ class DagPlanExecutorTest {
     }
 
     @Test
-    @DisplayName("T4: blank entity id denies before dispatch")
-    void blankEntityIdDeniesBeforeDispatch() {
+    @DisplayName("T4: blank entity ref is a BIND FAILURE (a gap), never a coverage denial, before dispatch")
+    void blankEntityIdIsBindFailureNotCoverageDenial() {
+        // A blank/unresolved required entity-ref is an UNRESOLVED REFERENCE, not an access verdict.
+        // It must fail as a bind gap (flat-fallback/partial path) — NOT a coverage denial that
+        // synthesis would render as "outside your access" for an entity that is not a client at all.
         RecordingAdapter adapter = new RecordingAdapter(false);
         DagPlanExecutor exec = executor(harness(adapter));
         JsonNode leafInput = MAPPER.createObjectNode().put("entity", "");
@@ -432,7 +435,8 @@ class DagPlanExecutorTest {
                 "req", "conv", "token", coverageAllowing(Set.of("E-1")));
 
         assertThat(results.get(0).isOk()).isFalse();
-        assertThat(results.get(0).errorMessage()).containsIgnoringCase("coverage denied");
+        assertThat(results.get(0).errorMessage()).containsIgnoringCase("bind failure");
+        assertThat(results.get(0).errorMessage()).doesNotContainIgnoringCase("coverage denied");
         assertThat(adapter.order).isEmpty();
     }
 

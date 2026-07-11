@@ -129,45 +129,69 @@ class AgentResolverRerankerTest {
     }
 
     /**
-     * A confident re-ranker pick whose raw embedding score sits a hair below the routing floor must
-     * still route — the LLM verified the agent. This is the "Okafor's holdings" (0.398) vs "Okafor
-     * holdings" (0.418) case: a trivial phrasing change dropped 0.02 under the 0.40 floor and turned a
-     * would-be coverage denial into an unhelpful "no service can answer." The pick is trusted within a
-     * tolerance so the route reaches the coverage CHECK.
+     * A rerank pick whose raw embedding score sits just below the routing floor now ABSTAINS at
+     * routing — the pick-score-tolerance band-aid has been retired. The disposition it used to catch
+     * (the "Okafor's holdings" 0.398 vs "Okafor holdings" 0.418 phrasing-sensitivity that flipped a
+     * would-be coverage denial into "no service") is now handled deterministically BEFORE routing by
+     * {@code ReferenceGroundingService}: a grounded out-of-book reference denies at ANY embedding
+     * score, so the routing score never sits between the user and a denial. On the debug {@code
+     * resolve()} path there is no grounded reference ({@code entityKnown=false}), so a below-floor
+     * leader correctly abstains here; the legitimate near-floor in-book case routes on the chat path
+     * via {@code entityKnown} instead.
      */
     @Test
-    void aConfidentRerankPickIsTrustedJustBelowTheScoreFloor() throws Exception {
+    void aRerankPickJustBelowTheFloorAbstainsNowThatGroundingOwnsThatDisposition() throws Exception {
         RoutingRerankerClient reranker = mock(RoutingRerankerClient.class);
         var alpha = candidate("cap.alpha", "holdings capability", 0.398);   // just under the 0.40 floor
         var beta = candidate("cap.beta", "second capability", 0.376);        // near-tie → re-ranker fires
         AgentResolver resolver = resolver(List.of(alpha, beta), reranker);
-        ReflectionTestUtils.setField(resolver, "rerankPickScoreTolerance", 0.05);
         when(reranker.rerank(anyString(), any()))
                 .thenReturn(RoutingRerankerClient.Decision.pick("cap.alpha", "clear match"));
 
         ResolverResult result = resolver.resolve("give me the holdings");
 
         assertThat(result.fallback())
-                .as("a confident pick a hair below the floor must route, not abstain into 'no service'")
+                .as("with the band-aid retired, a below-floor pick abstains; grounding, not routing, owns the deny")
+                .isTrue();
+    }
+
+    /**
+     * A grounded turn ({@code entityKnown=true}, the chat path) whose leader sits just below the
+     * routing floor still routes — the subject was RESOLVED + coverage-CHECKED pre-routing, so only
+     * the facet is muddy. This is the mechanism that REPLACES the retired pick-score-tolerance for the
+     * legitimate near-floor in-book case.
+     */
+    @Test
+    void aGroundedTurnJustBelowTheFloorStillRoutes() throws Exception {
+        RoutingRerankerClient reranker = mock(RoutingRerankerClient.class);
+        var alpha = candidate("cap.alpha", "holdings capability", 0.398);   // just under the 0.40 floor
+        var beta = candidate("cap.beta", "second capability", 0.376);
+        AgentResolver resolver = resolver(List.of(alpha, beta), reranker);
+        when(reranker.rerank(anyString(), any()))
+                .thenReturn(RoutingRerankerClient.Decision.pick("cap.alpha", "clear match"));
+
+        ResolverResult result = resolver.resolveContextual("give me the holdings", true);
+
+        assertThat(result.fallback())
+                .as("a grounded (entityKnown) near-floor query must route, not abstain")
                 .isFalse();
         assertThat(result.selected().get(0).manifest().agentId()).isEqualTo("cap.alpha");
     }
 
-    /** But a leader FAR below the floor still abstains, even with a pick — the tolerance is small. */
+    /** A leader far below the floor still abstains on the debug path — no grounding relaxation there. */
     @Test
     void aLeaderFarBelowTheFloorStillAbstainsDespiteAPick() throws Exception {
         RoutingRerankerClient reranker = mock(RoutingRerankerClient.class);
-        var alpha = candidate("cap.alpha", "weak capability", 0.300);        // well under 0.40 - 0.05
+        var alpha = candidate("cap.alpha", "weak capability", 0.300);        // well under the 0.40 floor
         var beta = candidate("cap.beta", "second capability", 0.280);
         AgentResolver resolver = resolver(List.of(alpha, beta), reranker);
-        ReflectionTestUtils.setField(resolver, "rerankPickScoreTolerance", 0.05);
         when(reranker.rerank(anyString(), any()))
                 .thenReturn(RoutingRerankerClient.Decision.pick("cap.alpha", "best of a weak set"));
 
         ResolverResult result = resolver.resolve("something only weakly related");
 
         assertThat(result.fallback())
-                .as("a genuinely weak leader must still abstain — the pick tolerance is narrow")
+                .as("a genuinely weak leader must still abstain")
                 .isTrue();
     }
 
