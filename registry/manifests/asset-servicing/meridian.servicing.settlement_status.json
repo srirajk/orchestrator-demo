@@ -37,7 +37,7 @@
         "failed trades for the relationship",
         "settlement status for this client",
         "unsettled trades I should know about",
-        "pending settlements for the Whitman relationship",
+        "pending settlements for this relationship",
         "what are the outstanding trade settlements on the servicing side",
         "show me pending and failed settlements for this relationship",
         "which trades have not settled yet for this custody account",
@@ -59,37 +59,84 @@
   "output_schema": {
     "type": "object",
     "properties": {
-      "relationship_id": { "type": "string" },
-      "pending": { "type": "array", "items": { "type": "object" } },
+      "relationship_id": {
+        "type": "string"
+      },
+      "pending": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      },
       "failed": {
         "type": "array",
         "items": {
           "type": "object",
           "properties": {
-            "trade_id": { "type": "string" },
-            "security": { "type": "string" },
-            "isin": { "type": "string" },
-            "settle_date": { "type": "string" },
-            "as_of_date": { "type": "string" },
-            "amount": { "type": "number" },
-            "side": { "type": "string" },
-            "reason": { "type": "string" },
-            "fail_item": { "type": "boolean" }
+            "trade_id": {
+              "type": "string"
+            },
+            "security": {
+              "type": "string"
+            },
+            "isin": {
+              "type": "string"
+            },
+            "settle_date": {
+              "type": "string"
+            },
+            "as_of_date": {
+              "type": "string"
+            },
+            "amount": {
+              "type": "number"
+            },
+            "side": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "fail_item": {
+              "type": "boolean"
+            }
           },
-          "required": ["trade_id", "security", "settle_date", "as_of_date", "amount", "side"]
+          "required": [
+            "trade_id",
+            "security",
+            "settle_date",
+            "as_of_date",
+            "amount",
+            "side"
+          ]
         }
       },
-      "as_of_date": { "type": "string" },
-      "agent_narrative": { "type": "string" }
+      "as_of_date": {
+        "type": "string"
+      },
+      "agent_narrative": {
+        "type": "string"
+      }
     },
-    "required": ["relationship_id", "pending", "failed", "as_of_date"]
+    "required": [
+      "relationship_id",
+      "pending",
+      "failed",
+      "as_of_date"
+    ]
   },
   "io": {
     "consumes": [
-      { "entity": "relationship_id", "required": true }
+      {
+        "entity": "relationship_id",
+        "required": true
+      }
     ],
     "produces": [
-      { "name": "settlement_status", "type": "servicing.settlement_status" }
+      {
+        "name": "settlement_status",
+        "type": "servicing.settlement_status"
+      }
     ]
   }
 }

@@ -3,7 +3,6 @@
   "display_name": "Corporate Actions",
   "parent_domain": "asset-servicing",
   "resource_scoped": false,
-
   "entity_types": [
     {
       "key": "fund_id",
@@ -32,11 +31,12 @@
       "default": "latest available"
     }
   ],
-
   "required_context": [],
-
   "agents": [
     "meridian.servicing.corporate_actions",
     "meridian.servicing.nav"
-  ]
+  ],
+  "messages": {
+    "capability_unavailable": "I can't reach a service authorized to answer that part of your request. If you have access to a related capability, ask for it directly and I'll help."
+  }
 }

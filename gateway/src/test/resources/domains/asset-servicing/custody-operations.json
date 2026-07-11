@@ -3,7 +3,6 @@
   "display_name": "Custody Operations",
   "parent_domain": "asset-servicing",
   "resource_scoped": false,
-
   "entity_types": [
     {
       "key": "fund_id",
@@ -31,11 +30,12 @@
       "required": false
     }
   ],
-
   "required_context": [],
-
   "agents": [
     "meridian.servicing.custody_positions",
     "meridian.servicing.settlement_status"
-  ]
+  ],
+  "messages": {
+    "capability_unavailable": "That capability isn't available to you right now."
+  }
 }

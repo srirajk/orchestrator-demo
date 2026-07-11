@@ -23,7 +23,7 @@
     {
       "id": "get_policy_details",
       "name": "get_policy_details",
-      "description": "Retrieve policy details \u2014 line of business, premium, coverage limit, deductible, status, and effective date \u2014 for a commercial insurance policy.",
+      "description": "Retrieve policy details — line of business, premium, coverage limit, deductible, status, and effective date — for a commercial insurance policy.",
       "tags": [
         "policy",
         "policy-details",
@@ -33,9 +33,9 @@
         "insurance"
       ],
       "examples": [
-        "show me the policy details for the Continental Freight policy",
+        "show me the details of this policy",
         "what is the coverage limit for this policy",
-        "what is the premium for POL-77001",
+        "what is the premium on this policy",
         "what line of business is this policy",
         "is this policy active"
       ],
@@ -55,27 +55,70 @@
   "output_schema": {
     "type": "object",
     "properties": {
-      "policy_id": { "type": "string" },
-      "policy_name": { "type": "string" },
-      "line_of_business": { "type": "string" },
-      "insured_name": { "type": "string" },
-      "premium": { "type": "number" },
-      "premium_currency": { "type": "string" },
-      "coverage_limit": { "type": "number" },
-      "deductible": { "type": "number" },
-      "status": { "type": "string" },
-      "effective_date": { "type": "string" },
-      "expiry_date": { "type": "string" },
-      "as_of_date": { "type": "string" }
+      "policy_id": {
+        "type": "string"
+      },
+      "policy_name": {
+        "type": "string"
+      },
+      "line_of_business": {
+        "type": "string"
+      },
+      "insured_name": {
+        "type": "string"
+      },
+      "premium": {
+        "type": "number"
+      },
+      "premium_currency": {
+        "type": "string"
+      },
+      "coverage_limit": {
+        "type": "number"
+      },
+      "deductible": {
+        "type": "number"
+      },
+      "status": {
+        "type": "string"
+      },
+      "effective_date": {
+        "type": "string"
+      },
+      "expiry_date": {
+        "type": "string"
+      },
+      "as_of_date": {
+        "type": "string"
+      }
     },
-    "required": ["policy_id", "policy_name", "line_of_business", "insured_name", "premium", "premium_currency", "coverage_limit", "deductible", "status", "effective_date", "expiry_date", "as_of_date"]
+    "required": [
+      "policy_id",
+      "policy_name",
+      "line_of_business",
+      "insured_name",
+      "premium",
+      "premium_currency",
+      "coverage_limit",
+      "deductible",
+      "status",
+      "effective_date",
+      "expiry_date",
+      "as_of_date"
+    ]
   },
   "io": {
     "consumes": [
-      { "entity": "policy_id", "required": true }
+      {
+        "entity": "policy_id",
+        "required": true
+      }
     ],
     "produces": [
-      { "name": "policy_record", "type": "insurance.policy_record" }
+      {
+        "name": "policy_record",
+        "type": "insurance.policy_record"
+      }
     ]
   }
 }

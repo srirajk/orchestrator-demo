@@ -35,7 +35,7 @@
         "how has this account performed",
         "year-to-date returns for the client",
         "P&L for the relationship this quarter",
-        "performance of the Whitman portfolio",
+        "performance of this portfolio",
         "portfolio performance summary for this relationship",
         "how did the portfolio perform this quarter"
       ],
@@ -54,11 +54,20 @@
   },
   "io": {
     "consumes": [
-      { "entity": "relationship_id", "required": true },
-      { "entity": "period", "required": false }
+      {
+        "entity": "relationship_id",
+        "required": true
+      },
+      {
+        "entity": "period",
+        "required": false
+      }
     ],
     "produces": [
-      { "name": "performance", "type": "wealth.performance" }
+      {
+        "name": "performance",
+        "type": "wealth.performance"
+      }
     ]
   }
 }

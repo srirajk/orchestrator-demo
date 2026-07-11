@@ -11,6 +11,8 @@ import ai.conduit.gateway.domain.coverage.CoverageClient;
 import ai.conduit.gateway.domain.coverage.CoverageResolveResult;
 import ai.conduit.gateway.domain.coverage.CoverageResource;
 import ai.conduit.gateway.domain.coverage.ReferenceGroundingService;
+import ai.conduit.gateway.domain.coverage.ReferenceGroundingService.GroundedInterpretation;
+import ai.conduit.gateway.domain.coverage.ReferenceGroundingService.GroundedReferenceSet;
 import ai.conduit.gateway.domain.coverage.ReferenceGroundingService.GroundingResult;
 import ai.conduit.gateway.domain.intent.Intent;
 import ai.conduit.gateway.domain.intent.IntentClassifier;
@@ -25,6 +27,7 @@ import ai.conduit.gateway.infrastructure.metrics.GatewaySloMetrics;
 import ai.conduit.gateway.infrastructure.telemetry.event.AgentCompleteData;
 import ai.conduit.gateway.infrastructure.telemetry.event.AgentStartData;
 import ai.conduit.gateway.infrastructure.telemetry.event.AgentsResolvedData;
+import ai.conduit.gateway.infrastructure.telemetry.event.RoutePreparedData;
 import ai.conduit.gateway.infrastructure.telemetry.event.CheckDeniedData;
 import ai.conduit.gateway.infrastructure.telemetry.event.EntitlementCheckData;
 import ai.conduit.gateway.infrastructure.telemetry.event.GateData;
@@ -44,6 +47,7 @@ import ai.conduit.gateway.orchestration.planner.DagResolution;
 import ai.conduit.gateway.orchestration.planner.DagResolver;
 import ai.conduit.gateway.orchestration.planner.ResolutionError;
 import ai.conduit.gateway.registry.model.AgentManifest;
+import ai.conduit.gateway.registry.model.RoutingCandidate;
 import ai.conduit.gateway.registry.service.AgentRegistry;
 import ai.conduit.gateway.resolver.model.ResolverResult;
 import ai.conduit.gateway.resolver.service.AgentResolver;
@@ -123,6 +127,7 @@ public class ChatService {
     private final TraceEventPublisher      tracePublisher;
     private final CoverageClient           coverageClient;
     private final ReferenceGroundingService referenceGrounding;
+    private final RoutePreparer            routePreparer;
     private final DomainManifestStore      manifestStore;
     private final ai.conduit.gateway.domain.clarify.ClarificationComposer clarificationComposer;
     private final Tracer                   tracer;
@@ -148,6 +153,25 @@ public class ChatService {
     @org.springframework.beans.factory.annotation.Value("${conduit.orchestration.dag-enabled:false}")
     private boolean dagEnabled;
 
+    /**
+     * Whether to derive and pass the grounded-references' domain set into {@code resolveContextual} so the
+     * Piece-5 conflict trigger is reachable (routing spec V2 Piece 4/5). Bound to the SAME property as the
+     * resolver's own trigger so one flag controls both sides. OFF by default: the gateway then calls the
+     * two-arg {@code resolveContextual}, so routing behaviour and every existing resolver mock are
+     * byte-identical. Flipping it ON supplies the grounded domain set; the trigger still never denies — it
+     * only makes a near-tie rerank abstain on error instead of trusting the embedding leader.
+     */
+    @org.springframework.beans.factory.annotation.Value("${conduit.routing.rerank-conflict-trigger.enabled:false}")
+    private boolean conflictTriggerEnabled;
+
+    /**
+     * The preparation/masking contract version stamped onto every {@link RouteDecision} the Piece-6
+     * decision endpoint returns, so the goal-pick harness can assert the endpoint exercised the current
+     * production preparation (not a stale/forked one). Config, never a constant (CLAUDE.md §5).
+     */
+    @org.springframework.beans.factory.annotation.Value("${conduit.routing.preparation-version:route-prep-v2}")
+    private String preparationVersion;
+
     public ChatService(ObjectMapper mapper,
                        IntentClassifier intentClassifier,
                        AgentResolver resolver,
@@ -159,6 +183,7 @@ public class ChatService {
                        TraceEventPublisher tracePublisher,
                        CoverageClient coverageClient,
                        ReferenceGroundingService referenceGrounding,
+                       RoutePreparer routePreparer,
                        DomainManifestStore manifestStore,
                        ai.conduit.gateway.domain.clarify.ClarificationComposer clarificationComposer,
                        Tracer tracer,
@@ -179,6 +204,7 @@ public class ChatService {
         this.tracePublisher      = tracePublisher;
         this.coverageClient      = coverageClient;
         this.referenceGrounding  = referenceGrounding;
+        this.routePreparer       = routePreparer;
         this.manifestStore       = manifestStore;
         this.clarificationComposer = clarificationComposer;
         this.tracer              = tracer;
@@ -317,7 +343,7 @@ public class ChatService {
             switch (intentResult.intent()) {
                 case FETCH_DATA -> handleFetchData(request, emitter, latestPrompt,
                         conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan,
-                        intentResult.extractedEntities(), streamId, true, callerToken);
+                        intentResult.extractedEntities(), streamId, true, callerToken, null);
                 case FOLLOW_UP  -> handleFollowUp(request, emitter, latestPrompt,
                         conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan,
                         intentResult.extractedEntities(), streamId, callerToken);
@@ -334,7 +360,7 @@ public class ChatService {
                 // clarification. Enriching it would collapse the FETCH_DATA/CLARIFY distinction.
                 case CLARIFY    -> handleFetchData(request, emitter, latestPrompt,
                         conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan,
-                        intentResult.extractedEntities(), streamId, false, callerToken);
+                        intentResult.extractedEntities(), streamId, false, callerToken, null);
                 case CHITCHAT   -> handleChitchat(request, emitter, conversationId, requestId, requestStart, streamId, rootSpan);
             }
 
@@ -360,7 +386,8 @@ public class ChatService {
                                   Principal jwtPrincipal,
                                   String requestId, long requestStart, Span rootSpan,
                                   EntityBag preExtracted, String streamId,
-                                  boolean carryContext, String callerToken) throws Exception {
+                                  boolean carryContext, String callerToken,
+                                  PreparedRoute preparedMemo) throws Exception {
         Span span = tracer.spanBuilder("chat.fetch_data").startSpan();
         Scope fetchScope = span.makeCurrent();
         // coverageRelId is set by the coverage pipeline (or the Stage-1 grounding memo) before synthesis.
@@ -382,19 +409,26 @@ public class ChatService {
         Principal principal = (jwtPrincipal != null) ? jwtPrincipal : Principal.anonymous();
         String tenantId = jwtPrincipal != null ? jwtPrincipal.tenantId() : "default";
         try {
-            // ── STAGE 1: DETERMINISTIC REFERENCE GROUNDING (pre-routing) ──────────────
+            // ── STAGE 1: SINGLE-PASS REFERENCE GROUNDING via the shared prepared route ─────────
             // A security-relevant disposition (coverage DENY) and its inputs — the extracted entity
             // reference, the manifest required entity, the coverage service — do not depend on routing
-            // at all. So we RESOLVE + CHECK the turn's reference BEFORE the semantic router runs: a
-            // grounded, out-of-book reference denies at ANY embedding score, and injection prose (which
-            // only dilutes the embedding) can never dodge it. Generalizes the old typed-id pre-check to
-            // every reference source (typed id + LLM-extracted name), per manifest resolvable entity.
-            // The four-way verdict lattice (see ReferenceGroundingService): RESOLVED→denied ⇒ terminal
-            // DENY here; RESOLVED→allowed ⇒ memoize + route entityKnown; AMBIGUOUS ⇒ fall through to the
-            // existing discover∩candidates clarify; NOT_FOUND ⇒ demote to content (never a denial).
-            // RESOLVE is principal-agnostic; CHECK only ever sees a resolved id; fails closed.
-            GroundingResult grounding = referenceGrounding.ground(
-                    preExtracted, latestPrompt, principal, tenantId, callerToken);
+            // at all, so a grounded out-of-book reference denies at ANY embedding score BEFORE the router
+            // runs. (routing spec V2 Piece 4) The pre-Piece-4 code ground the focal reference TWICE — in
+            // ReferenceGroundingService.ground() for this terminal DENY/UNAVAILABLE/CLARIFY lattice, and
+            // again in RoutePreparer.prepare()->groundMentions() for masking + relaxation. The group
+            // model now owns disposition, so we ground ONCE (via prepare) and drive the SAME terminal
+            // lattice from the memoized focal verdict. A scalar-only extraction that carries no mention
+            // model (a legacy extractor path or a unit-test bag) yields an empty grounded set; only THEN
+            // do we fall back to the scalar ground() lattice — so a reference that DID ground through the
+            // mention model is never re-resolved (the double coverage check is removed). RESOLVE is
+            // principal-agnostic; CHECK only ever sees a resolved id; fails closed.
+            PreparedRoute prepared = (preparedMemo != null) ? preparedMemo
+                    : routePreparer.prepare(request, latestPrompt, preExtracted, carryContext,
+                            false, principal, tenantId, callerToken);
+            GroundingResult focalVerdict = prepared.groundedSet().focalVerdict();
+            GroundingResult grounding = focalVerdict.verdict() != ReferenceGroundingService.Verdict.NONE
+                    ? focalVerdict
+                    : referenceGrounding.ground(preExtracted, latestPrompt, principal, tenantId, callerToken);
             GroundingResult groundedMemo = null;
             switch (grounding.verdict()) {
                 case DENIED -> {
@@ -431,24 +465,28 @@ public class ChatService {
                 default -> { /* AMBIGUOUS / NOT_FOUND / NONE — normal pipeline runs unchanged. */ }
             }
 
-            // ── CONTEXT-AWARE ROUTING ────────────────────────────────────────────────
-            // Route with the smallest context needed for this turn. If the existing focal-reference
-            // derivation already grounded the entity and the user did NOT type a fresh identifier,
-            // the current message supplies the facet and should not be diluted by older turns. If
-            // the user did type a fresh identifier, use only the immediately prior user turn plus
-            // the current turn so terse overrides can inherit the prior facet without stale facets.
-            // CLARIFY turns route on the bare message so an under-specified ask cannot inherit a
-            // confident domain.
-            // A grounded+allowed reference makes the subject known regardless of carryContext (a
-            // CLARIFY-classified turn that nonetheless resolved+covered is really a FETCH). Otherwise
-            // the original signal applies: an explicit grounded resolvable reference on a
-            // context-carrying turn.
-            boolean entityKnown = groundedMemo != null
-                    || (carryContext && hasGroundedResolvableReference(preExtracted, latestPrompt));
-            String routingText = routingTextForFetch(request, latestPrompt, carryContext, entityKnown);
+            // ── CONTEXT-AWARE ROUTING (Piece 3 prepared route + Piece 5 conflict-trigger wiring) ──
+            // The routing text + bias-to-fetch relaxation come from the shared preparation pipeline
+            // (RoutePreparer, computed above): resolved entity spans are MASKED so routing keys on the
+            // capability asked rather than the entity named, an empty masked residual widens to the full
+            // masked window, and relaxation is granted ONLY on a RESOLVED_ALLOWED-and-masked focal (or a
+            // deterministic non-coverage-scoped id). A FOLLOW_UP passes its already-prepared memo through.
+            tracePublisher.publish(TraceEvent.of("route_prepared", requestId, conversationId,
+                    RoutePreparedData.from(prepared.maskDiagnostics(), prepared.relaxationAllowed())));
             long routingStart = System.nanoTime();
-            ResolverResult resolved = resolver.resolveContextual(routingText, entityKnown);
+            // Piece 4/5 wiring: derive the grounded references' DOMAIN set from the memoized grounded set
+            // and pass it so the (config-OFF) conflict trigger is reachable. Gated on the SAME property as
+            // the resolver's trigger, so with the trigger OFF (default) we call the two-arg overload and
+            // behaviour — plus every existing resolver mock — is byte-identical. The trigger never denies;
+            // it only makes the near-tie rerank's error handling stricter on a genuine cross-domain conflict.
+            Set<String> groundedDomainIds = conflictTriggerEnabled
+                    ? groundedDomainIds(prepared.groundedSet()) : Set.of();
+            ResolverResult resolved = groundedDomainIds.isEmpty()
+                    ? resolver.resolveContextual(prepared.maskedRoutingText(), prepared.relaxationAllowed())
+                    : resolver.resolveContextual(prepared.maskedRoutingText(), prepared.relaxationAllowed(),
+                            groundedDomainIds);
             recordGatewayStage("routing", System.nanoTime() - routingStart);
+            resolved = withPrimaryCandidate(resolved);
 
             List<AgentsResolvedData.AgentRef> selectedRefs = resolved.selected().stream()
                     .map(c -> new AgentsResolvedData.AgentRef(
@@ -502,6 +540,23 @@ public class ChatService {
                 return;
             }
 
+            // ── REQUESTED-CAPABILITY-GROUP MODEL (routing spec V2 Piece 4) ───────────────
+            // Partition the routed capabilities into requested GROUPS. When the Piece-5 reranker named an
+            // explicit multi-facet shortlist there is one group per facet; otherwise (the common case —
+            // a single confident pick or a balanced cross-domain fan-out) there is exactly ONE group of
+            // every selected candidate. The multi-group path runs structural authz + coverage + binding +
+            // execution + withhold PER GROUP and merges the allowed groups, so an entitled facet is served
+            // while a denied facet is withheld honestly instead of first-survivor roulette. The
+            // single-group path falls through to the pre-Piece-4 flat disposition below UNCHANGED, so the
+            // overwhelmingly common single-capability request is byte-identical to today.
+            RequestedPlan plan = buildRequestedPlan(resolved);
+            if (plan.isMultiGroup()) {
+                disposeGroups(plan, request, emitter, latestPrompt, conversationId, userId, principal,
+                        tenantId, groundedMemo, preExtracted, requestId, requestStart, rootSpan,
+                        streamId, callerToken, prepared);
+                return;
+            }
+
             // Prune agents the principal is not permitted to invoke (domain + classification).
             // Must happen BEFORE input synthesis so we never synthesize inputs for denied agents.
             List<AgentManifest> manifests = resolved.selected().stream()
@@ -525,7 +580,12 @@ public class ChatService {
                 // instead of jumping agents_resolved → request_complete. (bug 239)
                 tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
                         new CheckDeniedData("structural", null, userId, "no-covered-agents", "cerbos")));
-                streamTextAndComplete(emitter, "You do not have access to any of the required services for this query.", streamId);
+                // Structural capability-unavailable copy, scoped to the retained pre-authz candidate's
+                // sub-domain (never HashMap-order roulette); the generic fallback keeps this byte-identical
+                // when a sub-domain declares no `capability_unavailable` key (bug-238 class).
+                streamTextAndComplete(emitter, msg("capability_unavailable",
+                        "You do not have access to any of the required services for this query.",
+                        subDomainOf(manifests)), streamId);
                 tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                         new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
                 return;
@@ -1143,27 +1203,637 @@ public class ChatService {
         return io.consumes().stream().anyMatch(c -> c != null && c.isProducedRef());
     }
 
+    // ═══ Production-path routing decision — the Piece-6 test/dev decision endpoint's engine ══════════
+
+    /**
+     * Runs the REAL shared pre-routing preparation for ONE turn and projects the outcome into a
+     * {@link RouteDecision}, STOPPING before any agent is invoked (routing spec V2 Piece 6). This is the
+     * engine behind the test-profile decision endpoint the goal-pick harness gates on.
+     *
+     * <p><b>Not a fork.</b> The sequence below is the exact production {@code handleFetchData} pre-routing
+     * path — {@link IntentClassifier#classify} → {@link RoutePreparer#prepare} → the same
+     * {@code resolveContextual} overload → {@link #withPrimaryCandidate} → {@link #buildRequestedPlan} →
+     * per-group {@link EntitlementService#filterAgents} — reusing the SAME beans the chat request path
+     * uses (no forked masking, no forked resolver). The projection stops before input synthesis /
+     * execution, so no agent is called and nothing mutates. {@link RouteDecision#path()} is stamped
+     * {@code "production"} as a witness that this ran, not a debug shortcut.
+     *
+     * <p><b>Disposition scope.</b> {@link RouteDecision#disposition()} carries the structural (Cerbos)
+     * authorization verdict per requested capability — the gate that decides a persona-token conflict row
+     * — computed without invoking agents. The coverage (book-of-business) verdict is surfaced separately
+     * as {@link RouteDecision#focalVerdict()} / {@link RouteDecision#overallDisposition()}. DAG
+     * producer-closure pruning is NOT re-run here (it needs execution-time closure); a DAG group's
+     * disposition reflects its own structural authz only.
+     *
+     * @param request     the client-sent conversation window (same DTO the chat path takes).
+     * @param jwtPrincipal the verified caller principal (never {@code null} on the authenticated endpoint).
+     * @param callerToken the caller's own verified bearer token, threaded to the coverage CHECK.
+     */
+    public RouteDecision decideRoute(ChatRequest request, Principal jwtPrincipal, String callerToken) {
+        IntentResult intentResult = intentClassifier.classify(request.messages());
+        Intent intent = intentResult.intent();
+        EntityBag preExtracted = intentResult.extractedEntities();
+        String latestPrompt = extractLatestUserMessage(request);
+        // Window policy parity with handleChat's dispatch: a CLARIFY turn routes on its bare message
+        // (carryContext=false) so it cannot inherit a confident domain from history; every other intent
+        // carries context, exactly as FETCH_DATA/FOLLOW_UP do.
+        boolean carryContext = intent != Intent.CLARIFY;
+
+        Principal principal = (jwtPrincipal != null) ? jwtPrincipal : Principal.anonymous();
+        String tenantId = jwtPrincipal != null ? jwtPrincipal.tenantId() : "default";
+
+        // 1) Shared preparation (masking + relaxation + full grounded set) — the production bean.
+        PreparedRoute prepared = routePreparer.prepare(request, latestPrompt, preExtracted, carryContext,
+                false, principal, tenantId, callerToken);
+
+        // 2) Terminal focal grounding verdict — the SAME memo-or-scalar fallback handleFetchData uses.
+        GroundingResult focal = prepared.groundedSet().focalVerdict();
+        GroundingResult grounding = focal.verdict() != ReferenceGroundingService.Verdict.NONE
+                ? focal
+                : referenceGrounding.ground(preExtracted, latestPrompt, principal, tenantId, callerToken);
+
+        // 3) Context-aware routing over the MASKED text — the identical overload selection production makes.
+        Set<String> groundedDomainIds = conflictTriggerEnabled
+                ? groundedDomainIds(prepared.groundedSet()) : Set.of();
+        ResolverResult resolved = groundedDomainIds.isEmpty()
+                ? resolver.resolveContextual(prepared.maskedRoutingText(), prepared.relaxationAllowed())
+                : resolver.resolveContextual(prepared.maskedRoutingText(), prepared.relaxationAllowed(),
+                        groundedDomainIds);
+        resolved = withPrimaryCandidate(resolved);
+
+        // 4) Requested-capability groups (production partitioner).
+        RequestedPlan plan = buildRequestedPlan(resolved);
+
+        // 5) Per-group structural authorization — no agent invocation.
+        List<RouteDecision.GroupDisposition> dispositions = new ArrayList<>();
+        int servedGroups = 0;
+        int deniedGroups = 0;
+        for (RequestedPlan.RequestedGroup group : plan.groups()) {
+            List<AgentManifest> allowed = entitlementService.filterAgents(principal, group.candidates());
+            Set<String> allowedIds = allowed.stream().map(AgentManifest::agentId)
+                    .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
+            List<String> allowedList = new ArrayList<>();
+            List<String> deniedList = new ArrayList<>();
+            for (String id : group.requestedCapabilityIds()) {
+                if (allowedIds.contains(id)) allowedList.add(id); else deniedList.add(id);
+            }
+            String disp = allowedList.isEmpty() ? "DENIED"
+                    : (deniedList.isEmpty() ? "SERVED" : "PARTIAL");
+            if ("DENIED".equals(disp)) deniedGroups++; else servedGroups++;
+            dispositions.add(new RouteDecision.GroupDisposition(
+                    group.requestedCapabilityIds(), allowedList, deniedList, disp));
+        }
+
+        return new RouteDecision(
+                RouteDecision.PRODUCTION_PATH,
+                preparationVersion,
+                prepared.maskDiagnostics().maskMode(),
+                prepared.maskedRoutingText(),
+                prepared.maskDiagnostics(),
+                prepared.relaxationAllowed(),
+                grounding.verdict().name(),
+                projectGrounded(prepared.groundedSet()),
+                projectResolver(resolved),
+                projectCandidates(resolved),
+                projectGroups(plan),
+                dispositions,
+                overallDisposition(grounding, resolved, servedGroups, deniedGroups));
+    }
+
+    /** Terminal disposition class: coverage verdict first, then abstain, then the merged group verdict. */
+    private static String overallDisposition(GroundingResult grounding, ResolverResult resolved,
+                                             int servedGroups, int deniedGroups) {
+        switch (grounding.verdict()) {
+            case DENIED -> { return "COVERAGE_DENIED"; }
+            case UNAVAILABLE -> { return "COVERAGE_UNAVAILABLE"; }
+            default -> { /* fall through */ }
+        }
+        if (resolved.fallback() || resolved.selected().isEmpty()) return "ABSTAIN";
+        if (servedGroups == 0) return "STRUCTURAL_DENIED";
+        if (deniedGroups > 0) return "PARTIAL";
+        return "SERVED";
+    }
+
+    /** Projects each grounded interpretation into a status view — never a raw verbatim text or id. */
+    private static List<RouteDecision.GroundedStatus> projectGrounded(GroundedReferenceSet groundedSet) {
+        List<RouteDecision.GroundedStatus> out = new ArrayList<>();
+        if (groundedSet == null) return out;
+        for (ReferenceGroundingService.GroundedMention gm : groundedSet.mentions()) {
+            boolean aligned = gm.mention() != null && gm.mention().span() != null;
+            for (GroundedInterpretation gi : gm.interpretations()) {
+                out.add(new RouteDecision.GroundedStatus(
+                        gi.entityKey(), gi.subDomainId(), gi.status().name(),
+                        gi.mentionKind() != null ? gi.mentionKind().name() : null,
+                        aligned, gi.denialReason(), gm.focal()));
+            }
+        }
+        return out;
+    }
+
+    private RouteDecision.ResolverDecision projectResolver(ResolverResult resolved) {
+        ResolverResult.PrimaryCandidate pc = resolved.primaryCandidate();
+        return new RouteDecision.ResolverDecision(
+                resolved.fallback(), resolved.topScore(), resolved.margin(), resolved.rerankFired(),
+                resolved.rerankSelectedIds(),
+                pc != null ? pc.agentId() : null,
+                pc != null ? pc.subDomainId() : null,
+                pc != null ? pc.domain() : null);
+    }
+
+    /** ALL routed candidates: the selected set (above floor) plus the below-floor skipped tail. */
+    private List<RouteDecision.CandidateView> projectCandidates(ResolverResult resolved) {
+        List<RouteDecision.CandidateView> out = new ArrayList<>();
+        for (RoutingCandidate c : resolved.selected()) out.add(candidateView(c, true));
+        for (RoutingCandidate c : resolved.skipped()) out.add(candidateView(c, false));
+        return out;
+    }
+
+    private RouteDecision.CandidateView candidateView(RoutingCandidate c, boolean selected) {
+        AgentManifest m = c.manifest();
+        return new RouteDecision.CandidateView(
+                m.agentId(), m.domain(), subDomainIdOf(m), m.protocol(), c.score(), selected);
+    }
+
+    private static List<RouteDecision.GroupView> projectGroups(RequestedPlan plan) {
+        List<RouteDecision.GroupView> out = new ArrayList<>();
+        for (RequestedPlan.RequestedGroup g : plan.groups()) {
+            out.add(new RouteDecision.GroupView(
+                    g.requestedCapabilityIds(), g.kind().name(), g.goalId(),
+                    g.requiredEntityKeys(), g.routingEvidence()));
+        }
+        return out;
+    }
+
+    // ═══ Requested-capability-group model + per-group disposition (routing spec V2 Piece 4) ══════════
+
+    /**
+     * Partition the routed capabilities into requested {@link RequestedPlan.RequestedGroup groups}. When
+     * the Piece-5 reranker named an explicit multi-facet shortlist
+     * ({@link ResolverResult#rerankSelectedIds()} non-empty and ≥2 back-able), there is ONE group per
+     * facet; otherwise there is exactly one group of every selected candidate — the pre-Piece-4 flat set,
+     * so the common single-capability request stays byte-identical. Groups are NEVER inferred from raw
+     * below-floor noise (spec DO-NOT): only from the resolver's selection + the reranker's explicit ids.
+     */
+    private RequestedPlan buildRequestedPlan(ResolverResult resolved) {
+        List<AgentManifest> selected = resolved.selected().stream().map(c -> c.manifest()).toList();
+        List<String> facetIds = resolved.rerankSelectedIds();
+        if (facetIds == null || facetIds.isEmpty()) {
+            return new RequestedPlan(List.of(groupOf(selected, "single-selection")));
+        }
+        List<RequestedPlan.RequestedGroup> groups = new ArrayList<>();
+        for (String id : facetIds) {
+            AgentManifest m = findManifest(id, resolved);
+            if (m != null) groups.add(groupOf(List.of(m), "rerank-facet"));
+        }
+        // A reranker that named ≤1 back-able facet is not a genuine multi-group request — fall back to the
+        // single flat group rather than split off a lone facet and silently drop the rest.
+        if (groups.size() <= 1) {
+            return new RequestedPlan(List.of(groupOf(selected, "single-selection")));
+        }
+        return new RequestedPlan(groups);
+    }
+
+    /** Builds one requested group over {@code manifests}, deriving flat/DAG kind + goal from the manifests. */
+    private RequestedPlan.RequestedGroup groupOf(List<AgentManifest> manifests, String evidence) {
+        List<String> ids = manifests.stream().map(AgentManifest::agentId).toList();
+        String goalId = manifests.stream().filter(ChatService::hasProducedRefConsume)
+                .map(AgentManifest::agentId).findFirst().orElse(null);
+        RequestedPlan.RequestedGroup.Kind kind = goalId != null
+                ? RequestedPlan.RequestedGroup.Kind.DAG : RequestedPlan.RequestedGroup.Kind.FLAT;
+        return new RequestedPlan.RequestedGroup(ids, manifests, kind, goalId,
+                requiredEntityKeysFor(manifests), evidence);
+    }
+
+    private List<String> requiredEntityKeysFor(List<AgentManifest> manifests) {
+        java.util.Set<String> keys = new java.util.LinkedHashSet<>();
+        for (AgentManifest m : manifests) {
+            EffectiveManifest em = manifestStore.getEffective(m.agentId(), m.domain(), m.subDomain());
+            if (em != null && em.requiredContext() != null) keys.addAll(em.requiredContext());
+        }
+        return List.copyOf(keys);
+    }
+
+    /**
+     * The routed manifest for {@code id}, searched in the ABOVE-FLOOR {@link ResolverResult#selected()}
+     * set ONLY. A requested group is never formed from a below-floor ({@code skipped()}) candidate: the
+     * reranker's top-5 shortlist is taken BEFORE the confidence floor, so a {@code multiple([ids])} may
+     * name a below-floor id — grouping it would let it be invoked past the floor (spec Piece 4: groups
+     * come from above-floor candidates only; DO-NOT infer groups from noise). A named id that is not
+     * above-floor returns {@code null}, so {@code buildRequestedPlan} drops it (and falls back to the
+     * single flat group when fewer than two facets survive).
+     */
+    private static AgentManifest findManifest(String id, ResolverResult resolved) {
+        return resolved.selected().stream()
+                .map(c -> c.manifest())
+                .filter(m -> id.equals(m.agentId()))
+                .findFirst().orElse(null);
+    }
+
+    /** Attaches the diagnostic {@link ResolverResult.PrimaryCandidate} (post-rerank leader, pre-filter). */
+    private ResolverResult withPrimaryCandidate(ResolverResult resolved) {
+        if (resolved == null || resolved.selected() == null || resolved.selected().isEmpty()) return resolved;
+        AgentManifest leader = resolved.selected().get(0).manifest();
+        String subDomainId = subDomainIdOf(leader);
+        Span.current().setAttribute("conduit.routing.primary_agent", safeMetricTag(leader.agentId()));
+        if (subDomainId != null) Span.current().setAttribute("conduit.routing.primary_subdomain", subDomainId);
+        return resolved.withPrimaryCandidate(
+                new ResolverResult.PrimaryCandidate(leader.agentId(), subDomainId, leader.domain()));
+    }
+
+    /** The grounded references' DOMAIN ids (sub-domain → parent domain) for the Piece-5 conflict trigger. */
+    private java.util.Set<String> groundedDomainIds(GroundedReferenceSet groundedSet) {
+        java.util.Set<String> out = new java.util.LinkedHashSet<>();
+        if (groundedSet == null) return out;
+        for (GroundedInterpretation gi : groundedSet.allInterpretations()) {
+            String sd = gi.subDomainId();
+            if (sd == null) continue;
+            manifestStore.getSubDomain(sd)
+                    .map(s -> s.parentDomain())
+                    .filter(d -> d != null && !d.isBlank())
+                    .ifPresent(out::add);
+        }
+        return out;
+    }
+
+    private String subDomainIdOf(AgentManifest m) {
+        try {
+            EffectiveManifest em = manifestStore.getEffective(m.agentId(), m.domain(), m.subDomain());
+            return em != null && em.subDomainId() != null ? em.subDomainId() : m.subDomain();
+        } catch (RuntimeException e) {
+            return m.subDomain();
+        }
+    }
+
+    /** The sub-domain id of a candidate list's first (retained pre-authz) manifest — for denial copy. */
+    private String subDomainOf(List<AgentManifest> manifests) {
+        return (manifests == null || manifests.isEmpty()) ? null : subDomainIdOf(manifests.get(0));
+    }
+
+    /**
+     * Per-group disposition: structural authz + coverage + binding + execution + withhold run PER GROUP,
+     * then the allowed groups are MERGED into one answer. Rules (spec Piece 4):
+     * <ul>
+     *   <li>all groups denied → structural {@code capability_unavailable} copy;</li>
+     *   <li>some denied → serve the allowed groups, label the fully-withheld domains honestly (bug-260
+     *       scoping: a domain still served by ANY group is never withheld);</li>
+     *   <li>a DAG group whose required producer is authorization-pruned → DENY that group, never a silent
+     *       flat-fallback;</li>
+     *   <li>a group with no requested facet is never formed, so a denial is only ever recorded for a
+     *       capability the user actually requested (noise never surfaces a user-visible denial).</li>
+     * </ul>
+     * The memoized {@link GroundedReferenceSet} is consumed for coverage — no reference is re-resolved.
+     */
+    private void disposeGroups(RequestedPlan plan, ChatRequest request, SseEmitter emitter,
+                               String latestPrompt, String conversationId, String userId, Principal principal,
+                               String tenantId, GroundingResult groundedMemo, EntityBag preExtracted,
+                               String requestId, long requestStart, Span rootSpan, String streamId,
+                               String callerToken, PreparedRoute prepared) throws Exception {
+        markGatewayPath("groups");
+        List<NodeResult> merged = new ArrayList<>();
+        java.util.Set<String> servedDomains = new java.util.LinkedHashSet<>();
+        List<AgentManifest> deniedUserVisible = new ArrayList<>();
+        List<AgentManifest> allCandidates = new ArrayList<>();
+        // "which resource?" questions from entitled groups whose required entity is unresolved. Emitted
+        // at merge ONLY when no group served — a served answer is never pre-empted by a clarify.
+        List<String> clarifyQuestions = new ArrayList<>();
+
+        for (RequestedPlan.RequestedGroup group : plan.groups()) {
+            allCandidates.addAll(group.candidates());
+
+            // (1) Structural authz over THIS group's own candidates (scoped, not request-global).
+            entitlementService.explainStructuralGates(principal, group.candidates())
+                    .forEach(g -> tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
+                            new GateData(g.gate(), g.allow() ? GateData.EFFECT_ALLOW : GateData.EFFECT_DENY,
+                                    g.reason(), g.agent()))));
+            List<AgentManifest> allowed = entitlementService.filterAgents(principal, group.candidates());
+
+            // (2) DAG producer prune → deny this group (never a silent flat-fallback). Closure is derived
+            //     intra-group here (ground/bind → closure → authz), not at group formation (spec Piece 4/6).
+            boolean dagProducerDenied = group.isDag()
+                    && dagProducerPruned(group, principal, preExtracted);
+
+            if (allowed.isEmpty() || dagProducerDenied) {
+                recordGroupDenied(group, requestId, conversationId, userId, dagProducerDenied);
+                deniedUserVisible.add(group.candidates().get(0));
+                continue;
+            }
+
+            // (3) Coverage — consume the memoized grounded set for this group's sub-domain (no re-resolve).
+            GroupCoverage cov = coverageForGroup(allowed, prepared.groundedSet(), groundedMemo, principal,
+                    tenantId, callerToken, requestId, conversationId, preExtracted, request);
+            if (cov.denied()) {
+                recordGroupDenied(group, requestId, conversationId, userId, false);
+                deniedUserVisible.add(group.candidates().get(0));
+                continue;
+            }
+            if (cov.outcome() == GroupCoverageOutcome.CLARIFY) {
+                // Entitled caller with an unresolved required entity — collect the clarify; emit at merge
+                // only if no group served. The group is NEVER bound (no unchecked id reaches an agent).
+                clarifyQuestions.add(cov.clarifyQuestion());
+                deniedUserVisible.add(group.candidates().get(0));
+                continue;
+            }
+            if (cov.outcome() == GroupCoverageOutcome.WITHHOLD) {
+                // Fail-closed: unresolved required coverage with no clarify formable — never bind an id.
+                recordGroupDenied(group, requestId, conversationId, userId, false);
+                deniedUserVisible.add(group.candidates().get(0));
+                continue;
+            }
+
+            // (4) Bind + execute. A DAG group runs through tryDag (its producer prune was already handled
+            //     above as a group denial, so the fall-through here is an intra-group flat plan only).
+            EntityBag groupBag = injectCoverage(preExtracted, cov);
+            SynthesisResult synthesis = (groupBag != null)
+                    ? inputSynthesizer.synthesize(groupBag, allowed)
+                    : inputSynthesizer.synthesize(latestPrompt, allowed);
+            if (synthesis.inputs().isEmpty()) {
+                // Nothing bindable (an unresolved required entity) — withhold rather than fabricate an id.
+                deniedUserVisible.add(group.candidates().get(0));
+                continue;
+            }
+            List<NodeResult> results = tryDag(synthesis, allowed, groupBag, principal, requestId,
+                    conversationId, callerToken).orElseGet(() -> {
+                        List<PlanNode> nodes = synthesis.inputs().entrySet().stream()
+                                .map(e -> new PlanNode(e.getKey(), allowed.stream()
+                                        .filter(a -> a.agentId().equals(e.getKey())).findFirst().orElseThrow(),
+                                        e.getValue(), List.of()))
+                                .collect(Collectors.toList());
+                        nodes.forEach(n -> tracePublisher.publish(TraceEvent.of("agent_start", requestId,
+                                conversationId, new AgentStartData(n.nodeId(), n.agent().protocol()))));
+                        return executor.execute(new Plan(nodes), callerToken);
+                    });
+            results.forEach(r -> {
+                String prev = r.isOk() && r.data() != null
+                        ? r.data().toString().substring(0, Math.min(80, r.data().toString().length()))
+                        : r.status().name();
+                String status = r.isOk() ? "ok" : (r.isCleanSkip() ? "skipped" : "failed");
+                tracePublisher.publish(TraceEvent.of("agent_complete", requestId, conversationId,
+                        new AgentCompleteData(r.agentId(), r.latencyMs(), status, prev)));
+            });
+            merged.addAll(results);
+            allowed.stream().map(AgentManifest::domain).filter(d -> d != null && !d.isBlank())
+                    .forEach(servedDomains::add);
+        }
+
+        int okAgents = (int) merged.stream().filter(NodeResult::isOk).count();
+        int failedAgents = (int) merged.stream().filter(NodeResult::isFailure).count();
+
+        // MERGE — nothing served. An ENTITLED caller whose required entity is merely unresolved is
+        // CLARIFIED (ask which resource), NOT told they lack access; only a genuine all-denied request
+        // gets the structural capability-unavailable copy.
+        if (merged.isEmpty()) {
+            if (!clarifyQuestions.isEmpty()) {
+                emitRequestOutcome("CLARIFIED");
+                streamTextAndComplete(emitter, clarifyQuestions.get(0), streamId);
+                tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
+                        new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                return;
+            }
+            emitRequestOutcome("DENIED");
+            tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
+                    new CheckDeniedData("structural", null, userId, "no-covered-groups", "cerbos")));
+            streamTextAndComplete(emitter, msg("capability_unavailable",
+                    "You do not have access to any of the required services for this query.",
+                    subDomainOf(allCandidates)), streamId);
+            tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
+                    new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+            return;
+        }
+
+        // Some served, some denied → serve the allowed groups; label ONLY fully-withheld domains (bug-260:
+        // a domain still served by any group is never withheld).
+        List<String> withheldDomains = computeWithheldDomains(deniedUserVisible, servedDomains);
+        if (okAgents > 0 && failedAgents > 0) emitRequestPartial();
+        boolean noAgentData = okAgents == 0 && failedAgents > 0;
+        if (noAgentData) emitRequestNoData();
+        if (rootSpan != null) {
+            rootSpan.setAttribute("conduit.agents.ok", okAgents);
+            rootSpan.setAttribute("conduit.agents.failed", failedAgents);
+            rootSpan.setAttribute("conduit.answer.degraded", failedAgents > 0);
+            rootSpan.setAttribute("conduit.plan.node_count", merged.size());
+        }
+
+        tracePublisher.publish(TraceEvent.of("synthesis_start", requestId, conversationId,
+                new SynthesisStartData(merged.size(), okAgents)));
+        publishGroundedFigures(requestId, conversationId, merged);
+
+        long synthesisStart = System.nanoTime();
+        String answer = answerSynthesizer.synthesize(merged, latestPrompt, request.messages(), emitter,
+                streamId, withheldDomains, requestStart);
+        recordGatewayStage("synthesis", System.nanoTime() - synthesisStart);
+        setTraceOutput(rootSpan, answer);
+        emitRequestOutcome(noAgentData ? "FAILED" : "ANSWERED");
+        servedDomains.forEach(this::emitAssistantDomain);
+        tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
+                new RequestCompleteData(System.currentTimeMillis() - requestStart, merged.size(), okAgents)));
+    }
+
+    /** How one group's coverage resolved (per-group disposition, spec Piece 4). */
+    private enum GroupCoverageOutcome { PROCEED, DENIED, CLARIFY, WITHHOLD }
+
+    /**
+     * The coverage outcome for one group.
+     * <ul>
+     *   <li>{@code PROCEED} — bind with {@code coverageRelId} (an ALLOWED id), or with no id at all when
+     *       the group needs no resource-scoped coverage;</li>
+     *   <li>{@code DENIED} — fail-closed access denial (a matched out-of-book DENY, or coverage
+     *       UNAVAILABLE for the group's own sub-domain);</li>
+     *   <li>{@code CLARIFY} — an ENTITLED caller whose required entity is unresolved is asked which
+     *       resource ({@code clarifyQuestion}) — never told they lack access;</li>
+     *   <li>{@code WITHHOLD} — fail-closed when no clarify can be formed (empty book / coverage down).</li>
+     * </ul>
+     */
+    private record GroupCoverage(GroupCoverageOutcome outcome, String coverageRelId,
+                                 EntityType coverageEntity, String clarifyQuestion) {
+        boolean denied() { return outcome == GroupCoverageOutcome.DENIED; }
+        static GroupCoverage proceed(String id, EntityType e) {
+            return new GroupCoverage(GroupCoverageOutcome.PROCEED, id, e, null);
+        }
+        static GroupCoverage denied(EntityType e) {
+            return new GroupCoverage(GroupCoverageOutcome.DENIED, null, e, null);
+        }
+        static GroupCoverage clarify(String question, EntityType e) {
+            return new GroupCoverage(GroupCoverageOutcome.CLARIFY, null, e, question);
+        }
+        static GroupCoverage withhold(EntityType e) {
+            return new GroupCoverage(GroupCoverageOutcome.WITHHOLD, null, e, null);
+        }
+    }
+
+    /**
+     * Coverage for ONE group, consuming the memoized {@link GroundedReferenceSet} rather than re-resolving.
+     * The first resource-scoped allowed agent's sub-domain is matched against the grounded interpretations:
+     * a DENIED interpretation denies the group; a sub-domain-matching UNAVAILABLE interpretation FAILS
+     * CLOSED (coverage could not be verified — mirrors the flat path's UNAVAILABLE terminal deny); a
+     * RESOLVED_ALLOWED one yields its canonical id to bind; the single-lattice focal memo is honoured for
+     * the scalar-bag path.
+     *
+     * <p>A resource-scoped, required-coverage group with NO allowed interpretation and no allowed memo has
+     * an UNRESOLVED required entity. It must NOT bind+invoke an unchecked id — {@link EntityResolver}
+     * binds an id-shaped reference VERBATIM with no lookup, so a group whose bag still carries a coverage
+     * reference would otherwise run an agent on an id that never passed CHECK (the fail-open hole). Such a
+     * group is CLARIFIED (an entitled caller is asked which resource, reusing the flat clarify machinery)
+     * or, when no clarify can be formed, WITHHELD — never bound.
+     */
+    private GroupCoverage coverageForGroup(List<AgentManifest> allowed, GroundedReferenceSet groundedSet,
+                                           GroundingResult groundedMemo, Principal principal, String tenantId,
+                                           String callerToken, String requestId, String conversationId,
+                                           EntityBag preExtracted, ChatRequest request) {
+        for (AgentManifest m : allowed) {
+            if (!entitlementService.requiresCoverage(m)) continue;
+            EffectiveManifest em = manifestStore.getEffective(m.agentId(), m.domain(), m.subDomain());
+            if (em == null || !em.resourceScoped()) continue;
+            EntityType coverageEntity = coverageEntityType(em);
+            for (GroundedInterpretation gi : groundedSet.allInterpretations()) {
+                if (!em.subDomainId().equals(gi.subDomainId())) continue;
+                if (coverageEntity != null && gi.entityType() != null
+                        && !coverageEntity.key().equals(gi.entityType().key())) continue;
+                if (gi.isDenied()) {
+                    tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
+                            GateData.deny(GateData.GATE_COVERAGE,
+                                    gi.canonicalId() + " not in " + principal.id() + "'s book", m.agentId())));
+                    tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
+                            new CheckDeniedData("coverage", gi.canonicalId(), principal.id(),
+                                    gi.denialReason(), "coverage")));
+                    return GroupCoverage.denied(coverageEntity);
+                }
+                if (gi.status() == ReferenceGroundingService.GroundStatus.UNAVAILABLE) {
+                    // FAIL CLOSED — the coverage service was unreachable for THIS group's own sub-domain,
+                    // so we cannot verify the id is in-book. Never grant access on an unverified id
+                    // (matches the flat path's UNAVAILABLE terminal deny).
+                    tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
+                            GateData.deny(GateData.GATE_COVERAGE,
+                                    "coverage unavailable for " + principal.id(), m.agentId())));
+                    tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
+                            new CheckDeniedData("coverage", gi.canonicalId(), principal.id(),
+                                    "coverage-unavailable", "coverage")));
+                    return GroupCoverage.denied(coverageEntity);
+                }
+                if (gi.isAllowed()) {
+                    tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
+                            GateData.allow(GateData.GATE_COVERAGE,
+                                    gi.canonicalId() + " in " + principal.id() + "'s book", m.agentId())));
+                    return GroupCoverage.proceed(gi.canonicalId(), coverageEntity);
+                }
+                // NOT_FOUND / AMBIGUOUS for this sub-domain — keep scanning; resolved after the loop.
+            }
+            if (consumeGroundingMemo(groundedMemo, em, coverageEntity)) {
+                return GroupCoverage.proceed(groundedMemo.resolvedId(), coverageEntity);
+            }
+            // No ALLOWED interpretation and no allowed focal memo → the required coverage entity is
+            // unresolved. If the bag carries a coverage-entity reference, EntityResolver would self-bind
+            // it VERBATIM (no CHECK) — fail-open. Distinguish a genuinely unresolved required entity
+            // (CLARIFY — ask which resource, never an access denial) from a group with nothing to bind.
+            boolean carriesUncheckedRef = coverageEntity != null && preExtracted != null
+                    && preExtracted.reference(coverageEntity.extractAs()) != null;
+            if (carriesUncheckedRef) {
+                return coverageClarifyOrWithhold(em, coverageEntity, principal, tenantId, callerToken,
+                        request, requestId, conversationId);
+            }
+            // Nothing in the bag for EntityResolver to self-bind; the group proceeds and input synthesis
+            // simply yields no bound agent while the required entity is still missing (belt-and-suspenders
+            // strip in injectCoverage guarantees no coverage reference survives an id-less PROCEED).
+            return GroupCoverage.proceed(null, coverageEntity);
+        }
+        return GroupCoverage.proceed(null, null);
+    }
+
+    /**
+     * A resource-scoped group whose required coverage entity is unresolved (NOT_FOUND / AMBIGUOUS / no
+     * matching interpretation): reuse the flat path's clarify machinery so an ENTITLED caller is asked
+     * which resource ("which ⟨entity⟩?"), never told they lack access. Fails closed (WITHHOLD) when the
+     * book cannot be discovered (empty / no coverage contract) or the coverage service is unavailable.
+     */
+    private GroupCoverage coverageClarifyOrWithhold(EffectiveManifest em, EntityType coverageEntity,
+                                                    Principal principal, String tenantId, String callerToken,
+                                                    ChatRequest request, String requestId, String conversationId) {
+        if (em.coverage() == null) return GroupCoverage.withhold(coverageEntity);
+        try {
+            List<CoverageResource> discovered = coverageClient.discover(
+                    principal.id(), tenantId, em.coverage(), callerToken);
+            if (discovered == null || discovered.isEmpty()) {
+                return GroupCoverage.withhold(coverageEntity);
+            }
+            return GroupCoverage.clarify(
+                    buildClarificationQuestion(em, List.of(), discovered, request), coverageEntity);
+        } catch (CoverageClient.CoverageUnavailableException e) {
+            // Coverage service down while forming the clarify — fail closed.
+            tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
+                    new CheckDeniedData("coverage", null, principal.id(), "coverage-unavailable", "coverage")));
+            return GroupCoverage.withhold(coverageEntity);
+        }
+    }
+
+    /** Injects a group's coverage-verified canonical id into the bag (mirrors the flat binder). */
+    private EntityBag injectCoverage(EntityBag preExtracted, GroupCoverage cov) {
+        if (preExtracted == null) return null;
+        if (cov == null || cov.coverageEntity() == null) return preExtracted;
+        if (cov.coverageRelId() == null) {
+            // PROCEED without an ALLOWED coverage id — strip any coverage-entity reference so
+            // EntityResolver cannot self-bind an unchecked id verbatim (belt-and-suspenders for the
+            // fail-open hole; a group with a bindable reference is diverted to CLARIFY/WITHHOLD upstream).
+            return preExtracted.withReference(cov.coverageEntity().extractAs(), null);
+        }
+        return preExtracted
+                .withReference(cov.coverageEntity().extractAs(), cov.coverageRelId())
+                .withResolvedValue(cov.coverageEntity().key(), cov.coverageRelId());
+    }
+
+    /**
+     * True when a DAG group's required producer is authorization-pruned — the group must then be DENIED,
+     * never silently flat-fallen-back (spec DO-NOT). Derives the producer closure intra-group (goal →
+     * registry DAG → producers) and re-gates every manifest the plan touches; a prune returns true. A
+     * goal that resolves to no multi-node DAG (or the flag is off) is NOT a producer prune → false, so it
+     * runs as an ordinary flat group.
+     */
+    private boolean dagProducerPruned(RequestedPlan.RequestedGroup group, Principal principal,
+                                      EntityBag preExtracted) {
+        if (!dagEnabled || group.goalId() == null || preExtracted == null) return false;
+        Set<String> availableEntities = entityResolver.resolve(preExtracted).resolved().keySet();
+        DagResolution resolution = dagResolver.resolve(group.goalId(), registry.listAll(), availableEntities);
+        if (!resolution.ok() || resolution.plan() == null || resolution.plan().nodes().size() <= 1) {
+            return false;
+        }
+        List<AgentManifest> planManifests = resolution.plan().nodes().stream()
+                .map(PlanNode::agent).collect(Collectors.toList());
+        return entitlementService.filterAgents(principal, planManifests).size() < planManifests.size();
+    }
+
+    /** Records (trace only — never streamed) that one requested group was denied and is withheld. */
+    private void recordGroupDenied(RequestedPlan.RequestedGroup group, String requestId,
+                                   String conversationId, String userId, boolean dagProducerDenied) {
+        String reason = dagProducerDenied ? "dag-producer-denied" : "no-covered-agents";
+        tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
+                new CheckDeniedData("structural", group.goalId(), userId, reason, "cerbos")));
+        log.info("Requested group {} denied ({}) — withheld from the merged answer",
+                group.requestedCapabilityIds(), reason);
+    }
+
     private void handleFollowUp(ChatRequest request, SseEmitter emitter,
                                  String latestPrompt, String conversationId,
                                  String userId,
                                  Principal jwtPrincipal,
                                  String requestId, long requestStart, Span rootSpan,
                                  EntityBag preExtracted, String streamId, String callerToken) throws Exception {
-        // ── BIAS-TO-FETCH FALLTHROUGH ────────────────────────────────────────────
+        // ── BIAS-TO-FETCH FALLTHROUGH (Piece 3: unified prepared route) ───────────
         // A follow-up whose needed data is not already in context ("what's the performance on that
-        // portfolio?" when only holdings were shown) must fetch it, not answer "no info" from
-        // memory. When the turn carries a single grounded resolvable entity (a name/id the focal
-        // derivation resolved, or an id typed in the message) AND the conversation routes
-        // confidently to agents, serve it through the fetch pipeline. If either is missing it is a
-        // genuine context-answerable follow-up (explain / recap / aggregate) → synthesize from
-        // history. The probe uses entityKnown=true so a terse fresh-data follow-up is not stranded
-        // by the margin abstain; the coverage CHECK remains the access gate.
+        // portfolio?" when only holdings were shown) must fetch it, not answer "no info" from memory.
+        // When the turn carries a grounded resolvable entity AND the conversation routes confidently,
+        // serve it through the fetch pipeline; otherwise it is a genuine context-answerable follow-up
+        // (explain / recap / aggregate) → synthesize from history. The probe now routes on the SAME
+        // masked text + relaxation the fetch path uses (no separate unmasked probe), and the prepared
+        // memo is threaded into handleFetchData so grounding/masking runs exactly once.
         if (preExtracted != null && hasGroundedResolvableReference(preExtracted, latestPrompt)) {
-            ResolverResult probe = resolver.resolveContextual(buildRoutingQuery(request), true);
+            Principal principal = (jwtPrincipal != null) ? jwtPrincipal : Principal.anonymous();
+            String tenantId = jwtPrincipal != null ? jwtPrincipal.tenantId() : "default";
+            PreparedRoute prepared = routePreparer.prepare(request, latestPrompt, preExtracted,
+                    true, false, principal, tenantId, callerToken);
+            ResolverResult probe = resolver.resolveContextual(
+                    prepared.maskedRoutingText(), prepared.relaxationAllowed());
             if (!probe.fallback() && !probe.selected().isEmpty()) {
                 log.info("FOLLOW_UP → fetch fallthrough (grounded entity + confident route) requestId={}", requestId);
                 handleFetchData(request, emitter, latestPrompt, conversationId, userId, jwtPrincipal,
-                        requestId, requestStart, rootSpan, preExtracted, streamId, true, callerToken);
+                        requestId, requestStart, rootSpan, preExtracted, streamId, true, callerToken, prepared);
                 return;
             }
         }
@@ -1359,53 +2029,9 @@ public class ChatService {
         return "";
     }
 
-    /**
-     * Builds the routing query by concatenating the most recent user turns (bounded by
-     * {@code routingContextTurns}, current turn last) so a keyword-less follow-up inherits the
-     * conversation's established domain vocabulary. This is the "carried topic" the resolver uses to
-     * derive the query's domain (plan §2). Only USER turns are included — assistant answers would
-     * inject their own vocabulary and skew the embedding. No domain knowledge here: it is raw
-     * conversation text. Falls back to the latest user message when there is only one turn.
-     */
-    private String buildRoutingQuery(ChatRequest request) {
-        return buildRoutingQuery(request, Math.max(1, routingContextTurns));
-    }
-
-    private String buildRoutingQuery(ChatRequest request, int window) {
-        String latest = extractLatestUserMessage(request);
-        if (request.messages() == null || request.messages().isEmpty()) return latest;
-        List<String> userTurns = new ArrayList<>();
-        for (int i = request.messages().size() - 1; i >= 0 && userTurns.size() < window; i--) {
-            Message m = request.messages().get(i);
-            if ("user".equals(m.role()) && m.content() != null && !m.content().isBlank()) {
-                userTurns.add(m.content().trim());
-            }
-        }
-        if (userTurns.size() <= 1) return latest;
-        java.util.Collections.reverse(userTurns);  // oldest → newest (current turn last)
-        return String.join("\n", userTurns);
-    }
-
-    private String routingTextForFetch(ChatRequest request, String latestPrompt,
-                                       boolean carryContext, boolean entityKnown) {
-        if (!carryContext) return latestPrompt;
-        if (entityKnown && !latestContainsResolvableId(latestPrompt)) {
-            return latestPrompt;
-        }
-        if (entityKnown && latestContainsResolvableId(latestPrompt)) {
-            return buildRoutingQuery(request, 2);
-        }
-        return buildRoutingQuery(request);
-    }
-
-    private boolean latestContainsResolvableId(String latestPrompt) {
-        if (latestPrompt == null || latestPrompt.isBlank()) return false;
-        return manifestStore.entityTypes().stream()
-                .filter(EntityType::isResolvable)
-                .map(EntityType::idPattern)
-                .filter(pattern -> pattern != null && !pattern.isBlank())
-                .anyMatch(pattern -> java.util.regex.Pattern.compile(pattern).matcher(latestPrompt).find());
-    }
+    // The routing-query builder, the fetch-window selector, and the typed-id check that used to live
+    // here now belong to RoutePreparer (Piece 3), which owns window selection + message-local masking
+    // as one pipeline shared by FETCH_DATA and the FOLLOW_UP fallthrough.
 
     /**
      * True when the turn carries an explicit, grounded resolvable entity reference — either a
@@ -1437,7 +2063,7 @@ public class ChatService {
             }
             String pattern = et.idPattern();
             if (pattern != null && !pattern.isBlank() && latestPrompt != null
-                    && java.util.regex.Pattern.compile(pattern).matcher(latestPrompt).find()) {
+                    && manifestStore.compiledIdPattern(pattern).matcher(latestPrompt).find()) {
                 return true;
             }
         }
@@ -1588,7 +2214,7 @@ public class ChatService {
                 .map(node -> node.path(et.key()).asText(null))
                 .filter(v -> v != null && !v.isBlank())
                 .filter(v -> et.idPattern() == null || et.idPattern().isBlank()
-                        || v.toUpperCase().matches(et.idPattern()))
+                        || manifestStore.compiledIdPattern(et.idPattern()).matcher(v.toUpperCase()).matches())
                 .findFirst().orElse(null);
     }
 

@@ -1,0 +1,75 @@
+{
+  "thresholds": {
+    "_note": "Name-invariance: the SAME capability asked four ways — corpus name, a novel (not-in-corpus) name, a bare id, and no entity at all — must route to the SAME capability. All rows share one expected_goal per family; gating them on exact-capability accuracy enforces identical routing regardless of which entity token (if any) appears. Personas are entitled to the capability so routing is not masked by a denial. capability_accuracy floor is a placeholder until rebaseline.py freezes the C-baseline.",
+    "capability_accuracy": 0.9,
+    "abstain_rate": 1.0,
+    "topk_recall": 0.9,
+    "canonical_poaching_tolerance": 0
+  },
+  "queries": [
+    {
+      "id": "ni_risk_profile_corpus_name",
+      "category": "name_invariance",
+      "persona": "rm_jane",
+      "query": "Pull the client risk tolerance assessment for the Whitman Family Office.",
+      "expected_goal": "meridian.wealth.risk_profile",
+      "note": "Corpus name (Whitman is in rm_jane's book)."
+    },
+    {
+      "id": "ni_risk_profile_novel_name",
+      "category": "name_invariance",
+      "persona": "rm_jane",
+      "query": "Pull the client risk tolerance assessment for the Delacroix-Whitfield Trust.",
+      "expected_goal": "meridian.wealth.risk_profile",
+      "note": "Novel name not in the corpus — routing must key on 'risk tolerance assessment', not the (masked) name, so it lands on risk_profile identically."
+    },
+    {
+      "id": "ni_risk_profile_bare_id",
+      "category": "name_invariance",
+      "persona": "rm_jane",
+      "query": "Pull the client risk tolerance assessment for REL-00042.",
+      "expected_goal": "meridian.wealth.risk_profile",
+      "note": "Bare id — the id span is masked; the capability words decide the route."
+    },
+    {
+      "id": "ni_risk_profile_no_entity",
+      "category": "name_invariance",
+      "persona": "rm_jane",
+      "query": "Pull the client risk tolerance assessment.",
+      "expected_goal": "meridian.wealth.risk_profile",
+      "note": "No entity at all — routing must still select risk_profile from the capability words alone (a missing required entity is a downstream clarify, not a different ROUTE)."
+    },
+    {
+      "id": "ni_settlement_status_corpus_name",
+      "category": "name_invariance",
+      "persona": "ops_analyst_singh",
+      "query": "List pending and failed settlements for the Okafor Family Account.",
+      "expected_goal": "meridian.servicing.settlement_status",
+      "note": "Corpus name (Okafor Family Account is ops_analyst_singh's seeded servicing relationship)."
+    },
+    {
+      "id": "ni_settlement_status_novel_name",
+      "category": "name_invariance",
+      "persona": "ops_analyst_singh",
+      "query": "List pending and failed settlements for the Harborline Logistics account.",
+      "expected_goal": "meridian.servicing.settlement_status",
+      "note": "Novel servicing name — must route to settlement_status on the capability words."
+    },
+    {
+      "id": "ni_settlement_status_bare_id",
+      "category": "name_invariance",
+      "persona": "ops_analyst_singh",
+      "query": "List pending and failed settlements for REL-00188.",
+      "expected_goal": "meridian.servicing.settlement_status",
+      "note": "Bare servicing id."
+    },
+    {
+      "id": "ni_settlement_status_no_entity",
+      "category": "name_invariance",
+      "persona": "ops_analyst_singh",
+      "query": "List pending and failed settlements.",
+      "expected_goal": "meridian.servicing.settlement_status",
+      "note": "No entity — capability words alone must route to settlement_status."
+    }
+  ]
+}

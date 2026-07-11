@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
+import java.util.Set;
 import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -193,6 +194,162 @@ class AgentResolverRerankerTest {
         assertThat(result.fallback())
                 .as("a genuinely weak leader must still abstain")
                 .isTrue();
+    }
+
+    // ── Piece 5 — expanded bounded reranker contract ────────────────────────────────────────────
+
+    /**
+     * A valid multi-facet answer names the explicit shortlist subset. The request still fans out (the
+     * embedding candidates survive), and the selected ids are carried on {@code rerankSelectedIds} so
+     * Piece 4 can form one requested group per id.
+     */
+    @Test
+    void multipleWithExplicitIdsCarriesSelectionAndFansOut() throws Exception {
+        RoutingRerankerClient reranker = mock(RoutingRerankerClient.class);
+        var alpha = candidate("cap.alpha", "first capability", 0.600);
+        var beta = candidate("cap.beta", "second capability", 0.590);
+        AgentResolver resolver = resolver(List.of(alpha, beta), reranker);
+        when(reranker.rerank(anyString(), any())).thenReturn(
+                RoutingRerankerClient.Decision.multiple(List.of("cap.alpha", "cap.beta"), "two distinct facets"));
+
+        ResolverResult result = resolver.resolve("holdings and settlement status");
+
+        assertThat(result.fallback()).isFalse();
+        assertThat(result.selected()).isNotEmpty();
+        assertThat(result.rerankFired()).isTrue();
+        assertThat(result.rerankSelectedIds())
+                .as("the validated explicit shortlist subset is carried forward for Piece 4")
+                .containsExactly("cap.alpha", "cap.beta");
+    }
+
+    /**
+     * A {@code multiple} naming an id that was never in the shortlist is an INVALID multi-facet answer.
+     * Off the conflict path it degrades to the historical fan-out (keep candidates, no selection carried),
+     * never abstains — a broken reranker must not fail an otherwise-routable request.
+     */
+    @Test
+    void multipleWithUnknownIdIsInvalidAndFansOutOffConflictPath() throws Exception {
+        RoutingRerankerClient reranker = mock(RoutingRerankerClient.class);
+        var alpha = candidate("cap.alpha", "first capability", 0.600);
+        var beta = candidate("cap.beta", "second capability", 0.590);
+        AgentResolver resolver = resolver(List.of(alpha, beta), reranker);
+        when(reranker.rerank(anyString(), any())).thenReturn(
+                RoutingRerankerClient.Decision.multiple(List.of("cap.alpha", "cap.ghost"), "one id is bogus"));
+
+        ResolverResult result = resolver.resolve("holdings and settlement status");
+
+        assertThat(result.fallback()).isFalse();
+        assertThat(result.selected()).isNotEmpty();
+        assertThat(result.rerankSelectedIds())
+                .as("an unknown id invalidates the whole multi-facet answer — no ids carried")
+                .isEmpty();
+    }
+
+    /** A {@code multiple} with a duplicated id is invalid (unique required) — same fan-out, no selection. */
+    @Test
+    void multipleWithDuplicateIdIsInvalid() throws Exception {
+        RoutingRerankerClient reranker = mock(RoutingRerankerClient.class);
+        var alpha = candidate("cap.alpha", "first capability", 0.600);
+        var beta = candidate("cap.beta", "second capability", 0.590);
+        AgentResolver resolver = resolver(List.of(alpha, beta), reranker);
+        when(reranker.rerank(anyString(), any())).thenReturn(
+                RoutingRerankerClient.Decision.multiple(List.of("cap.alpha", "cap.alpha"), "duplicate"));
+
+        ResolverResult result = resolver.resolve("holdings and settlement status");
+
+        assertThat(result.fallback()).isFalse();
+        assertThat(result.rerankSelectedIds()).isEmpty();
+    }
+
+    /**
+     * On the CONFLICT path (routed leader's domain ∉ the grounded refs' domain set, trigger enabled) an
+     * invalid {@code multiple} is treated as an error → ABSTAIN, preserving margin abstention. Contrast
+     * {@link #multipleWithUnknownIdIsInvalidAndFansOutOffConflictPath}, which fans out off that path.
+     */
+    @Test
+    void invalidMultipleAbstainsOnConflictPath() throws Exception {
+        RoutingRerankerClient reranker = mock(RoutingRerankerClient.class);
+        var alpha = candidate("cap.alpha", "first capability", 0.600);   // domain = "test-domain"
+        var beta = candidate("cap.beta", "second capability", 0.590);
+        AgentResolver resolver = resolver(List.of(alpha, beta), reranker);
+        ReflectionTestUtils.setField(resolver, "rerankConflictTriggerEnabled", true);
+        when(reranker.rerank(anyString(), any())).thenReturn(
+                RoutingRerankerClient.Decision.multiple(List.of("cap.ghost"), "unknown id"));
+
+        // grounded refs live in a DIFFERENT domain than the leader → conflict trigger fires.
+        ResolverResult result = resolver.resolveContextual("give me the details", false, Set.of("other-domain"));
+
+        assertThat(result.fallback())
+                .as("a conflict-path invalid multiple abstains rather than trusting the embedding leader")
+                .isTrue();
+        assertThat(result.selected()).isEmpty();
+    }
+
+    /**
+     * A reranker ERROR on the conflict path abstains (preserve margin abstention). This is the deliberate
+     * counterpoint to {@link #rerankerErrorFallsBackToEmbeddingLeaderWithoutFailingRequest}, where the
+     * same error on the ordinary near-tie path keeps the embedding leader.
+     */
+    @Test
+    void conflictPathRerankerErrorAbstains() throws Exception {
+        RoutingRerankerClient reranker = mock(RoutingRerankerClient.class);
+        var alpha = candidate("cap.alpha", "first capability", 0.600);
+        var beta = candidate("cap.beta", "second capability", 0.590);
+        AgentResolver resolver = resolver(List.of(alpha, beta), reranker);
+        ReflectionTestUtils.setField(resolver, "rerankConflictTriggerEnabled", true);
+        when(reranker.rerank(anyString(), any())).thenThrow(new RuntimeException("offline"));
+
+        ResolverResult result = resolver.resolveContextual("give me the details", false, Set.of("other-domain"));
+
+        assertThat(result.fallback())
+                .as("a conflict-path reranker error preserves abstention")
+                .isTrue();
+        assertThat(result.selected()).isEmpty();
+    }
+
+    /**
+     * The conflict trigger ships OFF: with the flag at its default (false), a leader whose domain is not
+     * in the grounded set behaves EXACTLY as before — a reranker error on the near-tie path falls back to
+     * the embedding leader, never abstains. No behaviour change from the plumbing until Piece 6 turns it on.
+     */
+    @Test
+    void conflictTriggerOffByDefaultIsNoBehaviourChange() throws Exception {
+        RoutingRerankerClient reranker = mock(RoutingRerankerClient.class);
+        var alpha = candidate("cap.alpha", "first capability", 0.600);
+        var beta = candidate("cap.beta", "second capability", 0.599);   // near-tie
+        AgentResolver resolver = resolver(List.of(alpha, beta), reranker);
+        // rerankConflictTriggerEnabled left at its Java default (false) — the shipped config state.
+        when(reranker.rerank(anyString(), any())).thenThrow(new RuntimeException("offline"));
+
+        ResolverResult result = resolver.resolveContextual("near tie request", false, Set.of("other-domain"));
+
+        assertThat(result.fallback())
+                .as("trigger off ⇒ ordinary near-tie error path ⇒ embedding fallback, not abstain")
+                .isFalse();
+        assertThat(result.selected().get(0).manifest().agentId()).isEqualTo("cap.alpha");
+    }
+
+    /**
+     * The conflict trigger is a rerank/abstain HINT, never a denial: with the flag ON and a domain
+     * mismatch, a valid reranker pick still ROUTES (bug-261 is a legitimate cross-domain case). The
+     * trigger only changed which capability was chosen, not whether the request is served.
+     */
+    @Test
+    void conflictTriggerOnStillRoutesOnValidPick() throws Exception {
+        RoutingRerankerClient reranker = mock(RoutingRerankerClient.class);
+        var alpha = candidate("cap.alpha", "first capability", 0.600);
+        var beta = candidate("cap.beta", "second capability", 0.590);
+        AgentResolver resolver = resolver(List.of(alpha, beta), reranker);
+        ReflectionTestUtils.setField(resolver, "rerankConflictTriggerEnabled", true);
+        when(reranker.rerank(anyString(), any())).thenReturn(
+                RoutingRerankerClient.Decision.pick("cap.beta", "capability match"));
+
+        ResolverResult result = resolver.resolveContextual("give me the details", false, Set.of("other-domain"));
+
+        assertThat(result.fallback())
+                .as("a conflict is a hint, never a denial — a valid pick still routes")
+                .isFalse();
+        assertThat(result.selected().get(0).manifest().agentId()).isEqualTo("cap.beta");
     }
 
     @SuppressWarnings("unchecked")

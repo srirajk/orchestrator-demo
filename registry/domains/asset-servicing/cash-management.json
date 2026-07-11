@@ -3,7 +3,6 @@
   "display_name": "Cash Management",
   "parent_domain": "asset-servicing",
   "resource_scoped": true,
-
   "entity_types": [
     {
       "key": "relationship_id",
@@ -40,10 +39,13 @@
       "required": false
     }
   ],
-
-  "required_context": ["relationship_id"],
-
+  "required_context": [
+    "relationship_id"
+  ],
   "agents": [
     "meridian.servicing.cash_management"
-  ]
+  ],
+  "messages": {
+    "capability_unavailable": "I can't reach a service authorized to answer that part of your request. If you have access to a related capability, ask for it directly and I'll help."
+  }
 }

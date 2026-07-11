@@ -32,7 +32,7 @@
         "wealth-management"
       ],
       "examples": [
-        "current holdings for the Whitman relationship",
+        "current holdings for this relationship",
         "portfolio allocation for this client",
         "what is this account invested in",
         "position breakdown for the relationship",
@@ -58,24 +58,65 @@
   "output_schema": {
     "type": "object",
     "properties": {
-      "relationship_id": { "type": "string" },
-      "relationship_name": { "type": "string" },
-      "positions": { "type": "array", "items": { "type": "object" } },
-      "allocation_by_class": { "type": "array", "items": { "type": "object" } },
-      "total_value": { "type": "number" },
-      "currency": { "type": "string" },
-      "as_of_date": { "type": "string" },
-      "risk_profile": { "type": ["object", "null"] },
-      "agent_narrative": { "type": "string" }
+      "relationship_id": {
+        "type": "string"
+      },
+      "relationship_name": {
+        "type": "string"
+      },
+      "positions": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      },
+      "allocation_by_class": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      },
+      "total_value": {
+        "type": "number"
+      },
+      "currency": {
+        "type": "string"
+      },
+      "as_of_date": {
+        "type": "string"
+      },
+      "risk_profile": {
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "agent_narrative": {
+        "type": "string"
+      }
     },
-    "required": ["relationship_id", "relationship_name", "positions", "allocation_by_class", "total_value", "currency", "as_of_date"]
+    "required": [
+      "relationship_id",
+      "relationship_name",
+      "positions",
+      "allocation_by_class",
+      "total_value",
+      "currency",
+      "as_of_date"
+    ]
   },
   "io": {
     "consumes": [
-      { "entity": "relationship_id", "required": true }
+      {
+        "entity": "relationship_id",
+        "required": true
+      }
     ],
     "produces": [
-      { "name": "holdings", "type": "wealth.holdings" }
+      {
+        "name": "holdings",
+        "type": "wealth.holdings"
+      }
     ]
   }
 }

@@ -147,6 +147,9 @@ services:
     ports:
       - "8080:8080"
     environment:
+      # Routing-diagnostic endpoint (/debug/route) for the eval harness — OFF in the image default (B2),
+      # enabled here for the demo/eval only. Never enable in a production deployment.
+      CONDUIT_DEBUG_ROUTE_DECISION_ENABLED: ${CONDUIT_DEBUG_ROUTE_DECISION_ENABLED:-true}
       CONDUIT_LLM_INTENT_CLASSIFIER_BASE_URL: ${CONDUIT_LLM_INTENT_CLASSIFIER_BASE_URL:-https://api.z.ai/api/paas/v4}
       CONDUIT_LLM_INTENT_CLASSIFIER_API_KEY: ${CONDUIT_LLM_INTENT_CLASSIFIER_API_KEY:-${ZAI_API_KEY:-}}
       CONDUIT_LLM_INTENT_CLASSIFIER_MODEL: ${CONDUIT_LLM_INTENT_CLASSIFIER_MODEL:-glm-4.5-flash}

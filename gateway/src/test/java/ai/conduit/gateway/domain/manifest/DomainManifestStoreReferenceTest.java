@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.env.StandardEnvironment;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -67,5 +68,48 @@ class DomainManifestStoreReferenceTest {
     void emptyOrNullBag_yieldsNoReference() {
         assertThat(store.identifyByReference(EntityBag.empty(), "…")).isEmpty();
         assertThat(store.identifyByReference(null, "…")).isEmpty();
+    }
+
+    // ── Piece 2: return-all + deterministic ordering ─────────────────────────────────────────────
+
+    @Test
+    void identifyAllByReference_returnsEligibleInterpretations_deterministically() {
+        List<IdentifiedReference> refs =
+                store.identifyAllByReference(bag("relationship_reference", "Whitman Family Office"), "…");
+
+        assertThat(refs).isNotEmpty();
+        assertThat(refs).extracting(r -> r.subDomain().subDomainId()).contains("private-banking");
+        // Deterministic: a second identical call yields the identical ordered list.
+        List<IdentifiedReference> again =
+                store.identifyAllByReference(bag("relationship_reference", "Whitman Family Office"), "…");
+        assertThat(again).extracting(r -> r.subDomain().subDomainId())
+                .isEqualTo(refs.stream().map(r -> r.subDomain().subDomainId()).toList());
+        // identifyByReference is the deterministic first-of-order compat view.
+        assertThat(store.identifyByReference(bag("relationship_reference", "Whitman Family Office"), "…"))
+                .get().extracting(r -> r.subDomain().subDomainId()).isEqualTo(refs.get(0).subDomain().subDomainId());
+    }
+
+    @Test
+    void interpretationsForReference_scopesToRequiredResolvableSlot() {
+        // A required, resolvable, resource-scoped slot grounds…
+        assertThat(store.interpretationsForReference("relationship_reference", "Whitman"))
+                .extracting(r -> r.subDomain().subDomainId()).containsExactly("private-banking");
+        assertThat(store.interpretationsForReference("policy_reference", "the Acme fleet policy"))
+                .extracting(r -> r.subDomain().subDomainId()).containsExactly("claims-servicing");
+        // …a resolvable slot that is NOT any resource-scoped sub-domain's required entity does not.
+        assertThat(store.interpretationsForReference("fund_reference", "the growth fund")).isEmpty();
+        assertThat(store.interpretationsForReference("relationship_reference", " ")).isEmpty();
+    }
+
+    // ── Piece 2 / V2.1 #4: resolvable-but-non-coverage-scoped id_pattern flag ─────────────────────
+
+    @Test
+    void matchesNonCoverageScopedResolvableId_flagsFundPatternOnly() {
+        // fund_id (FND-…) is resolvable on resource_scoped=false servicing sub-domains → flagged.
+        assertThat(store.matchesNonCoverageScopedResolvableId("FND-000123")).isTrue();
+        // relationship_id (REL-…) is resolvable only on a resource_scoped=true sub-domain → not flagged.
+        assertThat(store.matchesNonCoverageScopedResolvableId("REL-00042")).isFalse();
+        assertThat(store.matchesNonCoverageScopedResolvableId("just some prose")).isFalse();
+        assertThat(store.matchesNonCoverageScopedResolvableId(null)).isFalse();
     }
 }

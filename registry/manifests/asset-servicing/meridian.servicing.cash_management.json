@@ -36,7 +36,7 @@
         "cash position for the relationship",
         "projected cash for this account",
         "available cash balances",
-        "liquidity on the Whitman account",
+        "liquidity on this account",
         "cash management summary for this relationship",
         "give me an overview of cash management for this account"
       ],
@@ -56,21 +56,50 @@
   "output_schema": {
     "type": "object",
     "properties": {
-      "relationship_id": { "type": "string" },
-      "balances": { "type": "array", "items": { "type": "object" } },
-      "projected_cash_usd": { "type": "number" },
-      "note": { "type": ["string", "null"] },
-      "as_of_date": { "type": "string" },
-      "agent_narrative": { "type": "string" }
+      "relationship_id": {
+        "type": "string"
+      },
+      "balances": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      },
+      "projected_cash_usd": {
+        "type": "number"
+      },
+      "note": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "as_of_date": {
+        "type": "string"
+      },
+      "agent_narrative": {
+        "type": "string"
+      }
     },
-    "required": ["relationship_id", "balances", "projected_cash_usd", "as_of_date"]
+    "required": [
+      "relationship_id",
+      "balances",
+      "projected_cash_usd",
+      "as_of_date"
+    ]
   },
   "io": {
     "consumes": [
-      { "entity": "relationship_id", "required": true }
+      {
+        "entity": "relationship_id",
+        "required": true
+      }
     ],
     "produces": [
-      { "name": "cash_position", "type": "servicing.cash_position" }
+      {
+        "name": "cash_position",
+        "type": "servicing.cash_position"
+      }
     ]
   }
 }

@@ -37,7 +37,7 @@
         "any dividends or splits coming up",
         "elections due on this account",
         "corporate action calendar for the relationship",
-        "corporate action calendar for the Whitman relationship",
+        "corporate action calendar for this relationship",
         "corporate actions summary for this relationship",
         "any corporate action activity I should know about on this account"
       ],
@@ -56,10 +56,16 @@
   },
   "io": {
     "consumes": [
-      { "entity": "fund_id", "required": true }
+      {
+        "entity": "fund_id",
+        "required": true
+      }
     ],
     "produces": [
-      { "name": "corporate_actions", "type": "servicing.corporate_actions" }
+      {
+        "name": "corporate_actions",
+        "type": "servicing.corporate_actions"
+      }
     ]
   }
 }

@@ -34,7 +34,7 @@
       ],
       "examples": [
         "is this portfolio too concentrated",
-        "how concentrated is the Whitman relationship",
+        "how concentrated is this relationship",
         "what is the single-name concentration risk for this client",
         "does this account breach our concentration limits",
         "check diversification for this portfolio",
@@ -62,19 +62,39 @@
   "output_schema": {
     "type": "object",
     "properties": {
-      "analysis": { "type": "string" },
-      "relationship_id": { "type": "string" },
-      "relationship_name": { "type": "string" },
-      "as_of_date": { "type": "string" },
-      "currency": { "type": "string" },
-      "position_count": { "type": "integer" },
-      "basis_total_value": { "type": "number" },
-      "basis_label": { "type": "string" },
-      "reported_total_value": { "type": "number" },
+      "analysis": {
+        "type": "string"
+      },
+      "relationship_id": {
+        "type": "string"
+      },
+      "relationship_name": {
+        "type": "string"
+      },
+      "as_of_date": {
+        "type": "string"
+      },
+      "currency": {
+        "type": "string"
+      },
+      "position_count": {
+        "type": "integer"
+      },
+      "basis_total_value": {
+        "type": "number"
+      },
+      "basis_label": {
+        "type": "string"
+      },
+      "reported_total_value": {
+        "type": "number"
+      },
       "policy": {
         "type": "object",
         "properties": {
-          "single_name_threshold_pct": { "type": "number" }
+          "single_name_threshold_pct": {
+            "type": "number"
+          }
         }
       },
       "single_name": {
@@ -83,25 +103,64 @@
           "top": {
             "type": "object",
             "properties": {
-              "weight_pct": { "type": "number" }
+              "weight_pct": {
+                "type": "number"
+              }
             }
           }
         }
       },
-      "asset_class": { "type": ["object", "null"] },
-      "sector": { "type": ["object", "null"] },
+      "asset_class": {
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "sector": {
+        "type": [
+          "object",
+          "null"
+        ]
+      },
       "diversification": {
         "type": "object",
         "properties": {
-          "hhi": { "type": "number" }
+          "hhi": {
+            "type": "number"
+          }
         }
       },
-      "flags": { "type": "array", "items": { "type": "object" } },
-      "breach_count": { "type": "integer" },
-      "risk_context": { "type": ["object", "null"] },
-      "notes": { "type": "array", "items": { "type": "string" } }
+      "flags": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      },
+      "breach_count": {
+        "type": "integer"
+      },
+      "risk_context": {
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "notes": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
     },
-    "required": ["analysis", "position_count", "policy", "single_name", "diversification", "flags", "breach_count"]
+    "required": [
+      "analysis",
+      "position_count",
+      "policy",
+      "single_name",
+      "diversification",
+      "flags",
+      "breach_count"
+    ]
   },
   "io": {
     "consumes": [
@@ -116,10 +175,26 @@
         "name": "concentration",
         "type": "wealth.concentration",
         "figures": [
-          { "label": "Top single-name concentration of invested holdings ex-cash", "path": "single_name.top.weight_pct", "format": "percent1" },
-          { "label": "Concentration breach count", "path": "breach_count", "format": "count" },
-          { "label": "Diversification HHI", "path": "diversification.hhi", "format": "plain" },
-          { "label": "Single-name threshold", "path": "policy.single_name_threshold_pct", "format": "percent1" }
+          {
+            "label": "Top single-name concentration of invested holdings ex-cash",
+            "path": "single_name.top.weight_pct",
+            "format": "percent1"
+          },
+          {
+            "label": "Concentration breach count",
+            "path": "breach_count",
+            "format": "count"
+          },
+          {
+            "label": "Diversification HHI",
+            "path": "diversification.hhi",
+            "format": "plain"
+          },
+          {
+            "label": "Single-name threshold",
+            "path": "policy.single_name_threshold_pct",
+            "format": "percent1"
+          }
         ]
       }
     ]

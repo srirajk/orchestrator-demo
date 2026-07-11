@@ -46,10 +46,11 @@
   "messages": {
     "no_coverage": "You have no policies in your book of business.",
     "reference_not_found": "I could not find a policy matching \"{reference}\". Please provide the policy ID or a more specific name.",
-    "needs_more_detail": "Sorry \u2014 none of the services I can reach are able to answer that as asked. If you mention the policy and what you'd like to know, I'll try again.",
+    "needs_more_detail": "Sorry — none of the services I can reach are able to answer that as asked. If you mention the policy and what you'd like to know, I'll try again.",
     "specify_entity": "Please specify the policy name or policy ID.",
     "missing_entity_question": "Which policy are you asking about? Please provide the policy ID or insured name to continue.",
-    "followup_clarification": "Could you clarify what you'd like to know about {entity}? For example: policy details, premium, coverage limit, or claim status."
+    "followup_clarification": "Could you clarify what you'd like to know about {entity}? For example: policy details, premium, coverage limit, or claim status.",
+    "capability_unavailable": "I can't reach a service authorized to answer that part of your request. If you have access to a related capability, ask for it directly and I'll help."
   },
   "clarification_schema": {
     "policy_id": {

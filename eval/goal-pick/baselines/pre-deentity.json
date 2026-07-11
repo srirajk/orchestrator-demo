@@ -1,0 +1,3554 @@
+{
+  "dataset": "eval/goal-pick/labeled_queries.json",
+  "gateway_url": "http://localhost:8080",
+  "dag_goals": [
+    "meridian.insurance.renewal_risk",
+    "meridian.servicing.settlement_risk",
+    "meridian.servicing.trade_penalty",
+    "meridian.wealth.concentration",
+    "meridian.wealth.concentration_review"
+  ],
+  "summary": {
+    "total": 73,
+    "correct": 70
+  },
+  "rows": [
+    {
+      "id": "canonical_wealth_holdings",
+      "category": "canonical",
+      "persona": "rm_jane",
+      "query": "Show the securities held in Whitman Family Office's wealth portfolio.",
+      "expected_goal": "meridian.wealth.holdings",
+      "shape": "flat",
+      "picked_goal": "meridian.wealth.holdings",
+      "correct": true,
+      "expected_domain": "wealth-management",
+      "picked_domain": "wealth-management",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.7232112288479999,
+      "selected_agent_ids": [
+        "meridian.wealth.holdings",
+        "meridian.wealth.performance",
+        "meridian.servicing.cash_management",
+        "meridian.servicing.corporate_actions",
+        "meridian.wealth.risk_profile",
+        "meridian.wealth.concentration",
+        "meridian.wealth.goal_planning",
+        "meridian.servicing.settlement_status"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.wealth.holdings",
+          "name": "Wealth Holdings",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.7232112288479999
+        },
+        {
+          "agent_id": "meridian.wealth.performance",
+          "name": "Wealth Performance",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.72226369381
+        },
+        {
+          "agent_id": "meridian.servicing.cash_management",
+          "name": "Asset Servicing Cash Management",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.570429801941
+        },
+        {
+          "agent_id": "meridian.servicing.corporate_actions",
+          "name": "Asset Servicing Corporate Actions",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.5696528553960001
+        },
+        {
+          "agent_id": "meridian.wealth.risk_profile",
+          "name": "Wealth Risk Profile",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.5653369426729999
+        },
+        {
+          "agent_id": "meridian.wealth.concentration",
+          "name": "Wealth Concentration Analysis",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.516316592693
+        },
+        {
+          "agent_id": "meridian.wealth.goal_planning",
+          "name": "Wealth Goal Planning",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.49828171730000004
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_status",
+          "name": "Asset Servicing Settlement Status",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.49443376064300004
+        }
+      ]
+    },
+    {
+      "id": "canonical_wealth_performance",
+      "category": "canonical",
+      "persona": "rm_jane",
+      "query": "How did REL-00042 perform over the latest quarter?",
+      "expected_goal": "meridian.wealth.performance",
+      "shape": "flat",
+      "picked_goal": "meridian.wealth.performance",
+      "correct": true,
+      "expected_domain": "wealth-management",
+      "picked_domain": "wealth-management",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.454059302807,
+      "selected_agent_ids": [
+        "meridian.wealth.performance",
+        "meridian.wealth.market_research"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.wealth.performance",
+          "name": "Wealth Performance",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.454059302807
+        },
+        {
+          "agent_id": "meridian.wealth.market_research",
+          "name": "Wealth Market Research",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.323850691319
+        }
+      ]
+    },
+    {
+      "id": "canonical_wealth_risk_profile",
+      "category": "canonical",
+      "persona": "rm_jane",
+      "query": "Pull the client risk tolerance assessment for Whitman Family Office.",
+      "expected_goal": "meridian.wealth.risk_profile",
+      "shape": "flat",
+      "picked_goal": "meridian.wealth.risk_profile",
+      "correct": true,
+      "expected_domain": "wealth-management",
+      "picked_domain": "wealth-management",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.6665913462640001,
+      "selected_agent_ids": [
+        "meridian.wealth.risk_profile",
+        "meridian.wealth.performance",
+        "meridian.servicing.corporate_actions",
+        "meridian.servicing.settlement_status",
+        "meridian.wealth.holdings",
+        "meridian.wealth.concentration",
+        "meridian.wealth.goal_planning"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.wealth.risk_profile",
+          "name": "Wealth Risk Profile",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.6665913462640001
+        },
+        {
+          "agent_id": "meridian.wealth.performance",
+          "name": "Wealth Performance",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.535961031914
+        },
+        {
+          "agent_id": "meridian.servicing.corporate_actions",
+          "name": "Asset Servicing Corporate Actions",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.525733947754
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_status",
+          "name": "Asset Servicing Settlement Status",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.5096111893649999
+        },
+        {
+          "agent_id": "meridian.wealth.holdings",
+          "name": "Wealth Holdings",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.49406516552
+        },
+        {
+          "agent_id": "meridian.wealth.concentration",
+          "name": "Wealth Concentration Analysis",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.46807134151499996
+        },
+        {
+          "agent_id": "meridian.wealth.goal_planning",
+          "name": "Wealth Goal Planning",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.434748768806
+        }
+      ]
+    },
+    {
+      "id": "canonical_wealth_goal_planning",
+      "category": "canonical",
+      "persona": "rm_jane",
+      "query": "Are Whitman's financial objectives still funded enough to stay on plan?",
+      "expected_goal": "meridian.wealth.goal_planning",
+      "shape": "flat",
+      "picked_goal": "meridian.wealth.goal_planning",
+      "correct": true,
+      "expected_domain": "wealth-management",
+      "picked_domain": "wealth-management",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.80787050724,
+      "selected_agent_ids": [
+        "meridian.wealth.goal_planning",
+        "meridian.wealth.performance",
+        "meridian.wealth.holdings",
+        "meridian.servicing.cash_management",
+        "meridian.servicing.settlement_status",
+        "meridian.wealth.concentration",
+        "meridian.wealth.risk_profile",
+        "meridian.servicing.corporate_actions"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.wealth.goal_planning",
+          "name": "Wealth Goal Planning",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.80787050724
+        },
+        {
+          "agent_id": "meridian.wealth.performance",
+          "name": "Wealth Performance",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.674080252647
+        },
+        {
+          "agent_id": "meridian.wealth.holdings",
+          "name": "Wealth Holdings",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.6334470510479999
+        },
+        {
+          "agent_id": "meridian.servicing.cash_management",
+          "name": "Asset Servicing Cash Management",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.619525671005
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_status",
+          "name": "Asset Servicing Settlement Status",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.608941674232
+        },
+        {
+          "agent_id": "meridian.wealth.concentration",
+          "name": "Wealth Concentration Analysis",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.600941956043
+        },
+        {
+          "agent_id": "meridian.wealth.risk_profile",
+          "name": "Wealth Risk Profile",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.597965836525
+        },
+        {
+          "agent_id": "meridian.servicing.corporate_actions",
+          "name": "Asset Servicing Corporate Actions",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.558859825134
+        }
+      ]
+    },
+    {
+      "id": "canonical_wealth_concentration",
+      "category": "canonical",
+      "persona": "rm_jane",
+      "query": "Evaluate whether Whitman's portfolio is overexposed to a few issuers.",
+      "expected_goal": "meridian.wealth.concentration",
+      "shape": "analytics",
+      "picked_goal": "meridian.wealth.concentration",
+      "correct": true,
+      "expected_domain": "wealth-management",
+      "picked_domain": "wealth-management",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.820791959763,
+      "selected_agent_ids": [
+        "meridian.wealth.performance",
+        "meridian.wealth.holdings",
+        "meridian.wealth.concentration",
+        "meridian.wealth.risk_profile",
+        "meridian.servicing.cash_management",
+        "meridian.wealth.concentration_review",
+        "meridian.wealth.goal_planning",
+        "meridian.servicing.settlement_status"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.wealth.performance",
+          "name": "Wealth Performance",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.820791959763
+        },
+        {
+          "agent_id": "meridian.wealth.holdings",
+          "name": "Wealth Holdings",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.654147326946
+        },
+        {
+          "agent_id": "meridian.wealth.concentration",
+          "name": "Wealth Concentration Analysis",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.641427099705
+        },
+        {
+          "agent_id": "meridian.wealth.risk_profile",
+          "name": "Wealth Risk Profile",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.641223013401
+        },
+        {
+          "agent_id": "meridian.servicing.cash_management",
+          "name": "Asset Servicing Cash Management",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.639474987984
+        },
+        {
+          "agent_id": "meridian.wealth.concentration_review",
+          "name": "Wealth Concentration Review Flag",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.590659737587
+        },
+        {
+          "agent_id": "meridian.wealth.goal_planning",
+          "name": "Wealth Goal Planning",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.556671202183
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_status",
+          "name": "Asset Servicing Settlement Status",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.5349423289299999
+        }
+      ]
+    },
+    {
+      "id": "canonical_wealth_concentration_review",
+      "category": "canonical",
+      "persona": "rm_jane",
+      "query": "Does the completed concentration analysis require a firm review flag?",
+      "expected_goal": "meridian.wealth.concentration_review",
+      "shape": "analytics",
+      "picked_goal": "meridian.wealth.concentration_review",
+      "correct": true,
+      "expected_domain": "wealth-management",
+      "picked_domain": "wealth-management",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.878031253815,
+      "selected_agent_ids": [
+        "meridian.wealth.concentration_review",
+        "meridian.wealth.risk_profile"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.wealth.concentration_review",
+          "name": "Wealth Concentration Review Flag",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.878031253815
+        },
+        {
+          "agent_id": "meridian.wealth.risk_profile",
+          "name": "Wealth Risk Profile",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.592306375504
+        }
+      ]
+    },
+    {
+      "id": "canonical_wealth_market_research",
+      "category": "canonical",
+      "persona": "rm_jane",
+      "query": "Give me Meridian's current macro and sector outlook for client discussions.",
+      "expected_goal": "meridian.wealth.market_research",
+      "shape": "flat",
+      "picked_goal": "meridian.wealth.market_research",
+      "correct": true,
+      "expected_domain": "wealth-management",
+      "picked_domain": "wealth-management",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.502470076084,
+      "selected_agent_ids": [
+        "meridian.wealth.market_research",
+        "meridian.wealth.goal_planning",
+        "meridian.servicing.corporate_actions",
+        "meridian.wealth.holdings",
+        "meridian.servicing.cash_management",
+        "meridian.insurance.policy_details"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.wealth.market_research",
+          "name": "Wealth Market Research",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.502470076084
+        },
+        {
+          "agent_id": "meridian.wealth.goal_planning",
+          "name": "Wealth Goal Planning",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.36838984489399995
+        },
+        {
+          "agent_id": "meridian.servicing.corporate_actions",
+          "name": "Asset Servicing Corporate Actions",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.36430382728599997
+        },
+        {
+          "agent_id": "meridian.wealth.holdings",
+          "name": "Wealth Holdings",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.32112169265699997
+        },
+        {
+          "agent_id": "meridian.servicing.cash_management",
+          "name": "Asset Servicing Cash Management",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.319269299507
+        },
+        {
+          "agent_id": "meridian.insurance.policy_details",
+          "name": "Insurance Policy Details",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.30253100395200005
+        }
+      ]
+    },
+    {
+      "id": "canonical_hr_policy_qa",
+      "category": "canonical",
+      "persona": "hr_partner_lund",
+      "query": "What does Meridian policy provide for new-parent leave?",
+      "expected_goal": "meridian.hr.policy_qa",
+      "shape": "flat",
+      "picked_goal": "meridian.hr.policy_qa",
+      "correct": true,
+      "expected_domain": "hr",
+      "picked_domain": "hr",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.571975231171,
+      "selected_agent_ids": [
+        "meridian.hr.policy_qa",
+        "meridian.servicing.custody_positions",
+        "meridian.wealth.market_research"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.hr.policy_qa",
+          "name": "HR Policy Q&A",
+          "protocol": "http",
+          "domain": "hr",
+          "score": 0.571975231171
+        },
+        {
+          "agent_id": "meridian.servicing.custody_positions",
+          "name": "Asset Servicing Custody Positions",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.391247868538
+        },
+        {
+          "agent_id": "meridian.wealth.market_research",
+          "name": "Wealth Market Research",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.38518333435100005
+        }
+      ]
+    },
+    {
+      "id": "canonical_insurance_policy_details",
+      "category": "canonical",
+      "persona": "uw_sam",
+      "query": "Pull the commercial policy record and limits for POL-77001.",
+      "expected_goal": "meridian.insurance.policy_details",
+      "shape": "flat",
+      "picked_goal": "meridian.insurance.policy_details",
+      "correct": true,
+      "expected_domain": "insurance",
+      "picked_domain": "insurance",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.708111822605,
+      "selected_agent_ids": [
+        "meridian.insurance.policy_details"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.insurance.policy_details",
+          "name": "Insurance Policy Details",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.708111822605
+        }
+      ]
+    },
+    {
+      "id": "canonical_insurance_claim_status",
+      "category": "canonical",
+      "persona": "uw_sam",
+      "query": "What claims are currently open under policy POL-77001?",
+      "expected_goal": "meridian.insurance.claim_status",
+      "shape": "flat",
+      "picked_goal": "meridian.insurance.claim_status",
+      "correct": true,
+      "expected_domain": "insurance",
+      "picked_domain": "insurance",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.688753068447,
+      "selected_agent_ids": [
+        "meridian.insurance.claim_status",
+        "meridian.insurance.policy_details",
+        "meridian.insurance.renewal_risk"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.insurance.claim_status",
+          "name": "Insurance Claim Status",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.688753068447
+        },
+        {
+          "agent_id": "meridian.insurance.policy_details",
+          "name": "Insurance Policy Details",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.577414095402
+        },
+        {
+          "agent_id": "meridian.insurance.renewal_risk",
+          "name": "Insurance Renewal Risk Analysis",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.532638251781
+        }
+      ]
+    },
+    {
+      "id": "canonical_insurance_renewal_risk",
+      "category": "canonical",
+      "persona": "uw_sam",
+      "query": "Should Continental Freight be treated as a renewal concern given claim losses?",
+      "expected_goal": "meridian.insurance.renewal_risk",
+      "shape": "analytics",
+      "picked_goal": "meridian.insurance.renewal_risk",
+      "correct": true,
+      "expected_domain": "insurance",
+      "picked_domain": "insurance",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.63941681385,
+      "selected_agent_ids": [
+        "meridian.insurance.renewal_risk",
+        "meridian.insurance.claim_status",
+        "meridian.insurance.policy_details",
+        "meridian.servicing.settlement_status",
+        "meridian.servicing.settlement_risk"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.insurance.renewal_risk",
+          "name": "Insurance Renewal Risk Analysis",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.63941681385
+        },
+        {
+          "agent_id": "meridian.insurance.claim_status",
+          "name": "Insurance Claim Status",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.6956932544709999
+        },
+        {
+          "agent_id": "meridian.insurance.policy_details",
+          "name": "Insurance Policy Details",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.570493400097
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_status",
+          "name": "Asset Servicing Settlement Status",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.456347644329
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_risk",
+          "name": "Asset Servicing Settlement Risk Analysis",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.43341040611299997
+        }
+      ]
+    },
+    {
+      "id": "canonical_servicing_settlement_status",
+      "category": "canonical",
+      "persona": "ops_analyst_singh",
+      "query": "Which pending or failed settlements are outstanding for REL-00188?",
+      "expected_goal": "meridian.servicing.settlement_status",
+      "shape": "flat",
+      "picked_goal": "meridian.servicing.settlement_status",
+      "correct": true,
+      "expected_domain": "asset-servicing",
+      "picked_domain": "asset-servicing",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.598536252975,
+      "selected_agent_ids": [
+        "meridian.servicing.settlement_status",
+        "meridian.servicing.settlement_risk",
+        "meridian.insurance.claim_status"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.servicing.settlement_status",
+          "name": "Asset Servicing Settlement Status",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.598536252975
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_risk",
+          "name": "Asset Servicing Settlement Risk Analysis",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.547404110432
+        },
+        {
+          "agent_id": "meridian.insurance.claim_status",
+          "name": "Insurance Claim Status",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.39851194620099994
+        }
+      ]
+    },
+    {
+      "id": "canonical_servicing_cash_management",
+      "category": "canonical",
+      "persona": "ops_analyst_singh",
+      "query": "Review available and projected cash for the Okafor servicing relationship.",
+      "expected_goal": "meridian.servicing.cash_management",
+      "shape": "flat",
+      "picked_goal": "meridian.servicing.cash_management",
+      "correct": true,
+      "expected_domain": "asset-servicing",
+      "picked_domain": "asset-servicing",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.44915407896000004,
+      "selected_agent_ids": [
+        "meridian.servicing.cash_management",
+        "meridian.servicing.settlement_risk",
+        "meridian.servicing.settlement_status",
+        "meridian.servicing.nav",
+        "meridian.wealth.goal_planning",
+        "meridian.insurance.claim_status",
+        "meridian.hr.policy_qa",
+        "meridian.servicing.corporate_actions"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.servicing.cash_management",
+          "name": "Asset Servicing Cash Management",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.44915407896000004
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_risk",
+          "name": "Asset Servicing Settlement Risk Analysis",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.442471146584
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_status",
+          "name": "Asset Servicing Settlement Status",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.415525138378
+        },
+        {
+          "agent_id": "meridian.servicing.nav",
+          "name": "Asset Servicing NAV",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.35548430681200005
+        },
+        {
+          "agent_id": "meridian.wealth.goal_planning",
+          "name": "Wealth Goal Planning",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.33218240737899996
+        },
+        {
+          "agent_id": "meridian.insurance.claim_status",
+          "name": "Insurance Claim Status",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.32231271266899997
+        },
+        {
+          "agent_id": "meridian.hr.policy_qa",
+          "name": "HR Policy Q&A",
+          "protocol": "http",
+          "domain": "hr",
+          "score": 0.31923812627799997
+        },
+        {
+          "agent_id": "meridian.servicing.corporate_actions",
+          "name": "Asset Servicing Corporate Actions",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.313630342484
+        }
+      ]
+    },
+    {
+      "id": "canonical_servicing_custody_positions",
+      "category": "canonical",
+      "persona": "ops_analyst_singh",
+      "query": "Break down REL-00188's assets by custody location.",
+      "expected_goal": "meridian.servicing.custody_positions",
+      "shape": "flat",
+      "picked_goal": "meridian.servicing.custody_positions",
+      "correct": true,
+      "expected_domain": "asset-servicing",
+      "picked_domain": "asset-servicing",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.5904250741,
+      "selected_agent_ids": [
+        "meridian.servicing.custody_positions",
+        "meridian.servicing.settlement_status",
+        "meridian.servicing.settlement_risk"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.servicing.custody_positions",
+          "name": "Asset Servicing Custody Positions",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.5904250741
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_status",
+          "name": "Asset Servicing Settlement Status",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.47375595569600004
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_risk",
+          "name": "Asset Servicing Settlement Risk Analysis",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.460751533508
+        }
+      ]
+    },
+    {
+      "id": "canonical_servicing_nav",
+      "category": "canonical",
+      "persona": "ops_analyst_singh",
+      "query": "Give me the latest fund valuation for FUND-ALPHA.",
+      "expected_goal": "meridian.servicing.nav",
+      "shape": "flat",
+      "picked_goal": "meridian.servicing.nav",
+      "correct": true,
+      "expected_domain": "asset-servicing",
+      "picked_domain": "asset-servicing",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.5457704663280001,
+      "selected_agent_ids": [
+        "meridian.servicing.nav",
+        "meridian.wealth.holdings",
+        "meridian.wealth.market_research",
+        "meridian.wealth.goal_planning",
+        "meridian.servicing.cash_management",
+        "meridian.wealth.concentration",
+        "meridian.servicing.corporate_actions",
+        "meridian.servicing.settlement_risk",
+        "meridian.wealth.risk_profile",
+        "meridian.wealth.performance"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.servicing.nav",
+          "name": "Asset Servicing NAV",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.5457704663280001
+        },
+        {
+          "agent_id": "meridian.wealth.holdings",
+          "name": "Wealth Holdings",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.416939616203
+        },
+        {
+          "agent_id": "meridian.wealth.market_research",
+          "name": "Wealth Market Research",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.39525616169
+        },
+        {
+          "agent_id": "meridian.wealth.goal_planning",
+          "name": "Wealth Goal Planning",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.383020877838
+        },
+        {
+          "agent_id": "meridian.servicing.cash_management",
+          "name": "Asset Servicing Cash Management",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.38052260875699995
+        },
+        {
+          "agent_id": "meridian.wealth.concentration",
+          "name": "Wealth Concentration Analysis",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.37996160984000005
+        },
+        {
+          "agent_id": "meridian.servicing.corporate_actions",
+          "name": "Asset Servicing Corporate Actions",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.350437283516
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_risk",
+          "name": "Asset Servicing Settlement Risk Analysis",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.33981060981800004
+        },
+        {
+          "agent_id": "meridian.wealth.risk_profile",
+          "name": "Wealth Risk Profile",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.33837664127300005
+        },
+        {
+          "agent_id": "meridian.wealth.performance",
+          "name": "Wealth Performance",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.33604115247699995
+        }
+      ]
+    },
+    {
+      "id": "canonical_servicing_corporate_actions",
+      "category": "canonical",
+      "persona": "ops_analyst_singh",
+      "query": "What dividend, split, or election events are pending on the servicing book?",
+      "expected_goal": "meridian.servicing.corporate_actions",
+      "shape": "flat",
+      "picked_goal": "meridian.servicing.corporate_actions",
+      "correct": true,
+      "expected_domain": "asset-servicing",
+      "picked_domain": "asset-servicing",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.614694476128,
+      "selected_agent_ids": [
+        "meridian.servicing.corporate_actions"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.servicing.corporate_actions",
+          "name": "Asset Servicing Corporate Actions",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.614694476128
+        }
+      ]
+    },
+    {
+      "id": "canonical_servicing_settlement_risk",
+      "category": "canonical",
+      "persona": "ops_analyst_singh",
+      "query": "What is the settlement risk for REL-00188 (Okafor)?",
+      "expected_goal": "meridian.servicing.settlement_risk",
+      "shape": "analytics",
+      "picked_goal": "meridian.servicing.settlement_risk",
+      "correct": true,
+      "expected_domain": "asset-servicing",
+      "picked_domain": "asset-servicing",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.600842654705,
+      "selected_agent_ids": [
+        "meridian.servicing.settlement_risk",
+        "meridian.servicing.settlement_status",
+        "meridian.insurance.renewal_risk"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.servicing.settlement_risk",
+          "name": "Asset Servicing Settlement Risk Analysis",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.600842654705
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_status",
+          "name": "Asset Servicing Settlement Status",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.530929923058
+        },
+        {
+          "agent_id": "meridian.insurance.renewal_risk",
+          "name": "Insurance Renewal Risk Analysis",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.453411519527
+        }
+      ]
+    },
+    {
+      "id": "canonical_servicing_trade_penalty",
+      "category": "canonical",
+      "persona": "ops_analyst_singh",
+      "query": "Itemize penalty aging for each failed trade row on REL-00188.",
+      "expected_goal": "meridian.servicing.trade_penalty",
+      "shape": "analytics",
+      "picked_goal": "meridian.servicing.trade_penalty",
+      "correct": true,
+      "expected_domain": "asset-servicing",
+      "picked_domain": "asset-servicing",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.695875763893,
+      "selected_agent_ids": [
+        "meridian.servicing.trade_penalty"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.servicing.trade_penalty",
+          "name": "Asset Servicing Failed Trade Penalty",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.695875763893
+        }
+      ]
+    },
+    {
+      "id": "held_out_wealth_holdings",
+      "category": "held_out",
+      "persona": "rm_jane",
+      "query": "What securities and asset classes make up the Calderon Trust portfolio?",
+      "expected_goal": "meridian.wealth.holdings",
+      "note": "Held-out paraphrase; not a manifest example.",
+      "shape": "flat",
+      "picked_goal": "meridian.wealth.holdings",
+      "correct": true,
+      "expected_domain": "wealth-management",
+      "picked_domain": "wealth-management",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.401975154877,
+      "selected_agent_ids": [
+        "meridian.wealth.holdings",
+        "meridian.servicing.custody_positions",
+        "meridian.wealth.concentration",
+        "meridian.wealth.concentration_review",
+        "meridian.wealth.risk_profile",
+        "meridian.wealth.performance",
+        "meridian.servicing.nav",
+        "meridian.wealth.market_research"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.wealth.holdings",
+          "name": "Wealth Holdings",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.401975154877
+        },
+        {
+          "agent_id": "meridian.servicing.custody_positions",
+          "name": "Asset Servicing Custody Positions",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.414372205734
+        },
+        {
+          "agent_id": "meridian.wealth.concentration",
+          "name": "Wealth Concentration Analysis",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.367928028107
+        },
+        {
+          "agent_id": "meridian.wealth.concentration_review",
+          "name": "Wealth Concentration Review Flag",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.36305630207100004
+        },
+        {
+          "agent_id": "meridian.wealth.risk_profile",
+          "name": "Wealth Risk Profile",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.360626339912
+        },
+        {
+          "agent_id": "meridian.wealth.performance",
+          "name": "Wealth Performance",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.34548544883700005
+        },
+        {
+          "agent_id": "meridian.servicing.nav",
+          "name": "Asset Servicing NAV",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.335884928703
+        },
+        {
+          "agent_id": "meridian.wealth.market_research",
+          "name": "Wealth Market Research",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.324530899525
+        }
+      ]
+    },
+    {
+      "id": "held_out_wealth_performance",
+      "category": "held_out",
+      "persona": "rm_jane",
+      "query": "Calculate the recent investment return for the Calderon Trust wealth portfolio.",
+      "expected_goal": "meridian.wealth.performance",
+      "note": "Held-out paraphrase; not a manifest example.",
+      "shape": "flat",
+      "picked_goal": "meridian.wealth.performance",
+      "correct": true,
+      "expected_domain": "wealth-management",
+      "picked_domain": "wealth-management",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.43776965141299995,
+      "selected_agent_ids": [
+        "meridian.wealth.performance",
+        "meridian.wealth.concentration",
+        "meridian.servicing.nav",
+        "meridian.wealth.holdings",
+        "meridian.servicing.cash_management",
+        "meridian.wealth.risk_profile"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.wealth.performance",
+          "name": "Wealth Performance",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.43776965141299995
+        },
+        {
+          "agent_id": "meridian.wealth.concentration",
+          "name": "Wealth Concentration Analysis",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.437791407108
+        },
+        {
+          "agent_id": "meridian.servicing.nav",
+          "name": "Asset Servicing NAV",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.43078005313900003
+        },
+        {
+          "agent_id": "meridian.wealth.holdings",
+          "name": "Wealth Holdings",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.42642962932600004
+        },
+        {
+          "agent_id": "meridian.servicing.cash_management",
+          "name": "Asset Servicing Cash Management",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.386342406273
+        },
+        {
+          "agent_id": "meridian.wealth.risk_profile",
+          "name": "Wealth Risk Profile",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.36382436752299996
+        }
+      ]
+    },
+    {
+      "id": "held_out_wealth_risk_profile",
+      "category": "held_out",
+      "persona": "rm_jane",
+      "query": "Show Calderon's wealth risk tolerance rating and exposure profile.",
+      "expected_goal": "meridian.wealth.risk_profile",
+      "note": "Held-out paraphrase; not a manifest example.",
+      "shape": "flat",
+      "picked_goal": "abstain",
+      "correct": false,
+      "expected_domain": "wealth-management",
+      "picked_domain": null,
+      "domain_correct": false,
+      "fallback": true,
+      "top_score": 0.39758241176599995,
+      "selected_agent_ids": [],
+      "selected": []
+    },
+    {
+      "id": "held_out_wealth_goal_planning",
+      "category": "held_out",
+      "persona": "rm_jane",
+      "query": "Check the funding status of Calderon's financial planning goals.",
+      "expected_goal": "meridian.wealth.goal_planning",
+      "note": "Held-out paraphrase; not a manifest example.",
+      "shape": "flat",
+      "picked_goal": "abstain",
+      "correct": false,
+      "expected_domain": "wealth-management",
+      "picked_domain": null,
+      "domain_correct": false,
+      "fallback": true,
+      "top_score": 0.33299088478100003,
+      "selected_agent_ids": [],
+      "selected": []
+    },
+    {
+      "id": "held_out_wealth_concentration",
+      "category": "held_out",
+      "persona": "rm_jane",
+      "query": "Which Calderon holdings are making single-issuer exposure look stretched?",
+      "expected_goal": "meridian.wealth.concentration",
+      "note": "Held-out paraphrase; not a manifest example.",
+      "shape": "analytics",
+      "picked_goal": "meridian.wealth.concentration",
+      "correct": true,
+      "expected_domain": "wealth-management",
+      "picked_domain": "wealth-management",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.538812160492,
+      "selected_agent_ids": [
+        "meridian.wealth.concentration",
+        "meridian.wealth.holdings",
+        "meridian.servicing.custody_positions",
+        "meridian.wealth.market_research"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.wealth.concentration",
+          "name": "Wealth Concentration Analysis",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.538812160492
+        },
+        {
+          "agent_id": "meridian.wealth.holdings",
+          "name": "Wealth Holdings",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.314267039299
+        },
+        {
+          "agent_id": "meridian.servicing.custody_positions",
+          "name": "Asset Servicing Custody Positions",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.30345475673699995
+        },
+        {
+          "agent_id": "meridian.wealth.market_research",
+          "name": "Wealth Market Research",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.30067551136000004
+        }
+      ]
+    },
+    {
+      "id": "held_out_wealth_concentration_review",
+      "category": "held_out",
+      "persona": "rm_jane",
+      "query": "After the concentration result, should the breach be escalated for review?",
+      "expected_goal": "meridian.wealth.concentration_review",
+      "note": "Held-out paraphrase; not a manifest example.",
+      "shape": "analytics",
+      "picked_goal": "meridian.wealth.concentration_review",
+      "correct": true,
+      "expected_domain": "wealth-management",
+      "picked_domain": "wealth-management",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.647651612759,
+      "selected_agent_ids": [
+        "meridian.wealth.concentration_review",
+        "meridian.wealth.concentration"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.wealth.concentration_review",
+          "name": "Wealth Concentration Review Flag",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.647651612759
+        },
+        {
+          "agent_id": "meridian.wealth.concentration",
+          "name": "Wealth Concentration Analysis",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.5182087421420001
+        }
+      ]
+    },
+    {
+      "id": "held_out_wealth_market_research",
+      "category": "held_out",
+      "persona": "rm_jane",
+      "query": "What is the investment desk's latest view on private credit and rates?",
+      "expected_goal": "meridian.wealth.market_research",
+      "note": "Held-out paraphrase; not a manifest example.",
+      "shape": "flat",
+      "picked_goal": "meridian.wealth.market_research",
+      "correct": true,
+      "expected_domain": "wealth-management",
+      "picked_domain": "wealth-management",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.588172256947,
+      "selected_agent_ids": [
+        "meridian.wealth.market_research",
+        "meridian.servicing.cash_management",
+        "meridian.wealth.holdings"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.wealth.market_research",
+          "name": "Wealth Market Research",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.588172256947
+        },
+        {
+          "agent_id": "meridian.servicing.cash_management",
+          "name": "Asset Servicing Cash Management",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.42971253395099995
+        },
+        {
+          "agent_id": "meridian.wealth.holdings",
+          "name": "Wealth Holdings",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.41642761230500003
+        }
+      ]
+    },
+    {
+      "id": "held_out_hr_policy_qa",
+      "category": "held_out",
+      "persona": "hr_partner_lund",
+      "query": "Can staff use unused vacation later, or does PTO expire?",
+      "expected_goal": "meridian.hr.policy_qa",
+      "note": "Held-out paraphrase; not a manifest example.",
+      "shape": "flat",
+      "picked_goal": "meridian.hr.policy_qa",
+      "correct": true,
+      "expected_domain": "hr",
+      "picked_domain": "hr",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.59170627594,
+      "selected_agent_ids": [
+        "meridian.hr.policy_qa"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.hr.policy_qa",
+          "name": "HR Policy Q&A",
+          "protocol": "http",
+          "domain": "hr",
+          "score": 0.59170627594
+        }
+      ]
+    },
+    {
+      "id": "held_out_insurance_policy_details",
+      "category": "held_out",
+      "persona": "uw_sam",
+      "query": "What coverage, deductible, and premium are recorded for this policy?",
+      "expected_goal": "meridian.insurance.policy_details",
+      "note": "Held-out paraphrase; not a manifest example.",
+      "shape": "flat",
+      "picked_goal": "meridian.insurance.policy_details",
+      "correct": true,
+      "expected_domain": "insurance",
+      "picked_domain": "insurance",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.6867608428,
+      "selected_agent_ids": [
+        "meridian.insurance.policy_details",
+        "meridian.insurance.renewal_risk",
+        "meridian.insurance.claim_status"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.insurance.policy_details",
+          "name": "Insurance Policy Details",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.6867608428
+        },
+        {
+          "agent_id": "meridian.insurance.renewal_risk",
+          "name": "Insurance Renewal Risk Analysis",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.665681421757
+        },
+        {
+          "agent_id": "meridian.insurance.claim_status",
+          "name": "Insurance Claim Status",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.567170977592
+        }
+      ]
+    },
+    {
+      "id": "held_out_insurance_claim_status",
+      "category": "held_out",
+      "persona": "uw_sam",
+      "query": "Show the loss file status and adjuster details for CLM-5501.",
+      "expected_goal": "meridian.insurance.claim_status",
+      "note": "Held-out paraphrase; not a manifest example.",
+      "shape": "flat",
+      "picked_goal": "meridian.insurance.claim_status",
+      "correct": true,
+      "expected_domain": "insurance",
+      "picked_domain": "insurance",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.568978786469,
+      "selected_agent_ids": [
+        "meridian.insurance.claim_status"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.insurance.claim_status",
+          "name": "Insurance Claim Status",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.568978786469
+        }
+      ]
+    },
+    {
+      "id": "held_out_insurance_renewal_risk",
+      "category": "held_out",
+      "persona": "uw_sam",
+      "query": "Do the incurred losses make this account unattractive to renew?",
+      "expected_goal": "meridian.insurance.renewal_risk",
+      "note": "Held-out paraphrase; not a manifest example.",
+      "shape": "analytics",
+      "picked_goal": "meridian.insurance.renewal_risk",
+      "correct": true,
+      "expected_domain": "insurance",
+      "picked_domain": "insurance",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.7227950692180001,
+      "selected_agent_ids": [
+        "meridian.insurance.renewal_risk",
+        "meridian.servicing.corporate_actions"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.insurance.renewal_risk",
+          "name": "Insurance Renewal Risk Analysis",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.7227950692180001
+        },
+        {
+          "agent_id": "meridian.servicing.corporate_actions",
+          "name": "Asset Servicing Corporate Actions",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.47115242481200004
+        }
+      ]
+    },
+    {
+      "id": "held_out_servicing_settlement_status",
+      "category": "held_out",
+      "persona": "ops_analyst_singh",
+      "query": "Are any Okafor trades still waiting to settle or already failed?",
+      "expected_goal": "meridian.servicing.settlement_status",
+      "note": "Held-out paraphrase; not a manifest example.",
+      "shape": "flat",
+      "picked_goal": "meridian.servicing.settlement_status",
+      "correct": true,
+      "expected_domain": "asset-servicing",
+      "picked_domain": "asset-servicing",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.479973435402,
+      "selected_agent_ids": [
+        "meridian.servicing.settlement_status",
+        "meridian.servicing.trade_penalty",
+        "meridian.servicing.settlement_risk"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.servicing.settlement_status",
+          "name": "Asset Servicing Settlement Status",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.479973435402
+        },
+        {
+          "agent_id": "meridian.servicing.trade_penalty",
+          "name": "Asset Servicing Failed Trade Penalty",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.41638439893699997
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_risk",
+          "name": "Asset Servicing Settlement Risk Analysis",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.39999520778700004
+        }
+      ]
+    },
+    {
+      "id": "held_out_servicing_cash_management",
+      "category": "held_out",
+      "persona": "ops_analyst_singh",
+      "query": "How much cash is expected to be available for the Okafor account?",
+      "expected_goal": "meridian.servicing.cash_management",
+      "note": "Held-out paraphrase; not a manifest example.",
+      "shape": "flat",
+      "picked_goal": "meridian.servicing.cash_management",
+      "correct": true,
+      "expected_domain": "asset-servicing",
+      "picked_domain": "asset-servicing",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.5844606161120001,
+      "selected_agent_ids": [
+        "meridian.servicing.cash_management",
+        "meridian.wealth.holdings",
+        "meridian.servicing.settlement_status",
+        "meridian.servicing.settlement_risk",
+        "meridian.hr.policy_qa"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.servicing.cash_management",
+          "name": "Asset Servicing Cash Management",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.5844606161120001
+        },
+        {
+          "agent_id": "meridian.wealth.holdings",
+          "name": "Wealth Holdings",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.44086432457
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_status",
+          "name": "Asset Servicing Settlement Status",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.40111112594599996
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_risk",
+          "name": "Asset Servicing Settlement Risk Analysis",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.392924427986
+        },
+        {
+          "agent_id": "meridian.hr.policy_qa",
+          "name": "HR Policy Q&A",
+          "protocol": "http",
+          "domain": "hr",
+          "score": 0.386140227318
+        }
+      ]
+    },
+    {
+      "id": "held_out_servicing_custody_positions",
+      "category": "held_out",
+      "persona": "ops_analyst_singh",
+      "query": "Where are Okafor's securities held across custodians?",
+      "expected_goal": "meridian.servicing.custody_positions",
+      "note": "Held-out paraphrase; not a manifest example.",
+      "shape": "flat",
+      "picked_goal": "meridian.servicing.custody_positions",
+      "correct": true,
+      "expected_domain": "asset-servicing",
+      "picked_domain": "asset-servicing",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.5690240263940001,
+      "selected_agent_ids": [
+        "meridian.servicing.custody_positions",
+        "meridian.servicing.nav",
+        "meridian.wealth.concentration"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.servicing.custody_positions",
+          "name": "Asset Servicing Custody Positions",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.5690240263940001
+        },
+        {
+          "agent_id": "meridian.servicing.nav",
+          "name": "Asset Servicing NAV",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.377787470818
+        },
+        {
+          "agent_id": "meridian.wealth.concentration",
+          "name": "Wealth Concentration Analysis",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.373675465584
+        }
+      ]
+    },
+    {
+      "id": "held_out_servicing_nav",
+      "category": "held_out",
+      "persona": "ops_analyst_singh",
+      "query": "What is the current valuation number for the alpha fund?",
+      "expected_goal": "meridian.servicing.nav",
+      "note": "Held-out paraphrase; not a manifest example.",
+      "shape": "flat",
+      "picked_goal": "meridian.servicing.nav",
+      "correct": true,
+      "expected_domain": "asset-servicing",
+      "picked_domain": "asset-servicing",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.5174966454509999,
+      "selected_agent_ids": [
+        "meridian.servicing.nav",
+        "meridian.wealth.holdings",
+        "meridian.servicing.cash_management",
+        "meridian.insurance.renewal_risk",
+        "meridian.wealth.goal_planning",
+        "meridian.wealth.concentration",
+        "meridian.servicing.settlement_risk",
+        "meridian.wealth.risk_profile",
+        "meridian.insurance.policy_details"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.servicing.nav",
+          "name": "Asset Servicing NAV",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.5174966454509999
+        },
+        {
+          "agent_id": "meridian.wealth.holdings",
+          "name": "Wealth Holdings",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.437492489815
+        },
+        {
+          "agent_id": "meridian.servicing.cash_management",
+          "name": "Asset Servicing Cash Management",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.372195243835
+        },
+        {
+          "agent_id": "meridian.insurance.renewal_risk",
+          "name": "Insurance Renewal Risk Analysis",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.347133159637
+        },
+        {
+          "agent_id": "meridian.wealth.goal_planning",
+          "name": "Wealth Goal Planning",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.341814696789
+        },
+        {
+          "agent_id": "meridian.wealth.concentration",
+          "name": "Wealth Concentration Analysis",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.33805799484300003
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_risk",
+          "name": "Asset Servicing Settlement Risk Analysis",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.33775210380599996
+        },
+        {
+          "agent_id": "meridian.wealth.risk_profile",
+          "name": "Wealth Risk Profile",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.30108118057300004
+        },
+        {
+          "agent_id": "meridian.insurance.policy_details",
+          "name": "Insurance Policy Details",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.300128221512
+        }
+      ]
+    },
+    {
+      "id": "held_out_servicing_corporate_actions",
+      "category": "held_out",
+      "persona": "ops_analyst_singh",
+      "query": "Are there issuer events requiring a servicing election this week?",
+      "expected_goal": "meridian.servicing.corporate_actions",
+      "note": "Held-out paraphrase; not a manifest example.",
+      "shape": "flat",
+      "picked_goal": "meridian.servicing.corporate_actions",
+      "correct": true,
+      "expected_domain": "asset-servicing",
+      "picked_domain": "asset-servicing",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.48220992088299997,
+      "selected_agent_ids": [
+        "meridian.servicing.corporate_actions"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.servicing.corporate_actions",
+          "name": "Asset Servicing Corporate Actions",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.48220992088299997
+        }
+      ]
+    },
+    {
+      "id": "held_out_servicing_settlement_risk",
+      "category": "held_out",
+      "persona": "ops_analyst_singh",
+      "query": "Could the unsettled Okafor trades create cash penalty exposure or escalation risk?",
+      "expected_goal": "meridian.servicing.settlement_risk",
+      "note": "Held-out paraphrase; not a manifest example.",
+      "shape": "analytics",
+      "picked_goal": "meridian.servicing.settlement_risk",
+      "correct": true,
+      "expected_domain": "asset-servicing",
+      "picked_domain": "asset-servicing",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.528261899948,
+      "selected_agent_ids": [
+        "meridian.servicing.settlement_risk",
+        "meridian.servicing.trade_penalty",
+        "meridian.servicing.settlement_status",
+        "meridian.wealth.market_research",
+        "meridian.wealth.concentration_review",
+        "meridian.wealth.risk_profile"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.servicing.settlement_risk",
+          "name": "Asset Servicing Settlement Risk Analysis",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.528261899948
+        },
+        {
+          "agent_id": "meridian.servicing.trade_penalty",
+          "name": "Asset Servicing Failed Trade Penalty",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.46340596675900003
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_status",
+          "name": "Asset Servicing Settlement Status",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.42524069547700005
+        },
+        {
+          "agent_id": "meridian.wealth.market_research",
+          "name": "Wealth Market Research",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.33235383033800003
+        },
+        {
+          "agent_id": "meridian.wealth.concentration_review",
+          "name": "Wealth Concentration Review Flag",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.32312655448899996
+        },
+        {
+          "agent_id": "meridian.wealth.risk_profile",
+          "name": "Wealth Risk Profile",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.30938398838000003
+        }
+      ]
+    },
+    {
+      "id": "held_out_servicing_trade_penalty",
+      "category": "held_out",
+      "persona": "ops_analyst_singh",
+      "query": "Produce one penalty-aging line for every failed settlement item.",
+      "expected_goal": "meridian.servicing.trade_penalty",
+      "note": "Held-out paraphrase; not a manifest example.",
+      "shape": "analytics",
+      "picked_goal": "meridian.servicing.trade_penalty",
+      "correct": true,
+      "expected_domain": "asset-servicing",
+      "picked_domain": "asset-servicing",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.5354833602910001,
+      "selected_agent_ids": [
+        "meridian.servicing.trade_penalty",
+        "meridian.servicing.settlement_risk",
+        "meridian.servicing.settlement_status",
+        "meridian.insurance.renewal_risk"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.servicing.trade_penalty",
+          "name": "Asset Servicing Failed Trade Penalty",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.5354833602910001
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_risk",
+          "name": "Asset Servicing Settlement Risk Analysis",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.5260586738590001
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_status",
+          "name": "Asset Servicing Settlement Status",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.41123235225699994
+        },
+        {
+          "agent_id": "meridian.insurance.renewal_risk",
+          "name": "Insurance Renewal Risk Analysis",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.34958350658399995
+        }
+      ]
+    },
+    {
+      "id": "near_miss_wealth_holdings",
+      "category": "near_miss",
+      "persona": "rm_jane",
+      "query": "Show the securities currently held by wealth relationship REL-00042.",
+      "expected_goal": "meridian.wealth.holdings",
+      "shape": "flat",
+      "picked_goal": "meridian.wealth.holdings",
+      "correct": true,
+      "expected_domain": "wealth-management",
+      "picked_domain": "wealth-management",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.5690792799,
+      "selected_agent_ids": [
+        "meridian.wealth.holdings",
+        "meridian.wealth.performance",
+        "meridian.wealth.concentration",
+        "meridian.servicing.cash_management",
+        "meridian.servicing.custody_positions",
+        "meridian.servicing.nav",
+        "meridian.servicing.corporate_actions",
+        "meridian.wealth.goal_planning",
+        "meridian.wealth.risk_profile"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.wealth.holdings",
+          "name": "Wealth Holdings",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.5690792799
+        },
+        {
+          "agent_id": "meridian.wealth.performance",
+          "name": "Wealth Performance",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.48815298080400005
+        },
+        {
+          "agent_id": "meridian.wealth.concentration",
+          "name": "Wealth Concentration Analysis",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.47509455680799995
+        },
+        {
+          "agent_id": "meridian.servicing.cash_management",
+          "name": "Asset Servicing Cash Management",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.447745084763
+        },
+        {
+          "agent_id": "meridian.servicing.custody_positions",
+          "name": "Asset Servicing Custody Positions",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.425678491592
+        },
+        {
+          "agent_id": "meridian.servicing.nav",
+          "name": "Asset Servicing NAV",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.42396897077600004
+        },
+        {
+          "agent_id": "meridian.servicing.corporate_actions",
+          "name": "Asset Servicing Corporate Actions",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.398815989494
+        },
+        {
+          "agent_id": "meridian.wealth.goal_planning",
+          "name": "Wealth Goal Planning",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.38095575571100004
+        },
+        {
+          "agent_id": "meridian.wealth.risk_profile",
+          "name": "Wealth Risk Profile",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.37359631061599996
+        }
+      ]
+    },
+    {
+      "id": "near_miss_wealth_performance",
+      "category": "near_miss",
+      "persona": "rm_jane",
+      "query": "What quarterly return did Whitman's managed wealth account produce?",
+      "expected_goal": "meridian.wealth.performance",
+      "shape": "flat",
+      "picked_goal": "meridian.wealth.performance",
+      "correct": true,
+      "expected_domain": "wealth-management",
+      "picked_domain": "wealth-management",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.7149253487589999,
+      "selected_agent_ids": [
+        "meridian.wealth.performance",
+        "meridian.wealth.holdings",
+        "meridian.servicing.cash_management",
+        "meridian.wealth.goal_planning",
+        "meridian.wealth.concentration",
+        "meridian.wealth.risk_profile",
+        "meridian.servicing.corporate_actions",
+        "meridian.servicing.settlement_status",
+        "meridian.wealth.concentration_review"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.wealth.performance",
+          "name": "Wealth Performance",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.7149253487589999
+        },
+        {
+          "agent_id": "meridian.wealth.holdings",
+          "name": "Wealth Holdings",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.694421708584
+        },
+        {
+          "agent_id": "meridian.servicing.cash_management",
+          "name": "Asset Servicing Cash Management",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.682407557964
+        },
+        {
+          "agent_id": "meridian.wealth.goal_planning",
+          "name": "Wealth Goal Planning",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.629396736622
+        },
+        {
+          "agent_id": "meridian.wealth.concentration",
+          "name": "Wealth Concentration Analysis",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.5893583297730001
+        },
+        {
+          "agent_id": "meridian.wealth.risk_profile",
+          "name": "Wealth Risk Profile",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.565915286541
+        },
+        {
+          "agent_id": "meridian.servicing.corporate_actions",
+          "name": "Asset Servicing Corporate Actions",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.544416546822
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_status",
+          "name": "Asset Servicing Settlement Status",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.531312644482
+        },
+        {
+          "agent_id": "meridian.wealth.concentration_review",
+          "name": "Wealth Concentration Review Flag",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.46731007099199995
+        }
+      ]
+    },
+    {
+      "id": "near_miss_wealth_risk_profile",
+      "category": "near_miss",
+      "persona": "rm_jane",
+      "query": "Does the risk exposure line up with what Whitman said they can tolerate?",
+      "expected_goal": "meridian.wealth.risk_profile",
+      "shape": "flat",
+      "picked_goal": "meridian.wealth.risk_profile",
+      "correct": true,
+      "expected_domain": "wealth-management",
+      "picked_domain": "wealth-management",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.808647930622,
+      "selected_agent_ids": [
+        "meridian.wealth.risk_profile",
+        "meridian.servicing.cash_management",
+        "meridian.wealth.concentration",
+        "meridian.servicing.settlement_status",
+        "meridian.wealth.performance",
+        "meridian.wealth.concentration_review"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.wealth.risk_profile",
+          "name": "Wealth Risk Profile",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.808647930622
+        },
+        {
+          "agent_id": "meridian.servicing.cash_management",
+          "name": "Asset Servicing Cash Management",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.615447759628
+        },
+        {
+          "agent_id": "meridian.wealth.concentration",
+          "name": "Wealth Concentration Analysis",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.608002305031
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_status",
+          "name": "Asset Servicing Settlement Status",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.5693287253379999
+        },
+        {
+          "agent_id": "meridian.wealth.performance",
+          "name": "Wealth Performance",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.552280306816
+        },
+        {
+          "agent_id": "meridian.wealth.concentration_review",
+          "name": "Wealth Concentration Review Flag",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.531800329685
+        }
+      ]
+    },
+    {
+      "id": "near_miss_wealth_goal_planning",
+      "category": "near_miss",
+      "persona": "rm_jane",
+      "query": "Are REL-00042's financial goal funding targets still achievable?",
+      "expected_goal": "meridian.wealth.goal_planning",
+      "shape": "flat",
+      "picked_goal": "meridian.wealth.goal_planning",
+      "correct": true,
+      "expected_domain": "wealth-management",
+      "picked_domain": "wealth-management",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.46743786335000004,
+      "selected_agent_ids": [
+        "meridian.wealth.goal_planning",
+        "meridian.servicing.settlement_risk",
+        "meridian.insurance.renewal_risk",
+        "meridian.insurance.claim_status",
+        "meridian.hr.policy_qa",
+        "meridian.servicing.nav",
+        "meridian.servicing.cash_management"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.wealth.goal_planning",
+          "name": "Wealth Goal Planning",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.46743786335000004
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_risk",
+          "name": "Asset Servicing Settlement Risk Analysis",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.414261460304
+        },
+        {
+          "agent_id": "meridian.insurance.renewal_risk",
+          "name": "Insurance Renewal Risk Analysis",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.391371369362
+        },
+        {
+          "agent_id": "meridian.insurance.claim_status",
+          "name": "Insurance Claim Status",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.351701498032
+        },
+        {
+          "agent_id": "meridian.hr.policy_qa",
+          "name": "HR Policy Q&A",
+          "protocol": "http",
+          "domain": "hr",
+          "score": 0.34694015979799997
+        },
+        {
+          "agent_id": "meridian.servicing.nav",
+          "name": "Asset Servicing NAV",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.33977544307700003
+        },
+        {
+          "agent_id": "meridian.servicing.cash_management",
+          "name": "Asset Servicing Cash Management",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.32923394441599996
+        }
+      ]
+    },
+    {
+      "id": "near_miss_wealth_concentration",
+      "category": "near_miss",
+      "persona": "rm_jane",
+      "query": "Find any oversized single-name exposure in Whitman's portfolio.",
+      "expected_goal": "meridian.wealth.concentration",
+      "shape": "analytics",
+      "picked_goal": "meridian.wealth.concentration",
+      "correct": true,
+      "expected_domain": "wealth-management",
+      "picked_domain": "wealth-management",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.58281826973,
+      "selected_agent_ids": [
+        "meridian.wealth.concentration",
+        "meridian.wealth.performance",
+        "meridian.wealth.holdings",
+        "meridian.wealth.risk_profile",
+        "meridian.servicing.cash_management",
+        "meridian.wealth.concentration_review",
+        "meridian.wealth.goal_planning",
+        "meridian.servicing.settlement_status",
+        "meridian.servicing.corporate_actions"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.wealth.concentration",
+          "name": "Wealth Concentration Analysis",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.58281826973
+        },
+        {
+          "agent_id": "meridian.wealth.performance",
+          "name": "Wealth Performance",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.695190191269
+        },
+        {
+          "agent_id": "meridian.wealth.holdings",
+          "name": "Wealth Holdings",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.634156405926
+        },
+        {
+          "agent_id": "meridian.wealth.risk_profile",
+          "name": "Wealth Risk Profile",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.618251919746
+        },
+        {
+          "agent_id": "meridian.servicing.cash_management",
+          "name": "Asset Servicing Cash Management",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.581764221191
+        },
+        {
+          "agent_id": "meridian.wealth.concentration_review",
+          "name": "Wealth Concentration Review Flag",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.5277001261709999
+        },
+        {
+          "agent_id": "meridian.wealth.goal_planning",
+          "name": "Wealth Goal Planning",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.516816616058
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_status",
+          "name": "Asset Servicing Settlement Status",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.514795660973
+        },
+        {
+          "agent_id": "meridian.servicing.corporate_actions",
+          "name": "Asset Servicing Corporate Actions",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.476428389549
+        }
+      ]
+    },
+    {
+      "id": "near_miss_wealth_concentration_review",
+      "category": "near_miss",
+      "persona": "rm_jane",
+      "query": "If concentration breaches exist, surface the review indicator.",
+      "expected_goal": "meridian.wealth.concentration_review",
+      "shape": "analytics",
+      "picked_goal": "meridian.wealth.concentration_review",
+      "correct": true,
+      "expected_domain": "wealth-management",
+      "picked_domain": "wealth-management",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.654191613197,
+      "selected_agent_ids": [
+        "meridian.wealth.concentration_review",
+        "meridian.wealth.concentration",
+        "meridian.wealth.risk_profile"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.wealth.concentration_review",
+          "name": "Wealth Concentration Review Flag",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.654191613197
+        },
+        {
+          "agent_id": "meridian.wealth.concentration",
+          "name": "Wealth Concentration Analysis",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.5171647667879999
+        },
+        {
+          "agent_id": "meridian.wealth.risk_profile",
+          "name": "Wealth Risk Profile",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.455746471882
+        }
+      ]
+    },
+    {
+      "id": "near_miss_wealth_market_research",
+      "category": "near_miss",
+      "persona": "rm_jane",
+      "query": "What are the firm's latest thoughts on equities and alternatives?",
+      "expected_goal": "meridian.wealth.market_research",
+      "shape": "flat",
+      "picked_goal": "meridian.wealth.market_research",
+      "correct": true,
+      "expected_domain": "wealth-management",
+      "picked_domain": "wealth-management",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.648169159889,
+      "selected_agent_ids": [
+        "meridian.wealth.market_research",
+        "meridian.servicing.corporate_actions"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.wealth.market_research",
+          "name": "Wealth Market Research",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.648169159889
+        },
+        {
+          "agent_id": "meridian.servicing.corporate_actions",
+          "name": "Asset Servicing Corporate Actions",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.43121844530099995
+        }
+      ]
+    },
+    {
+      "id": "near_miss_hr_policy_qa",
+      "category": "near_miss",
+      "persona": "hr_partner_lund",
+      "query": "Explain the company's learning reimbursement policy.",
+      "expected_goal": "meridian.hr.policy_qa",
+      "shape": "flat",
+      "picked_goal": "meridian.hr.policy_qa",
+      "correct": true,
+      "expected_domain": "hr",
+      "picked_domain": "hr",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.540508031845,
+      "selected_agent_ids": [
+        "meridian.hr.policy_qa",
+        "meridian.insurance.policy_details",
+        "meridian.insurance.renewal_risk",
+        "meridian.insurance.claim_status",
+        "meridian.servicing.corporate_actions",
+        "meridian.servicing.settlement_risk",
+        "meridian.wealth.concentration_review"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.hr.policy_qa",
+          "name": "HR Policy Q&A",
+          "protocol": "http",
+          "domain": "hr",
+          "score": 0.540508031845
+        },
+        {
+          "agent_id": "meridian.insurance.policy_details",
+          "name": "Insurance Policy Details",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.503865242004
+        },
+        {
+          "agent_id": "meridian.insurance.renewal_risk",
+          "name": "Insurance Renewal Risk Analysis",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.476061761379
+        },
+        {
+          "agent_id": "meridian.insurance.claim_status",
+          "name": "Insurance Claim Status",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.432696938515
+        },
+        {
+          "agent_id": "meridian.servicing.corporate_actions",
+          "name": "Asset Servicing Corporate Actions",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.359706521034
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_risk",
+          "name": "Asset Servicing Settlement Risk Analysis",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.325522065163
+        },
+        {
+          "agent_id": "meridian.wealth.concentration_review",
+          "name": "Wealth Concentration Review Flag",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.31188309192700003
+        }
+      ]
+    },
+    {
+      "id": "near_miss_insurance_policy_details",
+      "category": "near_miss",
+      "persona": "uw_sam",
+      "query": "Is POL-77001 active and what line of business is it?",
+      "expected_goal": "meridian.insurance.policy_details",
+      "shape": "flat",
+      "picked_goal": "meridian.insurance.policy_details",
+      "correct": true,
+      "expected_domain": "insurance",
+      "picked_domain": "insurance",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.684673309326,
+      "selected_agent_ids": [
+        "meridian.insurance.policy_details"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.insurance.policy_details",
+          "name": "Insurance Policy Details",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.684673309326
+        }
+      ]
+    },
+    {
+      "id": "near_miss_insurance_claim_status",
+      "category": "near_miss",
+      "persona": "uw_sam",
+      "query": "Who is handling the open claim and how much is reserved?",
+      "expected_goal": "meridian.insurance.claim_status",
+      "shape": "flat",
+      "picked_goal": "meridian.insurance.claim_status",
+      "correct": true,
+      "expected_domain": "insurance",
+      "picked_domain": "insurance",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.6363174915309999,
+      "selected_agent_ids": [
+        "meridian.insurance.claim_status",
+        "meridian.insurance.renewal_risk"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.insurance.claim_status",
+          "name": "Insurance Claim Status",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.6363174915309999
+        },
+        {
+          "agent_id": "meridian.insurance.renewal_risk",
+          "name": "Insurance Renewal Risk Analysis",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.610979259014
+        }
+      ]
+    },
+    {
+      "id": "near_miss_insurance_renewal_risk",
+      "category": "near_miss",
+      "persona": "uw_sam",
+      "query": "Do open losses change the renewal posture for Continental Freight?",
+      "expected_goal": "meridian.insurance.renewal_risk",
+      "shape": "analytics",
+      "picked_goal": "meridian.insurance.renewal_risk",
+      "correct": true,
+      "expected_domain": "insurance",
+      "picked_domain": "insurance",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.608447432518,
+      "selected_agent_ids": [
+        "meridian.insurance.renewal_risk",
+        "meridian.insurance.claim_status",
+        "meridian.insurance.policy_details"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.insurance.renewal_risk",
+          "name": "Insurance Renewal Risk Analysis",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.608447432518
+        },
+        {
+          "agent_id": "meridian.insurance.claim_status",
+          "name": "Insurance Claim Status",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.467721223831
+        },
+        {
+          "agent_id": "meridian.insurance.policy_details",
+          "name": "Insurance Policy Details",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.45970207452800005
+        }
+      ]
+    },
+    {
+      "id": "near_miss_servicing_settlement_status",
+      "category": "near_miss",
+      "persona": "ops_analyst_singh",
+      "query": "What pending trades have not settled for the Okafor relationship?",
+      "expected_goal": "meridian.servicing.settlement_status",
+      "shape": "flat",
+      "picked_goal": "meridian.servicing.settlement_status",
+      "correct": true,
+      "expected_domain": "asset-servicing",
+      "picked_domain": "asset-servicing",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.6087104678149999,
+      "selected_agent_ids": [
+        "meridian.servicing.settlement_status"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.servicing.settlement_status",
+          "name": "Asset Servicing Settlement Status",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.6087104678149999
+        }
+      ]
+    },
+    {
+      "id": "near_miss_servicing_cash_management",
+      "category": "near_miss",
+      "persona": "ops_analyst_singh",
+      "query": "Review liquidity across settlement cash accounts for REL-00188.",
+      "expected_goal": "meridian.servicing.cash_management",
+      "shape": "flat",
+      "picked_goal": "meridian.servicing.cash_management",
+      "correct": true,
+      "expected_domain": "asset-servicing",
+      "picked_domain": "asset-servicing",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.410186171532,
+      "selected_agent_ids": [
+        "meridian.servicing.cash_management",
+        "meridian.servicing.settlement_risk",
+        "meridian.servicing.settlement_status",
+        "meridian.wealth.concentration_review",
+        "meridian.servicing.nav",
+        "meridian.insurance.renewal_risk"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.servicing.cash_management",
+          "name": "Asset Servicing Cash Management",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.410186171532
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_risk",
+          "name": "Asset Servicing Settlement Risk Analysis",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.512783050537
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_status",
+          "name": "Asset Servicing Settlement Status",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.46644687652600003
+        },
+        {
+          "agent_id": "meridian.wealth.concentration_review",
+          "name": "Wealth Concentration Review Flag",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.37870359420800004
+        },
+        {
+          "agent_id": "meridian.servicing.nav",
+          "name": "Asset Servicing NAV",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.35109108686400003
+        },
+        {
+          "agent_id": "meridian.insurance.renewal_risk",
+          "name": "Insurance Renewal Risk Analysis",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.34188079833999996
+        }
+      ]
+    },
+    {
+      "id": "near_miss_servicing_custody_positions",
+      "category": "near_miss",
+      "persona": "ops_analyst_singh",
+      "query": "Show custody-side holdings rather than wealth portfolio holdings for Okafor.",
+      "expected_goal": "meridian.servicing.custody_positions",
+      "shape": "flat",
+      "picked_goal": "meridian.servicing.custody_positions",
+      "correct": true,
+      "expected_domain": "asset-servicing",
+      "picked_domain": "asset-servicing",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.6275013089179999,
+      "selected_agent_ids": [
+        "meridian.servicing.custody_positions",
+        "meridian.wealth.holdings",
+        "meridian.servicing.settlement_risk",
+        "meridian.servicing.settlement_status",
+        "meridian.wealth.concentration"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.servicing.custody_positions",
+          "name": "Asset Servicing Custody Positions",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.6275013089179999
+        },
+        {
+          "agent_id": "meridian.wealth.holdings",
+          "name": "Wealth Holdings",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.483806014061
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_risk",
+          "name": "Asset Servicing Settlement Risk Analysis",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.477625310421
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_status",
+          "name": "Asset Servicing Settlement Status",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.47344362735699996
+        },
+        {
+          "agent_id": "meridian.wealth.concentration",
+          "name": "Wealth Concentration Analysis",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.426943540573
+        }
+      ]
+    },
+    {
+      "id": "near_miss_servicing_nav",
+      "category": "near_miss",
+      "persona": "ops_analyst_singh",
+      "query": "I need the net asset value for the named fund, not a client relationship.",
+      "expected_goal": "meridian.servicing.nav",
+      "shape": "flat",
+      "picked_goal": "meridian.servicing.nav",
+      "correct": true,
+      "expected_domain": "asset-servicing",
+      "picked_domain": "asset-servicing",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.762527704239,
+      "selected_agent_ids": [
+        "meridian.servicing.nav"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.servicing.nav",
+          "name": "Asset Servicing NAV",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.762527704239
+        }
+      ]
+    },
+    {
+      "id": "near_miss_servicing_corporate_actions",
+      "category": "near_miss",
+      "persona": "ops_analyst_singh",
+      "query": "Check for dividend elections or split activity pending in servicing.",
+      "expected_goal": "meridian.servicing.corporate_actions",
+      "shape": "flat",
+      "picked_goal": "meridian.servicing.corporate_actions",
+      "correct": true,
+      "expected_domain": "asset-servicing",
+      "picked_domain": "asset-servicing",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.561870396137,
+      "selected_agent_ids": [
+        "meridian.servicing.corporate_actions"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.servicing.corporate_actions",
+          "name": "Asset Servicing Corporate Actions",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.561870396137
+        }
+      ]
+    },
+    {
+      "id": "near_miss_servicing_settlement_risk",
+      "category": "near_miss",
+      "persona": "ops_analyst_singh",
+      "query": "Are failed settlements likely to cause operating exposure for REL-00188?",
+      "expected_goal": "meridian.servicing.settlement_risk",
+      "shape": "analytics",
+      "picked_goal": "meridian.servicing.settlement_risk",
+      "correct": true,
+      "expected_domain": "asset-servicing",
+      "picked_domain": "asset-servicing",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.472557246685,
+      "selected_agent_ids": [
+        "meridian.servicing.settlement_risk",
+        "meridian.servicing.settlement_status",
+        "meridian.insurance.renewal_risk"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.servicing.settlement_risk",
+          "name": "Asset Servicing Settlement Risk Analysis",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.472557246685
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_status",
+          "name": "Asset Servicing Settlement Status",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.43558847904200004
+        },
+        {
+          "agent_id": "meridian.insurance.renewal_risk",
+          "name": "Insurance Renewal Risk Analysis",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.367579460144
+        }
+      ]
+    },
+    {
+      "id": "near_miss_servicing_trade_penalty",
+      "category": "near_miss",
+      "persona": "ops_analyst_singh",
+      "query": "Return trade id, age, and cash penalty for each failed trade separately.",
+      "expected_goal": "meridian.servicing.trade_penalty",
+      "shape": "analytics",
+      "picked_goal": "meridian.servicing.trade_penalty",
+      "correct": true,
+      "expected_domain": "asset-servicing",
+      "picked_domain": "asset-servicing",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.813689947128,
+      "selected_agent_ids": [
+        "meridian.servicing.trade_penalty"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.servicing.trade_penalty",
+          "name": "Asset Servicing Failed Trade Penalty",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.813689947128
+        }
+      ]
+    },
+    {
+      "id": "confuser_wealth_concentration_vs_servicing_risk",
+      "category": "cross_agent_confuser",
+      "persona": "rm_jane",
+      "query": "Show portfolio concentration risk, not settlement risk, for Whitman.",
+      "expected_goal": "meridian.wealth.concentration",
+      "shape": "analytics",
+      "picked_goal": "meridian.wealth.concentration_review",
+      "correct": false,
+      "expected_domain": "wealth-management",
+      "picked_domain": "wealth-management",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.719142735004,
+      "selected_agent_ids": [
+        "meridian.wealth.risk_profile",
+        "meridian.wealth.performance",
+        "meridian.servicing.cash_management",
+        "meridian.wealth.holdings",
+        "meridian.servicing.settlement_status",
+        "meridian.wealth.concentration_review",
+        "meridian.wealth.concentration",
+        "meridian.wealth.goal_planning"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.wealth.risk_profile",
+          "name": "Wealth Risk Profile",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.719142735004
+        },
+        {
+          "agent_id": "meridian.wealth.performance",
+          "name": "Wealth Performance",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.7333598136899999
+        },
+        {
+          "agent_id": "meridian.servicing.cash_management",
+          "name": "Asset Servicing Cash Management",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.654036521912
+        },
+        {
+          "agent_id": "meridian.wealth.holdings",
+          "name": "Wealth Holdings",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.6162858605379999
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_status",
+          "name": "Asset Servicing Settlement Status",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.59095197916
+        },
+        {
+          "agent_id": "meridian.wealth.concentration_review",
+          "name": "Wealth Concentration Review Flag",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.590005993843
+        },
+        {
+          "agent_id": "meridian.wealth.concentration",
+          "name": "Wealth Concentration Analysis",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.584683597088
+        },
+        {
+          "agent_id": "meridian.wealth.goal_planning",
+          "name": "Wealth Goal Planning",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.502529323101
+        }
+      ]
+    },
+    {
+      "id": "confuser_servicing_risk_vs_trade_penalty",
+      "category": "cross_agent_confuser",
+      "persona": "ops_analyst_singh",
+      "query": "I need overall settlement risk, not row-by-row failed-trade penalties, for REL-00188.",
+      "expected_goal": "meridian.servicing.settlement_risk",
+      "shape": "analytics",
+      "picked_goal": "meridian.servicing.settlement_risk",
+      "correct": true,
+      "expected_domain": "asset-servicing",
+      "picked_domain": "asset-servicing",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.484243273735,
+      "selected_agent_ids": [
+        "meridian.servicing.settlement_risk",
+        "meridian.servicing.trade_penalty",
+        "meridian.servicing.settlement_status",
+        "meridian.insurance.claim_status"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.servicing.settlement_risk",
+          "name": "Asset Servicing Settlement Risk Analysis",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.484243273735
+        },
+        {
+          "agent_id": "meridian.servicing.trade_penalty",
+          "name": "Asset Servicing Failed Trade Penalty",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.612467586994
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_status",
+          "name": "Asset Servicing Settlement Status",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.502169787884
+        },
+        {
+          "agent_id": "meridian.insurance.claim_status",
+          "name": "Insurance Claim Status",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.369612812996
+        }
+      ]
+    },
+    {
+      "id": "confuser_trade_penalty_vs_settlement_risk",
+      "category": "cross_agent_confuser",
+      "persona": "ops_analyst_singh",
+      "query": "Itemize per-failed-trade penalties, not a relationship-level settlement risk summary.",
+      "expected_goal": "meridian.servicing.trade_penalty",
+      "shape": "analytics",
+      "picked_goal": "meridian.servicing.trade_penalty",
+      "correct": true,
+      "expected_domain": "asset-servicing",
+      "picked_domain": "asset-servicing",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.771270871162,
+      "selected_agent_ids": [
+        "meridian.servicing.trade_penalty",
+        "meridian.servicing.settlement_status",
+        "meridian.servicing.settlement_risk"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.servicing.trade_penalty",
+          "name": "Asset Servicing Failed Trade Penalty",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.771270871162
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_status",
+          "name": "Asset Servicing Settlement Status",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.5852003097530001
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_risk",
+          "name": "Asset Servicing Settlement Risk Analysis",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.566543757915
+        }
+      ]
+    },
+    {
+      "id": "confuser_servicing_status_vs_trade_penalty",
+      "category": "cross_agent_confuser",
+      "persona": "ops_analyst_singh",
+      "query": "List pending and failed settlements only; do not calculate per-trade penalties.",
+      "expected_goal": "meridian.servicing.settlement_status",
+      "shape": "flat",
+      "picked_goal": "meridian.servicing.settlement_status",
+      "correct": true,
+      "expected_domain": "asset-servicing",
+      "picked_domain": "asset-servicing",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.598912119865,
+      "selected_agent_ids": [
+        "meridian.servicing.settlement_status",
+        "meridian.servicing.trade_penalty",
+        "meridian.servicing.settlement_risk",
+        "meridian.insurance.claim_status"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.servicing.settlement_status",
+          "name": "Asset Servicing Settlement Status",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.598912119865
+        },
+        {
+          "agent_id": "meridian.servicing.trade_penalty",
+          "name": "Asset Servicing Failed Trade Penalty",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.7215501070020001
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_risk",
+          "name": "Asset Servicing Settlement Risk Analysis",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.5057848095890001
+        },
+        {
+          "agent_id": "meridian.insurance.claim_status",
+          "name": "Insurance Claim Status",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.410146653652
+        }
+      ]
+    },
+    {
+      "id": "confuser_wealth_holdings_vs_custody",
+      "category": "cross_agent_confuser",
+      "persona": "rm_jane",
+      "query": "I want wealth portfolio holdings, not custody-location records, for Whitman.",
+      "expected_goal": "meridian.wealth.holdings",
+      "shape": "flat",
+      "picked_goal": "meridian.wealth.holdings",
+      "correct": true,
+      "expected_domain": "wealth-management",
+      "picked_domain": "wealth-management",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.674690723419,
+      "selected_agent_ids": [
+        "meridian.wealth.holdings",
+        "meridian.wealth.performance",
+        "meridian.servicing.custody_positions",
+        "meridian.servicing.settlement_status"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.wealth.holdings",
+          "name": "Wealth Holdings",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.674690723419
+        },
+        {
+          "agent_id": "meridian.wealth.performance",
+          "name": "Wealth Performance",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.5329097509380001
+        },
+        {
+          "agent_id": "meridian.servicing.custody_positions",
+          "name": "Asset Servicing Custody Positions",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.47706937789899995
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_status",
+          "name": "Asset Servicing Settlement Status",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.472492575645
+        }
+      ]
+    },
+    {
+      "id": "confuser_custody_vs_wealth_holdings",
+      "category": "cross_agent_confuser",
+      "persona": "ops_analyst_singh",
+      "query": "I want custody-location positions, not wealth portfolio allocation, for REL-00188.",
+      "expected_goal": "meridian.servicing.custody_positions",
+      "shape": "flat",
+      "picked_goal": "meridian.servicing.custody_positions",
+      "correct": true,
+      "expected_domain": "asset-servicing",
+      "picked_domain": "asset-servicing",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.655192732811,
+      "selected_agent_ids": [
+        "meridian.servicing.custody_positions",
+        "meridian.servicing.settlement_status",
+        "meridian.wealth.holdings"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.servicing.custody_positions",
+          "name": "Asset Servicing Custody Positions",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.655192732811
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_status",
+          "name": "Asset Servicing Settlement Status",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.450982391834
+        },
+        {
+          "agent_id": "meridian.wealth.holdings",
+          "name": "Wealth Holdings",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.44318664073900005
+        }
+      ]
+    },
+    {
+      "id": "confuser_policy_details_vs_renewal",
+      "category": "cross_agent_confuser",
+      "persona": "uw_sam",
+      "query": "Show policy terms and limits, not renewal risk, for POL-77001.",
+      "expected_goal": "meridian.insurance.policy_details",
+      "shape": "flat",
+      "picked_goal": "meridian.insurance.policy_details",
+      "correct": true,
+      "expected_domain": "insurance",
+      "picked_domain": "insurance",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.5747588276860001,
+      "selected_agent_ids": [
+        "meridian.insurance.policy_details",
+        "meridian.insurance.renewal_risk",
+        "meridian.insurance.claim_status"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.insurance.policy_details",
+          "name": "Insurance Policy Details",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.5747588276860001
+        },
+        {
+          "agent_id": "meridian.insurance.renewal_risk",
+          "name": "Insurance Renewal Risk Analysis",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.6829361319539999
+        },
+        {
+          "agent_id": "meridian.insurance.claim_status",
+          "name": "Insurance Claim Status",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.46455544233299995
+        }
+      ]
+    },
+    {
+      "id": "confuser_renewal_vs_performance",
+      "category": "cross_agent_confuser",
+      "persona": "uw_sam",
+      "query": "I need insurance renewal risk, not investment performance.",
+      "expected_goal": "meridian.insurance.renewal_risk",
+      "shape": "analytics",
+      "picked_goal": "meridian.insurance.renewal_risk",
+      "correct": true,
+      "expected_domain": "insurance",
+      "picked_domain": "insurance",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.634884178638,
+      "selected_agent_ids": [
+        "meridian.insurance.renewal_risk",
+        "meridian.insurance.policy_details"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.insurance.renewal_risk",
+          "name": "Insurance Renewal Risk Analysis",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.634884178638
+        },
+        {
+          "agent_id": "meridian.insurance.policy_details",
+          "name": "Insurance Policy Details",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.42801988124799994
+        }
+      ]
+    },
+    {
+      "id": "confuser_risk_profile_vs_renewal_negation",
+      "category": "cross_agent_confuser",
+      "persona": "rm_jane",
+      "query": "What is the client's risk tolerance, not the insurance renewal risk?",
+      "expected_goal": "meridian.wealth.risk_profile",
+      "shape": "flat",
+      "picked_goal": "meridian.wealth.risk_profile",
+      "correct": true,
+      "expected_domain": "wealth-management",
+      "picked_domain": "wealth-management",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.615714788437,
+      "selected_agent_ids": [
+        "meridian.wealth.risk_profile",
+        "meridian.insurance.renewal_risk",
+        "meridian.wealth.concentration",
+        "meridian.servicing.settlement_risk",
+        "meridian.insurance.policy_details"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.wealth.risk_profile",
+          "name": "Wealth Risk Profile",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.615714788437
+        },
+        {
+          "agent_id": "meridian.insurance.renewal_risk",
+          "name": "Insurance Renewal Risk Analysis",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.662580311298
+        },
+        {
+          "agent_id": "meridian.wealth.concentration",
+          "name": "Wealth Concentration Analysis",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.464312553406
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_risk",
+          "name": "Asset Servicing Settlement Risk Analysis",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.46261817216900003
+        },
+        {
+          "agent_id": "meridian.insurance.policy_details",
+          "name": "Insurance Policy Details",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.45790117979
+        }
+      ]
+    },
+    {
+      "id": "confuser_performance_vs_renewal_negation",
+      "category": "cross_agent_confuser",
+      "persona": "rm_jane",
+      "query": "Show recent investment performance, not renewal risk.",
+      "expected_goal": "meridian.wealth.performance",
+      "shape": "flat",
+      "picked_goal": "meridian.wealth.performance",
+      "correct": true,
+      "expected_domain": "wealth-management",
+      "picked_domain": "wealth-management",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.43067455291699996,
+      "selected_agent_ids": [
+        "meridian.wealth.performance",
+        "meridian.insurance.renewal_risk",
+        "meridian.wealth.market_research",
+        "meridian.wealth.concentration",
+        "meridian.wealth.holdings",
+        "meridian.servicing.nav",
+        "meridian.servicing.cash_management",
+        "meridian.wealth.concentration_review"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.wealth.performance",
+          "name": "Wealth Performance",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.43067455291699996
+        },
+        {
+          "agent_id": "meridian.insurance.renewal_risk",
+          "name": "Insurance Renewal Risk Analysis",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.542658507824
+        },
+        {
+          "agent_id": "meridian.wealth.market_research",
+          "name": "Wealth Market Research",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.45396059751499995
+        },
+        {
+          "agent_id": "meridian.wealth.concentration",
+          "name": "Wealth Concentration Analysis",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.44712865352599995
+        },
+        {
+          "agent_id": "meridian.wealth.holdings",
+          "name": "Wealth Holdings",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.39859640598299995
+        },
+        {
+          "agent_id": "meridian.servicing.nav",
+          "name": "Asset Servicing NAV",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.384364843369
+        },
+        {
+          "agent_id": "meridian.servicing.cash_management",
+          "name": "Asset Servicing Cash Management",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.35640043020199996
+        },
+        {
+          "agent_id": "meridian.wealth.concentration_review",
+          "name": "Wealth Concentration Review Flag",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.31963431835199996
+        }
+      ]
+    },
+    {
+      "id": "confuser_policy_details_vs_claims_negation",
+      "category": "cross_agent_confuser",
+      "persona": "uw_sam",
+      "query": "Pull policy terms and limits, not open claim status.",
+      "expected_goal": "meridian.insurance.policy_details",
+      "shape": "flat",
+      "picked_goal": "meridian.insurance.policy_details",
+      "correct": true,
+      "expected_domain": "insurance",
+      "picked_domain": "insurance",
+      "domain_correct": true,
+      "fallback": false,
+      "top_score": 0.464753866196,
+      "selected_agent_ids": [
+        "meridian.insurance.policy_details",
+        "meridian.insurance.claim_status",
+        "meridian.insurance.renewal_risk",
+        "meridian.servicing.settlement_risk",
+        "meridian.servicing.settlement_status",
+        "meridian.wealth.concentration_review"
+      ],
+      "selected": [
+        {
+          "agent_id": "meridian.insurance.policy_details",
+          "name": "Insurance Policy Details",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.464753866196
+        },
+        {
+          "agent_id": "meridian.insurance.claim_status",
+          "name": "Insurance Claim Status",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.6587684154510001
+        },
+        {
+          "agent_id": "meridian.insurance.renewal_risk",
+          "name": "Insurance Renewal Risk Analysis",
+          "protocol": "http",
+          "domain": "insurance",
+          "score": 0.535997569561
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_risk",
+          "name": "Asset Servicing Settlement Risk Analysis",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.432590663433
+        },
+        {
+          "agent_id": "meridian.servicing.settlement_status",
+          "name": "Asset Servicing Settlement Status",
+          "protocol": "mcp",
+          "domain": "asset-servicing",
+          "score": 0.37213373184200005
+        },
+        {
+          "agent_id": "meridian.wealth.concentration_review",
+          "name": "Wealth Concentration Review Flag",
+          "protocol": "http",
+          "domain": "wealth-management",
+          "score": 0.33014225959800003
+        }
+      ]
+    },
+    {
+      "id": "out_of_scope_001",
+      "category": "out_of_scope",
+      "persona": "rm_jane",
+      "query": "What's the cafeteria menu today?",
+      "expected_goal": "abstain",
+      "shape": "out_of_scope",
+      "picked_goal": "abstain",
+      "correct": true,
+      "expected_domain": null,
+      "picked_domain": null,
+      "domain_correct": null,
+      "fallback": true,
+      "top_score": 0.20878028869599996,
+      "selected_agent_ids": [],
+      "selected": []
+    },
+    {
+      "id": "out_of_scope_002",
+      "category": "out_of_scope",
+      "persona": "rm_jane",
+      "query": "Book me a flight to Tokyo next Friday.",
+      "expected_goal": "abstain",
+      "shape": "out_of_scope",
+      "picked_goal": "abstain",
+      "correct": true,
+      "expected_domain": null,
+      "picked_domain": null,
+      "domain_correct": null,
+      "fallback": true,
+      "top_score": 0.22939723730100003,
+      "selected_agent_ids": [],
+      "selected": []
+    },
+    {
+      "id": "out_of_scope_003",
+      "category": "out_of_scope",
+      "persona": "rm_jane",
+      "query": "Write a haiku about compound interest.",
+      "expected_goal": "abstain",
+      "shape": "out_of_scope",
+      "picked_goal": "abstain",
+      "correct": true,
+      "expected_domain": null,
+      "picked_domain": null,
+      "domain_correct": null,
+      "fallback": true,
+      "top_score": 0.359974265099,
+      "selected_agent_ids": [],
+      "selected": []
+    },
+    {
+      "id": "out_of_scope_004",
+      "category": "out_of_scope",
+      "persona": "uw_sam",
+      "query": "What is the weather in Chicago?",
+      "expected_goal": "abstain",
+      "shape": "out_of_scope",
+      "picked_goal": "abstain",
+      "correct": true,
+      "expected_domain": null,
+      "picked_domain": null,
+      "domain_correct": null,
+      "fallback": true,
+      "top_score": 0.154157042503,
+      "selected_agent_ids": [],
+      "selected": []
+    },
+    {
+      "id": "out_of_scope_005",
+      "category": "out_of_scope",
+      "persona": "ops_analyst_singh",
+      "query": "Summarize yesterday's NBA scores.",
+      "expected_goal": "abstain",
+      "shape": "out_of_scope",
+      "picked_goal": "abstain",
+      "correct": true,
+      "expected_domain": null,
+      "picked_domain": null,
+      "domain_correct": null,
+      "fallback": true,
+      "top_score": 0.25886738300300005,
+      "selected_agent_ids": [],
+      "selected": []
+    },
+    {
+      "id": "out_of_scope_006",
+      "category": "out_of_scope",
+      "persona": "hr_partner_lund",
+      "query": "Generate a logo for a coffee shop.",
+      "expected_goal": "abstain",
+      "shape": "out_of_scope",
+      "picked_goal": "abstain",
+      "correct": true,
+      "expected_domain": null,
+      "picked_domain": null,
+      "domain_correct": null,
+      "fallback": true,
+      "top_score": 0.143144905567,
+      "selected_agent_ids": [],
+      "selected": []
+    },
+    {
+      "id": "out_of_scope_007",
+      "category": "out_of_scope",
+      "persona": "rm_jane",
+      "query": "Tell me everything important.",
+      "expected_goal": "abstain",
+      "shape": "out_of_scope",
+      "picked_goal": "abstain",
+      "correct": true,
+      "expected_domain": null,
+      "picked_domain": null,
+      "domain_correct": null,
+      "fallback": true,
+      "top_score": 0.21296620368999997,
+      "selected_agent_ids": [],
+      "selected": []
+    },
+    {
+      "id": "out_of_scope_008",
+      "category": "out_of_scope",
+      "persona": "uw_sam",
+      "query": "Translate this sentence into French: good morning.",
+      "expected_goal": "abstain",
+      "shape": "out_of_scope",
+      "picked_goal": "abstain",
+      "correct": true,
+      "expected_domain": null,
+      "picked_domain": null,
+      "domain_correct": null,
+      "fallback": true,
+      "top_score": 0.15246856212600002,
+      "selected_agent_ids": [],
+      "selected": []
+    }
+  ]
+}

@@ -23,7 +23,7 @@
     {
       "id": "get_claim_status",
       "name": "get_claim_status",
-      "description": "Retrieve the status of an insurance claim \u2014 amount, status, incident date, and adjuster \u2014 by claim ID, or list all claims on a policy.",
+      "description": "Retrieve the status of an insurance claim — amount, status, incident date, and adjuster — by claim ID, or list all claims on a policy.",
       "tags": [
         "claim",
         "claim-status",
@@ -33,11 +33,11 @@
         "insurance"
       ],
       "examples": [
-        "what is the claim status for CLM-5501",
+        "what is the status of this claim",
         "show me the status of the claim",
         "are there any open claims on this policy",
         "who is the adjuster on this claim",
-        "what is the claim amount for the Continental Freight policy"
+        "what is the claim amount on this policy"
       ],
       "inputModes": [
         "application/json"
@@ -55,22 +55,58 @@
   "output_schema": {
     "type": "object",
     "properties": {
-      "policy_id": { "type": "string" },
-      "claim_count": { "type": "integer" },
-      "claims": { "type": "array", "items": { "type": "object" } },
-      "claim_id": { "type": ["string", "null"] },
-      "amount": { "type": ["number", "null"] },
-      "status": { "type": ["string", "null"] }
+      "policy_id": {
+        "type": "string"
+      },
+      "claim_count": {
+        "type": "integer"
+      },
+      "claims": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      },
+      "claim_id": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "amount": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "status": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
     },
-    "required": ["policy_id", "claims"]
+    "required": [
+      "policy_id",
+      "claims"
+    ]
   },
   "io": {
     "consumes": [
-      { "entity": "policy_id", "required": true },
-      { "entity": "claim_id", "required": false }
+      {
+        "entity": "policy_id",
+        "required": true
+      },
+      {
+        "entity": "claim_id",
+        "required": false
+      }
     ],
     "produces": [
-      { "name": "claim_status", "type": "insurance.claim_status" }
+      {
+        "name": "claim_status",
+        "type": "insurance.claim_status"
+      }
     ]
   }
 }

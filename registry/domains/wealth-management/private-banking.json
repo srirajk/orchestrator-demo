@@ -54,10 +54,11 @@
   "messages": {
     "no_coverage": "You have no client relationships in your coverage.",
     "reference_not_found": "I could not find a client relationship matching \"{reference}\". Please provide the relationship ID or a more specific name.",
-    "needs_more_detail": "Sorry \u2014 none of the services I can reach are able to answer that as asked. If you mention the client and what you'd like to know, I'll try again.",
+    "needs_more_detail": "Sorry — none of the services I can reach are able to answer that as asked. If you mention the client and what you'd like to know, I'll try again.",
     "specify_entity": "Please specify the client name or relationship ID.",
     "missing_entity_question": "Which client relationship are you asking about? Please provide the relationship ID or client name to continue.",
-    "followup_clarification": "Could you clarify what you'd like to know about {entity}? For example: holdings, performance, settlements, or corporate actions."
+    "followup_clarification": "Could you clarify what you'd like to know about {entity}? For example: holdings, performance, settlements, or corporate actions.",
+    "capability_unavailable": "I can't reach a service authorized to answer that part of your request. If you have access to a related capability, ask for it directly and I'll help."
   },
   "clarification_schema": {
     "relationship_id": {

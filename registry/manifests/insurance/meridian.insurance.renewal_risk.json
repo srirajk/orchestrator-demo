@@ -35,7 +35,7 @@
       ],
       "examples": [
         "should we reprice this policy at renewal given the open claims",
-        "what is the loss ratio on the Continental Freight policy",
+        "what is the loss ratio on this policy",
         "is this policy a renewal risk",
         "should we non-renew this account",
         "what is the combined ratio for this policy",
@@ -59,16 +59,33 @@
   "output_schema": {
     "type": "object",
     "properties": {
-      "loss_ratio_pct": { "type": "number" },
-      "loss_ratio_label": { "type": "string" },
-      "incurred_losses": { "type": "number" },
-      "client_disclosure": { "type": "string" },
-      "notes": { "type": "array", "items": { "type": "string" } },
-      "breach_count": { "type": "integer" },
+      "loss_ratio_pct": {
+        "type": "number"
+      },
+      "loss_ratio_label": {
+        "type": "string"
+      },
+      "incurred_losses": {
+        "type": "number"
+      },
+      "client_disclosure": {
+        "type": "string"
+      },
+      "notes": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "breach_count": {
+        "type": "integer"
+      },
       "policy": {
         "type": "object",
         "properties": {
-          "target_loss_ratio_pct": { "type": "number" }
+          "target_loss_ratio_pct": {
+            "type": "number"
+          }
         }
       }
     }
@@ -91,11 +108,31 @@
         "name": "renewal_analysis",
         "type": "insurance.renewal_analysis",
         "figures": [
-          { "label": "Claims-based loss ratio", "path": "loss_ratio_pct", "format": "percent1" },
-          { "label": "Firm renewal target", "path": "policy.target_loss_ratio_pct", "format": "percent1" },
-          { "label": "Incurred losses", "path": "incurred_losses", "format": "currency_usd" },
-          { "label": "Renewal breach count", "path": "breach_count", "format": "count" },
-          { "label": "Claims-based loss-ratio disclosure", "path": "client_disclosure", "format": "plain" }
+          {
+            "label": "Claims-based loss ratio",
+            "path": "loss_ratio_pct",
+            "format": "percent1"
+          },
+          {
+            "label": "Firm renewal target",
+            "path": "policy.target_loss_ratio_pct",
+            "format": "percent1"
+          },
+          {
+            "label": "Incurred losses",
+            "path": "incurred_losses",
+            "format": "currency_usd"
+          },
+          {
+            "label": "Renewal breach count",
+            "path": "breach_count",
+            "format": "count"
+          },
+          {
+            "label": "Claims-based loss-ratio disclosure",
+            "path": "client_disclosure",
+            "format": "plain"
+          }
         ]
       }
     ]

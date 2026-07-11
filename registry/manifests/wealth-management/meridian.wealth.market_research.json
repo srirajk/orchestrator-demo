@@ -37,13 +37,13 @@
       ],
       "examples": [
         "what is the current house view on equities",
-        "Meridian outlook on fixed income for this quarter",
+        "the house outlook on fixed income for this quarter",
         "what sectors do you recommend for H2 2026",
         "macro outlook and key risks",
         "what is the investment team's view on alternatives",
         "current market commentary",
         "house view on the market",
-        "what is Meridian's view on private credit",
+        "what is the house view on private credit",
         "what sectors are overweight in the model portfolio"
       ],
       "inputModes": [
@@ -62,7 +62,10 @@
   "io": {
     "consumes": [],
     "produces": [
-      { "name": "market_research", "type": "wealth.market_research" }
+      {
+        "name": "market_research",
+        "type": "wealth.market_research"
+      }
     ]
   }
 }

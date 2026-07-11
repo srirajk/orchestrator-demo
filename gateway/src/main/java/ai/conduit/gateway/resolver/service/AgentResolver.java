@@ -13,8 +13,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Resolver — Stage A + Stage B from the spec.
@@ -91,6 +93,20 @@ public class AgentResolver {
     @Value("${conduit.routing.rerank.max-candidates:5}")
     private int rerankMaxCandidates;
 
+    /**
+     * Conflict trigger (routing spec V2 Piece 5, V2.1 minor) — a rerank/abstain HINT only, never a
+     * denial or correctness rule. When the routed leader's domain is not among the grounded references'
+     * domains (a set the caller derives from the Piece-2 {@code GroundedReferenceSet} and passes in —
+     * this resolver never reads grounding, only compares ids), the query is a candidate for a
+     * conflict-path rerank whose error handling is STRICTER (a reranker error/invalid response abstains
+     * rather than trusting the embedding leader, preserving margin abstention). Ships OFF: it is enabled
+     * only after Piece 6's top-k recall gate passes, because a contaminated shortlist can exclude the
+     * right capability and the LLM cannot recover an absent candidate. Off ⇒ the trigger never fires and
+     * behaviour is byte-identical to before.
+     */
+    @Value("${conduit.routing.rerank-conflict-trigger.enabled:false}")
+    private boolean rerankConflictTriggerEnabled;
+
     // The former `rerank.pick-score-tolerance` band-aid — which let a rerank-picked leader a hair
     // below the routing floor still route so a phrasing-sensitive score ("Okafor's holdings" 0.398 vs
     // "Okafor holdings" 0.418) would not flip a would-be coverage denial into "no service" — has been
@@ -122,7 +138,7 @@ public class AgentResolver {
     public ResolverResult resolve(String prompt, String domain) {
         List<RoutingCandidate> candidates = vectorIndex.search(
                 prompt, domain, topK, id -> registry.find(id).orElse(null));
-        return select(candidates, prompt, false);
+        return select(candidates, prompt, false, Set.of());
     }
 
     /** Convenience overload — no domain filter. */
@@ -185,6 +201,22 @@ public class AgentResolver {
      */
     @Observed(name = "resolver.route.contextual")
     public ResolverResult resolveContextual(String routingText, boolean entityKnown) {
+        return resolveContextual(routingText, entityKnown, Set.of());
+    }
+
+    /**
+     * Context-aware routing that additionally supplies the <b>grounded references' domain set</b> for
+     * the Piece-5 conflict trigger. {@code groundedDomainIds} are the manifest domain ids of the turn's
+     * grounded references (the caller derives them from the Piece-2 {@code GroundedReferenceSet}); the
+     * resolver never inspects grounding, it only checks whether the routed leader's domain id is in this
+     * set. Empty set ⇒ no conflict trigger (identical to the two-arg overload). The trigger is itself
+     * gated OFF by {@code conduit.routing.rerank-conflict-trigger.enabled}, so today this is inert
+     * plumbing for Piece 4 to wire; it never denies — it only makes the near-tie rerank's error handling
+     * stricter on a genuine cross-domain conflict.
+     */
+    @Observed(name = "resolver.route.contextual")
+    public ResolverResult resolveContextual(String routingText, boolean entityKnown,
+                                             Set<String> groundedDomainIds) {
         List<RoutingCandidate> broad = vectorIndex.search(
                 routingText, null, topK, id -> registry.find(id).orElse(null));
 
@@ -227,7 +259,7 @@ public class AgentResolver {
             return new ResolverResult(List.of(), broad, true, leaderScore, routingText, margin, false);
         }
 
-        ResolverResult result = select(broad, routingText, entityKnown);
+        ResolverResult result = select(broad, routingText, entityKnown, groundedDomainIds);
         log.debug("Resolver(contextual): leader={} domain={} margin={} → {} selected",
                 leader.manifest().agentId(), domain, String.format("%.3f", margin),
                 result.selected().size());
@@ -239,7 +271,8 @@ public class AgentResolver {
      * ({@code topScore * relativeFloorFactor}) once the top score is decisive, else the absolute
      * {@code confidenceFloor}. Prunes long-tail matches for focused queries.
      */
-    private ResolverResult select(List<RoutingCandidate> candidates, String queryText, boolean entityKnown) {
+    private ResolverResult select(List<RoutingCandidate> candidates, String queryText, boolean entityKnown,
+                                  Set<String> groundedDomainIds) {
         if (candidates.isEmpty()) {
             return new ResolverResult(List.of(), List.of(), true, 0.0, queryText, 0.0, false);
         }
@@ -249,7 +282,7 @@ public class AgentResolver {
         double topScore = candidates.get(0).score();
         double runnerUpScore = candidates.size() > 1 ? candidates.get(1).score() : 0.0;
         double topMargin = candidates.size() > 1 ? topScore - runnerUpScore : Double.MAX_VALUE;
-        RerankApplication rerank = maybeRerank(candidates, queryText, topScore, topMargin);
+        RerankApplication rerank = maybeRerank(candidates, queryText, topScore, topMargin, groundedDomainIds);
         if (rerank.abstain()) {
             meterRegistry.counter("resolver.fallback").increment();
             return new ResolverResult(List.of(), candidates, true, topScore, queryText,
@@ -307,29 +340,55 @@ public class AgentResolver {
         if (fallback) meterRegistry.counter("resolver.fallback").increment();
 
         return new ResolverResult(selected, skipped, fallback, topScore, queryText,
-                topMargin, rerank.rerankFired());
+                topMargin, rerank.rerankFired(), rerank.selectedIds());
     }
 
     private RerankApplication maybeRerank(List<RoutingCandidate> candidates, String queryText,
-                                          double topScore, double topMargin) {
-        if (!shouldRerank(candidates, topScore, topMargin)) {
+                                          double topScore, double topMargin, Set<String> groundedDomainIds) {
+        RerankTrigger trigger = rerankTrigger(candidates, topScore, topMargin, groundedDomainIds);
+        if (trigger == RerankTrigger.NONE) {
             meterRegistry.counter("resolver.rerank.skipped").increment();
             return RerankApplication.unchanged(candidates);
         }
 
+        // On the CONFLICT path (the routed leader's domain is not among the grounded refs' domains) a
+        // reranker error / unusable answer must ABSTAIN, not silently trust the embedding leader — the
+        // whole point of the trigger is to preserve margin abstention when the entity and the capability
+        // disagree. On the ordinary near-tie / near-abstain paths the historical embedding-fallback
+        // behaviour is kept (a broken reranker never fails an otherwise-routable request).
+        boolean conflictPath = trigger == RerankTrigger.CONFLICT;
+
         List<RoutingCandidate> shortlist = candidates.stream()
                 .limit(Math.max(1, rerankMaxCandidates))
                 .toList();
+        Set<String> shortlistIds = new HashSet<>();
+        for (RoutingCandidate c : shortlist) {
+            shortlistIds.add(c.manifest().agentId());
+        }
         try {
             RoutingRerankerClient.Decision decision = rerankerClient.rerank(queryText, shortlist);
             if (decision.needsMultiple()) {
-                // The query is CLEAR but broader than any one capability. The re-ranker only exists to
-                // break a near-tie by picking a single winner; that it cannot is not a reason to throw
-                // away the embedding search's candidates. Keep them and let the confidence floor and
-                // margin gates below decide — which is exactly what happens when the re-ranker errors.
-                log.debug("Resolver rerank: multi-capability request, keeping candidates: {}", decision.reason());
+                // The query is CLEAR but broader than any one capability. Piece 5: a valid multi-facet
+                // answer names the explicit shortlist subset (one id per requested facet) — validate it
+                // (in-shortlist, unique, non-empty, capped) and carry it forward for Piece 4 to form one
+                // requested group per id, keeping the embedding candidates so the request still fans out.
+                List<String> selectedIds = validMultiple(decision.candidateIds(), shortlistIds);
+                if (selectedIds.isEmpty()) {
+                    // No usable explicit ids (empty / duplicate / unknown / over cap). On a conflict path
+                    // that is an error-equivalent → abstain and preserve margin abstention. Off the
+                    // conflict path, fall back to the historical multi-capability behaviour: keep the
+                    // embedding candidates and let the confidence floor + margin gates decide.
+                    log.debug("Resolver rerank: multi-capability answer without usable ids (conflictPath={}): {}",
+                            conflictPath, decision.reason());
+                    meterRegistry.counter("resolver.rerank.invalid_multiple").increment();
+                    return conflictPath
+                            ? RerankApplication.abstain(candidates)
+                            : RerankApplication.noOpinion(candidates);
+                }
+                log.debug("Resolver rerank: multi-capability request, selected {}: {}",
+                        selectedIds, decision.reason());
                 meterRegistry.counter("resolver.rerank.needs_multiple").increment();
-                return RerankApplication.noOpinion(candidates);
+                return RerankApplication.multiple(candidates, selectedIds);
             }
             if (decision.abstain()) {
                 // Genuinely ambiguous: indistinguishable candidates, or none fit. Clarify.
@@ -341,30 +400,87 @@ public class AgentResolver {
                     .filter(c -> c.manifest().agentId().equals(decision.candidateId()))
                     .findFirst();
             if (picked.isEmpty()) {
-                log.warn("Resolver rerank returned non-candidate id '{}'; using embedding leader",
-                        decision.candidateId());
+                log.warn("Resolver rerank returned non-candidate id '{}' (conflictPath={}); {}",
+                        decision.candidateId(), conflictPath,
+                        conflictPath ? "abstaining" : "using embedding leader");
                 meterRegistry.counter("resolver.rerank.invalid").increment();
-                return RerankApplication.embeddingFallback(candidates);
+                return conflictPath
+                        ? RerankApplication.abstain(candidates)
+                        : RerankApplication.embeddingFallback(candidates);
             }
             meterRegistry.counter("resolver.rerank.pick").increment();
             log.debug("Resolver rerank picked {}: {}", picked.get().manifest().agentId(), decision.reason());
             return RerankApplication.reordered(reorder(candidates, picked.get()));
         } catch (Exception e) {
-            log.warn("Resolver rerank failed ({}); using embedding leader: {}",
-                    e.getClass().getSimpleName(), e.getMessage());
+            log.warn("Resolver rerank failed ({}, conflictPath={}); {}: {}",
+                    e.getClass().getSimpleName(), conflictPath,
+                    conflictPath ? "abstaining" : "using embedding leader", e.getMessage());
             meterRegistry.counter("resolver.rerank.error").increment();
-            return RerankApplication.embeddingFallback(candidates);
+            return conflictPath
+                    ? RerankApplication.abstain(candidates)
+                    : RerankApplication.embeddingFallback(candidates);
         }
     }
 
-    private boolean shouldRerank(List<RoutingCandidate> candidates, double topScore, double topMargin) {
+    /**
+     * Why (and how) the reranker fires for this candidate set — a small tag, never an anonymous boolean,
+     * because the three triggers demand different error handling downstream. Priority: a CONFLICT (when
+     * enabled) dominates, because its stricter abstain-on-error is the whole reason it exists; otherwise
+     * the historical near-tie / near-abstain triggers apply, both of which keep the embedding-fallback
+     * error path.
+     */
+    private RerankTrigger rerankTrigger(List<RoutingCandidate> candidates, double topScore,
+                                        double topMargin, Set<String> groundedDomainIds) {
         if (!rerankEnabled || candidates.size() < 2) {
-            return false;
+            return RerankTrigger.NONE;
         }
-        boolean nearTie = topMargin <= rerankMarginThreshold;
+        if (isConflict(candidates, groundedDomainIds)) {
+            return RerankTrigger.CONFLICT;
+        }
+        if (topMargin <= rerankMarginThreshold) {
+            return RerankTrigger.NEAR_TIE;
+        }
         boolean nearAbstain = topScore >= routingMinScore
                 && topScore <= routingMinScore + rerankAbstainAdjacentBand;
-        return nearTie || nearAbstain;
+        return nearAbstain ? RerankTrigger.NEAR_ABSTAIN : RerankTrigger.NONE;
+    }
+
+    /**
+     * The Piece-5 conflict signal, config-OFF by default: the routed leader's domain id is NOT among the
+     * grounded references' domain ids. Pure id-set membership — no domain literal, no entity-type word;
+     * the grounded domain set is supplied by the caller. A HINT to rerank with stricter error handling,
+     * never a denial: bug-261 is a legitimate cross-domain case, so a conflict must never itself reject a
+     * route — it only asks the reranker to decide and preserves abstention if the reranker cannot.
+     */
+    private boolean isConflict(List<RoutingCandidate> candidates, Set<String> groundedDomainIds) {
+        if (!rerankConflictTriggerEnabled || groundedDomainIds == null || groundedDomainIds.isEmpty()) {
+            return false;
+        }
+        String leaderDomain = candidates.get(0).manifest().domain();
+        return leaderDomain == null || !groundedDomainIds.contains(leaderDomain);
+    }
+
+    /**
+     * Validate a multi-facet answer's explicit shortlist subset: each id must be in the presented
+     * shortlist, non-empty, and unique; the result is capped at {@code rerankMaxCandidates}. Returns the
+     * validated ids in first-seen order, or an EMPTY list if any id is unknown or duplicated (so the
+     * caller treats the whole answer as an invalid {@code multiple}). Order-preserving and deterministic.
+     */
+    private List<String> validMultiple(List<String> candidateIds, Set<String> shortlistIds) {
+        if (candidateIds == null || candidateIds.isEmpty()) {
+            return List.of();
+        }
+        List<String> validated = new ArrayList<>(candidateIds.size());
+        Set<String> seen = new HashSet<>();
+        for (String id : candidateIds) {
+            if (id == null || id.isBlank() || !shortlistIds.contains(id) || !seen.add(id)) {
+                // unknown, empty, or duplicate id ⇒ the multi-facet answer is unusable as a whole
+                return List.of();
+            }
+            validated.add(id);
+        }
+        int cap = Math.max(1, rerankMaxCandidates);
+        return validated.size() > cap ? List.copyOf(validated.subList(0, cap)) : List.copyOf(validated);
     }
 
     private static List<RoutingCandidate> reorder(List<RoutingCandidate> candidates, RoutingCandidate picked) {
@@ -376,22 +492,35 @@ public class AgentResolver {
         return List.copyOf(reordered);
     }
 
+    /**
+     * How (and why) the reranker fired for this candidate set. A small tag rather than another anonymous
+     * boolean, because the trigger decides error handling: only {@link #CONFLICT} abstains on a reranker
+     * error / invalid response; {@link #NEAR_TIE} and {@link #NEAR_ABSTAIN} keep the embedding fallback.
+     * {@link #NONE} = the reranker was not invoked.
+     */
+    private enum RerankTrigger { NONE, NEAR_TIE, NEAR_ABSTAIN, CONFLICT }
+
     private record RerankApplication(
             List<RoutingCandidate> candidates,
             boolean abstain,
             boolean suppressMarginAbstain,
-            boolean rerankFired) {
+            boolean rerankFired,
+            List<String> selectedIds) {
+
+        RerankApplication {
+            selectedIds = selectedIds == null ? List.of() : List.copyOf(selectedIds);
+        }
 
         static RerankApplication unchanged(List<RoutingCandidate> candidates) {
-            return new RerankApplication(candidates, false, false, false);
+            return new RerankApplication(candidates, false, false, false, List.of());
         }
 
         static RerankApplication reordered(List<RoutingCandidate> candidates) {
-            return new RerankApplication(candidates, false, true, true);
+            return new RerankApplication(candidates, false, true, true, List.of());
         }
 
         static RerankApplication embeddingFallback(List<RoutingCandidate> candidates) {
-            return new RerankApplication(candidates, false, true, true);
+            return new RerankApplication(candidates, false, true, true, List.of());
         }
 
         /**
@@ -401,11 +530,22 @@ public class AgentResolver {
          * abstain gate is NOT suppressed: a genuinely weak or too-close leader must still abstain.
          */
         static RerankApplication noOpinion(List<RoutingCandidate> candidates) {
-            return new RerankApplication(candidates, false, false, true);
+            return new RerankApplication(candidates, false, false, true, List.of());
+        }
+
+        /**
+         * A VALID multi-facet answer (Piece 5): the re-ranker named an explicit, validated shortlist
+         * subset — one id per requested facet. Same routing shape as {@link #noOpinion} (keep the
+         * embedding candidates, fan out, margin abstain NOT suppressed) but the selected ids are carried
+         * forward on {@link ResolverResult#rerankSelectedIds()} so Piece 4 can form one requested group
+         * per id.
+         */
+        static RerankApplication multiple(List<RoutingCandidate> candidates, List<String> selectedIds) {
+            return new RerankApplication(candidates, false, false, true, selectedIds);
         }
 
         static RerankApplication abstain(List<RoutingCandidate> candidates) {
-            return new RerankApplication(candidates, true, false, true);
+            return new RerankApplication(candidates, true, false, true, List.of());
         }
     }
 }

@@ -39,7 +39,7 @@
         "is this portfolio too aggressive for what the client said they could handle",
         "does the account's risk exposure match the client's stated tolerance",
         "is this allocation appropriate given the client's risk appetite",
-        "risk profile for the Whitman relationship"
+        "risk profile for this relationship"
       ],
       "inputModes": [
         "application/json"
@@ -56,10 +56,16 @@
   },
   "io": {
     "consumes": [
-      { "entity": "relationship_id", "required": true }
+      {
+        "entity": "relationship_id",
+        "required": true
+      }
     ],
     "produces": [
-      { "name": "risk_profile", "type": "wealth.risk_profile" }
+      {
+        "name": "risk_profile",
+        "type": "wealth.risk_profile"
+      }
     ]
   }
 }

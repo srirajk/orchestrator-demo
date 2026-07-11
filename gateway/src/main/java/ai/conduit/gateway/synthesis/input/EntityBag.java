@@ -13,14 +13,20 @@ import java.util.Map;
  *   <li>{@code references} — {@code extract_as} → raw extracted value (resolvable + literal kinds)</li>
  *   <li>{@code lists}      — {@code extract_as} → list value (list kinds)</li>
  *   <li>{@code resolved}   — {@code key} → resolved id/value (filled by the resolver)</li>
+ *   <li>{@code mentions}   — the full span-aware provenance model (multi-reference, offsets, source);
+ *       {@code references} is the lossy scalar VIEW of it (latest explicit, else carried anaphora)</li>
  * </ul>
+ *
+ * <p>{@code references} is retained unchanged so every existing {@code reference(key)} caller keeps
+ * working; {@code mentions} is the richer model the grounding / masking stages consume.
  */
 public record EntityBag(
     Map<String, String> references,
     Map<String, List<String>> lists,
     Map<String, String> resolved,
     boolean needsClarification,
-    List<EntityCandidate> candidates
+    List<EntityCandidate> candidates,
+    MentionSet mentions
 ) {
 
     public record EntityCandidate(String entityId, String name) {}
@@ -31,15 +37,22 @@ public record EntityBag(
         lists      = lists == null ? Map.of() : Map.copyOf(lists);
         resolved   = resolved == null ? Map.of() : Map.copyOf(resolved);
         candidates = candidates == null ? List.of() : List.copyOf(candidates);
+        mentions   = mentions == null ? MentionSet.empty() : mentions;
     }
 
     public static EntityBag empty() {
-        return new EntityBag(Map.of(), Map.of(), Map.of(), false, List.of());
+        return new EntityBag(Map.of(), Map.of(), Map.of(), false, List.of(), MentionSet.empty());
     }
 
-    /** Builds an extracted (un-resolved) bag from the raw extraction maps. */
+    /** Builds an extracted (un-resolved) bag from the raw extraction maps, with no mention model. */
     public static EntityBag of(Map<String, String> references, Map<String, List<String>> lists) {
-        return new EntityBag(references, lists, Map.of(), false, List.of());
+        return of(references, lists, MentionSet.empty());
+    }
+
+    /** Builds an extracted (un-resolved) bag carrying the full span-aware mention model. */
+    public static EntityBag of(Map<String, String> references, Map<String, List<String>> lists,
+                               MentionSet mentions) {
+        return new EntityBag(references, lists, Map.of(), false, List.of(), mentions);
     }
 
     // ── Generic accessors (keyed by manifest declarations) ──────────────────────
@@ -59,27 +72,32 @@ public record EntityBag(
         return lists.getOrDefault(extractAs, List.of());
     }
 
+    /** All extracted mentions of one entity {@code key}, in recorded order; never null. */
+    public List<Mention> mentionsFor(String entityKey) {
+        return mentions.forKey(entityKey);
+    }
+
     // ── Immutable transforms ────────────────────────────────────────────────────
 
     public EntityBag withResolved(Map<String, String> resolved, boolean needsClarification) {
-        return new EntityBag(this.references, this.lists, resolved, needsClarification, List.of());
+        return new EntityBag(this.references, this.lists, resolved, needsClarification, List.of(), this.mentions);
     }
 
     /** Returns a copy with one resolved entity key overridden. */
     public EntityBag withResolvedValue(String key, String value) {
         var next = new java.util.LinkedHashMap<>(this.resolved);
         if (value == null) next.remove(key); else next.put(key, value);
-        return new EntityBag(this.references, this.lists, next, this.needsClarification, this.candidates);
+        return new EntityBag(this.references, this.lists, next, this.needsClarification, this.candidates, this.mentions);
     }
 
     public EntityBag withCandidates(List<EntityCandidate> candidates) {
-        return new EntityBag(this.references, this.lists, this.resolved, true, candidates);
+        return new EntityBag(this.references, this.lists, this.resolved, true, candidates, this.mentions);
     }
 
     /** Returns a copy with one reference field overridden (used to inject a resolved id pre-resolution). */
     public EntityBag withReference(String extractAs, String value) {
         var next = new java.util.LinkedHashMap<>(this.references);
         if (value == null) next.remove(extractAs); else next.put(extractAs, value);
-        return new EntityBag(next, this.lists, this.resolved, this.needsClarification, this.candidates);
+        return new EntityBag(next, this.lists, this.resolved, this.needsClarification, this.candidates, this.mentions);
     }
 }

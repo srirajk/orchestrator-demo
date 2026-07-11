@@ -34,8 +34,8 @@
       "examples": [
         "does this concentration analysis need a review flag",
         "should this portfolio concentration breach be flagged for review",
-        "show the concentration review flag for Whitman",
-        "does the Rivera diversified trust need a concentration review flag",
+        "show the concentration review flag for this client",
+        "does this trust need a concentration review flag",
         "flag any firm policy concentration breach for review"
       ],
       "inputModes": [
@@ -54,16 +54,41 @@
   "output_schema": {
     "type": "object",
     "properties": {
-      "review_flag": { "type": "boolean" },
-      "flag_type": { "type": "string" },
-      "relationship_id": { "type": "string" },
-      "relationship_name": { "type": "string" },
-      "breach_count": { "type": "integer" },
-      "flags": { "type": "array", "items": { "type": "object" } },
-      "policy": { "type": "object" },
-      "agent_narrative": { "type": "string" }
+      "review_flag": {
+        "type": "boolean"
+      },
+      "flag_type": {
+        "type": "string"
+      },
+      "relationship_id": {
+        "type": "string"
+      },
+      "relationship_name": {
+        "type": "string"
+      },
+      "breach_count": {
+        "type": "integer"
+      },
+      "flags": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      },
+      "policy": {
+        "type": "object"
+      },
+      "agent_narrative": {
+        "type": "string"
+      }
     },
-    "required": ["review_flag", "flag_type", "breach_count", "flags", "agent_narrative"]
+    "required": [
+      "review_flag",
+      "flag_type",
+      "breach_count",
+      "flags",
+      "agent_narrative"
+    ]
   },
   "io": {
     "consumes": [
@@ -75,7 +100,10 @@
     ],
     "condition": "breach_count > `0`",
     "produces": [
-      { "name": "concentration_review", "type": "wealth.concentration_review" }
+      {
+        "name": "concentration_review",
+        "type": "wealth.concentration_review"
+      }
     ]
   }
 }

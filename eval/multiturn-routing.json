@@ -85,6 +85,26 @@
       "must_not_route": ["meridian.insurance.claim_status"],
       "focus_mechanism": "facet-carry + id-backstop",
       "note": "FACET CARRY + ID BACKSTOP (bug-233): the bare 'and for REL-00099?' inherits the prior turn's settlement facet (routing does not abstain on the margin because the turn carries an explicit grounded id) and the deterministic id_pattern backstop recovers REL-00099 when the LLM drops it. Calderon settlement answers."
+    },
+    {
+      "id": "mt_10_nav_fund_setup",
+      "user": "what's the latest NAV on fund FND-7781?",
+      "intent": "FETCH_DATA",
+      "expected_domain": "asset-servicing",
+      "expected_outcome": "ANSWERED",
+      "must_not_route": ["meridian.insurance.claim_status"],
+      "focus_mechanism": "facet-carry-setup",
+      "note": "Establishes a NAV/corporate-actions facet by explicit FUND id. FND- (fund_id) is a resolvable type but resource_scoped:false (corporate-actions), so it never coverage-grounds — sets up the terse non-coverage-scoped id follow-up below."
+    },
+    {
+      "id": "mt_11_facet_carry_terse_fnd",
+      "user": "and FND-7782?",
+      "intent": "FETCH_DATA",
+      "expected_domain": "asset-servicing",
+      "expected_outcome": "ANSWERED",
+      "must_not_route": ["meridian.insurance.claim_status"],
+      "focus_mechanism": "facet-carry + non-coverage-scoped id relaxation (V2.1 #4)",
+      "note": "THE FND- analogue of mt_09 (routing spec V2.1 #4). The bare 'and FND-7782?' inherits the prior NAV facet. FND- is resolvable but resource_scoped:false, so it can NEVER RESOLVED_ALLOWED-ground; instead a deterministic manifest id_pattern match on the fund id earns the routing relaxation (V2.1 #4), so routing does not margin-abstain into a clarify. NAV/corporate-actions answers. Operator note: if FND-7782 is not seeded in the demo's fund inventory, swap in any second seeded FND- id — the row guards ROUTING (relaxation, no clarify), not that particular fund's data."
     }
   ]
 }

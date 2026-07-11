@@ -1,0 +1,44 @@
+{
+  "thresholds": {
+    "_note": "Capability-entity-conflict rows: an entity strongly associated with domain A is named while the CAPABILITY asked belongs to domain B, requested by a persona NOT entitled to domain B. Two things must hold: (1) routing keys on the CAPABILITY (expected_goal is the domain-B capability, scored as a flat pick — capability-first routing, not entity-first), and (2) that capability is DENIED for this persona (expected_denied_capability must land in a denied/partial group). There are no clear/out-of-scope rows here, so only the denial expectations gate. Test data — domain literals are allowed (CLAUDE.md §5); the gateway Java carries none.",
+    "canonical_poaching_tolerance": 0
+  },
+  "queries": [
+    {
+      "id": "cec_uwsam_settlements_on_servicing_entity",
+      "category": "capability_entity_conflict",
+      "persona": "uw_sam",
+      "query": "Show pending and failed settlements for Continental Freight.",
+      "expected_goal": "meridian.servicing.settlement_status",
+      "expected_denied_capability": "meridian.servicing.settlement_status",
+      "note": "uw_sam holds the insurance segment only. 'settlements' is an asset-servicing capability; routing must pick settlement_status (capability-first) and structural authz must DENY it for an insurance-only persona — never silently substitute an insurance capability because the persona is an underwriter."
+    },
+    {
+      "id": "cec_rmjane_renewal_on_wealth_entity",
+      "category": "capability_entity_conflict",
+      "persona": "rm_jane",
+      "query": "What is the insurance renewal risk for the Whitman Family Office?",
+      "expected_goal": "meridian.insurance.renewal_risk",
+      "expected_denied_capability": "meridian.insurance.renewal_risk",
+      "note": "Whitman is a wealth/servicing relationship rm_jane covers, but 'insurance renewal risk' is an insurance capability rm_jane's segments (wealth+servicing) do not authorize. Route to renewal_risk (capability-first) and DENY — do not fall back to a wealth capability just because the entity is a wealth client."
+    },
+    {
+      "id": "cec_uwsam_holdings_on_wealth_entity",
+      "category": "capability_entity_conflict",
+      "persona": "uw_sam",
+      "query": "Pull the wealth portfolio holdings for the Whitman Family Office.",
+      "expected_goal": "meridian.wealth.holdings",
+      "expected_denied_capability": "meridian.wealth.holdings",
+      "note": "A wealth capability requested by an insurance-only persona about a wealth entity. Route to holdings (capability-first), DENY structurally."
+    },
+    {
+      "id": "cec_opssingh_renewal_on_servicing_entity",
+      "category": "capability_entity_conflict",
+      "persona": "ops_analyst_singh",
+      "query": "Give me the insurance renewal risk for REL-00188.",
+      "expected_goal": "meridian.insurance.renewal_risk",
+      "expected_denied_capability": "meridian.insurance.renewal_risk",
+      "note": "ops_analyst_singh holds the servicing segment. An insurance capability keyed off a servicing relationship id must route to renewal_risk and DENY — the servicing entitlement does not spill into insurance."
+    }
+  ]
+}

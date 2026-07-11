@@ -156,6 +156,51 @@ conduit:
       # chance to choose among the bounded candidates or strengthen abstain.
       abstain-adjacent-band: ${CONDUIT_ROUTING_RERANK_ABSTAIN_ADJACENT_BAND:0.08}
       max-candidates: ${CONDUIT_ROUTING_RERANK_MAX_CANDIDATES:5}
+    # Piece 5 — conflict trigger. A rerank/abstain HINT only, never a denial: when the routed leader's
+    # domain is NOT among the grounded references' domains, the near-tie rerank runs with STRICTER error
+    # handling (a reranker error/invalid answer abstains instead of trusting the embedding leader).
+    # Ships OFF — enabled only after Piece 6's top-k recall gate passes, since a contaminated shortlist
+    # can exclude the right capability and the LLM cannot recover an absent candidate. Off ⇒ inert.
+    rerank-conflict-trigger:
+      enabled: ${CONDUIT_ROUTING_RERANK_CONFLICT_TRIGGER_ENABLED:false}
+    # Piece 3 — shared pre-routing preparation. A resolved entity span is blanked from the routing
+    # text with this neutral deictic so routing keys on the CAPABILITY asked, not the entity named.
+    # World-B: the token is validated at runtime to never equal an entity-type display/resolveType/key
+    # (banned → falls back to a pure deictic). NOT a domain literal — a generic English placeholder.
+    entity-mask-token: ${CONDUIT_ROUTING_ENTITY_MASK_TOKEN:the subject}
+    # Config-driven near-empty policy (no Java word list, CLAUDE.md §5): after masking, a residual
+    # carrying only these function/request words is "near-empty" and widens to the full masked window
+    # before the router decides. Generic English stopwords + request verbs — zero domain vocabulary.
+    residual-stopwords: >-
+      the,a,an,and,or,but,for,of,to,in,on,at,by,with,from,about,as,is,are,was,were,be,been,
+      me,my,mine,our,ours,your,yours,their,it,its,that,this,these,those,them,they,
+      show,give,tell,get,pull,find,list,see,view,provide,share,send,fetch,check,look,
+      please,can,could,would,will,shall,do,does,did,now,then,also,just,what,whats,which,who
+    # Minimum non-stopword, non-mask content tokens a masked residual must carry to route on its own.
+    min-residual-content-tokens: ${CONDUIT_ROUTING_MIN_RESIDUAL_CONTENT_TOKENS:1}
+    # Piece 6 — the preparation/masking contract version stamped onto every /debug/route decision so the
+    # goal-pick harness can assert the endpoint exercised the CURRENT production preparation (not a stale
+    # or forked one). Bump this string whenever the masking/relaxation contract changes materially.
+    preparation-version: ${CONDUIT_ROUTING_PREPARATION_VERSION:route-prep-v2}
+  # Piece 2 — multi-reference grounding budgets. Grounding every mention across all its manifest
+  # interpretations fans out coverage RESOLVE+CHECK calls (each ≤5s); these bounds cap the fan-out,
+  # bound its concurrency, and give the stage a deadline (unfinished interpretations fail-closed).
+  # Piece 6 — the production-path routing DECISION endpoint (POST /debug/route). Config-gated so it is
+  # never a prod attack surface: the controller bean only exists when this is true. ON for the everyday
+  # demo (the goal-pick harness drives it with each row's own persona token); a prod profile MUST leave
+  # it false. The endpoint invokes no agent and mutates nothing — it returns the routing decision only,
+  # authorized as an authenticated (non-admin) caller against the caller's OWN coverage.
+  debug:
+    route-decision:
+      # OFF by default (B2): this endpoint is a routing-diagnostic surface (below-floor candidate
+      # catalog + per-sub-domain grounding statuses = an existence oracle) reachable by any
+      # authenticated principal. Enabled explicitly for the demo/eval via docker-compose, never in prod.
+      enabled: ${CONDUIT_DEBUG_ROUTE_DECISION_ENABLED:false}
+  grounding:
+    max-mentions: ${CONDUIT_GROUNDING_MAX_MENTIONS:8}
+    max-interpretations-per-mention: ${CONDUIT_GROUNDING_MAX_INTERPRETATIONS_PER_MENTION:4}
+    concurrency: ${CONDUIT_GROUNDING_CONCURRENCY:8}
+    stage-deadline-ms: ${CONDUIT_GROUNDING_STAGE_DEADLINE_MS:8000}
   chat:
     # Recent user turns (incl. current) concatenated into the routing query so keyword-less
     # follow-ups inherit the conversation's domain vocabulary. Bounded to limit domain drift.

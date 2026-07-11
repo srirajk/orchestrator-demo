@@ -29,20 +29,54 @@ public interface RoutingRerankerClient {
      * strong candidates with a confident leader.
      *
      * <p>The outcome is structured, never inferred from {@code reason}: that text is LLM prose.
+     *
+     * <p><b>Piece 5 — {@code multiple} now carries an explicit shortlist.</b> A multi-facet answer no
+     * longer means "keep everything the embedding search returned"; it names the precise subset of
+     * shortlist ids that together cover the request ({@link #candidateIds}), one id per distinct facet.
+     * The caller validates them (in-shortlist, unique, non-empty, capped) and Piece 4 forms one
+     * requested group per selected id. A {@code multiple} with no explicit ids (or an unusable list) is
+     * an <i>invalid</i> multi-facet answer — the caller decides how to treat it per trigger path. The
+     * embedding {@code score} the re-ranker was shown is diagnostic input only; it never becomes the
+     * selection — {@link #candidateIds} is the selection.
      */
-    record Decision(String candidateId, boolean abstain, boolean needsMultiple, String reason) {
+    record Decision(String candidateId, List<String> candidateIds, boolean abstain,
+                    boolean needsMultiple, String reason) {
+
+        public Decision {
+            candidateIds = candidateIds == null ? List.of() : List.copyOf(candidateIds);
+        }
+
         public static Decision pick(String candidateId, String reason) {
-            return new Decision(candidateId, false, false, reason);
+            return new Decision(candidateId, List.of(), false, false, reason);
         }
 
         /** The candidates are indistinguishable or none fit → the caller clarifies. */
         public static Decision abstain(String reason) {
-            return new Decision(null, true, false, reason);
+            return new Decision(null, List.of(), true, false, reason);
         }
 
-        /** One agent cannot serve this query → the caller keeps the candidate set and fans out. */
+        /**
+         * No single agent serves this query — the named shortlist ids each cover a distinct requested
+         * facet. The caller validates the ids against the shortlist it presented and (Piece 4) forms one
+         * requested group per id.
+         */
+        public static Decision multiple(List<String> candidateIds, String reason) {
+            return new Decision(null, candidateIds, false, true, reason);
+        }
+
+        /**
+         * A multi-facet answer with no explicit shortlist — the re-ranker declined a single winner but
+         * did not (or could not) name the facets. Retained for callers that only need the "fan out"
+         * signal; {@link #multiple(List, String)} is preferred so Piece 4 can name the groups. Treated
+         * as an invalid {@code multiple} by the id validation (empty list).
+         */
         public static Decision needsMultiple(String reason) {
-            return new Decision(null, false, true, reason);
+            return new Decision(null, List.of(), false, true, reason);
+        }
+
+        /** True when {@code multiple} named a non-empty, unique shortlist subset. Validated by the caller. */
+        public boolean hasExplicitCandidateIds() {
+            return candidateIds != null && !candidateIds.isEmpty();
         }
     }
 }

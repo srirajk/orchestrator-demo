@@ -34,7 +34,7 @@
       "examples": [
         "is this client on track for their goals",
         "financial plan status for the relationship",
-        "are the Whitman goals funded",
+        "are this client's goals funded",
         "financial goal progress for this relationship this year",
         "goal progress for this account"
       ],
@@ -53,10 +53,16 @@
   },
   "io": {
     "consumes": [
-      { "entity": "relationship_id", "required": true }
+      {
+        "entity": "relationship_id",
+        "required": true
+      }
     ],
     "produces": [
-      { "name": "goal_status", "type": "wealth.goal_status" }
+      {
+        "name": "goal_status",
+        "type": "wealth.goal_status"
+      }
     ]
   }
 }

@@ -11,6 +11,8 @@ import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +34,9 @@ public class DomainManifestStore {
     // Reverse map: agentId → subDomainId — built from sub-domain agents[] lists at load time.
     // Used as fallback when the AgentManifest in Redis lacks sub_domain (Jackson/record issue).
     private final Map<String, String>            agentToSubDomain = new HashMap<>();
+    // Compiled id_pattern cache, populated at manifest-load time so the request path never
+    // re-compiles a manifest regex per call (extraction/routing hit these on every turn).
+    private final Map<String, Pattern>           idPatternCache   = new java.util.concurrent.ConcurrentHashMap<>();
 
     public DomainManifestStore(ObjectMapper mapper, Environment env,
                                @Value("${conduit.registry.location:classpath:}") String registryLocation) {
@@ -45,7 +50,34 @@ public class DomainManifestStore {
         loadDomains();
         loadSubDomains();
         validate();
-        log.info("DomainManifestStore loaded: {} domains, {} sub-domains", domains.size(), subDomains.size());
+        compileIdPatterns();
+        log.info("DomainManifestStore loaded: {} domains, {} sub-domains, {} id_pattern(s)",
+                domains.size(), subDomains.size(), idPatternCache.size());
+    }
+
+    /**
+     * Pre-compiles every declared {@code id_pattern} once at load time. The request path then reads
+     * a ready {@link Pattern} from the cache via {@link #compiledIdPattern(String)} instead of
+     * calling {@link Pattern#compile(String)} (or {@link String#matches(String)}) per turn.
+     */
+    private void compileIdPatterns() {
+        for (SubDomainManifest sd : subDomains.values()) {
+            if (sd.entityTypes() == null) continue;
+            for (EntityType et : sd.entityTypes()) {
+                String p = et.idPattern();
+                if (p != null && !p.isBlank()) idPatternCache.computeIfAbsent(p, Pattern::compile);
+            }
+        }
+    }
+
+    /**
+     * The compiled form of a manifest {@code id_pattern}, cached at load time. Returns {@code null}
+     * for a null/blank pattern. Compiles-and-caches on the (rare) first sight of a pattern not seen
+     * at load, so it is always safe to call and never compiles the same regex twice.
+     */
+    public Pattern compiledIdPattern(String idPattern) {
+        if (idPattern == null || idPattern.isBlank()) return null;
+        return idPatternCache.computeIfAbsent(idPattern, Pattern::compile);
     }
 
     private void loadDomains() throws IOException {
@@ -318,17 +350,27 @@ public class DomainManifestStore {
                                       SubDomainManifest subDomain, DomainManifest.Coverage coverage) {}
 
     /**
-     * Identifies a typed identifier in {@code text} to its owning sub-domain by manifest
-     * {@code id_pattern}. A bare id like {@code REL-00188} carries no domain vocabulary, so embedding
-     * routing scores it at noise level and can pick an unrelated domain — surfacing the WRONG
-     * domain's copy. But the id's pattern names its required-context entity type exactly, and that
-     * entity type's sub-domain is its domain. Scans only resource-scoped sub-domains' required,
-     * resolvable entity types with a coverage-backed parent domain, and returns the first match (the
-     * matched id + entity type + sub-domain + coverage), or empty. Manifest-driven — the gateway
-     * embeds no id prefix or domain literal.
+     * Deterministic, non-semantic order for a return-all interpretation list (routing spec V2.1 /
+     * Piece 2): sub-domain id, then entity-type key. A stable SORT KEY over manifest identifiers —
+     * NOT a Java precedence table and NOT a domain enum (World-B: the ordering encodes no domain
+     * preference, only reproducibility so a caller never depends on HashMap iteration order).
      */
-    public Optional<IdentifiedReference> identifyByIdPattern(String text) {
-        if (text == null || text.isBlank()) return Optional.empty();
+    private static final Comparator<IdentifiedReference> STABLE_INTERPRETATION_ORDER =
+        Comparator.comparing((IdentifiedReference r) -> r.subDomain() != null ? r.subDomain().subDomainId() : "")
+                  .thenComparing(r -> r.entityType() != null ? r.entityType().key() : "");
+
+    /**
+     * All typed-identifier interpretations in {@code text}, deterministically ordered. A bare id like
+     * {@code REL-00188} carries no domain vocabulary, so embedding routing scores it at noise level;
+     * its {@code id_pattern} names its required-context entity type exactly, and that entity type's
+     * sub-domain is its domain. Scans only resource-scoped sub-domains' required, resolvable entity
+     * types with a coverage-backed parent, returning EVERY match (the same id may satisfy patterns in
+     * several sub-domains) so ordering is non-semantic. Manifest-driven — no id prefix or domain
+     * literal in the gateway.
+     */
+    public List<IdentifiedReference> identifyAllByIdPattern(String text) {
+        if (text == null || text.isBlank()) return List.of();
+        List<IdentifiedReference> out = new ArrayList<>();
         for (SubDomainManifest sd : subDomains.values()) {
             if (!sd.resourceScoped()) continue;
             DomainManifest parent = sd.parentDomain() != null ? domains.get(sd.parentDomain()) : null;
@@ -339,32 +381,39 @@ public class DomainManifestStore {
                 if (required == null || !required.contains(et.key())) continue;
                 String pat = et.idPattern();
                 if (pat == null || pat.isBlank()) continue;
-                Matcher m = Pattern.compile(pat).matcher(text);
+                Matcher m = compiledIdPattern(pat).matcher(text);
                 if (m.find()) {
-                    return Optional.of(new IdentifiedReference(m.group(), et, sd, parent.coverage()));
+                    out.add(new IdentifiedReference(m.group(), et, sd, parent.coverage()));
                 }
             }
         }
-        return Optional.empty();
+        out.sort(STABLE_INTERPRETATION_ORDER);
+        return List.copyOf(out);
     }
 
     /**
-     * The reference-grounding counterpart to {@link #identifyByIdPattern(String)}: identifies an
-     * LLM-EXTRACTED human reference (a name like "the Okafor account", not a typed id) to its owning
-     * sub-domain, sourced from the {@code extract_as} slot of a resolvable, required entity type on a
-     * resource-scoped sub-domain with a coverage-backed parent. Returns the raw extracted value as the
-     * reference {@code id} (RESOLVE turns it into a canonical id) plus the entity type, sub-domain and
-     * coverage — everything the grounder needs to RESOLVE/CHECK the reference in the RIGHT domain,
-     * pre-routing. Manifest-driven: the gateway embeds no entity-type literal or domain name.
-     *
-     * <p>Scans required resolvable entity types in declaration order and returns the first one the
-     * bag carries a non-blank {@code extract_as} value for, or empty when the bag names none. The
-     * {@code latestPrompt} is unused today (the reference already lives in the bag) but is part of the
-     * signature so a future keyword-fallback source can be added without changing callers.
+     * The deterministic focal-compatibility view of {@link #identifyAllByIdPattern(String)}: the
+     * first interpretation in stable order, or empty. Retained for the single-{@code GroundingResult}
+     * focal lattice; multi-interpretation callers use the return-all form.
      */
-    public Optional<IdentifiedReference> identifyByReference(
+    public Optional<IdentifiedReference> identifyByIdPattern(String text) {
+        return identifyAllByIdPattern(text).stream().findFirst();
+    }
+
+    /**
+     * All LLM-extracted-name interpretations the {@code bag} carries, deterministically ordered — the
+     * reference-grounding counterpart to {@link #identifyAllByIdPattern(String)} for a name like "the
+     * Okafor account". A surface reference valid in several sub-domains (each declaring a required
+     * resolvable entity type under the same {@code extract_as}) yields several interpretations; a
+     * single {@code RESOLVE→CHECK} lattice serves each. Sourced from the {@code extract_as} slot of a
+     * resolvable, required entity type on a resource-scoped sub-domain with a coverage-backed parent.
+     * Manifest-driven: no entity-type literal or domain name in the gateway. {@code latestPrompt} is
+     * part of the signature for a future keyword-fallback source; unused today.
+     */
+    public List<IdentifiedReference> identifyAllByReference(
             ai.conduit.gateway.synthesis.input.EntityBag bag, String latestPrompt) {
-        if (bag == null) return Optional.empty();
+        if (bag == null) return List.of();
+        List<IdentifiedReference> out = new ArrayList<>();
         for (SubDomainManifest sd : subDomains.values()) {
             if (!sd.resourceScoped()) continue;
             DomainManifest parent = sd.parentDomain() != null ? domains.get(sd.parentDomain()) : null;
@@ -377,11 +426,75 @@ public class DomainManifestStore {
                 if (extractAs == null || extractAs.isBlank()) continue;
                 String ref = bag.reference(extractAs);
                 if (ref != null && !ref.isBlank()) {
-                    return Optional.of(new IdentifiedReference(ref, et, sd, parent.coverage()));
+                    out.add(new IdentifiedReference(ref, et, sd, parent.coverage()));
                 }
             }
         }
-        return Optional.empty();
+        out.sort(STABLE_INTERPRETATION_ORDER);
+        return List.copyOf(out);
+    }
+
+    /**
+     * The deterministic focal-compatibility view of {@link #identifyAllByReference}: the first
+     * interpretation in stable order, or empty. Retained so the single-{@code GroundingResult} focal
+     * lattice ({@code ReferenceGroundingService.ground}) keeps its exact contract; return-all callers
+     * (Piece 2 multi-reference grounding) use {@link #identifyAllByReference}.
+     */
+    public Optional<IdentifiedReference> identifyByReference(
+            ai.conduit.gateway.synthesis.input.EntityBag bag, String latestPrompt) {
+        return identifyAllByReference(bag, latestPrompt).stream().findFirst();
+    }
+
+    /**
+     * All eligible sub-domain interpretations for ONE surface reference under a specific
+     * {@code extractAs} slot (Piece 2 per-mention grounding). Same eligibility as
+     * {@link #identifyAllByReference} — resource-scoped sub-domains with a coverage-backed parent
+     * whose required resolvable entity type declares this {@code extractAs} — but keyed off the
+     * mention's own {@code extract_as} + verbatim reference rather than the whole bag, so each of a
+     * mention's interpretations can be ground independently. Deterministically ordered; empty when the
+     * slot names no coverage-grounding entity. Manifest-driven, World-B clean.
+     */
+    public List<IdentifiedReference> interpretationsForReference(String extractAs, String reference) {
+        if (extractAs == null || extractAs.isBlank() || reference == null || reference.isBlank()) {
+            return List.of();
+        }
+        List<IdentifiedReference> out = new ArrayList<>();
+        for (SubDomainManifest sd : subDomains.values()) {
+            if (!sd.resourceScoped()) continue;
+            DomainManifest parent = sd.parentDomain() != null ? domains.get(sd.parentDomain()) : null;
+            if (parent == null || parent.coverage() == null) continue;
+            List<String> required = sd.requiredContext();
+            for (EntityType et : sd.entityTypes()) {
+                if (!et.isResolvable()) continue;
+                if (required == null || !required.contains(et.key())) continue;
+                if (!extractAs.equals(et.extractAs())) continue;
+                out.add(new IdentifiedReference(reference, et, sd, parent.coverage()));
+            }
+        }
+        out.sort(STABLE_INTERPRETATION_ORDER);
+        return List.copyOf(out);
+    }
+
+    /**
+     * True when {@code text} matches the {@code id_pattern} of a resolvable entity type on a
+     * {@code resource_scoped=false} sub-domain (routing spec V2.1 #4). Such a type is resolvable but
+     * has no coverage book, so it can never {@code RESOLVED_ALLOWED}-ground — yet a deterministic
+     * pattern match on it is still a strong, non-semantic signal of intent that a later stage (Piece
+     * 3 relaxation) can trust WITHOUT LLM presence-trust. This method only RECORDS the match; it takes
+     * no disposition. Manifest-driven: the pattern and the scoping flag both come from the manifest.
+     */
+    public boolean matchesNonCoverageScopedResolvableId(String text) {
+        if (text == null || text.isBlank()) return false;
+        for (SubDomainManifest sd : subDomains.values()) {
+            if (sd.resourceScoped()) continue;
+            for (EntityType et : sd.entityTypes()) {
+                if (!et.isResolvable()) continue;
+                String pat = et.idPattern();
+                if (pat == null || pat.isBlank()) continue;
+                if (compiledIdPattern(pat).matcher(text).find()) return true;
+            }
+        }
+        return false;
     }
 
     public Map<String, DomainManifest> allDomains() {

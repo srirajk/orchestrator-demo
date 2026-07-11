@@ -1,8 +1,12 @@
 {
   "thresholds": {
+    "capability_accuracy": 0.9,
     "domain_accuracy": 0.9,
-    "abstain_rate": 0.9,
-    "canonical_poaching_tolerance": 0
+    "abstain_rate": 1.0,
+    "min_capability_recall": 0.0,
+    "topk_recall": 0.9,
+    "canonical_poaching_tolerance": 0,
+    "_note": "capability_accuracy/min_capability_recall/topk_recall are placeholders until the operator runs eval/goal-pick/rebaseline.py; freeze them to the recommended C-baseline it reports. abstain_rate=1.0 (OOS must fully abstain) and wrong-domain-substitution=0 are hard invariants (V2 DoD)."
   },
   "queries": [
     {

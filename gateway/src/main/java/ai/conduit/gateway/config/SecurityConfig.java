@@ -87,6 +87,12 @@ public class SecurityConfig {
                 // Admin plane — requires domain_admin or platform_admin role
                 .requestMatchers("/admin/agents/**").hasAnyRole("domain_admin", "platform_admin")
                 .requestMatchers("/admin/domains/**").hasAnyRole("domain_admin", "platform_admin")
+                // Piece-6 production-path decision endpoint: authorized for ANY authenticated caller
+                // (the goal-pick harness drives it with each row's own persona token, not an admin
+                // token). MUST precede the admin `/debug/**` rule below — first match wins. The bean
+                // itself is config-gated (conduit.debug.route-decision.enabled), so on a prod profile
+                // this matcher fronts a 404, not a live surface.
+                .requestMatchers(HttpMethod.POST, "/debug/route").authenticated()
                 .requestMatchers("/debug/**").hasAnyRole("domain_admin", "platform_admin")
                 // Everything else needs at least a valid token
                 .anyRequest().authenticated()

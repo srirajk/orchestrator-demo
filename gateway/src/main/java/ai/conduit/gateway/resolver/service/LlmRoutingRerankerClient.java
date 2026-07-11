@@ -14,6 +14,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -53,20 +54,27 @@ public class LlmRoutingRerankerClient implements RoutingRerankerClient {
         // but broader than any one capability (fan out). Conflating them made a well-specified
         // multi-part question come back as "I wasn't sure which services to consult."
         String systemPrompt = """
-                You choose the single best capability for a user request from a bounded candidate set.
-                Use only the candidate ids provided.
+                You choose the best capability (or set of capabilities) for a user request from a
+                bounded candidate set. Use only the candidate ids provided.
+                Match the action the user asks for, not the names they mention.
                 Pay close attention to exclusions, negation, and what the user asks to avoid.
 
                 Choose exactly one of:
-                  - a candidate id — one capability clearly serves the whole request.
-                  - "multiple"     — the request is CLEAR, but asks for several distinct things that no
-                                     single capability covers (e.g. holdings AND performance AND
-                                     settlement status). Do not use this merely because two candidates
-                                     look similar.
-                  - "abstain"      — the request is AMBIGUOUS: the candidates are indistinguishable for
-                                     it, or none genuinely match.
+                  - a single candidate id — one capability clearly serves the whole request.
+                  - "multiple"            — the request is CLEAR, but asks for several distinct things
+                                            that no single capability covers (e.g. holdings AND
+                                            performance AND settlement status). When you choose this you
+                                            MUST also return "candidate_ids": the explicit list of the
+                                            provided ids that together cover the request — one id per
+                                            distinct thing asked, each id taken from the candidates, no
+                                            duplicates. Do not use "multiple" merely because two
+                                            candidates look similar.
+                  - "abstain"             — the request is AMBIGUOUS: the candidates are
+                                            indistinguishable for it, or none genuinely match.
 
-                Return only JSON: {"candidate_id":"<one provided id | multiple | abstain>","reason":"one short reason"}.
+                Return only JSON:
+                {"candidate_id":"<one provided id | multiple | abstain>","candidate_ids":["<provided id>", ...],"reason":"one short reason"}.
+                "candidate_ids" is required and non-empty ONLY when candidate_id is "multiple"; otherwise omit it or return [].
                 """;
 
         ObjectNode userPayload = mapper.createObjectNode();
@@ -138,7 +146,21 @@ public class LlmRoutingRerankerClient implements RoutingRerankerClient {
             return Decision.abstain(reason);
         }
         if ("multiple".equalsIgnoreCase(id)) {
-            return Decision.needsMultiple(reason);
+            // The multi-facet answer names the explicit shortlist subset (one id per distinct facet).
+            // We carry the LLM's SELECTION here; the embedding scores it was shown stay separate and are
+            // never merged into the selection. Deduplication/in-shortlist/cap checks are the resolver's
+            // job (RoutingRerankerClient contract), not the transport's.
+            List<String> selected = new ArrayList<>();
+            JsonNode ids = parsed.path("candidate_ids");
+            if (ids.isArray()) {
+                for (JsonNode node : ids) {
+                    String candidateId = node.asText("").strip();
+                    if (!candidateId.isEmpty()) {
+                        selected.add(candidateId);
+                    }
+                }
+            }
+            return Decision.multiple(selected, reason);
         }
         return Decision.pick(id, reason);
     }
