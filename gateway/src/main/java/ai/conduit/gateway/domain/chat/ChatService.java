@@ -546,12 +546,14 @@ public class ChatService {
             // (e.g. wealth + insurance), the accessible part is still fulfilled below — these labels
             // are handed to the synthesizer so it states the withheld part honestly instead of
             // dropping it silently. Labels come from the pruned manifests' own domain() — World-B clean.
-            final List<String> withheldDomains = manifests.stream()
-                    .filter(m -> allowedManifests.stream().noneMatch(a -> a.agentId().equals(m.agentId())))
-                    .map(AgentManifest::domain)
-                    .filter(d -> d != null && !d.isBlank())
-                    .distinct()
-                    .collect(Collectors.toList());
+            //
+            // A domain is withheld ONLY if NONE of its selected agents survived the gate. If any agent
+            // in the domain is still allowed (e.g. settlement_status survives while the higher-
+            // classification settlement_risk is pruned), the domain IS served below — labeling it
+            // "outside your access" would contradict the data returned for it (bug-260). So withheld =
+            // referenced domains MINUS served domains, not "every pruned agent's domain".
+            final java.util.Set<String> servedDomains = new java.util.HashSet<>(finalDomains);
+            final List<String> withheldDomains = computeWithheldDomains(manifests, servedDomains);
 
             // ── Domain + agent tags on the root span ──────────────────────────────
             // First-class Langfuse filter chips (domain:*, agent:*) plus cost-by-domain
@@ -1741,6 +1743,24 @@ public class ChatService {
                 .distinct()
                 .sorted()
                 .collect(Collectors.joining(","));
+    }
+
+    /**
+     * Domains to label "withheld" (outside the caller's access) in the synthesized answer.
+     *
+     * <p>A domain is withheld ONLY when none of its selected agents survived the structural gate.
+     * If any agent in the domain is still allowed — e.g. {@code settlement_status} (confidential)
+     * survives while the higher-classification {@code settlement_risk} (confidential-pii) is pruned —
+     * the domain IS served, so it must NOT be labeled "outside your access"; doing so contradicts the
+     * data returned for it (bug-260). Withheld = referenced domains MINUS served domains.
+     */
+    static List<String> computeWithheldDomains(List<AgentManifest> selected, Set<String> servedDomains) {
+        return selected.stream()
+                .map(AgentManifest::domain)
+                .filter(d -> d != null && !d.isBlank())
+                .distinct()
+                .filter(d -> !servedDomains.contains(d))
+                .collect(Collectors.toList());
     }
 
     /**
