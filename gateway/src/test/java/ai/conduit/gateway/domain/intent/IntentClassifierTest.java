@@ -1,6 +1,7 @@
 package ai.conduit.gateway.domain.intent;
 
 import ai.conduit.gateway.api.v1.chat.dto.Message;
+import ai.conduit.gateway.config.PromptLoader;
 import ai.conduit.gateway.domain.manifest.DomainManifestStore;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -34,6 +35,7 @@ class IntentClassifierTest {
                 new SimpleMeterRegistry(),
                 OpenTelemetry.noop().getTracer("test"),
                 store,
+                prompts(),
                 "http://127.0.0.1:1",   // nothing listens here
                 "test-key",
                 "test-model",
@@ -44,6 +46,15 @@ class IntentClassifierTest {
                 1,   // retryInitialDelayMs
                 2,   // retryBackoffMultiplier
                 1);  // requestTimeoutSeconds
+    }
+
+    /** Loads the real prompt resources from the test classpath (mirrors production wiring). */
+    private static PromptLoader prompts() {
+        try {
+            return PromptLoader.forClasspath();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Test

@@ -1,6 +1,7 @@
 {
   "domain_id": "wealth-management",
   "display_name": "Wealth Management",
+  "domain_context": "client financial data",
   "coverage": {
     "discover_url": "${WEALTH_COVERAGE_URL}/coverage/{principal_id}",
     "check_url": "${WEALTH_COVERAGE_URL}/coverage/{principal_id}/resources/{id}",
@@ -8,7 +9,14 @@
     "cache_ttl_seconds": 30
   },
   "memory_compaction": {
+    "envelope_version": "context-envelope.v1",
     "must_preserve": ["relationship_id", "client_name", "time_period", "domain"],
-    "can_drop": ["raw_agent_outputs", "routing_decisions"]
+    "can_drop": ["raw_agent_outputs", "routing_decisions"],
+    "summary_policy": {
+      "owner": "memory-service",
+      "max_summary_tokens": 600,
+      "ledger_retention_days": 90,
+      "include_runtime_events": ["gateway.response_completed"]
+    }
   }
 }

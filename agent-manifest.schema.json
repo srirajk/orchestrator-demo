@@ -222,8 +222,8 @@
                     },
                     "format": {
                       "type": "string",
-                      "minLength": 1,
-                      "description": "Generic formatter id, such as percent, percent1, currency_usd, count, plain, or date."
+                      "enum": ["percent", "percent1", "percent2", "currency_usd", "count", "date", "plain"],
+                      "description": "Generic formatter id. Enumerated to exactly the formats GroundedFigureRenderer renders and GroundedFigureValidator gates on; a value outside this set is rejected at ingestion instead of silently rendering as plain and weakening the grounding gate."
                     }
                   }
                 }

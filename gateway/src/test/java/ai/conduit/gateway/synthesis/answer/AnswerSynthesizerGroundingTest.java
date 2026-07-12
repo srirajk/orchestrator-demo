@@ -1,5 +1,6 @@
 package ai.conduit.gateway.synthesis.answer;
 
+import ai.conduit.gateway.config.PromptLoader;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
@@ -21,11 +22,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AnswerSynthesizerGroundingTest {
 
     private static AnswerSynthesizer synthesizer() {
-        // deterministicFigureFallback is stateless; the collaborators are unused on this path.
+        // deterministicFigureFallback is stateless; the collaborators (incl. the DomainManifestStore)
+        // are unused on this path — an explicit non-blank domain-context override means
+        // composedDomainContext() is never consulted.
         return new AnswerSynthesizer(
-                new ObjectMapper(), null, null, null, null, new SimpleMeterRegistry(),
+                new ObjectMapper(), null, null, null, null, new SimpleMeterRegistry(), prompts(), null,
                 "http://unused", "", "test-model", false, "Meridian", "test context",
                 1, 1, 1, 5, 5);
+    }
+
+    /** Loads the real prompt resources from the test classpath (mirrors production wiring). */
+    private static PromptLoader prompts() {
+        try {
+            return PromptLoader.forClasspath();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private static GroundedFigure figure(String label, String rendered) {

@@ -15,7 +15,12 @@ public record DomainManifest(
     // over the grounded candidate set. The clarify DECISION stays deterministic in gateway code —
     // this only affects WORDING. clarifyTone is an optional style hint passed to the composer.
     @JsonProperty("clarify_style") String clarifyStyle,
-    @JsonProperty("clarify_tone") String clarifyTone
+    @JsonProperty("clarify_tone") String clarifyTone,
+    // Optional short, neutral phrase describing this domain's data coverage (e.g. "client
+    // financial data"). Composed across all loaded domains into the classifier/synthesizer
+    // framing string (see DomainManifestStore.composedDomainContext). Domain copy lives here,
+    // never in gateway Java (World B) — the gateway only joins declared phrases.
+    @JsonProperty("domain_context") String domainContext
 ) {
     /** Clarification style, defaulting to the safe deterministic template when unset. */
     public String clarifyStyleOrDefault() {

@@ -71,12 +71,14 @@ conduit:
     deadline-ms: ${CONDUIT_REQUEST_DEADLINE_MS:90000}
 
   # ── Assistant framing (World B) ───────────────────────────────────────────────
-  # Domain-neutral defaults. A domain deployment overrides these to reskin the
-  # assistant; the gateway carries no hardcoded domain copy. domain-context feeds the
-  # intent-classifier opener + the history-only synthesis prompt; display-name names
-  # the answer synthesizer's identity.
+  # domain-context is an OPTIONAL explicit override for the classifier opener + history-only
+  # synthesis prompt. Left BLANK by default: the gateway then COMPOSES the framing from the
+  # loaded domain manifests' domain_context phrases (DomainManifestStore.composedDomainContext),
+  # falling back to a domain-neutral default when none declare one. Set it only to force a
+  # specific framing. The gateway carries no hardcoded domain copy. display-name names the
+  # answer synthesizer's identity.
   assistant:
-    domain-context: ${CONDUIT_ASSISTANT_DOMAIN_CONTEXT:an enterprise data assistant for relationship managers}
+    domain-context: ${CONDUIT_ASSISTANT_DOMAIN_CONTEXT:}
     display-name: ${CONDUIT_ASSISTANT_DISPLAY_NAME:Meridian}
   auth:
     jwks-url: ${CONDUIT_AUTH_JWKS_URL:http://iam-service:8084/.well-known/jwks.json}

@@ -159,9 +159,16 @@ services:
       CONDUIT_LLM_SYNTHESIZER_BASE_URL: ${CONDUIT_LLM_SYNTHESIZER_BASE_URL:-https://api.z.ai/api/paas/v4}
       CONDUIT_LLM_SYNTHESIZER_API_KEY: ${CONDUIT_LLM_SYNTHESIZER_API_KEY:-${ZAI_API_KEY:-}}
       CONDUIT_LLM_SYNTHESIZER_MODEL: ${CONDUIT_LLM_SYNTHESIZER_MODEL:-glm-4.6}
-      CONDUIT_LLM_CLARIFICATION_COMPOSER_BASE_URL: ${CONDUIT_LLM_CLARIFICATION_COMPOSER_BASE_URL:-https://api.z.ai/api/paas/v4}
-      CONDUIT_LLM_CLARIFICATION_COMPOSER_API_KEY: ${CONDUIT_LLM_CLARIFICATION_COMPOSER_API_KEY:-${ZAI_API_KEY:-}}
+      # Clarification composer: base-url/key inherit the intent classifier's (so its model tier can be
+      # selected independently without stranding it on a different provider's endpoint).
+      CONDUIT_LLM_CLARIFICATION_COMPOSER_BASE_URL: ${CONDUIT_LLM_CLARIFICATION_COMPOSER_BASE_URL:-${CONDUIT_LLM_INTENT_CLASSIFIER_BASE_URL:-https://api.z.ai/api/paas/v4}}
+      CONDUIT_LLM_CLARIFICATION_COMPOSER_API_KEY: ${CONDUIT_LLM_CLARIFICATION_COMPOSER_API_KEY:-${CONDUIT_LLM_INTENT_CLASSIFIER_API_KEY:-${ZAI_API_KEY:-}}}
       CONDUIT_LLM_CLARIFICATION_COMPOSER_MODEL: ${CONDUIT_LLM_CLARIFICATION_COMPOSER_MODEL:-glm-4.5-flash}
+      # Routing reranker: base-url/key inherit the intent classifier's (see application.yml fallback);
+      # model is independently selectable so the rerank tier (locked: gpt-5-mini) is not tied to intent.
+      CONDUIT_LLM_ROUTING_RERANKER_BASE_URL: ${CONDUIT_LLM_ROUTING_RERANKER_BASE_URL:-${CONDUIT_LLM_INTENT_CLASSIFIER_BASE_URL:-https://api.z.ai/api/paas/v4}}
+      CONDUIT_LLM_ROUTING_RERANKER_API_KEY: ${CONDUIT_LLM_ROUTING_RERANKER_API_KEY:-${CONDUIT_LLM_INTENT_CLASSIFIER_API_KEY:-${ZAI_API_KEY:-}}}
+      CONDUIT_LLM_ROUTING_RERANKER_MODEL: ${CONDUIT_LLM_ROUTING_RERANKER_MODEL:-glm-4.5-flash}
       SPRING_DATA_REDIS_HOST: redis-stack
       SPRING_DATA_REDIS_PORT: 6379
       CONDUIT_EMBEDDING_PROVIDER: remote
@@ -188,7 +195,10 @@ services:
       # Multi-step orchestration (D11): derive+execute the producer→consumer DAG for fan-in
       # analytics goals. Reversible — set to "false" (or remove) to fall back to flat fan-out.
       CONDUIT_ORCHESTRATION_DAG_ENABLED: "true"
-      CONDUIT_ASSISTANT_DOMAIN_CONTEXT: ${CONDUIT_ASSISTANT_DOMAIN_CONTEXT:-an enterprise assistant for banking staff — covering client financial data, market research, and internal HR policies}
+      # Assistant framing is COMPOSED from the domain manifests' domain_context phrases (World B):
+      # no hand-maintained domain copy here. Leave blank to compose from manifests; set a non-blank
+      # value only to force a specific framing.
+      CONDUIT_ASSISTANT_DOMAIN_CONTEXT: ${CONDUIT_ASSISTANT_DOMAIN_CONTEXT:-}
       # ── Conduit Insights: metric sources (in-network URLs; keys from env) ──────
       CONDUIT_INSIGHTS_PROMETHEUS_URL: http://prometheus:9090
       CONDUIT_INSIGHTS_LANGFUSE_URL: http://langfuse:3000

@@ -17,7 +17,7 @@ class EffectiveManifestMergeTest {
                 "http://coverage/check/{principal_id}/{id}",
                 "http://coverage/resolve",
                 300),
-            null, null, null);
+            null, null, null, null);
         var sub = new SubDomainManifest("private-banking", "Private Banking",
             "wealth-management", List.of("relationship_id"), true, Map.of(), List.of());
 
@@ -34,7 +34,7 @@ class EffectiveManifestMergeTest {
             "http://coverage/check/{principal_id}/{id}",
             "http://coverage/resolve",
             60);
-        var domain = new DomainManifest("wealth-management", "Wealth", coverage, null, null, null);
+        var domain = new DomainManifest("wealth-management", "Wealth", coverage, null, null, null, null);
         var sub = new SubDomainManifest("private-banking", "PB", "wealth-management",
             List.of("relationship_id"), true, Map.of(), List.of());
 
@@ -50,7 +50,7 @@ class EffectiveManifestMergeTest {
         var domain = new DomainManifest("wealth-management", "Wealth", null,
             new DomainManifest.MemoryCompaction(
                 List.of("relationship_id", "client_name"),
-                List.of("raw_agent_outputs")), null, null);
+                List.of("raw_agent_outputs")), null, null, null);
         var sub = new SubDomainManifest("private-banking", "PB", "wealth-management",
             List.of("relationship_id"), false, Map.of(), List.of());
 
@@ -62,7 +62,7 @@ class EffectiveManifestMergeTest {
 
     @Test
     void requiredContextFromSubDomain() {
-        var domain = new DomainManifest("wealth-management", "Wealth", null, null, null, null);
+        var domain = new DomainManifest("wealth-management", "Wealth", null, null, null, null, null);
         var sub = new SubDomainManifest("private-banking", "PB", "wealth-management",
             List.of("relationship_id", "time_period"), false,
             Map.of(), List.of());
@@ -76,7 +76,7 @@ class EffectiveManifestMergeTest {
     void clarificationSchemaFromSubDomain() {
         var schema = new ClarificationSchema(
             "Which client relationship?", "principal_book", 1, null);
-        var domain = new DomainManifest("wealth-management", "Wealth", null, null, null, null);
+        var domain = new DomainManifest("wealth-management", "Wealth", null, null, null, null, null);
         var sub = new SubDomainManifest("private-banking", "PB", "wealth-management",
             List.of("relationship_id"), false,
             Map.of("relationship_id", schema), List.of());
@@ -102,7 +102,7 @@ class EffectiveManifestMergeTest {
     void nullSubDomainNotResourceScoped() {
         var domain = new DomainManifest("wealth-management", "Wealth",
             new DomainManifest.Coverage("http://x/discover", "http://x/check", "http://x/resolve", 60),
-            null, null, null);
+            null, null, null, null);
 
         var effective = EffectiveManifest.merge(domain, null, "meridian.wealth.holdings");
 

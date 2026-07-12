@@ -1,6 +1,7 @@
 {
   "domain_id": "insurance",
   "display_name": "Insurance",
+  "domain_context": "insurance policies and claims",
   "clarify_style": "composed",
   "clarify_tone": "warm, concise, and professional — like a helpful colleague",
   "coverage": {

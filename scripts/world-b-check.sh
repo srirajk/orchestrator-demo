@@ -24,6 +24,9 @@ set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GATEWAY_SRC="$ROOT/gateway/src/main/java"
+# Externalized LLM prompt skeletons live here. They must be scanned with the SAME CRITICAL
+# patterns as the Java — moving prompt text to resources must not move it out of the gate.
+PROMPT_SRC="$ROOT/gateway/src/main/resources/prompts"
 QUIET="${1:-}"
 
 if [[ ! -d "$GATEWAY_SRC" ]]; then
@@ -39,22 +42,28 @@ strip_comments() { grep -vE ':[0-9]+:[[:space:]]*(\*|//|/\*)'; }
 LAST_COUNT=0   # set by scan(); read by the caller — keeps report off the count stream
 
 # scan <label> <regex>  → prints matching code lines, sets LAST_COUNT
+# Scans the gateway Java (comment lines dropped) AND the externalized prompt resources (every
+# line is live, so no comment stripping there).
 scan() {
   local label="$1" regex="$2"
-  local hits count=0
-  hits="$(grep -rnE "$regex" "$GATEWAY_SRC" --include='*.java' 2>/dev/null | strip_comments)"
+  local hits count=0 hj hp
+  hj="$(grep -rnE "$regex" "$GATEWAY_SRC" --include='*.java' 2>/dev/null | strip_comments)"
+  hp=""
+  [[ -d "$PROMPT_SRC" ]] && hp="$(grep -rnE "$regex" "$PROMPT_SRC" 2>/dev/null)"
+  hits="$(printf '%s\n%s\n' "$hj" "$hp" | grep -v '^[[:space:]]*$')"
   [[ -n "$hits" ]] && count="$(printf '%s\n' "$hits" | grep -c .)"
   LAST_COUNT="$count"
   if [[ "$count" -gt 0 && "$QUIET" != "--quiet" ]]; then
     echo ""
     echo "  ▸ $label  ($count)"
-    printf '%s\n' "$hits" | sed "s#$GATEWAY_SRC/#      #"
+    printf '%s\n' "$hits" | sed -e "s#$GATEWAY_SRC/#      #" -e "s#$PROMPT_SRC/#      #"
   fi
 }
 
 echo "═══════════════════════════════════════════════════════════════════════"
 echo " World B check — gateway must carry zero domain knowledge"
 echo " target: ${GATEWAY_SRC#"$ROOT"/}"
+echo "         ${PROMPT_SRC#"$ROOT"/}"
 echo "═══════════════════════════════════════════════════════════════════════"
 
 # ── CRITICAL — these must NEVER appear in gateway code ───────────────────────

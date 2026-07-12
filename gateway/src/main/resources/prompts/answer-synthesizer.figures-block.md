@@ -1,0 +1,2 @@
+Use the placeholder exactly when mentioning a listed figure. Mention each listed figure once when it is part of the answer. Do not type the figure's digits yourself; the gateway will substitute values.
+Example: given a figure whose label is "metric alpha" with its own placeholder string, and the question "what is metric alpha?", a correct answer is "Metric alpha is " followed by that figure's placeholder string. An INCORRECT answer types the number itself, reformats it, or adds two placeholders together.

@@ -1,6 +1,11 @@
 package ai.conduit.gateway.domain.manifest;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.networknt.schema.JsonSchema;
+import com.networknt.schema.JsonSchemaFactory;
+import com.networknt.schema.SpecVersion;
+import com.networknt.schema.ValidationMessage;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,14 +16,17 @@ import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Service
 public class DomainManifestStore {
@@ -29,6 +37,13 @@ public class DomainManifestStore {
     private final ObjectMapper mapper;
     private final Environment env;
     private final String registryLocation;
+    // Domain + sub-domain manifests are schema-validated at load time exactly as agent manifests are
+    // (ManifestValidator). A malformed/unschema'd manifest FAILS STARTUP instead of being silently
+    // dropped (which would remove a domain's entity types / CLARIFY gates / copy with no signal).
+    // The classpath copies here are the authoritative runtime schemas, kept byte-identical to the
+    // registry/ copies by DomainSchemaCopiesInSyncTest.
+    private final JsonSchema domainSchema;
+    private final JsonSchema subDomainSchema;
     private final Map<String, DomainManifest>    domains          = new HashMap<>();
     private final Map<String, SubDomainManifest> subDomains       = new HashMap<>();
     // Reverse map: agentId → subDomainId — built from sub-domain agents[] lists at load time.
@@ -43,6 +58,34 @@ public class DomainManifestStore {
         this.mapper = mapper;
         this.env = env;
         this.registryLocation = registryLocation;
+        this.domainSchema = loadSchema("/domain-manifest.schema.json");
+        this.subDomainSchema = loadSchema("/sub-domain-manifest.schema.json");
+    }
+
+    /** Loads a JSON schema from the gateway classpath, failing startup loudly if it is missing. */
+    private static JsonSchema loadSchema(String classpathResource) {
+        InputStream in = DomainManifestStore.class.getResourceAsStream(classpathResource);
+        if (in == null) {
+            throw new IllegalStateException(classpathResource + " not found on classpath. Ensure it "
+                    + "is present in gateway/src/main/resources/ (kept in sync with registry/).");
+        }
+        return JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012).getSchema(in);
+    }
+
+    /**
+     * Validates a raw manifest node against its schema, throwing (→ failing startup) on any error.
+     * Mirrors {@code ManifestValidator} so domain/sub-domain manifests get the same fail-loud contract
+     * agent manifests already have.
+     */
+    private void validateSchema(JsonSchema schema, JsonNode node, String kind, String filename) {
+        Set<ValidationMessage> errors = schema.validate(node);
+        if (!errors.isEmpty()) {
+            String detail = errors.stream()
+                    .map(ValidationMessage::getMessage)
+                    .collect(Collectors.joining("; "));
+            throw new IllegalStateException(
+                    kind + " manifest '" + filename + "' failed schema validation: " + detail);
+        }
     }
 
     @PostConstruct
@@ -90,15 +133,26 @@ public class DomainManifestStore {
             return;
         }
         for (Resource r : resources) {
+            JsonNode node;
             try {
-                DomainManifest d = mapper.readValue(r.getInputStream(), DomainManifest.class);
-                // Resolve environment variable placeholders in Coverage URL fields
-                d = resolveEnvVarsInCoverage(d);
-                domains.put(d.domainId(), d);
-                log.debug("Loaded domain: {}", d.domainId());
-            } catch (Exception e) {
-                throw new IllegalStateException("Failed to parse domain manifest " + r.getFilename() + ": " + e.getMessage(), e);
+                node = mapper.readTree(r.getInputStream());
+            } catch (IOException e) {
+                throw new IllegalStateException(
+                        "Failed to read domain manifest " + r.getFilename() + ": " + e.getMessage(), e);
             }
+            // FAIL LOUD: an unschema'd/malformed domain manifest aborts startup, never silently dropped.
+            validateSchema(domainSchema, node, "Domain", r.getFilename());
+            DomainManifest d;
+            try {
+                d = mapper.treeToValue(node, DomainManifest.class);
+            } catch (Exception e) {
+                throw new IllegalStateException(
+                        "Failed to parse domain manifest " + r.getFilename() + ": " + e.getMessage(), e);
+            }
+            // Resolve environment variable placeholders in Coverage URL fields
+            d = resolveEnvVarsInCoverage(d);
+            domains.put(d.domainId(), d);
+            log.debug("Loaded domain: {}", d.domainId());
         }
     }
 
@@ -116,7 +170,7 @@ public class DomainManifestStore {
         }
         DomainManifest.Coverage resolved = new DomainManifest.Coverage(discoverUrl, checkUrl, resolveUrl, c.cacheTtlSeconds());
         return new DomainManifest(d.domainId(), d.displayName(), resolved, d.memoryCompaction(),
-                d.clarifyStyle(), d.clarifyTone());
+                d.clarifyStyle(), d.clarifyTone(), d.domainContext());
     }
 
     private String resolveEnvVars(String template) {
@@ -143,26 +197,42 @@ public class DomainManifestStore {
         var resolver = new PathMatchingResourcePatternResolver();
         Resource[] resources;
         try {
-            resources = resolver.getResources(registryLocation + "domains/**/*.json");
+            // Exactly one directory deep: registry/domains/<domain>/<sub-domain>.json. This
+            // deterministically SEPARATES sub-domain files from the domain-level files matched by
+            // loadDomains' domains/*.json, so each file is validated against the RIGHT schema. The
+            // previous domains/**/*.json matched BOTH and silently skipped the domain-level files —
+            // which also meant a malformed sub-domain file was silently dropped (the bug fixed here).
+            resources = resolver.getResources(registryLocation + "domains/*/*.json");
         } catch (IOException e) {
             log.warn("No sub-domain manifests found");
             return;
         }
         for (Resource r : resources) {
+            JsonNode node;
             try {
-                SubDomainManifest sd = mapper.readValue(r.getInputStream(), SubDomainManifest.class);
-                if (sd.subDomainId() == null) continue; // skip domain-level files that were matched
-                subDomains.put(sd.subDomainId(), sd);
-                log.debug("Loaded sub-domain: {} (parent: {}) resourceScoped={}",
-                    sd.subDomainId(), sd.parentDomain(), sd.resourceScoped());
-                // Build reverse map so getEffective() works even when AgentManifest.subDomain() is null.
-                if (sd.agents() != null) {
-                    for (String aid : sd.agents()) {
-                        agentToSubDomain.put(aid, sd.subDomainId());
-                    }
-                }
+                node = mapper.readTree(r.getInputStream());
+            } catch (IOException e) {
+                throw new IllegalStateException(
+                        "Failed to read sub-domain manifest " + r.getFilename() + ": " + e.getMessage(), e);
+            }
+            // FAIL LOUD: a malformed sub-domain manifest silently dropped here would remove a domain's
+            // entity types / CLARIFY gates / copy without any signal — abort startup instead.
+            validateSchema(subDomainSchema, node, "Sub-domain", r.getFilename());
+            SubDomainManifest sd;
+            try {
+                sd = mapper.treeToValue(node, SubDomainManifest.class);
             } catch (Exception e) {
-                log.debug("Skipping non-subdomain file {}: {}", r.getFilename(), e.getMessage());
+                throw new IllegalStateException(
+                        "Failed to parse sub-domain manifest " + r.getFilename() + ": " + e.getMessage(), e);
+            }
+            subDomains.put(sd.subDomainId(), sd);
+            log.debug("Loaded sub-domain: {} (parent: {}) resourceScoped={}",
+                sd.subDomainId(), sd.parentDomain(), sd.resourceScoped());
+            // Build reverse map so getEffective() works even when AgentManifest.subDomain() is null.
+            if (sd.agents() != null) {
+                for (String aid : sd.agents()) {
+                    agentToSubDomain.put(aid, sd.subDomainId());
+                }
             }
         }
     }
@@ -495,6 +565,44 @@ public class DomainManifestStore {
             }
         }
         return false;
+    }
+
+    /**
+     * The classifier/synthesizer domain framing, COMPOSED deterministically from the
+     * {@code domain_context} phrases declared by the loaded domain manifests. World-B: the gateway
+     * emits NO domain literal — it only JOINS manifest-declared copy. Domains are ordered by
+     * {@code domain_id} so the prompt is stable regardless of map/load order. When no domain declares
+     * a {@code domain_context}, returns the domain-NEUTRAL default — never a domain-flavored string.
+     */
+    public String composedDomainContext() {
+        List<String> contexts = domains.values().stream()
+                .sorted(Comparator.comparing(DomainManifest::domainId))
+                .map(DomainManifest::domainContext)
+                .filter(c -> c != null && !c.isBlank())
+                .map(String::trim)
+                .toList();
+        return composeDomainContext(contexts);
+    }
+
+    /**
+     * Composes the framing string from already-ordered, non-blank domain-context phrases. Package-
+     * private + static so the join / neutral-fallback logic is unit-testable without loading manifests.
+     * The neutral default carries no domain knowledge; the "covering …" phrasing only joins the
+     * manifest-declared phrases.
+     */
+    static String composeDomainContext(List<String> contextsInDomainIdOrder) {
+        if (contextsInDomainIdOrder == null || contextsInDomainIdOrder.isEmpty()) {
+            return "an enterprise data assistant";
+        }
+        return "an enterprise data assistant covering " + humanJoin(contextsInDomainIdOrder);
+    }
+
+    /** Joins items as "a", "a and b", or "a, b and c" — deterministic, preserving list order. */
+    private static String humanJoin(List<String> items) {
+        int n = items.size();
+        if (n == 1) return items.get(0);
+        String head = String.join(", ", items.subList(0, n - 1));
+        return head + " and " + items.get(n - 1);
     }
 
     public Map<String, DomainManifest> allDomains() {

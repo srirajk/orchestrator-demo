@@ -1,6 +1,7 @@
 {
   "domain_id": "hr",
   "display_name": "Human Resources",
+  "domain_context": "internal HR policies",
   "memory_compaction": {
     "envelope_version": "context-envelope.v1",
     "must_preserve": ["policy_topic", "policy_id", "domain"],

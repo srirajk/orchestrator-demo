@@ -50,4 +50,21 @@ class ManifestSchemaCopiesInSyncTest {
                 .as("root %s has drifted from the runtime copy", SCHEMA)
                 .isEqualTo(runtime);
     }
+
+    /**
+     * The domain + sub-domain schemas are now loaded and enforced by the gateway ({@code
+     * DomainManifestStore}) from its classpath copy, while the registry service owns the authoritative
+     * copy under {@code registry/}. Same contract-in-two-places liability as the agent schema — guard it.
+     */
+    @Test
+    void bothCopiesOfTheDomainSchemasAreSemanticallyIdentical() throws Exception {
+        Path root = repoRoot();
+        for (String schema : new String[]{"domain-manifest.schema.json", "sub-domain-manifest.schema.json"}) {
+            JsonNode runtime = read(root.resolve("gateway/src/main/resources/" + schema));
+            JsonNode registry = read(root.resolve("registry/" + schema));
+            assertThat(registry)
+                    .as("registry/%s has drifted from the gateway classpath copy it is validated against", schema)
+                    .isEqualTo(runtime);
+        }
+    }
 }

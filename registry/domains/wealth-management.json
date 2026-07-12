@@ -1,6 +1,7 @@
 {
   "domain_id": "wealth-management",
   "display_name": "Wealth Management",
+  "domain_context": "client financial data",
   "clarify_style": "composed",
   "clarify_tone": "warm, concise, and professional — like a helpful colleague",
   "coverage": {

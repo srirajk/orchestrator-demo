@@ -1,5 +1,6 @@
 package ai.conduit.gateway.synthesis.input;
 
+import ai.conduit.gateway.config.PromptLoader;
 import ai.conduit.gateway.domain.manifest.DomainManifestStore;
 import ai.conduit.gateway.domain.manifest.EntityType;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -42,7 +43,16 @@ class EntityExtractorFallbackTest {
         DomainManifestStore store = mock(DomainManifestStore.class);
         when(store.entityTypes()).thenReturn(types);
 
-        return new EntityExtractor(restTemplate, new ObjectMapper(), store);
+        return new EntityExtractor(restTemplate, new ObjectMapper(), store, prompts());
+    }
+
+    /** Loads the real prompt resources from the test classpath (mirrors production wiring). */
+    private static PromptLoader prompts() {
+        try {
+            return PromptLoader.forClasspath();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Test

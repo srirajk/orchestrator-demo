@@ -1,0 +1,1 @@
+- CLARIFY ONLY when the request needs a specific resolvable entity to answer AND the latest user message neither states such an entity (by name or identifier) nor back-references one named earlier by the user. If the latest message states or back-references an entity, it is NOT ambiguous → FETCH_DATA, never CLARIFY.

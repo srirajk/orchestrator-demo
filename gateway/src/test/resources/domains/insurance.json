@@ -1,6 +1,7 @@
 {
   "domain_id": "insurance",
   "display_name": "Insurance",
+  "domain_context": "insurance policies and claims",
   "coverage": {
     "discover_url": "${INSURANCE_COVERAGE_URL}/coverage/{principal_id}",
     "check_url": "${INSURANCE_COVERAGE_URL}/coverage/{principal_id}/resources/{id}",
@@ -8,7 +9,14 @@
     "cache_ttl_seconds": 30
   },
   "memory_compaction": {
+    "envelope_version": "context-envelope.v1",
     "must_preserve": ["policy_id", "claim_id", "domain"],
-    "can_drop": ["raw_agent_outputs", "routing_decisions"]
+    "can_drop": ["raw_agent_outputs", "routing_decisions"],
+    "summary_policy": {
+      "owner": "memory-service",
+      "max_summary_tokens": 600,
+      "ledger_retention_days": 90,
+      "include_runtime_events": ["gateway.response_completed"]
+    }
   }
 }
