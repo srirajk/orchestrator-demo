@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-07-10T12:40:29.400Z
-> Files: 953 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-07-12T01:14:36.054Z
+> Files: 1102 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/
 
@@ -12,9 +12,17 @@
 
 - `glassbox.mjs` — Read-only visual check: log into the real chat UI, send prompts, screenshot the live glass box. (~785 tok)
 
+## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/
+
+- `multiturn_probe.py` — tok, ask, classify (~802 tok)
+
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/probe/
 
 - `Probe.java` — Probe: main (~1124 tok)
+
+## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/wt-mcp/.wolf/
+
+- `buglog.json` — Declares annotation (~48702 tok)
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/wt-mcp/gateway/src/main/java/ai/conduit/gateway/adapter/mcp/
 
@@ -33,9 +41,13 @@
 
 - `application.yml` (~4151 tok)
 
+## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/wt-mcp/gateway/src/test/java/ai/conduit/gateway/adapter/mcp/
+
+- `McpAdapterStreamableTest.java` — Streamable HTTP responds to a POST with EITHER a plain {@code application/json} body OR an (~967 tok)
+
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/wt-mcp/mock-agents/servicing/
 
-- `server.py` — JwtAuthMiddleware: get_custody_positions, get_settlements, get_corporate_actions, get_nav + 6 more (~3813 tok)
+- `server.py` — JwtAuthMiddleware: get_custody_positions, get_settlements, get_corporate_actions, get_nav + 5 more (~3979 tok)
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/wt-mcp/registry/
 
@@ -57,14 +69,20 @@
 - `feedback_gateway_rules.md` (~526 tok)
 - `feedback_no_sync_telemetry.md` (~506 tok)
 - `feedback_observability_standard.md` (~364 tok)
+- `feedback_seed_data_python_not_flyway.md` (~340 tok)
 - `feedback_verify_agent_base.md` (~394 tok)
 - `feedback_workflow_parallelism.md` (~341 tok)
-- `MEMORY.md` — Memory Index (~764 tok)
+- `MEMORY.md` — Memory Index (~1220 tok)
+- `project_bounded_context_redis_isolation.md` (~569 tok)
+- `project_branch_topology.md` (~639 tok)
+- `project_compose_profiles_and_backend.md` (~543 tok)
 - `project_domain_manifest_strategy.md` — Agreed Architecture — Domain Manifest + Gateway Strategy (~958 tok)
+- `project_entitlement_ground_truth.md` (~574 tok)
 - `project_gateway_auth_model.md` (~548 tok)
 - `project_gold_class_overnight.md` (~611 tok)
 - `project_langfuse_observability_model.md` (~462 tok)
 - `project_meridian_gateway.md` — What this project is (~777 tok)
+- `project_model_selection.md` (~407 tok)
 - `project_perf_livelock_rootcause.md` (~1023 tok)
 - `project_production_grade_phase.md` — Declares build (~3048 tok)
 - `project_repo_layout_worktrees.md` (~468 tok)
@@ -188,6 +206,11 @@
 ## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/config/
 
 - `AppConfig.java` — Synchronous client used by {@code EntityExtractor} (LLM) and {@code EntityResolver} (CRM). (~928 tok)
+- `PromptLoader.java` — Eager, fail-fast loader for the 5 gateway LLM prompt skeletons under `resources/prompts/**/*.md`; `prompt(name)` + strict `render(name,vars)` (throws on leftover `{{token}}`). Consumers render in their constructors so a missing/typo'd resource fails startup. (~700 tok)
+
+## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/auth/
+
+- `RevocationChecker.java` — Returns true if the authorization for this principal+relationship has been revoked, signalled (~759 tok)
 
 ## ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/chat/
 
@@ -312,7 +335,7 @@
 
 ## ../orchestrator-chat/iam-service/src/main/java/com/openwolf/iam/config/
 
-- `SecurityConfig.java` — Security configuration for the IAM service. (~6715 tok)
+- `SecurityConfig.java` — Security configuration for the IAM service. (~7526 tok)
 
 ## ../orchestrator-chat/iam-service/src/main/java/com/openwolf/iam/service/
 
@@ -459,7 +482,7 @@
 
 ## ../orchestrator-chat/tests/e2e/tests/
 
-- `09-cerbos-authz.spec.ts` — Cerbos Authorization Matrix — direct PDP API tests (~6346 tok)
+- `09-cerbos-authz.spec.ts` — Cerbos Authorization Matrix — direct PDP API tests (~7138 tok)
 
 ## ../orchestrator-chat/tests/load/
 
@@ -473,12 +496,12 @@
 
 - `.DS_Store` (~1640 tok)
 - `.gitignore` — Git ignore rules (~524 tok)
-- `agent-manifest.schema.json` (~1558 tok)
+- `agent-manifest.schema.json` — Declares used (~4210 tok)
 - `BUILD_REPORT.md` — Build Report — Conduit AI Gateway (~1028 tok)
-- `CLAUDE.md` — OpenWolf (~1698 tok)
-- `docker-compose.yml` — Docker Compose services (~8697 tok)
+- `CLAUDE.md` — OpenWolf (~2865 tok)
+- `docker-compose.yml` — Docker Compose services (~12100 tok)
 - `MORNING-NOTES.md` — Morning notes — OIDC SSO is fixed ✅ (~1292 tok)
-- `README.md` — Project documentation (~4394 tok)
+- `README.md` — Project documentation (~4427 tok)
 - `TODO.md` — Conduit — Open TODO / Backlog (~823 tok)
 - `z.ai-tiers.md` — Declares Model (~778 tok)
 
@@ -747,7 +770,7 @@
 - `DESIGN-SYSTEM.md` — Axiom Admin UI Design Direction (~251 tok)
 - `Dockerfile` — Docker container definition (~103 tok)
 - `index.html` — Meridian Admin (~236 tok)
-- `nginx.conf` (~148 tok)
+- `nginx.conf` (~412 tok)
 - `package.json` — Node.js package manifest (~192 tok)
 - `postcss.config.js` (~23 tok)
 - `tailwind.config.js` (~145 tok)
@@ -757,14 +780,14 @@
 
 ## admin-ui/src/
 
-- `App.tsx` — Protected (~423 tok)
+- `App.tsx` — Protected (~655 tok)
 - `index.css` — Styles: 5 rules (~228 tok)
 - `main.tsx` — queryClient (~141 tok)
 - `vite-env.d.ts` — Vite env typing for optional non-secret workbench gateway API base override (~65 tok)
 
 ## admin-ui/src/api/
 
-- `client.ts` — Exports authApi, User, AuditEntry, PageResponse + 16 more (~1988 tok)
+- `client.ts` — ABAC segments arrive from the backend as a {segment: data_classification} MAP (~2807 tok)
 
 ## admin-ui/src/auth/
 
@@ -774,7 +797,7 @@
 
 - `ErrorBoundary.tsx` — Route-level React crash boundary with Axiom fallback and reload action. (~455 tok)
 - `Layout.tsx` — Layout (~85 tok)
-- `Sidebar.tsx` — nav (~774 tok)
+- `Sidebar.tsx` — nav (~802 tok)
 
 ## admin-ui/src/components/ui/
 
@@ -815,13 +838,13 @@
 
 ## admin-ui/src/hooks/
 
-- `useAuth.tsx` — Ctx (~551 tok)
+- `useAuth.tsx` — Roles that may enter the admin console — mirrors the backend /admin/** guard. (~1050 tok)
 
 ## admin-ui/src/pages/
 
 - `AuditLog.tsx` — ACTION_COLORS — renders table (~3652 tok)
 - `Dashboard.tsx` — StatCard (~2110 tok)
-- `Login.tsx` — Login — renders form (~847 tok)
+- `Login.tsx` — Login — renders form (~1225 tok)
 - `Policies.tsx` — RESOURCES (~3774 tok)
 - `Roles.tsx` — EMPTY — renders table, modal (~3469 tok)
 - `Teams.tsx` — EMPTY — renders modal (~3886 tok)
@@ -831,6 +854,10 @@
 ## apps/admin/ (Axiom Admin Console — split from admin-ui)
 
 
+## apps/insights/web/
+
+- `nginx.conf` (~412 tok)
+
 ## apps/insights/web/src/
 
 - `App.tsx` — Conduit Insights React SPA (SSO login, 7 views). AnswerQualityView binds `grounding_distribution`→`<ScoreHistogram>` (vertical binned bars + 0→1 axis) and `grounding_by_model`→`<Bars unit="score">`. UserView binds `compaction`→`<CompactionStat>` (summary-attached bar + compactions/tokens-saved/avg-messages stat tiles). Unbuilt-endpoint placeholder panels have been removed (no stubs shown): TrustView dropped the 'Fabricated IDs' KPI card (trust-strip now 3 cols); AgentsView dropped 'Latency by stage' (Agent fleet now col12); UserView dropped 'Their conversations' + 'Entitlement decisions' (backend conversation-store adapter seam left intact — UI only). Awaiting-data panels (breakers, request volume, cost-over-time, bulkhead) kept. (~13000 tok)
@@ -838,6 +865,7 @@
 ## docs/
 
 - `agent-catalog.md` — Agent Catalog — The 9 Demo Agents (Conduit demo) (~1479 tok)
+- `AGENT-ONBOARDING-HANDBOOK.md` — The Conduit Agent Onboarding Handbook (~28735 tok)
 - `agent-registration-schema-a2a-aligned.md` — Agent Registration Schema — Grounded in the A2A Agent Card Standard (~1795 tok)
 - `agent-registry-demo-spec.md` — Agent Registry — Demo Spec (~2333 tok)
 - `AGENTS.md` — Conduit AI — Agent Guide (~2838 tok)
@@ -845,10 +873,13 @@
 - `authorization-model.md` — Enterprise AI Gateway — Authorization Model (~5478 tok)
 - `authz-architecture-brief.md` — Enterprise AI Gateway — Authorization & User Management Architectural Brief (~7031 tok)
 - `clearance-tiers-and-agent-metadata.md` — Clearance Tiers — Tenant Schema, Agent Metadata & Policy (~2142 tok)
+- `CODEX-DOMAIN-TEST-STORIES.md` — Conduit — domain-depth test STORIES (for Codex, browser-driven) (~2326 tok)
+- `CODEX-ENTITLEMENT-SWEEP-HANDOFF.md` — Codex handoff — entitlement sweep (browser run + capture) (~1009 tok)
+- `CONDUIT-GATEWAY-INTERNALS-WHITEPAPER.md` — Conduit Gateway — Internals & Design Rationale (technical deep-dive) (~5143 tok)
 - `CONDUIT-WORKBENCH-PLAN.md` — Conduit Workbench + Axiom Control Plane Plan (~1861 tok)
 - `DIAGRAM-PROMPTS.md` — Conduit — Diagram Prompts & Generation Guide (~4216 tok)
 - `domain-manifest-and-memory.md` — Governed Memory + Context Envelope Architecture (~1745 tok)
-- `domain-onboarding-standard.md` — Domain Onboarding Standard (~3140 tok)
+- `domain-onboarding-standard.md` — Domain Onboarding Standard — retired (~413 tok)
 - `EVAL-EXTRACTION.md` — Eval — Extraction Record (lift into its own project) (~1425 tok)
 - `EVAL-FRAMEWORK.md` — Conduit Eval Framework — an agent-agnostic evaluation worker (~2269 tok)
 - `EVAL-PRODUCT-VISION.md` — Eval — Product Vision (framework + app) (~1004 tok)
@@ -865,7 +896,28 @@
 - `PROMPT-AUDIT.md` — Prompt Contract Audit — every production prompt vs the 9-element framework (~1931 tok)
 - `QA-CODEX-PLAYBOOK.md` — Conduit — QA Playbook (for Codex / automated browser QA) (~4967 tok)
 - `technical-architecture-clear-boundaries.md` — Technical Architecture — Clear Boundaries (~1990 tok)
+- `UI-E2E-SCENARIOS-FOR-CODEX-v2.md` — Conduit UI — full end-to-end browser test plan v2 (for Codex) (~4370 tok)
+- `UI-E2E-SCENARIOS-FOR-CODEX.md` — Conduit UI — full end-to-end browser test plan (for Codex) (~1621 tok)
 - `WORLD-B-LOCKDOWN.md` — Conduit — World B Architecture Lockdown (~8940 tok)
+
+## docs/specs/
+
+- `AGENT-MANIFEST-DEEPDIVE.md` — Agent Manifest Deep-Dive — Completeness, Candidate Additions, Hidden Coupling, Robustness (~5301 tok)
+- `AUDIT-RECORD-SPEC.md` — Audit Record — capture spec (WORM, adapter-based) (~2838 tok)
+- `CLARIFY-ROUTING-DECOUPLE-FIX.md` — Spec: Decouple request disposition from routing confidence (clarify-path class fix) (~1571 tok)
+- `ENTITLEMENT-SWEEP-MATRIX.md` — Entitlement / correctness sweep — v2 (double-hat verified; FOR FINAL REVIEW, not yet run) (~2724 tok)
+- `GATEWAY-PACKAGE-STRUCTURE.md` — Gateway package structure — the convention of record (~1741 tok)
+- `LITMUS-TEST-DESIGN-FABLE.md` — Litmus-Test Design Review — Faithfulness Audit & Minimal Set (Fable) (~6463 tok)
+- `MODEL-SELECTION.md` — Gateway LLM model selection (locked 2026-07-11) (~611 tok)
+- `ONBOARDING-DOCS-AUDIT.md` — Onboarding Docs Audit — AGENT-ONBOARDING-HANDBOOK.md + domain-onboarding-standard.md (~7848 tok)
+- `PROMPT-EXTERNALIZATION-DESIGN.md` — Prompt Externalization Design — Framework Conformance & Resource Layout (~7782 tok)
+- `ROUTING-LAYER-CODEX-SOL-REVIEW.md` — Adversarial SOL code-level review of the capability-first routing implementation spec against the current grounding, masking, reranking, pruning, DAG, and eval paths. (~9000 tok)
+- `ROUTING-LAYER-FABLE-REVIEW.md` — Routing layer impl spec — Fable review (for reconciliation with Codex-SOL) (~1146 tok)
+- `ROUTING-LAYER-IMPL-SPEC-V2.md` — Routing layer — implementation spec V2 (capability-first routing, SOTA) (~3607 tok)
+- `ROUTING-LAYER-IMPL-SPEC.md` — Routing layer — implementation spec (capability-first routing, SOTA) (~2082 tok)
+- `ROUTING-LAYER-RECONCILED.md` — Routing layer — reconciled review (Fable + Codex-SOL + Opus) (~1295 tok)
+- `ROUTING-PRECISION-CODEX-SOL-REPORT.md` — Independent architecture verification of routing precision, post-prune intent preservation, corpus contamination, masking, reranking, eval coverage, and World-B compliance. (~7050 tok)
+- `ROUTING-PRECISION-CODEX-VERIFY.md` — Codex verification brief — generic routing precision (flagship design) (~1681 tok)
 
 ## e2e/test-results/.playwright-artifacts-0/traces/
 
@@ -972,8 +1024,18 @@
 - `langfuse_run_experiment.py` — Run a Langfuse experiment against the meridian-routing dataset. (~4132 tok)
 - `langfuse_seed_datasets.py` — Seed Langfuse datasets from eval/golden-prompts.json. (~3565 tok)
 - `multiturn-recency-insurance.json` — Cross-domain anaphor-recency regression guard (bug-234, uw_sam/insurance): establish policy A → switch B → re-name A → pronoun must bind to just-named A (POL-77002) not older B (POL-77001); asserted via coverage-gate entity in the decision trace. Proves the focal-recency fix is domain-generic. (~500 tok)
-- `multiturn-routing.json` — Multi-turn context-aware routing regression guard (Calderon keyword-less-follow-up fix); expected domain/outcome + must_not_route per turn. (~600 tok)
+- `multiturn-routing.json` — Declares but (~2009 tok)
 - `requirements.txt` — Python dependencies (~41 tok)
+
+## eval/goal-pick/
+
+- `capability_entity_conflict.json` (~902 tok)
+- `labeled_queries.json` (~5890 tok)
+- `measure_goal_pick.py` — Measure live goal-pick accuracy on the PRODUCTION routing path (routing spec V2 Piece 6). (~6778 tok)
+- `name_invariance.json` (~1028 tok)
+- `REBASELINE.md` — Goal-pick re-baseline — production-path threshold calibration (routing spec V2 Piece 6) (~1608 tok)
+- `rebaseline.py` — Re-baseline the resolver thresholds OFFLINE against frozen production-path score vectors. (~5120 tok)
+- `routing_edge_cases.json` (~1537 tok)
 
 ## eval/prompts/
 
@@ -995,32 +1057,146 @@
 ## gateway/
 
 - `Dockerfile` — Docker container definition (~135 tok)
-- `pom.xml` (~1494 tok)
+- `pom.xml` (~1845 tok)
+
+## gateway/src/main/java/ai/conduit/gateway/admin/
+
+- `AgentRegistryController.java` — Read-only view of the agent registry. (~546 tok)
+
+## gateway/src/main/java/ai/conduit/gateway/api/v1/admin/
+
+- `RouteDecisionController.java` — The Piece-6 production-path routing DECISION endpoint (routing spec V2). (~958 tok)
 
 ## gateway/src/main/java/ai/conduit/gateway/api/v1/chat/
 
 - `ChatCompletionsController.java` — Non-streaming ({@code stream:false}) — runs the same pipeline into a buffering emitter, (~2296 tok)
 
+## gateway/src/main/java/ai/conduit/gateway/config/
+
+- `GroundingConfig.java` — Binds the multi-reference grounding budgets from {@code conduit.grounding.*} (routing spec V2.1 / (~307 tok)
+- `PromptLoader.java` — Loads the gateway's LLM prompt skeletons from {@code classpath:prompts/**&#47;*.md} once, at bean (~1183 tok)
+- `RoutePreparationConfig.java` — Binds the pre-routing preparation pipeline (routing spec V2 Piece 3) from {@code conduit.routing.*} (~496 tok)
+- `SecurityConfig.java` — Spring Security resource server + role-based URL authorization. (~3859 tok)
+
 ## gateway/src/main/java/ai/conduit/gateway/domain/chat/
 
-- `ChatService.java` — Entry point from the controller — called on a virtual thread after the async boundary. Routes FETCH with bias-to-fetch (hasGroundedResolvableReference→resolveContextual entityKnown); FOLLOW_UP fallthrough to fetch when a grounded entity + confident route exist; routing-abstained FETCH degrades to grounded history synthesis when prior assistant data exists (hasPriorAssistantData). Deterministic identifier PRE-CHECK (identifyByIdPattern→resolve+CHECK→deny with the id's OWN domain copy before routing, bug-236); coverage else-branch named-entity backstop (resolveNamedReferenceBackstop/properNounPhrases: resolve typed proper-nouns principal-agnostically→CHECK→deny out-of-coverage NAMED entity instead of clarifying, bug-235); withheldDomains (structural-gate-pruned domains) threaded to the synthesizer for honest partial fulfillment (bug-237). Clarify copy aligned to capability (bug-239): buildDeterministicClarification lists candidates by NAME (+ id) with '- ' bullets (NO positional numbers) and invites "Reply with the <entityNoun> name or identifier" (entityNoun = manifest entity display, no hardcoded 'relationship ID'); buildClarificationQuestion hoists primaryResolvableEntity so the noun frames template + composed. No positional-index parsing anywhere — the resolver only honours name / manifest id_pattern. bug-233. setTraceOutput(rootSpan, answer): mirrors the synthesized answer onto the ROOT chat.handle span as langfuse.trace.output (blank skipped) at every answer path (synthesize, synthesizeFromHistory degrade, follow-up, chitchat) so Langfuse trace output populates and continuous eval scores it — clarify/deny paths (streamTextAndComplete) intentionally leave it empty and are filtered by the eval (bug-242). (~16600 tok)
+- `ChatService.java` — How many recent user turns (including the current one) are concatenated into the routing (~41883 tok)
+- `PreparedRoute.java` — The shared, span-aware output of the pre-routing preparation pipeline (routing spec V2 Piece 3). (~946 tok)
+- `RequestedPlan.java` — The requested-capability-group model (routing spec V2 Piece 4). A request is a set of (~1025 tok)
+- `RouteDecision.java` — The read-only diagnostic view of ONE production pre-routing decision (routing spec V2 Piece 6). (~2470 tok)
+- `RoutePreparationPolicy.java` — Config-driven knobs for the pre-routing preparation pipeline (routing spec V2 Piece 3). Bound from (~512 tok)
+- `RoutePreparer.java` — The shared pre-routing preparation pipeline (routing spec V2 Piece 3): one component every (~6043 tok)
 
 ## gateway/src/main/java/ai/conduit/gateway/domain/clarify/
 
-- `ClarificationComposer.java` — The 4th grounded LLM call site (alongside IntentClassifier / EntityExtractor / AnswerSynthesizer). PHRASES a natural clarify question over a GROUNDED candidate set handed in as DELIMITED DATA; it never DECIDES to clarify (that stays deterministic in ChatService: extracted ∩ required = ∅) and never invents. Generic scaffold; entity noun + optional tone come from the manifest (World-B clean). compose() returns null (→ caller serves the deterministic template) when the LLM is unreachable OR validate() rejects: output blank / too long, contains any id_pattern token outside the candidate id set (core foreign-ID guard), or references no candidate. System prompt forbids positional numbers / 'reply with the number' — options are referred to by name + identifier only (bug-239); OPTIONS data list uses '- ' bullets not numbers. Non-streaming, single completion, own tight budget (config conduit.llm.clarification-composer.*, defaults inherit intent-classifier Z.AI/flash). (~2400 tok)
+- `ClarificationComposer.java` — The 4th grounded LLM call site (alongside {@code IntentClassifier}, {@code EntityExtractor}, (~4850 tok)
+
+## gateway/src/main/java/ai/conduit/gateway/domain/coverage/
+
+- `GroundingBudget.java` — Config-driven budgets for multi-reference grounding (routing spec V2.1 / Piece 2). Grounding each (~433 tok)
+- `ReferenceGroundingService.java` — Stage-1 reference grounding — the deterministic, PRE-ROUTING step that resolves a human reference (~7755 tok)
 
 ## gateway/src/main/java/ai/conduit/gateway/domain/intent/
 
-- `IntentClassifier.java` — Stage A: combined intent+entity LLM (manifest-compiled prompt, temperature 0). Focal-entity rules (explicit name in latest msg supersedes history; pronoun→last focal; emit typed NAME not a recalled id; named entity→FETCH not CLARIFY) + deterministic deriveFocalReference() [id in latest msg → user-grounded ref → focalIdByNameMatch (proper-noun tokens vs transcript "Name (ID)") → lastFocalSingleId anaphora carry]. Extracts entities for FETCH_DATA AND FOLLOW_UP (bias-to-fetch fallthrough). bug-233. RECENCY (bug-234): deriveFocalReference() precedence reordered so an anaphoric turn that names no new entity binds to the MOST-RECENTLY-NAMED focal entity (recency carry) BEFORE the grounded-LLM-value fallback; a name shared with the latest message (sharesWord, ≥4 chars) counts as naming-this-turn and supersedes older focus. Fixes pronoun binding to a stale older entity. (~6500 tok)
+- `IntentClassifier.java` — Stage A of the request pipeline: classifies the user's intent before routing. (~11158 tok)
+
+## gateway/src/main/java/ai/conduit/gateway/domain/manifest/
+
+- `DomainManifest.java` — Clarification style, defaulting to the safe deterministic template when unset. (~585 tok)
+- `DomainManifestStore.java` — Loads a JSON schema from the gateway classpath, failing startup loudly if it is missing. (~8358 tok)
+
+## gateway/src/main/java/ai/conduit/gateway/infrastructure/audit/
+
+- `AsyncAuditWriter.java` — Persists the audit record for a request <em>off the request path</em> (Invariant 0 of the audit (~1661 tok)
+- `AuditRecord.java` — The immutable audit record for one request — the regulator-facing system of record. (~392 tok)
+- `AuditRecordAssembler.java` — Builds an {@link AuditRecord} from one request's decision trace. (~1401 tok)
+- `AuditRecordSink.java` — Where an {@link AuditRecord} is written. The name says what it does, not where it writes — the (~172 tok)
+- `ObjectStoreAuditSink.java` — Writes each {@link AuditRecord} to an S3-family object store as one immutable object under an (~1625 tok)
+
+## gateway/src/main/java/ai/conduit/gateway/infrastructure/telemetry/
+
+- `TraceEventPublisher.java` — In-memory pub/sub bus for glass-box trace events. (~2854 tok)
+
+## gateway/src/main/java/ai/conduit/gateway/infrastructure/telemetry/event/
+
+- `RoutePreparedData.java` — Glass-box / audit frame for the pre-routing preparation pipeline (routing spec V2 Piece 3). Records (~308 tok)
 
 ## gateway/src/main/java/ai/conduit/gateway/insights/
 
 - `BoardCatalog.java` — Declarative catalog of the 7 Insights boards + their panels (Prometheus PromQL or Langfuse). Board 7 (Cost & Quality) now also carries three answer-quality panels: `grounding_distribution` (bars histogram — grounding scores bucketed into SCORE_BINS=10 bins over [0,1] via `histogram()`), `grounding_by_model` (bars, score — avg grounding per generating model), and `compaction` (table — BFF compaction counters read from Prometheus: summary-attached %, tokens saved, compaction count, avg messages; range-invariant lifetime totals; gateway never calls the BFF). World-B clean (bins/labels/score-name are config/infra, no domain literals). (~4200 tok)
 - `LangfuseMetricsSource.java` — MetricsSource over the Langfuse public API (cost/tokens/eval scores). Adds `groundingScores(limit)` (raw values of the configured grounding score → histogram input) and `groundingByModel(limit)` (joins each grounding score's traceId to that trace's generation model via `modelByTrace()` over GENERATION observations, then averages per model). Grounding score name is config `conduit.insights.grounding-score-name:grounding` (not a domain literal). (~5400 tok)
 
+## gateway/src/main/java/ai/conduit/gateway/orchestration/executor/
+
+- `DagPlanExecutor.java` — Executes a dependency-wired {@link Plan} (populated {@code dependsOn} edges, topological order) (~11673 tok)
+
+## gateway/src/main/java/ai/conduit/gateway/registry/api/
+
+- `AgentRegistrationController.java` — The registry control plane: registering, updating, and deregistering agents. (~1290 tok)
+
+## gateway/src/main/java/ai/conduit/gateway/registry/embedding/
+
+- `EmbeddingModel.java` — The identity of the embedding model in use. (~271 tok)
+- `HashEmbedder.java` — Deterministic 384-dim vectors from SHA-256 hashing of token n-grams. A structural stand-in that (~1062 tok)
+- `ManifestEmbedder.java` — Embeds the agent corpus — the skill example prompts that make up the routing index. (~1855 tok)
+- `QueryEmbedder.java` — Embeds the user's question, once, on the request path. (~448 tok)
+- `RemoteEmbedder.java` — {@link TextEmbedder} backed by an OpenAI-compatible {@code /v1/embeddings} endpoint — (~2080 tok)
+- `TextEmbedder.java` — Turns text into a vector. The single low-level seam over whatever model is configured. (~308 tok)
+
+## gateway/src/main/java/ai/conduit/gateway/registry/index/
+
+- `VectorIndex.java` — Read-only view of the HNSW vector index over example-prompt embeddings. (~1458 tok)
+- `VectorIndexWriter.java` — Builds the routing vector index. Exists only in the {@code ingest} profile. (~2238 tok)
+
+## gateway/src/main/java/ai/conduit/gateway/registry/ingest/
+
+- `RegistryIngestionHealth.java` — Reports the registry service unhealthy until the agent manifests have been fully ingested. (~461 tok)
+- `RegistryIngestor.java` — Ingests the agent registry at startup of the registry service. (~2925 tok)
+
+## gateway/src/main/java/ai/conduit/gateway/registry/loader/
+
+- `RegistryBootstrapLoader.java` — Loads agent manifests from the external registry location at startup. (~1912 tok)
+
+## gateway/src/main/java/ai/conduit/gateway/registry/readiness/
+
+- `RegistryReadinessVerifier.java` — Refuses to start the gateway unless the registry ingestion job has produced a routing index that (~1046 tok)
+
+## gateway/src/main/java/ai/conduit/gateway/registry/service/
+
+- `AgentRegistrar.java` — Writes the agent registry. Exists only in the {@code ingest} profile. (~1629 tok)
+
+## gateway/src/main/java/ai/conduit/gateway/resolver/model/
+
+- `ResolverResult.java` — Output of the resolver — the full routing decision for one user prompt. (~984 tok)
+
+## gateway/src/main/java/ai/conduit/gateway/resolver/service/
+
+- `AgentResolver.java` — Resolver — Stage A + Stage B from the spec. (~8329 tok)
+- `LlmRoutingRerankerClient.java` — The reranker system prompt: a fully static skeleton ({@code routing-reranker.system.md}, no (~2534 tok)
+- `RoutingRerankerClient.java` — Second-pass selector for ambiguous embedding results. (~1099 tok)
+
 ## gateway/src/main/java/ai/conduit/gateway/synthesis/answer/
 
-- `AnswerSynthesizer.java` — Synthesizes a grounded, streamed answer from agent outputs using Z.AI GLM. System prompt forbids cross-entity aggregation/roll-ups (compute guardrail) and renders WITHHELD sections (structural-gate-denied domains) so mixed in/out-of-access asks fulfill the accessible part + state the withheld part; synthesizeFromHistory prompt also forbids computing/aggregating (bug-237). synthesize()/synthesizeFromHistory() now RETURN the accumulated answer text (String, was void) so ChatService can mirror it onto the ROOT chat.handle span as langfuse.trace.output — the former Span.current().setAttribute("langfuse.trace.output",…) here was unreliable (by synthesis time the active span is not guaranteed to be the root), so the trace-level output never landed and continuous eval scored an empty answer (bug-242). (~7600 tok)
+- `AnswerSynthesizer.java` — Synthesizes a grounded, streamed answer from agent outputs using Z.AI GLM. (~12908 tok)
+
+## gateway/src/main/java/ai/conduit/gateway/synthesis/input/
+
+- `EntityBag.java` — Generic, manifest-driven carrier for extracted and resolved entities. (~1253 tok)
+- `EntityExtractor.java` — Stage 1 — Extract. (~3586 tok)
+- `Mention.java` — One extracted reference to an entity, keyed by manifest entity {@code key}. Replaces the old (~524 tok)
+- `MentionAligner.java` — Deterministic reference aligner: locates a verbatim reference inside the ORIGINAL text of a (~1597 tok)
+- `MentionSet.java` — The full, span-aware provenance model for a request's extracted entity references: a flat list (~1043 tok)
+- `MentionSource.java` — How a {@link Mention} entered the conversation. (~147 tok)
+- `MentionSpan.java` — A half-open {@code [start, end)} character span over the ORIGINAL text of a single message (~318 tok)
+
+## gateway/src/main/java/ai/conduit/gateway/synthesis/input/ (Piece 1 mention model)
+
+- `EntityBag.java` — MODIFIED: added derived MentionSet component; references map is the lossy scalar view. (~700 tok)
+- `Mention.java` — one reference: entityKey, extractAs, verbatimText, messageIndex, span, source. (~330 tok)
+- `MentionAligner.java` — deterministic aligner: locates verbatim in original, normalization→original index map (case/punct/possessive/Unicode tolerant, token-boundary anchored). (~700 tok)
+- `MentionSet.java` — list of Mention keyed by entity key; compatScalar() = latest explicit else carried anaphora (mirrors deriveFocalReference). (~500 tok)
+- `MentionSource.java` — enum EXPLICIT/ANAPHORA: provenance of an extracted reference. (~120 tok)
+- `MentionSpan.java` — [start,end) char span over ORIGINAL message text; gateway-derived, null on miss. (~200 tok)
 
 ## gateway/src/main/java/ai/meridian/gateway/
 
@@ -1091,6 +1267,7 @@
 - `CoverageClient.java` — HTTP client for the DISCOVER / CHECK / RESOLVE coverage pipeline. (~1847 tok)
 - `CoverageResolveResult.java` — True if multiple candidates matched and disambiguation is needed. (~240 tok)
 - `CoverageResource.java` — Class: CoverageResource (~87 tok)
+- `ReferenceGroundingService.java` — Stage-1 PRE-ROUTING reference grounding. ground(bag,prompt,principal,tenant,token)→GroundingResult with the 4-way verdict lattice: RESOLVED_ALLOWED (memo: resolvedId+entityType+subDomain+coverage → caller routes entityKnown, coverage pipeline consumes memo), DENIED (terminal, owning sub-domain copy, never routes — fixes A2/S7-injection), AMBIGUOUS (fall through to discover∩candidates clarify), NOT_FOUND (demote to content, never a denial — fixes Tesla), UNAVAILABLE (fail-closed), NONE (normal pipeline). Sources a reference via manifestStore.identifyByIdPattern (typed id, preferred) then identifyByReference (LLM-extracted name). RESOLVE principal-agnostic; CHECK only ever sees a resolved id. World-B clean. (~1500 tok)
 
 ## gateway/src/main/java/ai/meridian/gateway/domain/intent/
 
@@ -1207,8 +1384,8 @@
 
 ## gateway/src/main/resources/
 
-- `agent-manifest.schema.json` (~1714 tok)
-- `application.yml` (~1871 tok)
+- `agent-manifest.schema.json` — Declares used (~4210 tok)
+- `application.yml` — Declares display (~6119 tok)
 
 ## gateway/src/main/resources/domains/
 
@@ -1236,6 +1413,106 @@
 - `acme.wealth.holdings.json` — Declares allocation (~422 tok)
 - `acme.wealth.performance.json` (~428 tok)
 - `acme.wealth.risk_profile.json` (~428 tok)
+
+## gateway/src/main/resources/prompts/
+
+- `answer-synthesizer-history.system.md` (~183 tok)
+- `answer-synthesizer.figures-block.md` — Declares the (~128 tok)
+- `answer-synthesizer.system.md` — Declares a (~590 tok)
+- `clarification-composer.default-question.md` (~9 tok)
+- `clarification-composer.system.md` (~361 tok)
+- `entity-extractor.system.md` (~143 tok)
+- `intent-classifier.clarify-rule.md` (~80 tok)
+- `intent-classifier.system.md` (~1196 tok)
+- `routing-reranker.system.md` (~395 tok)
+
+## gateway/src/main/resources/prompts/fragments/
+
+- `instruction-hierarchy.md` (~78 tok)
+
+## gateway/src/test/java/ai/conduit/gateway/api/v1/admin/
+
+- `RouteDecisionControllerTest.java` — Full-context tests for the Piece-6 production-path decision endpoint ({@code POST /debug/route}, (~2929 tok)
+
+## gateway/src/test/java/ai/conduit/gateway/config/
+
+- `PromptResourcesTest.java` — Drift guard for the externalized LLM prompt resources ({@code src/main/resources/prompts}), (~2268 tok)
+
+## gateway/src/test/java/ai/conduit/gateway/domain/chat/
+
+- `ChatServiceGroundingClarifyTest.java` — End-to-end (full-context) tests for the clarify-routing decouple through the real {@link ChatService (~2842 tok)
+- `ChatServiceGroupCoverageFailClosedTest.java` — Adversarial full-context tests for the entitlement fail-closed behaviour of the routing-spec V2 (~5152 tok)
+- `ChatServiceRequestedGroupTest.java` — End-to-end (full-context) tests for the routing-spec V2 Piece-4 requested-capability-group model and (~4706 tok)
+- `ChatServiceWithheldScopingTest.java` — bug-260: a domain must be labeled "withheld" (outside your access) ONLY when NONE of its selected (~802 tok)
+- `RoutePreparedRoutingTest.java` — Full-context wiring tests for the Piece-3 shared preparation pipeline as it reaches the router. (~2959 tok)
+- `RoutePreparerTest.java` — Unit tests for the Piece-3 preparation pipeline ({@link RoutePreparer}) with the grounding service (~2941 tok)
+
+## gateway/src/test/java/ai/conduit/gateway/domain/coverage/
+
+- `ReferenceGroundingMentionsTest.java` — Unit tests for Piece 2 multi-reference grounding ({@link ReferenceGroundingService#groundMentions}): (~5156 tok)
+- `ReferenceGroundingServiceTest.java` — Unit tests for the Stage-1 reference-grounding lattice — the security-visible core of the (~3281 tok)
+
+## gateway/src/test/java/ai/conduit/gateway/domain/intent/
+
+- `IntentClassifierMentionTest.java` — Exercises {@link IntentClassifier#buildMentionSet} — the LLM-output → span-aware mention model (~1950 tok)
+- `IntentClassifierTest.java` — CLAUDE.md §5 — "Never return canned/fallback data when the LLM is unreachable; surface the error." (~956 tok)
+
+## gateway/src/test/java/ai/conduit/gateway/domain/manifest/
+
+- `DomainManifestStoreContextTest.java` — {@code domain_context} moves the classifier/synthesizer domain framing OUT of a hand-maintained env (~1013 tok)
+- `DomainManifestStoreReferenceTest.java` — Loads the real test-resource manifests (wealth + insurance + asset-servicing) into a plain (~1538 tok)
+- `DomainManifestStoreValidationTest.java` — Domain and sub-domain manifests are now schema-validated at load time, with the same fail-loud (~1127 tok)
+- `EffectiveManifestMergeTest.java` — Class: EffectiveManifestMergeTest (~1288 tok)
+- `EffectiveManifestTest.java` — Targeted unit tests for {@link EffectiveManifest#merge} covering the three (~914 tok)
+
+## gateway/src/test/java/ai/conduit/gateway/infrastructure/audit/
+
+- `AsyncAuditWriterTest.java` — The audit write must be entirely off the request path: {@code submit} never blocks, and the record (~949 tok)
+- `AuditRecordAssemblerTest.java` — Class: AuditRecordAssemblerTest (~1193 tok)
+
+## gateway/src/test/java/ai/conduit/gateway/orchestration/executor/
+
+- `DagPlanExecutorTest.java` — Hermetic tests for {@link DagPlanExecutor}. Uses the <b>real</b> {@link AgentHarness} (real (~8200 tok)
+
+## gateway/src/test/java/ai/conduit/gateway/registry/embedding/
+
+- `ManifestEmbedderTest.java` — The corpus embedder's contract: identical text under an identical model is embedded once, ever; (~1613 tok)
+
+## gateway/src/test/java/ai/conduit/gateway/registry/index/
+
+- `VectorIndexModelStampTest.java` — Cosine similarity between vectors produced by two different embedding models is arithmetic (~1692 tok)
+
+## gateway/src/test/java/ai/conduit/gateway/registry/ingest/
+
+- `IngestionIsNotInTheGatewayTest.java` — The gateway must be structurally incapable of ingesting the registry. (~784 tok)
+- `RegistryReconciliationTest.java` — The registry folder is the source of truth for which agents exist. (~1000 tok)
+
+## gateway/src/test/java/ai/conduit/gateway/registry/loader/
+
+- `AgentManifestFigureFormatEnumTest.java` — {@code io.produces[].figures[].format} is now an enum pinned to exactly the formats the gateway (~1119 tok)
+- `ManifestSchemaCopiesInSyncTest.java` — The agent manifest schema exists in three places: the repo root, {@code registry/}, and the (~868 tok)
+
+## gateway/src/test/java/ai/conduit/gateway/registry/readiness/
+
+- `RegistryReadinessVerifierTest.java` — The gateway no longer builds the routing index, so it must not assume one is there. (~819 tok)
+
+## gateway/src/test/java/ai/conduit/gateway/resolver/service/
+
+- `AgentResolverRerankerTest.java` — A re-ranker that declines to pick a single winner because the request needs SEVERAL capabilities (~5552 tok)
+
+## gateway/src/test/java/ai/conduit/gateway/synthesis/answer/
+
+- `AnswerSynthesizerGroundingTest.java` — When the synthesizer LLM produces a figure that fails grounding validation, the answer is not (~1010 tok)
+
+## gateway/src/test/java/ai/conduit/gateway/synthesis/input/
+
+- `EntityExtractorFallbackTest.java` — When the extraction LLM is unreachable, {@link EntityExtractor} must degrade to a keyword parser (~1032 tok)
+- `MentionAlignerTest.java` — The deterministic aligner is the load-bearing half of the span model (routing spec V2.1 (~1150 tok)
+- `MentionSetTest.java` — Locks the compat-scalar derivation (routing spec V2.1 resolution #3) and the grouping/miss views (~760 tok)
+
+## gateway/src/test/java/ai/conduit/gateway/testsupport/
+
+- `RedisContainerTest.java` — Base class for full-context ({@code @SpringBootTest}) tests: they get their own Redis, in a (~469 tok)
 
 ## gateway/src/test/java/ai/meridian/gateway/
 
@@ -1265,6 +1542,12 @@
 
 - `EntityBagTest.java` — Locks in the generic, manifest-keyed EntityBag contract that replaced the wealth-shaped record. (~838 tok)
 
+## gateway/src/test/resources/domains/
+
+- `asset-servicing.json` (~134 tok)
+- `insurance.json` (~222 tok)
+- `wealth-management.json` (~229 tok)
+
 ## gateway/src/test/resources/domains/wealth-management/
 
 - `private-banking.json` (~769 tok)
@@ -1282,7 +1565,7 @@
 - `Dockerfile` — eclipse-temurin:21-jre-alpine; ZGC+ZGenerational; port 8084 (~40 tok)
 - `pom.xml` (~1326 tok)
 - `pom.xml` — Spring Boot 3.5.3 parent POM; Java 21; deps: web, data-jpa, security, oauth2-authorization-server, actuator, validation, postgresql, flyway, jackson-jsr310, cerbos-sdk-java:0.12.0, h2(test) (~220 tok)
-- `README.md` — Project documentation (~2879 tok)
+- `README.md` — Project documentation (~2880 tok)
 - `src/main/java/com/openwolf/iam/auth/` — CustomUserDetailsService (UserDetailsService using principal.id as sub), JwtClaimsCustomizer (OAuth2TokenCustomizer enriches ACCESS_TOKEN with roles/segments/classification/tenant_id/permissions) (~370 tok)
 - `src/main/java/com/openwolf/iam/config/` — 5 configs: VirtualThreadConfig (Tomcat VT executor), SecurityConfig (Order-1 AS + Order-2 API, RSA-2048 JWK, 3 OAuth2 clients, BCrypt-12, CORS), JpaConfig (@EnableJpaAuditing), CerbosConfig (@ConditionalOnProperty), JacksonConfig (~650 tok)
 - `src/main/java/com/openwolf/iam/controller/` — 10 controllers covering all 50+ endpoints: UserController, RoleController, TeamController, DomainController, PolicyController, AuditController, StatsController, AuthController (/auth/login + /auth/token), TenantController, HealthController (~1800 tok)
@@ -1310,7 +1593,7 @@
 - `CerbosConfig.java` — Creates a {@link CerbosBlockingClient} when {@code iam.cerbos.authz-enabled=true}. (~450 tok)
 - `JacksonConfig.java` — Configures the primary {@link ObjectMapper}: (~297 tok)
 - `JpaConfig.java` — Enables JPA auditing so that {@code @CreatedDate} and {@code @LastModifiedDate} (~143 tok)
-- `SecurityConfig.java` — Security configuration for the IAM service. (~4558 tok)
+- `SecurityConfig.java` — Security configuration for the IAM service. (~7492 tok)
 - `VirtualThreadConfig.java` — Configures Tomcat to dispatch every request on a virtual thread. (~412 tok)
 
 ## iam-service/src/main/java/com/openwolf/iam/controller/
@@ -1364,7 +1647,7 @@
 
 - `AuthzDeniedException.java` — Thrown by {@link com.openwolf.iam.service.CerbosAuthzService} when the Cerbos PDP (~125 tok)
 - `EntityNotFoundException.java` — Thrown when a requested entity does not exist in the database. (~158 tok)
-- `GlobalExceptionHandler.java` — Centralized exception handler — all exceptions map to {@link ErrorResponse}. (~1966 tok)
+- `GlobalExceptionHandler.java` — Centralized exception handler — all exceptions map to {@link ErrorResponse}. (~2236 tok)
 - `ResourceConflictException.java` — Thrown when a create/update operation would violate a uniqueness constraint. (~119 tok)
 
 ## iam-service/src/main/java/com/openwolf/iam/repository/
@@ -1673,18 +1956,19 @@
 
 ## registry/
 
-- `agent-manifest.schema.json` (~1714 tok)
+- `agent-manifest.schema.json` — Declares used (~4250 tok)
 - `context-envelope.schema.json` — Context envelope returned by the external memory service (~1900 tok)
-- `domain-manifest.schema.json` — Domain manifest contract with governed memory policy (~1200 tok)
+- `domain-manifest.schema.json` (~1365 tok)
 - `memory-ledger-event.schema.json` — Append-only gateway/memory event shell schema (~750 tok)
 - `README.md` — Registry onboarding and governed memory contract guide (~1160 tok)
 - `sub-domain-manifest.schema.json` — Sub-domain manifest contract for entity context and agents (~1050 tok)
 
 ## registry/domains/
 
-- `asset-servicing.json` — Asset-servicing domain with memory-service summary policy (~160 tok)
-- `insurance.json` — Insurance domain with coverage URLs and memory-service summary policy (~210 tok)
-- `wealth-management.json` — Wealth domain with coverage URLs and memory-service summary policy (~210 tok)
+- `asset-servicing.json` (~252 tok)
+- `hr.json` (~174 tok)
+- `insurance.json` (~314 tok)
+- `wealth-management.json` (~316 tok)
 
 ## registry/domains/asset-servicing/
 
@@ -1729,12 +2013,13 @@
 - `seed-demo.sh` — Meridian Gateway — Phoenix/Tempo demo seed (~176 tok)
 - `seed-langfuse-dashboard.sh` — Idempotently seeds the "Conduit — LLM Quality & Cost" Langfuse dashboard by applying seed-data/langfuse-dashboard.sql to Langfuse Postgres. Env-driven (LANGFUSE_DB_*); uses psql (now in the seeder image) else `docker exec`. Called as step (f) of seed-all.sh. (~500 tok)
 - `seed-users.sh` — Idempotently seed demo principals into Redis. PRINCIPALS ONLY now (price/convo/dataset/dashboard tails moved to seed-all.sh). Runs as seed-all.sh step (b) and standalone on host. (~700 tok)
+- `smoke-route.sh` — smoke-route.sh — trace-truth routing + entitlement smoke. (~1321 tok)
 - `smoke-ui.sh` — Tier-1 fast gate (invoked first by smoke.sh): 10 health URLs 200, CORS preflights per browser origin (chat→BFF :8099, admin→iam :5182→:8084), 4 personas mint JWT. No LLM/sleeps; exit=#failures. (~550 tok)
-- `smoke.sh` — smoke.sh — full API/CLI smoke for Conduit. Run against a live stack (docker compose up). (~1581 tok)
+- `smoke.sh` — smoke.sh — full API/CLI smoke for Conduit. Run against a live stack (docker compose up). (~1818 tok)
 - `verify-telemetry-e2e.sh` — ───────────────────────────────────────────────────────────────────────────── (~1151 tok)
 - `verify.sh` — Full verification script — runs after each phase to confirm acceptance criteria. (~713 tok)
 - `wait-for-healthy.sh` — Wait until all core docker-compose services report healthy, then exit 0. (~323 tok)
-- `world-b-check.sh` — ───────────────────────────────────────────────────────────────────────────── (~1272 tok)
+- `world-b-check.sh` — ───────────────────────────────────────────────────────────────────────────── (~1434 tok)
 
 ## scripts/eval-worker/
 
@@ -1748,6 +2033,10 @@
 - `langfuse-dashboard.sql` — Idempotent SQL that seeds the "Conduit — LLM Quality & Cost" Langfuse dashboard: 6 dashboard_widgets rows (cost-by-model, eval-scores, trace-volume, latency p50/p95, token-usage, score-histogram) + 1 dashboards row with the 12-col grid `definition`. Resolves project_id/owner by sub-query; all widgets min_version=1 (v1 views — v2 hits the v4-only events_core table). (~900 tok)
 - `principals.json` — 3 demo principals (rm_jane, rm_carlos, rm_guest) matching PrincipalStore hash schema: id, roles/book/segments/domains/adminDomains as JSON arrays, clearance as int string (~200 tok)
 - `principals.json` (~266 tok)
+
+## sweep/
+
+- `VERIFIED-VERDICT.md` — Entitlement sweep — VERIFIED verdict (Claude, trace-based) (~948 tok)
 
 ## test-results/
 
@@ -1766,6 +2055,10 @@
 - `playwright.config.ts` (~314 tok)
 - `tsconfig.json` — TypeScript configuration (~99 tok)
 
+## tests/e2e/security_harness/
+
+- `test_prompt_injection.py` — test_injection_cannot_override_the_entitlement_gate (~1392 tok)
+
 ## tests/e2e/tests/
 
 - `00-login.spec.ts` — Login / registration flow. (~1152 tok)
@@ -1778,7 +2071,7 @@
 - `09-cerbos-authz.spec.ts` — Cerbos Authorization Matrix — direct PDP API tests (~5810 tok)
 - `10-coverage-flow.spec.ts` — Coverage-flow E2E tests (Phase 11+). (~2278 tok)
 - `11-screenshots.spec.ts` — Capture utility (and a smoke test): logs in, screenshots the branded home, sends the (~371 tok)
-- `admin-ui.spec.ts` — Declares BASE (~960 tok)
+- `admin-ui.spec.ts` — BASE: watchForCrashes, loginAdmin, assertNoCrash (~1443 tok)
 - `helpers.ts` — Obtain a real RS256 JWT from the iam-service (~1961 tok)
 
 ## tests/integration/
@@ -1827,4 +2120,7 @@
 
 ## user-mgmt/tests/
 
+- `AgentManifestFigureFormatEnumTest.java` — test: figures[].format enum rejects bogus values, accepts all supported formats (~600 tok)
+- `DomainManifestStoreContextTest.java` — test: composedDomainContext joins domain_context by domain_id, neutral fallback (~600 tok)
+- `DomainManifestStoreValidationTest.java` — test: malformed domain/sub-domain manifests fail loud (schema validation) instead of silent drop (~700 tok)
 - `test_user_mgmt.py` — Tests: jwks_has_correct_structure, jwks_e_is_65537, jwks_n_length, issue_token_returns_rs256_jwt + 20 more (~7203 tok)

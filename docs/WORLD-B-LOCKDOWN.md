@@ -8,7 +8,7 @@
 > it is not part of the World B commitment.
 >
 > **Companion canonical docs:** [`PROJECT-OVERVIEW.md`](PROJECT-OVERVIEW.md) (what the project is +
-> module map), `gateway-domain-architecture.md` (architecture), `domain-onboarding-standard.md`
+> module map), `gateway-domain-architecture.md` (architecture), `AGENT-ONBOARDING-HANDBOOK.md`
 > and [`../registry/README.md`](../registry/README.md) (the onboarding contract domain teams
 > implement). This doc sits **above** those: it is the strategy and the lockdown; they are the
 > mechanics.
@@ -136,7 +136,7 @@ violation in a Python service. This is the precise inventory the refactor must c
 
 **Plus — RESOLVE contract violation** (`mock-agents/wealth-coverage/data.py`): `resolve()`
 filters candidates by `principal_id`'s book *before* returning them. The contract
-(`domain-onboarding-standard.md`) is explicit: **RESOLVE is principal-agnostic; CHECK is the
+(`AGENT-ONBOARDING-HANDBOOK.md`) is explicit: **RESOLVE is principal-agnostic; CHECK is the
 gate.** The correct `mock-agents/crm/data.py` already does this right (takes no principal for
 the ID lookup) and is the reference implementation.
 

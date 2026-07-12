@@ -8,32 +8,238 @@
 > your agent and a running service; everything else is done for you. This handbook exists to make
 > you fluent in that.
 >
-> **How to read it.** Sections 1–3 are the mental model and the manifest contract — read them
-> once, top to bottom. Sections 4 and 5 are the two chapters that decide whether your agent
-> actually *works* in production: **how it gets found** (routing) and **how it composes**
-> (workflow). They are the heart of the book; do not skim them. Sections 6–10 are the operational
-> reality — protocols, authorization, boot, verification, governance. Section 11 is four complete
-> worked examples you can copy. Section 12 is the list of ways to get it wrong. Section 13 is a
-> condensed schema reference to keep open while you write.
+> **How to read it.** If you just want to *do it*, start with **Section 0 — the copy-paste
+> quickstart** — a literally-executable walkthrough that onboards a throwaway domain end-to-end in
+> ten commands. Then come back for the depth. Sections 1–3 are the mental model and the manifest
+> contract — read them once, top to bottom. Sections 4 and 5 are the two chapters that decide
+> whether your agent actually *works* in production: **how it gets found** (routing) and **how it
+> composes** (workflow). They are the heart of the book; do not skim them. Sections 6–10 are the
+> operational reality — protocols, authorization, boot, verification, governance. Section 11 is
+> four complete worked examples you can copy. Section 12 is the list of ways to get it wrong.
+> Section 13 is the failure-mode catalog — symptom → cause → fix, with the exact error strings.
+> Section 14 is the full three-level schema reference (agent / domain / sub-domain) to keep open
+> while you write.
+>
+> **This is the one canonical onboarding document.** It absorbed the former
+> `domain-onboarding-standard.md`, which described a manifest schema that never shipped; that file
+> is now a pointer stub. Everything here is checked against the code and schemas in this repo as of
+> the audit in `docs/specs/ONBOARDING-DOCS-AUDIT.md`.
 
 ---
 
 ## Table of contents
 
+0. [Quickstart — onboard a domain in ten commands](#0-quickstart--onboard-a-domain-in-ten-commands)
 1. [Philosophy — the empty engine](#1-philosophy--the-empty-engine)
    - [Key terms — one sentence each](#key-terms--one-sentence-each)
 2. [Mental model & prerequisites](#2-mental-model--prerequisites)
 3. [Anatomy of an agent manifest](#3-anatomy-of-an-agent-manifest)
+   - [3.5 The domain & sub-domain manifests — where a new domain's vocabulary lives](#35-the-domain--sub-domain-manifests--where-a-new-domains-vocabulary-lives)
 4. [The art of skill examples](#4-the-art-of-skill-examples)
 5. [Making your agent composable — the workflow story](#5-making-your-agent-composable--the-workflow-story)
 6. [Reaching your service — HTTP and MCP](#6-reaching-your-service--http-and-mcp)
 7. [Authorization & entitlement](#7-authorization--entitlement)
-8. [What the gateway does at boot](#8-what-the-gateway-does-at-boot)
+   - [7.5 The coverage service you must build](#75-the-coverage-service-you-must-build)
+8. [What happens at ingestion (the registry-service)](#8-what-happens-at-ingestion-the-registry-service)
 9. [Verify & measure](#9-verify--measure)
 10. [Governance & lifecycle](#10-governance--lifecycle)
 11. [Worked end-to-end examples](#11-worked-end-to-end-examples)
 12. [Anti-patterns](#12-anti-patterns)
-13. [Appendix — condensed schema reference](#13-appendix--condensed-schema-reference)
+13. [Failure-mode catalog — symptom → cause → fix](#13-failure-mode-catalog--symptom--cause--fix)
+14. [Appendix — full schema reference (agent / domain / sub-domain)](#14-appendix--full-schema-reference-agent--domain--sub-domain)
+
+---
+
+## 0. Quickstart — onboard a domain in ten commands
+
+This is the whole loop, executable, with a **throwaway domain** you can delete afterward. It uses
+only real scripts and services in this repo. It reuses one already-running demo service
+(`hr-policy`) as the new agent's introspection target, so you can watch the full
+ingest → route loop **without standing up any new infrastructure** — exactly the seam that makes a
+real onboard "manifests + a service URL." For a *real* domain you point `connection` at *your own*
+service instead (§6) and, if your data is client-scoped, add a coverage service (§7.5).
+
+The design payoff to notice while you run it: **you add a whole new business domain without editing
+one line of gateway Java or one gateway environment variable.** The domain name, the assistant's
+framing copy (`domain_context`), the entity vocabulary, the routing examples, the user-facing
+messages — all of it lives in the three JSON files you create below. That is World B (§1), made
+concrete.
+
+### Step 1 — bring up the core stack and seed identities (once)
+
+```bash
+cd /Users/srirajkadimisetty/projects/orchestrator-demo
+docker compose -p orchestrator-demo up -d          # no-profile core set — the everyday demo
+bash scripts/seed-users.sh                          # seed demo principals into Redis
+```
+
+### Step 2 — write the domain manifest
+
+`registry/domains/quickstart-demo.json` — `domain_id`, `display_name`, and `memory_compaction`
+are schema-**required**; `domain_context` is optional but is what makes onboarding zero-config
+(§3.5, incoming change 3). Copy `memory_compaction` verbatim from an existing domain — it is
+schema-required boilerplate consumed by a future memory service, not by the gateway today (§3.5).
+
+```json
+{
+  "domain_id": "quickstart-demo",
+  "display_name": "Quickstart Demo",
+  "domain_context": "a throwaway onboarding demo",
+  "memory_compaction": {
+    "envelope_version": "context-envelope.v1",
+    "must_preserve": ["policy_topic", "domain"],
+    "can_drop": ["raw_agent_outputs", "routing_decisions"],
+    "summary_policy": {
+      "owner": "memory-service",
+      "max_summary_tokens": 400,
+      "refresh_after_turns": 6,
+      "ledger_retention_days": 30,
+      "include_runtime_events": ["gateway.agent_completed", "gateway.response_completed"],
+      "redact_fields": []
+    }
+  }
+}
+```
+
+### Step 3 — write the sub-domain manifest
+
+`registry/domains/quickstart-demo/quickstart-kb.json`. `entity_types`, `required_context`, and
+`agents` are all schema-**required** (§3.5). `resource_scoped: false` means role-gate only — **no
+coverage service needed** — which is why this quickstart works with zero new services.
+
+```json
+{
+  "sub_domain_id": "quickstart-kb",
+  "display_name": "Quickstart Knowledge Base",
+  "parent_domain": "quickstart-demo",
+  "resource_scoped": false,
+  "entity_types": [
+    {
+      "key": "policy_topic",
+      "extract_as": "policy_topic",
+      "kind": "literal",
+      "display": "quickstart topic",
+      "required": false
+    }
+  ],
+  "required_context": [],
+  "agents": ["meridian.quickstart.demo_qa"]
+}
+```
+
+### Step 4 — write the agent manifest
+
+`registry/manifests/quickstart-demo/meridian.quickstart.demo_qa.json`. `audience: "enterprise"`
+skips the structural gate (§7). The `connection` points at the **already-running** `hr-policy`
+service purely so introspection succeeds — for a real agent this is *your* service. Examples are
+capability-phrased and entity-free (§4.x).
+
+```json
+{
+  "agent_id": "meridian.quickstart.demo_qa",
+  "name": "Quickstart Demo Q&A",
+  "description": "Throwaway onboarding-demo agent. Reuses the hr-policy service only as an introspection target. Delete after the walkthrough.",
+  "version": "1.0.0",
+  "provider": { "organization": "Quickstart" },
+  "domain": "quickstart-demo",
+  "sub_domain": "quickstart-kb",
+  "audience": "enterprise",
+  "protocol": "http",
+  "connection": {
+    "openapi_url": "http://hr-policy:8091/openapi.json",
+    "operation_id": "get_policy_qa"
+  },
+  "capabilities": { "streaming": false },
+  "constraints": { "access_mode": "read", "data_classification": "internal", "sla_timeout_ms": 5000 },
+  "skills": [{
+    "id": "quickstart_demo_qa",
+    "name": "quickstart_demo_qa",
+    "description": "Throwaway quickstart agent used to demonstrate onboarding.",
+    "tags": ["quickstart", "onboarding-demo"],
+    "examples": [
+      "run the onboarding quickstart walkthrough",
+      "demonstrate the quickstart demo agent",
+      "show the quickstart onboarding example working"
+    ]
+  }]
+}
+```
+
+### Step 5 — re-ingest (the registry-service, not the gateway)
+
+Ingestion is the **registry-service**'s job, not the gateway's (§8). The registry mounts
+`./registry` read-only, so re-running it picks up your new files. The gateway does **not** need a
+rebuild — it reads the index from Redis.
+
+```bash
+docker compose -p orchestrator-demo up -d --build registry-service
+```
+
+### Step 6 — confirm it ingested cleanly
+
+```bash
+docker compose -p orchestrator-demo logs registry-service | grep -E "ingestion complete|UNVALIDATED"
+```
+
+You are looking for exactly these two lines (§8):
+
+```
+Registry ingestion complete: N loaded, 0 rejected
+select validation: X validated, 0 UNVALIDATED (no output schema)
+```
+
+If instead you see `Rejected 1 manifest(s). A partially-loaded registry routes silently…` and the
+container exited, one of your three files is schema-invalid — the log line just above it names the
+file and the failing field. Fix it and re-run Step 5. (This is fail-loud by design; see §13.)
+
+### Step 7 — World-B gate (no domain knowledge leaked into the gateway)
+
+```bash
+bash scripts/world-b-check.sh        # must report CRITICAL: 0
+```
+
+You changed only JSON under `registry/`, so this stays at 0 by construction — that is the whole
+point.
+
+### Step 8 — smoke the routing + entitlement path
+
+```bash
+bash scripts/smoke-route.sh          # asserts on POST /debug/route decisions, no synthesis
+```
+
+`smoke-route.sh` drives `POST /debug/route`, which is config-gated OFF by default and **ON for the
+demo** via compose (`CONDUIT_DEBUG_ROUTE_DECISION_ENABLED`, `application.yml` `conduit.debug.route-decision.enabled`).
+The core demo stack enables it; a prod profile leaves it off.
+
+### Step 9 — measure routing didn't regress (the goal-pick gate)
+
+```bash
+bash scripts/routing-measurement-gate.sh
+```
+
+This runs `eval/goal-pick/measure_goal_pick.py` against the live gateway's `/debug/route` using
+the labeled dataset `eval/goal-pick/labeled_queries.json`, and fails on low domain accuracy, weak
+abstention, or canonical-intent poaching (§4.6, §9). **Prerequisites:** the stack up (Step 1),
+users seeded (Step 1), and `/debug/route` enabled (Step 8's caveat).
+
+### Step 10 — tear the throwaway down (proves offboarding)
+
+```bash
+rm registry/domains/quickstart-demo.json
+rm -r registry/domains/quickstart-demo
+rm -r registry/manifests/quickstart-demo
+docker compose -p orchestrator-demo up -d --build registry-service
+docker compose -p orchestrator-demo logs registry-service | grep -E "Pruning|reconciled"
+```
+
+The manifest folder is the source of truth: an agent whose manifest is gone is **pruned** on the
+next ingest (`Pruning N orphaned agent(s)`), and the domain disappears with its files. No gateway
+code references it by name, so there is nothing else to clean up — the same World-B property that
+made onboarding cheap makes offboarding cheap (§10).
+
+> **The full onboarding gate**, for a real change, is `scripts/verify.sh` (build → `docker compose
+> up` → smoke → e2e → eval, with `world-b-check.sh` wired in as a hard gate). The ten steps above
+> are the fast inner loop; `verify.sh` is the belt-and-braces outer one.
 
 ---
 
@@ -119,8 +325,16 @@ in *your manifest*, not in the platform.
 
 The practical test, stated as a rule you can apply while typing: **if you find yourself wanting a
 change to the platform to onboard your agent, that is a bug in the manifest model — raise it, do not
-work around it.** In the entire life of this platform so far, three live domains and sixteen agents
-were onboarded with zero changes to the gateway. Yours should be no different.
+work around it.** In the entire life of this platform so far, four live domains
+(`wealth-management`, `asset-servicing`, `insurance`, `hr`) and eighteen agents were onboarded with
+zero changes to the gateway. Yours should be no different.
+
+**And "zero changes" now means zero — code *and* config.** The last hand-edited gateway setting an
+onboarding used to touch was the assistant's self-description (the framing phrase the intent
+classifier and answer synthesizer put in their prompts). That is now a manifest field —
+`domain_context` on the domain manifest (§3.5) — which the gateway composes from *all* loaded
+domains' phrases. Adding a domain no longer requires editing a gateway environment variable either.
+The "extend by describing, never by editing" claim is, as of that change, literally complete.
 
 ---
 
@@ -290,9 +504,16 @@ Two things are worth internalizing from that picture:
 ## 3. Anatomy of an agent manifest
 
 Your agent is described by a **manifest** — a JSON document you write. One agent = one JSON file, at
-`registry/manifests/<domain>/<agent_id>.json`, validated against
-`registry/agent-manifest.schema.json`. Below is every field, what it means, and — the part that
+`registry/manifests/<domain>/<agent_id>.json` (the ingest glob is `manifests/**/*.json`), validated
+against the agent-manifest JSON schema. Below is every field, what it means, and — the part that
 matters — *why it exists*. Throughout, keep one distinction in mind:
+
+> **The schema exists in three synced copies** — repo root `agent-manifest.schema.json`,
+> `registry/agent-manifest.schema.json`, and the gateway classpath copy at
+> `gateway/src/main/resources/agent-manifest.schema.json`. **Only the classpath copy is loaded at
+> runtime** (by the registry-service's `ManifestValidator`); the other two exist for editing and
+> reference. They must stay byte-identical — `ManifestSchemaCopiesInSyncTest` fails the build on
+> drift — so if you ever edit the schema (rare; you almost never should), edit all three.
 
 > **DECLARED vs DERIVED.** Some things you *declare* (identity, classification, routing examples,
 > the `io` contract). Some things the gateway *derives* by introspecting your live service (your
@@ -314,8 +535,8 @@ matters — *why it exists*. Throughout, keep one distinction in mind:
 
 | Field | Meaning | Why it exists |
 |---|---|---|
-| `domain` | The business domain, e.g. `wealth-management`. **Not** an enum in the schema. | World B: the gateway validates this against the *loaded domain manifests* at boot, not against a hardcoded list. A new domain is a new manifest, not a value hardcoded into the platform. |
-| `sub_domain` | The sub-domain within it, e.g. `private-banking`, `custody-operations`. | Resolves to a loaded sub-domain manifest, which is where entity types and coverage-service URLs live. This is how your agent inherits its domain's vocabulary without *containing* it. |
+| `domain` | The business domain, e.g. `wealth-management`. **Not** an enum in the schema. | World B: the value is interpreted against the *loaded domain manifests* — themselves now schema-validated at ingestion (§8) — not against a hardcoded list. A new domain is a new manifest, not a value hardcoded into the platform. |
+| `sub_domain` | The sub-domain within it, e.g. `private-banking`, `custody-operations`. | Resolves to a loaded sub-domain manifest, which is where **entity types** and coverage-service URLs live (§3.5). This is how your agent inherits its domain's vocabulary without *containing* it. |
 | `audience` | `segment` or `enterprise`. | `segment` = gated by business-segment membership + per-segment classification (the normal case for client data). `enterprise` = any authenticated user, segment gate skipped (e.g. an HR policy Q&A agent). This single word decides whether the structural gate (§7) applies. |
 
 ### How to reach it
@@ -323,7 +544,7 @@ matters — *why it exists*. Throughout, keep one distinction in mind:
 | Field | Meaning | Why it exists |
 |---|---|---|
 | `protocol` | `http`, `mcp`, or `a2a`. | Selects which `ProtocolAdapter` invokes you. New protocols are added behind that interface, not by branching the request path. |
-| `connection` | The *only* "how to call me" information. HTTP: `{ openapi_url, operation_id }`. MCP: `{ server_url, tool, transport? }`. A2A: `{ agent_card_url }`. | Notice what is **absent**: your input and output data shapes. Those are *derived* by introspection (§6). The connection tells the gateway where to knock; the service tells it what it looks like. |
+| `connection` | The *only* "how to call me" information. HTTP: `{ openapi_url, operation_id }`. MCP: `{ server_url, tool, transport?, protocol_version? }` — `transport` is `streamable` (default) \| `sse` (deprecated) \| `stdio` (§6). A2A: `{ agent_card_url }`. | Notice what is **absent**: your input and output data shapes. Those are *derived* by introspection (§6). The connection tells the gateway where to knock; the service tells it what it looks like. |
 | `capabilities` | `{ streaming: bool, … }`. | Declares transport-level features. Additive; unknown keys allowed. |
 
 ### Scope of authority and limits
@@ -349,6 +570,101 @@ matters — *why it exists*. Throughout, keep one distinction in mind:
 > when introspection genuinely cannot see your output (§6), not a place to hand-maintain a schema in
 > parallel with your service.
 
+### 3.5 The domain & sub-domain manifests — where a new domain's vocabulary lives
+
+If you are adding an agent to an **existing** domain, you can skip this section — your agent's
+`domain`/`sub_domain` already resolve, and you inherit the vocabulary. If you are onboarding a
+**new domain**, you write two more files first, and this is the single biggest conceptual step. All
+three levels are schema-validated at ingestion and a malformed one **fails startup** (§8), so get
+them right here.
+
+The three files and their schemas:
+
+| Level | File | Schema (classpath copy loaded at runtime) |
+|---|---|---|
+| Domain | `registry/domains/<domain>.json` | `registry/domain-manifest.schema.json` |
+| Sub-domain | `registry/domains/<domain>/<sub-domain>.json` | `registry/sub-domain-manifest.schema.json` |
+| Agent | `registry/manifests/<domain>/<agent_id>.json` | `agent-manifest.schema.json` |
+
+> Note the folder overlap: a domain file is `registry/domains/foo.json`; its sub-domain files are
+> one level **down**, in `registry/domains/foo/`. The full per-field tables for all three are in
+> §14; this section is the narrative + the one thing documented nowhere else — the `entity_types`
+> anatomy.
+
+#### The domain manifest — coverage, framing, governance
+
+Required: `domain_id`, `display_name`, `memory_compaction`. The rest is optional but load-bearing.
+
+- **`domain_context`** *(optional string, NEW)* — a short, neutral phrase describing this domain's
+  data coverage (e.g. `"internal HR policies"`, `"client financial data"`). The gateway composes
+  the phrases from **all** loaded domains, ordered by `domain_id`, into the framing string the
+  intent classifier and answer synthesizer put in their prompts. This is what replaced the old
+  hand-edited `CONDUIT_ASSISTANT_DOMAIN_CONTEXT` environment variable — declaring it here is what
+  makes onboarding a new domain require **zero gateway config** (§1). Omit it and the gateway falls
+  back to a domain-*neutral* default; it never invents a domain-flavored string.
+- **`clarify_style`** *(optional, `template` | `composed`, default `template`)* and **`clarify_tone`**
+  *(optional string)* — the *wording* policy for clarifying questions. `template` serves the
+  deterministic question byte-for-byte; `composed` lets the gateway phrase a natural question over
+  the grounded candidate set, using `clarify_tone` as a hint. **The clarify *decision* stays
+  deterministic either way** (§4.8, and the CLARIFY rule) — this only affects phrasing, and the
+  template is always the validated fallback. (`wealth-management.json` uses `composed`.)
+- **`coverage`** *(optional object)* — `{ discover_url, check_url, resolve_url, cache_ttl_seconds? }`.
+  Present only for domains whose data is client-scoped. **When the object is present the schema
+  requires all three URLs.** The *runtime* rule is narrower: a `resource_scoped` sub-domain requires
+  its parent domain to carry `coverage.discover_url` (enforced at load — §8). This is the coverage
+  service you must build; its full contract is §7.5.
+- **`memory_compaction`** *(required object)* — `envelope_version`, `must_preserve`,
+  `summary_policy` (with `owner` fixed to `"memory-service"`). **Today this is schema-required
+  boilerplate**: the gateway parses only `must_preserve`/`can_drop` and does *not* act on the
+  `summary_policy`. It is declared now and executed later by a future external memory service (there
+  is no memory service in the stack today). **Copy the block verbatim from an existing domain** and
+  move on — even the role-less `hr.json` carries one.
+
+#### The sub-domain manifest — entity types and user-facing copy
+
+Required: `sub_domain_id`, `display_name`, `parent_domain`, `resource_scoped`, `entity_types`,
+`required_context`, `agents`.
+
+- **`resource_scoped`** *(boolean)* — `true` = DISCOVER + CHECK against the coverage service before
+  fan-out (client-scoped data); `false` = the structural/role gate is sufficient, **no coverage
+  service** (e.g. `hr-knowledge`, `custody-operations`).
+- **`required_context`** *(array)* — entity keys that must be present before the gateway fans out.
+  Missing → a deterministic CLARIFY (`extracted ∩ required_context = ∅`, decided in gateway code,
+  never by an LLM).
+- **`clarification_schema`** *(object, per entity key)* — `{ question, options_source, priority, default? }`.
+  `options_source` is `discover` (call `coverage.discover_url`) | `agent_derived` | `none` (open
+  text) | **`principal_book`** (offer the principal's own book of business). The `question` string
+  is the exact copy the gateway posts — **this is where "which client?" lives, never in Java.**
+- **`messages`** *(object)* — a key→copy map of user-facing strings the gateway reads by key. One is
+  load-bearing: **`capability_unavailable`** (the copy shown when no reachable, authorized service
+  can answer part of a request). Others in live use: `no_coverage`, `reference_not_found`,
+  `missing_entity_question`, `followup_clarification`, `specify_entity`, `needs_more_detail`.
+- **`denial_messages`** *(object)* — a coverage reason-code → copy map (`not-covered`,
+  `coverage-transferred`, `relationship-closed`, `default`, …). §7.5 lists the reason codes.
+- **`agents`** *(array, ≥1)* — the agent IDs belonging to this sub-domain.
+
+##### `entity_types` — the anatomy (schema-required, documented nowhere else until now)
+
+Each element of `entity_types` declares one kind of business object your agents consume. This is the
+map-based entity model (adding an entity type is a manifest edit, not a new Java field). Required
+per element: `key`, `extract_as`, `kind`, `display`, `required`.
+
+| Field | Required | Type | What it does |
+|---|---|---|---|
+| `key` | yes | string | The canonical entity key an agent's `io.consumes[].entity` references (e.g. `relationship_id`, `policy_topic`). |
+| `extract_as` | yes | string | The variable name the entity extractor binds the human reference to before resolution (e.g. `relationship_reference`). |
+| `kind` | yes | `resolvable` \| `literal` \| `list` | `resolvable` = a human reference resolved to a real ID by the coverage service (RESOLVE, §7.5); `literal` = an in-line value matched by `id_pattern` (e.g. a period, a policy topic); `list` = a collection of literals (e.g. tickers). |
+| `display` | yes | string | The human phrase used when the gateway compiles prompts and clarifications about this entity (e.g. "client relationship"). Domain copy lives here, not in code. |
+| `id_pattern` | no | string (regex) | If a raw reference already matches this pattern, resolution short-circuits (e.g. `REL-\\d+` is already an ID; a `literal`'s pattern is how it is recognized in the text). |
+| `resolve_type` | no | string | The `type` passed to the coverage RESOLVE call for a `resolvable` entity (e.g. `relationship`, `fund`). |
+| `required` | yes | boolean | Whether this entity must be present for the sub-domain to fan out (drives CLARIFY together with `required_context`). |
+| `default` | no | string/number/bool | A fallback value for an optional `literal` (e.g. a `period` defaulting to `"QTD"`). |
+
+Live example — `registry/domains/wealth-management/private-banking.json` declares `relationship_id`
+(`resolvable`, `id_pattern: "REL-\\d+"`, `resolve_type: "relationship"`, required), `fund_id`
+(`resolvable`, `FND-\\w+`, optional), `period` (`literal`, default `"QTD"`), and `ticker_references`
+(`list`). Read that file alongside this table; it is the canonical model for a new sub-domain.
+
 ---
 
 ## 4. The art of skill examples
@@ -360,11 +676,16 @@ them with the seriousness of production code, because that is what they are.
 
 ### 4.1 How examples literally become the routing
 
-At boot, the gateway takes every string in every `skills[].examples` array and embeds it with a
-MiniLM model (`all-MiniLM-L6-v2`, 384-dimensional, behind `EmbeddingClient`) into a vector index
-(Redis, HNSW). At request time it embeds the user's question the same way and finds the
-nearest example vectors by cosine similarity. The agent whose examples sit *closest in meaning* to
-the question wins the route.
+At **ingestion** (in the registry-service, not the gateway — §8), every string in every
+`skills[].examples` array is embedded with a MiniLM model (`all-MiniLM-L6-v2`, 384-dimensional) into
+a vector index (Redis, HNSW). Embedding goes through the `TextEmbedder` port — split into
+`ManifestEmbedder` (the corpus, ingestion-only) and `QueryEmbedder` (the request path) — implemented
+by `RemoteEmbedder`, which calls a **Python sentence-transformers sidecar** over HTTP. (There is no
+in-JVM embedding model and no class called `EmbeddingClient`.) At request time the gateway embeds
+the user's question through the same `QueryEmbedder` and finds the nearest example vectors by cosine
+similarity. The agent whose examples sit *closest in meaning* to the question wins the route. The
+index is stamped with the embedding model id; if the gateway would query it with a different model,
+it refuses to start (§8, §13) — the corpus and the query must be the same geometry.
 
 Two consequences follow immediately, and they govern everything else in this section:
 
@@ -375,6 +696,35 @@ Two consequences follow immediately, and they govern everything else in this sec
 2. **Your examples define a region of meaning-space that you are claiming.** Two agents whose
    examples overlap in that space will fight over the same questions. Which brings us to the central
    craft.
+
+### 4.1a Capability-first: name the capability, never the client
+
+This is the single most important correctness property of the whole routing layer, and it changes
+how you write every example. **Route on the capability asked, never on the entity named.** Concretely:
+
+**The corpus is de-entitied.** Your examples must describe *what you do*, using a neutral deictic
+("this relationship", "this client", "the account") where a specific name might otherwise go. They
+must **never** contain a real client, entity, or ID name. The live manifests were deliberately
+scrubbed to this rule: `meridian.wealth.holdings` says `"current holdings for this relationship"`
+(not "…for the Whitman relationship"); `meridian.wealth.concentration` says
+`"how concentrated is this relationship"` (not "…the Whitman relationship"). An example carrying a
+client name is now an **anti-pattern** (§12).
+
+**Why it is non-negotiable: the query is masked before the router ever sees it.** On the request
+path, resolved entity spans are blanked out of the routing text and replaced with a neutral mask
+token (`conduit.routing.entity-mask-token`, default `"the subject"`) before the semantic router
+runs — this is the `RoutePreparationPolicy` masking stage (stamped `route-prep-v2`). So the router
+never routes on the words "Whitman" or "REL-00042"; it routes on the residual *capability* phrasing
+("how concentrated is **the subject**"). The consequence for you is mechanical and absolute:
+
+> **An example keyed to an entity name can never match a masked query.** The name is gone by the
+> time routing happens. A client-name example is dead weight at best; at worst it blurs your claimed
+> region with a token no real query will carry. Write the capability; the platform handles the
+> entity.
+
+This is *why* the collision story in §4.4 fixed a poaching agent by narrowing it to its capability
+("one row per failed trade") rather than by adding entity- or name-specific examples. Capability-first
+is the rule; §4.2–4.5 are how you execute it well.
 
 ### 4.2 Quality over quantity — the single most important rule
 
@@ -490,11 +840,26 @@ the unit tests use), scoring three shapes of query on their own terms:
   expected goal.
 - **Out-of-scope queries** (should reach *no one*) — correct iff the router **abstains** (§4.8).
 
-The current harness measures domain-level routing in the **~93%** range on the labeled set — with
-**held-out paraphrases**: queries that share an intent with the training examples but whose exact
-wording was deliberately *never* used as an example. Those held-out queries are the honest proof that
-the router **generalized** to the meaning of the intent rather than **memorized** the test strings. A
-score that only holds on strings you also planted as examples is not a routing result; it is an echo.
+The harness is a real, runnable command:
+
+```bash
+bash scripts/routing-measurement-gate.sh
+```
+
+It runs `eval/goal-pick/measure_goal_pick.py` against the **live gateway's** `POST /debug/route`
+using the labeled dataset `eval/goal-pick/labeled_queries.json`, and fails on low domain accuracy,
+weak abstention, or canonical-intent poaching. **Prerequisites:** the stack up, users seeded
+(`bash scripts/seed-users.sh`), and `/debug/route` enabled (config-gated off by default, on for the
+demo — §9). The measured number lives in the checked-in baselines at `eval/goal-pick/baselines/`
+(with `eval/goal-pick/REBASELINE.md` describing how to re-baseline); read the current baseline there
+rather than trusting any number quoted in prose — the metric has moved with each hardening pass and a
+hardcoded percentage in a doc will always rot.
+
+The dataset deliberately includes **held-out paraphrases**: queries that share an intent with the
+training examples but whose exact wording was *never* used as an example. Those held-out queries are
+the honest proof that the router **generalized** to the meaning of the intent rather than
+**memorized** the test strings. A score that only holds on strings you also planted as examples is
+not a routing result; it is an echo.
 
 A word on honesty, because this measurement has a history worth knowing. An early headline claimed
 routing accuracy of ~46%. On inspection that number was a **miscalibrated metric** — the harness had
@@ -777,6 +1142,40 @@ Semantics, and the guarantees that make it safe to run on live financial data:
 Note `trade_penalty`'s `max_items: 2` — a deliberately low cap for the demo so the truncation path is
 easy to exercise. In production you would set it to your real ceiling (under the global one).
 
+### 5.5a Declaring load-bearing figures — grounded answer attribution
+
+`produces` can carry more than a `name` and `type`. Each produced output may declare a
+**`figures[]`** array — the numbers in your output that the answer is *required* to attribute
+correctly. This is the machinery behind "grounded figures" (§1): the synthesizer summarizes agent
+output as delimited data and never computes a number, and `figures[]` is how you tell the platform
+*which* numbers are load-bearing and *how* they must be rendered, so a renderer and a validator can
+enforce it deterministically instead of trusting the model.
+
+Each figure is `{ label, path, format }`, all three **required**:
+
+- **`label`** — the human label the answer must use when it attributes this figure (e.g.
+  `"Concentration breach count"`).
+- **`path`** — a **JMESPath** into your producer's output that selects the value (e.g.
+  `single_name.top.weight_pct`, `breach_count`). Boot-validated against your introspected output
+  schema, exactly like a `select` (§5.3): a `path` that points at a field you don't emit fails
+  ingestion.
+- **`format`** — a formatter id from a **closed enum**. The allowed values are exactly:
+
+  ```
+  percent   percent1   percent2   currency_usd   count   date   plain
+  ```
+
+  These are the formats the figure renderer renders and the grounding validator gates on. **A value
+  outside this set is rejected at ingestion** (schema `enum`) — it cannot silently fall through to
+  `plain` and quietly weaken the grounding gate. (This enum lives in all three schema copies; §3.)
+
+Real example — `meridian.servicing.settlement_risk` declares figures like
+`{ "label": "CSDR penalty failed settlement amount", "path": "failed_amount_usd", "format": "currency_usd" }`
+and `{ "label": "Failed exposure to settled cash", "path": "cash_context.failed_exposure_to_settled_cash_pct", "format": "percent1" }`.
+`meridian.wealth.concentration` declares a `percent1` top-single-name weight, a `count` breach
+count, and a `plain` HHI. Declaring figures is optional, but if your answer quotes a number that
+*matters*, declare it as a figure so its attribution is enforced rather than hoped for.
+
 ### 5.6 The determinism + fail-safe guarantee, stated plainly
 
 Across §5.3–5.5, one principle repeats, and it is the spine of the whole orchestration layer:
@@ -823,6 +1222,16 @@ validated against.
   The gateway reads it as your output shape.
 - **If your tool genuinely cannot declare an output schema,** provide the manifest `output_schema`
   field as a fallback. This is the *only* sanctioned use of that field.
+
+**Transport — Streamable HTTP is the default.** MCP here is **Streamable HTTP at spec version
+`2025-11-25`**: a single `/mcp` endpoint (`connection.server_url: "http://…:8082/mcp"`). Declare it
+with `connection.transport: "streamable"` — or omit `transport` entirely, since `streamable` is the
+schema default. The `sse` value exists **only** as a deprecated legacy escape hatch (the old
+two-channel HTTP+SSE handshake); do not reach for it in a new agent. An optional
+`connection.protocol_version` overrides the negotiated spec version per-agent; absent it, the gateway
+uses `conduit.mcp.protocol-version` (`2025-11-25` for streamable) or `conduit.mcp.legacy-protocol-version`
+(`2024-11-05` for `sse`). The live MCP manifests in this repo (e.g.
+`meridian.servicing.settlement_status`) use `"transport": "streamable"` against a `/mcp` endpoint.
 
 ### Why introspection matters (and the honest-degradation rule)
 
@@ -898,28 +1307,134 @@ The gateway forwards the **end-user's JWT** to your service on every hop. Your s
 Each service independently confirms it is acting for the real end user. Defense in depth means the
 compromise of one hop does not hand an attacker every downstream service.
 
+### 7.5 The coverage service you must build
+
+If your domain's data is client-scoped (`resource_scoped: true`), you must stand up a **coverage
+service** and declare its three URLs on the domain manifest's `coverage` block (§3.5). The gateway
+calls it **generically** — it does not know what the responses *mean*; it only knows the contract.
+Implement it exactly.
+
+Two rules frame everything below: **the coverage service is the single source of truth for the book
+of business** (it appears nowhere else — not the gateway, not a manifest), and **RESOLVE is
+principal-agnostic while CHECK is the only gate** (resolution finds an entity across *all* entities;
+the coverage check decides whether *this* principal may have it — §7 Gate 3).
+
+**Every call carries:** `Authorization: Bearer <the forwarded end-user JWT>` — the *caller's* token,
+not any "gateway service token"; the gateway forwards the exact bearer it was handed and **refuses
+the coverage call if there is no caller identity.** Plus `X-Tenant-Id: <tenant_id from the validated
+JWT>` (the IAM service does enrich tokens with `tenant_id`, and the gateway sends it on every coverage
+call).
+
+#### DISCOVER — "which entities may this principal see?"
+
+```
+GET {discover_url}          e.g. GET /coverage/rm_jane
+→ 200: [ { "id": "REL-00042", "label": "Whitman Family Office", "sub_domain": "private-banking" }, … ]
+→ 200: []                    (principal has no resources)
+→ 503 / timeout:             gateway FAILS CLOSED — tells the user it cannot proceed, no stale data
+```
+
+Return **only** resources this principal is authorized to see — the list *is* the filter. Tag each
+with its `sub_domain` so the gateway knows the routing bucket. A DISCOVER list is for display and
+option-population; **it is not authorization** — CHECK still runs.
+
+#### CHECK — "is this specific entity in this principal's book?" (the gate)
+
+```
+GET {check_url}             e.g. GET /coverage/rm_jane/resources/REL-00042
+→ 200: { "allowed": true }
+→ 200: { "allowed": false, "reason": "not-covered" }
+→ 503 / timeout:            gateway FAILS CLOSED
+```
+
+Always call CHECK, even for a resource that came back from DISCOVER. Nothing reaches an agent without
+a passed CHECK; results are cached per principal+tenant+entity for `cache_ttl_seconds` (default 30),
+then re-checked. **Reason codes** map to the sub-domain manifest's `denial_messages` copy (§3.5):
+`not-covered`, `coverage-transferred`, `relationship-closed`, `service-error` (→ fail closed). Your
+sub-domain declares the exact user-facing wording for each; the gateway just looks it up by code.
+
+#### RESOLVE — "turn a human reference into a canonical ID" (principal-agnostic)
+
+```
+POST {resolve_url}          body: { "reference": "Whitman Family Office", "type": "relationship", "principal_id": "rm_jane" }
+→ 200 resolved:   { "resolved": true,  "id": "REL-00042", "canonical_name": "Whitman Family Office", "candidates": [] }
+→ 200 ambiguous:  { "resolved": false, "id": null, "candidates": [ {…}, {…} ] }
+→ 200 not-found:  { "resolved": false, "id": null, "candidates": [] }
+```
+
+`principal_id` is passed **for audit only — the service must NOT filter by it.** Filtering resolution
+by the principal's book would leak the *shape* of what they cannot see, and it conflates two concerns:
+finding the entity (RESOLVE) versus deciding access (CHECK). Ambiguous → the gateway intersects the
+candidates with a fresh DISCOVER, shows only the accessible ones, and posts a clarifying question.
+Not found → the gateway posts a "couldn't find a match" message (from `messages.reference_not_found`).
+**Zero fabricated IDs:** the LLM extracts the human reference; this deterministic lookup resolves it;
+an unresolved reference triggers a clarification, never a guess.
+
 ---
 
-## 8. What the gateway does at boot
+## 8. What happens at ingestion (the registry-service)
 
-When the gateway starts, for each manifest it runs a fixed pipeline. Knowing it tells you exactly
-where a mistake will surface — and it will surface *here*, at boot, not in front of a user.
+**Ingestion is a separate service, not the gateway.** The pipeline below runs in the
+**registry-service** — the same JVM image under the `registry` Spring profile
+(`SPRING_PROFILES_ACTIVE: registry`), its own container, which mounts `./registry` read-only and
+runs the ingest on startup. The `ManifestEmbedder`, `VectorIndexWriter`, and `AgentRegistrar` beans
+are `@Profile("registry")`, so **the gateway cannot embed or mutate routing data** — by construction.
+The registry-service's health goes green only *after* ingestion succeeds, and the gateway's
+`depends_on` blocks on that. This is why you re-ingest by rebuilding the registry-service, not the
+gateway (Quickstart Step 5), and why the gateway never needs a rebuild to pick up a manifest change —
+it reads the finished index from Redis.
 
-1. **Validate** your manifest against `agent-manifest.schema.json`. (Malformed manifest → rejected.)
+The pipeline, per manifest — knowing it tells you exactly where a mistake will surface, at ingestion,
+not in front of a user:
+
+0. **Validate the domain & sub-domain manifests** against `domain-manifest.schema.json` /
+   `sub-domain-manifest.schema.json`. Every file under `registry/domains/` is schema-validated;
+   a malformed or unschema'd one throws with the file named and **aborts startup** (it is no longer
+   silently skipped — this is the fail-loud change). The error reads
+   `Domain manifest 'foo.json' failed schema validation: <detail>` (or `Sub-domain manifest '…'`).
+1. **Validate your agent manifest** against the agent schema (classpath copy). Malformed → rejected.
 2. **Introspect** your service — fetch the OpenAPI doc or `tools/list` — and **derive** your input and
-   output wire schemas. (Unreachable service or missing operation → flagged.)
-3. **Embed** your `skills[].examples` with MiniLM into the vector index. Your agent is now routable by
-   meaning (§4).
+   output wire schemas. (Unreachable service or missing operation → flagged; the agents must be up,
+   which is why the registry-service `depends_on` them.)
+3. **Embed** your `skills[].examples` (via the sidecar) into the vector index. Your agent is now
+   routable by meaning (§4).
 4. **Wire** your `io` contract into the DAG resolver — match your `produces.type` to others'
    `consumes.from`, building the edges (§5).
-5. **Boot-validate** every `select`, `condition`, and `map` against the introspected schemas — the
-   "teeth" (§5.3). A `select` referencing a non-emitted field, a `condition` that isn't boolean, a
-   `map` whose `over` isn't an array → **your manifest fails to load, with a precise error.**
-6. **Register.** The boot log reports `Registry bootstrap complete: N loaded, 0 failed` and
-   `select validation: … 0 UNVALIDATED`.
+5. **Boot-validate** every `select`, `condition`, `map`, and figure `path` against the introspected
+   schemas — the "teeth" (§5.3, §5.5a). A `select` referencing a non-emitted field, a `condition`
+   that isn't boolean, a `map` whose `over` isn't an array, a figure `path` that doesn't exist →
+   **your manifest fails to load, with a precise error naming the `agentId`.**
+6. **Register**, then **reconcile**: the manifest folder is the source of truth, so any agent still
+   registered but no longer described by a manifest is **pruned** (§10).
 
-A green boot is `N loaded, 0 failed` **and** `0 UNVALIDATED`. Anything else is your onboarding telling
-you precisely what to fix, before anyone downstream is affected.
+The ingestion log ends with exactly these two lines:
+
+```
+Registry ingestion complete: N loaded, 0 rejected
+select validation: X validated, 0 UNVALIDATED (no output schema)
+```
+
+A green ingest is `0 rejected` **and** `0 UNVALIDATED`.
+
+**A rejected manifest fails the *whole* ingestion, not just your file.** With the default
+`conduit.registry.ingest.fail-on-invalid=true`, any rejected manifest throws
+`Rejected N manifest(s). A partially-loaded registry routes silently to whichever agents happened to
+survive.` and the registry container **exits 1**, so its health never goes green and the gateway
+never starts. This is deliberate — *"a registry that does not fully load is not a degraded registry,
+it is an unknown one."* Your onboarding failure is loud and blocks the boot, by design, rather than
+quietly dropping your agent and misrouting in production.
+
+**The gateway side is verification only.** On startup the gateway runs a `RegistryReadinessVerifier`
+that refuses to boot unless the index (a) exists, (b) has at least one agent registered, and (c) was
+built by the *same* embedding model the gateway will query with. Its remedy text: *"The registry
+service ingests the manifests and builds the index; wait for it to become healthy (docker compose up
+-d registry-service) before starting the gateway."* If you see the gateway refusing to start with one
+of those three messages (§13), start or finish the registry-service first.
+
+> **Write control plane (alternative to folder-drop + re-ingest).** The registry-service also exposes
+> `POST/PUT/DELETE /admin/agents` (also `@Profile("registry")`) for programmatic registration. The
+> gateway keeps only `GET /admin/agents` (read). For onboarding, the folder-drop + re-ingest flow in
+> the Quickstart is the reconciled source-of-truth path; the write API is there when you need it.
 
 ---
 
@@ -930,14 +1445,16 @@ it *stays* correct and doesn't harm the system.
 
 ### The onboarding checklist
 
-- [ ] **Schema valid** — manifest passes `agent-manifest.schema.json`.
-- [ ] **World-B clean** — `scripts/world-b-check.sh` reports **CRITICAL 0**. (You added no domain
-      knowledge to the gateway. If onboarding you required a change to the gateway itself, stop — it
-      belongs in your manifest.)
-- [ ] **Boots green** — `N loaded, 0 failed`, your `agent_id` present, and `select validation … 0
-      UNVALIDATED`.
+- [ ] **Schema valid** — manifest passes the agent schema (and, for a new domain, the domain &
+      sub-domain schemas — §8 step 0).
+- [ ] **World-B clean** — `bash scripts/world-b-check.sh` reports **CRITICAL: 0**. (You added no
+      domain knowledge to the gateway. If onboarding you required a change to the gateway itself,
+      stop — it belongs in your manifest.)
+- [ ] **Ingests green** — `Registry ingestion complete: N loaded, 0 rejected`, your `agent_id`
+      present, and `select validation: X validated, 0 UNVALIDATED (no output schema)`
+      (`docker compose -p orchestrator-demo logs registry-service`).
 - [ ] **Routes correctly** — a question phrased like your intent reaches your agent; a neighbor's
-      question does *not*.
+      question does *not*. Smoke it with `bash scripts/smoke-route.sh` (asserts on `POST /debug/route`).
 - [ ] **Entitlement denies out-of-book** — an out-of-book principal is denied; an in-book one is
       served. (If entitlement-gated.)
 - [ ] **Composes** — if you declared `io`, the `plan_graph` shows your node wired to its
@@ -946,7 +1463,10 @@ it *stays* correct and doesn't harm the system.
 ### The measurement gate — the durable safeguard
 
 The checklist is a point-in-time pass. The **goal-pick measurement gate** (§4.6, §4.9) is what keeps
-routing honest over time. Run the labeled goal-pick harness with your agent in the set and confirm:
+routing honest over time. Run it — `bash scripts/routing-measurement-gate.sh` (it drives the live
+gateway's `POST /debug/route` over `eval/goal-pick/labeled_queries.json`; **prerequisites:** stack up,
+`bash scripts/seed-users.sh` run, and `/debug/route` enabled — it is config-gated off by default and
+on for the demo via `CONDUIT_DEBUG_ROUTE_DECISION_ENABLED`) — with your agent in the set and confirm:
 
 - Overall domain-level routing accuracy **does not drop** because you were added.
 - Your agent does **not poach** a neighbor's queries.
@@ -977,9 +1497,14 @@ Onboarding is not a one-time event; a manifest is a living artifact with a lifec
   the examples, so both improve against real usage rather than against our guesses about usage. When
   the feedback loop surfaces a systematic miss, the fix is almost always a *manifest* fix — sharper
   examples, a better `select` — not a gateway change.
-- **Deprecation.** Retiring an agent is removing its manifest and standing down its service. Because
-  nothing in the gateway references it by name, there is no code to clean up — the same World-B
-  property that made onboarding cheap makes offboarding cheap.
+- **Deprecation / offboarding.** Retiring an agent is deleting its manifest and standing down its
+  service, then re-ingesting. Removal is **enforced by orphan reconciliation**: the manifest folder
+  is the source of truth, so on the next ingest any agent still registered but no longer described by
+  a manifest is pruned (`conduit.registry.ingest.prune-orphans=true`, default). You'll see
+  `Pruning N orphaned agent(s)` in the registry log (or `Registry reconciled — no orphaned agents`
+  when there's nothing to prune). Because nothing in the gateway references the agent by name, there
+  is no code to clean up — the same World-B property that made onboarding cheap makes offboarding
+  cheap.
 
 ---
 
@@ -1015,10 +1540,11 @@ for others to build on. No dependencies, no condition, no map.
     "description": "Retrieve current holdings, positions, and asset allocation breakdown for a wealth relationship.",
     "tags": ["holdings", "portfolio", "positions", "allocation", "wealth-management"],
     "examples": [
-      "current holdings for the Whitman relationship",
+      "current holdings for this relationship",
       "portfolio allocation for this client",
       "what is this account invested in",
       "position breakdown for the relationship",
+      "portfolio summary for this client",
       "portfolio value and top positions",
       "show me the portfolio for this relationship",
       "total portfolio value",
@@ -1059,7 +1585,7 @@ The `io` and the key examples:
   "id": "analyze_concentration",
   "examples": [
     "is this portfolio too concentrated",
-    "how concentrated is the Whitman relationship",
+    "how concentrated is this relationship",
     "does this account breach our concentration limits",
     "compute the HHI for this client's holdings",
     "which holdings are driving issuer concentration in this book",
@@ -1124,7 +1650,9 @@ over it, produces a per-trade penalty aggregate.
     "list every failed trade as separate penalty calculation rows",
     "produce a per-trade penalty table for failed trade items",
     "map each failed trade item into one penalty row",
+    "show skipped failed trade rows when the map cap is reached",
     "return trade id, security, age days, and penalty amount per row",
+    "itemize per-failed-trade penalty details",
     "row-by-row failed trade penalty listing"
   ],
   "tags": ["settlements", "failed-trades", "csdr", "cash-penalty", "map-iteration", "asset-servicing"]
@@ -1153,10 +1681,15 @@ its poaching of `settlement_risk`.
 
 Each of these is a real way onboarding goes wrong. Learn them as a list of "not that."
 
-- **Over-broad or keyword-stuffed examples.** `"settlement"`, `"failed settlement"`, a bare
-  relationship name — these claim a huge, contested region of meaning-space and poach neighbors (the
-  `trade_penalty` incident, §4.4). Fix: narrow each example to your *distinct* intent. Sentences, not
-  keyword bags.
+- **Client / entity names in examples.** `"current holdings for the Whitman relationship"`, a bare
+  relationship name, a real ID. This is now a hard anti-pattern: the request path **masks** resolved
+  entity spans out of the routing text before the router runs (§4.1a), so a name-keyed example can
+  *never* match a real query — it is dead weight that only blurs your claimed region. Fix: write the
+  capability with a neutral deictic ("this relationship", "this client"); the platform handles the
+  entity.
+- **Over-broad or keyword-stuffed examples.** `"settlement"`, `"failed settlement"` — these claim a
+  huge, contested region of meaning-space and poach neighbors (the `trade_penalty` incident, §4.4).
+  Fix: narrow each example to your *distinct* intent. Sentences, not keyword bags.
 - **Pasting test/eval strings as examples.** Inflates your measured accuracy while teaching the router
   nothing that generalizes; it collapses on the first paraphrase. Fix: write realistic, varied
   phrasings; keep the literal test strings *out* and prove generalization on held-out paraphrases
@@ -1183,38 +1716,97 @@ Each of these is a real way onboarding goes wrong. Learn them as a list of "not 
 
 ---
 
-## 13. Appendix — condensed schema reference
+## 13. Failure-mode catalog — symptom → cause → fix
 
-Validate against `registry/agent-manifest.schema.json`. **Required top-level:** `agent_id`, `name`,
-`description`, `version`, `provider`, `domain`, `audience`, `protocol`, `connection`, `capabilities`,
-`skills`, `constraints`.
+When onboarding goes wrong it fails *loud*, at ingestion or gateway startup, with a specific string.
+Grep the registry-service and gateway logs
+(`docker compose -p orchestrator-demo logs registry-service` / `… logs gateway`) and match the
+symptom here. Every string below is emitted by the code in this repo.
+
+| Symptom (log string) | Cause | Fix |
+|---|---|---|
+| `Rejected N manifest(s). A partially-loaded registry routes silently to whichever agents happened to survive.` + registry container **exits 1** | An agent manifest failed agent-schema validation (`fail-on-invalid=true`). One bad manifest fails the *whole* ingest. | Read the `  rejected: …` line just above it — it names the file and reason. Fix the manifest, re-ingest (Quickstart Step 5). |
+| `Domain manifest 'X.json' failed schema validation: …` / `Sub-domain manifest 'X.json' failed schema validation: …` (startup aborts) | A domain/sub-domain file violates `domain-manifest.schema.json` / `sub-domain-manifest.schema.json` (e.g. missing `entity_types`, `memory_compaction`; a bad `figures[].format`). | Fix the field named in the detail. Common: sub-domain missing required `entity_types`; a figure `format` outside the enum. |
+| `No manifests found at <pattern>` | Wrong path or the `./registry` mount is missing/empty. | Confirm files are under `registry/manifests/<domain>/` and the registry-service mounts `./registry:/registry:ro`. |
+| `select validation failed: agentId=<id> …` | A `consumes[].select` references a field the producer does not emit. | Fix the **`select`** (not the validator) — align it to the producer's real output schema (§5.3). |
+| `condition validation failed: agentId=<id> …` / `map validation failed …` / `produced figure validation failed …` | A `condition` isn't boolean, a `map.over` isn't an array, or a figure `path` doesn't exist in the output. | Correct the JMESPath against the introspected schema (§5.4, §5.5, §5.5a). |
+| `select validation: X validated, Y UNVALIDATED (no output schema)` with `Y > 0` (warning, not fatal) | A producer has no introspectable/declared output schema, so its consumers' `select`s can't be proven. | Give the producer an MCP `outputSchema` or a manifest `output_schema` fallback (§6). Target `Y = 0`. |
+| `Embedding service never became ready after N attempts` | The embeddings sidecar is down/unreachable during ingestion. | Bring up `embeddings` (`docker compose -p orchestrator-demo up -d embeddings`), then re-ingest. |
+| `Embedding service returned N-dim vectors but conduit.embedding.dimension is M` | Sidecar model / configured dimension mismatch. | Align the sidecar model and `CONDUIT_EMBEDDING_DIMENSION` (MiniLM = 384). |
+| Gateway refuses to start: `The routing vector index does not exist…` / `…exists but no agents are registered…` / `…was built by embedding model '…'` | `RegistryReadinessVerifier`: no index, empty index, or model-id mismatch between the index and the gateway's query embedder. | Start/finish the **registry-service** first (`docker compose -p orchestrator-demo up -d registry-service`) so the index exists and matches; then start the gateway (§8). |
+| `Sub-domain 'X' references unknown parent domain 'Y'` | A sub-domain's `parent_domain` doesn't resolve to a loaded domain manifest. | Fix `parent_domain`, or add the missing domain manifest. |
+| `Sub-domain 'X' is resource_scoped=true but its parent domain 'Y' has no coverage.discover_url configured.` | A client-scoped sub-domain's parent domain lacks a `coverage` block. | Add the `coverage` block (with `discover_url`) to the domain manifest, or set `resource_scoped: false` (§3.5, §7.5). |
+| `Pruning N orphaned agent(s) — registered but described by no manifest…` (warning) | You deleted a manifest; the agent is being deregistered on this ingest. | Expected during offboarding (§10). Nothing to fix. |
+
+---
+
+## 14. Appendix — full schema reference (agent / domain / sub-domain)
+
+Three schema files, three synced copies of the agent schema (only the gateway classpath copy is
+loaded at runtime; edit all three — §3). Fields marked `*` are required.
+
+### 14.1 Agent manifest — `agent-manifest.schema.json`
+
+**Required top-level:** `agent_id`, `name`, `description`, `version`, `provider`, `domain`,
+`audience`, `protocol`, `connection`, `capabilities`, `skills`, `constraints`.
 
 | Field | Type / values | Notes |
 |---|---|---|
-| `agent_id` | string, `^[a-z0-9]+(\.[a-z0-9_]+)+$` | Stable, namespaced. |
-| `name`, `description` | string (non-empty) | Describe what it does *and does not* do. |
-| `version` | string, `^\d+\.\d+\.\d+$` | Semver. |
-| `provider` | `{ organization*, contactEmail? }` | — |
-| `domain` | string | Validated against loaded domain manifests, not an enum. |
+| `agent_id`* | string, `^[a-z0-9]+(\.[a-z0-9_]+)+$` | Stable, namespaced. |
+| `name`*, `description`* | string (non-empty) | Describe what it does *and does not* do. |
+| `version`* | string, `^\d+\.\d+\.\d+$` | Semver. |
+| `provider`* | `{ organization*, contactEmail? }` | Owner. |
+| `domain`* | string | Interpreted against loaded (schema-validated) domain manifests, not an enum. |
 | `sub_domain` | string | Resolves to a loaded sub-domain manifest. |
-| `audience` | `segment` \| `enterprise` | `enterprise` skips the structural gate. |
-| `protocol` | `http` \| `mcp` \| `a2a` | Selects the adapter. |
-| `connection` | object | HTTP: `{ openapi_url*, operation_id* }`. MCP: `{ server_url*, tool*, transport? }` (`sse`\|`stdio`). A2A: `{ agent_card_url* }`. |
-| `capabilities` | `{ streaming*: bool, … }` | Additive. |
-| `constraints.access_mode` | `read` \| `write` | Phase-1 = `read`. |
-| `constraints.data_classification` | `public` \| `internal` \| `confidential` \| `confidential-pii` | Drives the classification gate. |
-| `constraints.sla_timeout_ms` | int 100–60000 | Join deadline. |
-| `constraints.rate_limit` | `{ requests*, per_seconds* }` | Optional. |
-| `max_response_tokens` | int 1–100000 | Optional truncation. |
-| `skills[]` | `{ id*, name*, description*, tags[≥1]*, examples[≥3]*, inputModes?, outputModes? }` | `examples` are the routing fuel (§4). |
+| `audience`* | `segment` \| `enterprise` | `enterprise` skips the structural gate. |
+| `protocol`* | `http` \| `mcp` \| `a2a` | Selects the adapter. |
+| `connection`* | object | HTTP: `{ openapi_url*, operation_id* }`. MCP: `{ server_url*, tool*, transport?, protocol_version? }` — `transport` = `streamable` (default) \| `sse` (deprecated) \| `stdio`. A2A: `{ agent_card_url* }`. |
+| `capabilities`* | `{ streaming*: bool, … }` | Transport-feature object; additive. **Not** a routing signal. |
+| `securitySchemes` | object | Optional declared auth schemes for the agent's own endpoint. |
+| `constraints.access_mode`* | `read` \| `write` | Phase-1 = `read`. |
+| `constraints.data_classification`* | `public` \| `internal` \| `confidential` \| `confidential-pii` | Drives the classification gate (§7). |
+| `constraints.sla_timeout_ms`* | int 100–60000 | Join deadline. |
+| `constraints.rate_limit` | `{ requests*, per_seconds* }` | Optional back-pressure. |
+| `max_response_tokens` | int 1–100000 | **Optional** truncation before synthesis. |
+| `skills[]`* | `{ id*, name*, description*, tags[≥1]*, examples[≥3]*, inputModes?, outputModes? }` | `examples` are the routing fuel; capability-phrased, entity-free (§4). |
 | `output_schema` | JSON Schema object | **Fallback only** when introspection can't derive output (§6). |
-| `io.consumes[]` | each `{ entity }` **or** `{ from, select?, required? }` | Exactly one of `entity`/`from` per item. `select` = JMESPath projection (§5.3). |
-| `io.produces[]` | `{ name*, type*, entities? }` | `type` matched by string equality — namespace it. `entities` is for per-producer coverage selectors. |
+| `io.consumes[]` | each `{ entity, required? }` **or** `{ from, select?, required? }` | Exactly one of `entity`/`from` per item; `required` may sit on either variant. `select` = JMESPath projection (§5.3). |
+| `io.produces[]` | `{ name*, type*, entities?, figures? }` | `type` matched by string equality — namespace it. `figures[]` = `{ label*, path*, format* }`; `format` ∈ `percent, percent1, percent2, currency_usd, count, date, plain` (closed enum — §5.5a). |
 | `io.condition` | string (JMESPath boolean) | Node runs only if true; else `skipped_condition_false` (§5.4). |
 | `io.map` | `{ over*, item_select?, max_items?, max_concurrency? }` | Bounded iteration; caps clamped to global ceilings (§5.5). |
 
-**Boot success looks like:** `Registry bootstrap complete: N loaded, 0 failed` and
-`select validation: … 0 UNVALIDATED`. **World-B gate:** `scripts/world-b-check.sh` → CRITICAL 0.
+### 14.2 Domain manifest — `domain-manifest.schema.json`
+
+**Required:** `domain_id`, `display_name`, `memory_compaction`. (`additionalProperties: false` — no
+stray keys.) See §3.5 for the narrative.
+
+| Field | Req | Type | Notes |
+|---|---|---|---|
+| `domain_id`* | yes | string `^[a-z0-9]+(-[a-z0-9]+)*$` | Matches agent `domain`. |
+| `display_name`* | yes | string | Human name shown in the glass-box. |
+| `domain_context` | no | string | Neutral coverage phrase composed (across all domains) into the classifier/synthesizer framing. Replaces the old env var (§1, §3.5). |
+| `clarify_style` | no | `template` \| `composed` (default `template`) | Clarification *wording* policy; decision stays deterministic. |
+| `clarify_tone` | no | string | Tone hint used only when `clarify_style: composed`. |
+| `coverage` | no | `{ discover_url*, check_url*, resolve_url*, cache_ttl_seconds? }` | Required as a set when present. Runtime requires `discover_url` for any resource-scoped child (§7.5). |
+| `memory_compaction`* | yes | `{ envelope_version*, must_preserve*, can_drop?, summary_policy* }` | `summary_policy.owner` is fixed `"memory-service"`. Schema-required boilerplate today; the gateway acts only on `must_preserve`/`can_drop` (§3.5). |
+
+### 14.3 Sub-domain manifest — `sub-domain-manifest.schema.json`
+
+**Required:** `sub_domain_id`, `display_name`, `parent_domain`, `resource_scoped`, `entity_types`,
+`required_context`, `agents`. (`additionalProperties: false`.)
+
+| Field | Req | Type | Notes |
+|---|---|---|---|
+| `sub_domain_id`* | yes | string `^[a-z0-9]+(-[a-z0-9]+)*$` | Matches agent `sub_domain`. |
+| `display_name`* | yes | string | Human name. |
+| `parent_domain`* | yes | string | Must resolve to a loaded domain (fail-fast, §8). |
+| `resource_scoped`* | yes | boolean | `true` = DISCOVER + CHECK before fan-out; `false` = role gate only. |
+| `entity_types`* | yes | array of `{ key*, extract_as*, kind*, display*, id_pattern?, resolve_type?, required*, default? }` | The entity model — full anatomy in §3.5. `kind` ∈ `resolvable, literal, list`. |
+| `required_context`* | yes | array of string | Entity keys that must be present before fan-out; missing → deterministic CLARIFY. |
+| `clarification_schema` | no | object of `{ question*, options_source*, priority*, default? }` | `options_source` ∈ `discover, agent_derived, none, principal_book`. `question` is the exact posted copy. |
+| `messages` | no | object (key → string) | User-facing copy read by key; load-bearing key: `capability_unavailable`. |
+| `denial_messages` | no | object (reason-code → string) | Coverage denial copy (`not-covered`, `coverage-transferred`, …). |
+| `agents`* | yes | array (≥1) of agent-id | Members of this sub-domain. |
 
 ---
 

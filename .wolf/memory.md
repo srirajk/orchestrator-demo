@@ -2380,3 +2380,572 @@
 | 08:40 | Edited ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/wt-mcp/mock-agents/servicing/server.py | inline fix | ~10 |
 | 08:40 | Edited ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/wt-mcp/mock-agents/servicing/server.py | 9→9 lines | ~184 |
 | 08:40 | Edited ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/wt-mcp/mock-agents/servicing/server.py | modified Exemptions() | ~196 |
+| 08:42 | Edited ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/wt-mcp/mock-agents/servicing/server.py | expanded (+7 lines) | ~288 |
+| 08:43 | Created ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/wt-mcp/gateway/src/test/java/ai/conduit/gateway/adapter/mcp/McpAdapterStreamableTest.java | — | ~967 |
+| 08:44 | Edited ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/wt-mcp/.wolf/buglog.json | expanded (+12 lines) | ~420 |
+| 08:52 | Created gateway/src/test/java/ai/conduit/gateway/registry/loader/ManifestSchemaCopiesInSyncTest.java | — | ~622 |
+| 09:03 | Created gateway/src/main/java/ai/conduit/gateway/registry/embedding/EmbeddingModel.java | — | ~271 |
+| 09:03 | Created gateway/src/main/java/ai/conduit/gateway/registry/embedding/TextEmbedder.java | — | ~308 |
+| 09:03 | Created gateway/src/main/java/ai/conduit/gateway/registry/embedding/RemoteEmbedder.java | — | ~2080 |
+| 09:04 | Created gateway/src/main/java/ai/conduit/gateway/registry/embedding/HashEmbedder.java | — | ~1062 |
+| 09:04 | Created gateway/src/main/java/ai/conduit/gateway/registry/embedding/ManifestEmbedder.java | — | ~1855 |
+| 09:04 | Created gateway/src/main/java/ai/conduit/gateway/registry/embedding/QueryEmbedder.java | — | ~448 |
+| 09:05 | Edited gateway/src/main/java/ai/conduit/gateway/registry/index/VectorIndex.java | added 2 condition(s) | ~1238 |
+| 09:05 | Edited gateway/src/main/java/ai/conduit/gateway/registry/index/VectorIndex.java | embed() → embedCorpus() | ~166 |
+| 09:05 | Edited gateway/src/main/java/ai/conduit/gateway/registry/index/VectorIndex.java | 2→2 lines | ~32 |
+| 09:05 | Edited gateway/src/main/java/ai/conduit/gateway/registry/index/VectorIndex.java | added 2 import(s) | ~78 |
+| 09:07 | Created gateway/src/test/java/ai/conduit/gateway/registry/embedding/ManifestEmbedderTest.java | — | ~1613 |
+| 09:07 | Created gateway/src/test/java/ai/conduit/gateway/registry/index/VectorIndexModelStampTest.java | — | ~1692 |
+| 09:11 | Edited gateway/src/main/java/ai/conduit/gateway/registry/loader/RegistryBootstrapLoader.java | added 1 import(s) | ~70 |
+| 09:11 | Edited gateway/src/main/java/ai/conduit/gateway/registry/loader/RegistryBootstrapLoader.java | expanded (+10 lines) | ~301 |
+| 09:21 | Session end: 55 writes across 31 files (GatewayClient.java, AppProperties.java, application.yml, LlmSummaryService.java, LlmPolicyGenerationService.java) | 20 reads | ~52119 tok |
+| 09:33 | Created gateway/src/main/java/ai/conduit/gateway/registry/index/VectorIndex.java | — | ~1458 |
+| 09:34 | Created gateway/src/main/java/ai/conduit/gateway/registry/index/VectorIndexWriter.java | — | ~2238 |
+| 09:34 | Created gateway/src/main/java/ai/conduit/gateway/registry/service/AgentRegistrar.java | — | ~1629 |
+| 09:35 | Created gateway/src/main/java/ai/conduit/gateway/registry/ingest/RegistryIngestor.java | — | ~2296 |
+| 09:35 | Created gateway/src/main/java/ai/conduit/gateway/registry/readiness/RegistryReadinessVerifier.java | — | ~1046 |
+| 09:36 | Created gateway/src/main/java/ai/conduit/gateway/admin/AgentRegistryController.java | — | ~546 |
+| 09:37 | Created gateway/src/test/java/ai/conduit/gateway/registry/ingest/IngestionIsNotInTheGatewayTest.java | — | ~784 |
+| 09:40 | Created gateway/src/main/java/ai/conduit/gateway/registry/ingest/RegistryIngestor.java | — | ~2423 |
+| 09:41 | Created gateway/src/main/java/ai/conduit/gateway/registry/ingest/RegistryIngestionHealth.java | — | ~461 |
+| 09:41 | Created gateway/src/main/java/ai/conduit/gateway/registry/api/AgentRegistrationController.java | — | ~1290 |
+| 09:44 | Created gateway/src/test/java/ai/conduit/gateway/registry/readiness/RegistryReadinessVerifierTest.java | — | ~819 |
+| 09:46 | Edited gateway/src/main/java/ai/conduit/gateway/registry/ingest/RegistryIngestor.java | added 2 condition(s) | ~710 |
+| 09:47 | Created gateway/src/test/java/ai/conduit/gateway/registry/ingest/RegistryReconciliationTest.java | — | ~1000 |
+| 09:59 | Session end: 68 writes across 41 files (GatewayClient.java, AppProperties.java, application.yml, LlmSummaryService.java, LlmPolicyGenerationService.java) | 22 reads | ~71925 tok |
+| 10:18 | Session end: 68 writes across 41 files (GatewayClient.java, AppProperties.java, application.yml, LlmSummaryService.java, LlmPolicyGenerationService.java) | 22 reads | ~71925 tok |
+| 10:34 | Edited ../orchestrator-chat/iam-service/src/main/java/com/openwolf/iam/config/SecurityConfig.java | added 1 import(s) | ~23 |
+| 10:35 | Edited ../orchestrator-chat/iam-service/src/main/java/com/openwolf/iam/config/SecurityConfig.java | expanded (+35 lines) | ~868 |
+| 10:35 | Edited ../orchestrator-chat/tests/e2e/tests/09-cerbos-authz.spec.ts | modified 4xx() | ~834 |
+| 10:38 | Edited ../orchestrator-chat/tests/e2e/tests/09-cerbos-authz.spec.ts | 5→8 lines | ~163 |
+| 10:42 | Created ../../.claude/projects/-Users-srirajkadimisetty-projects-orchestrator-demo/memory/feedback_seed_data_python_not_flyway.md | — | ~342 |
+| 10:52 | Created ../../.claude/projects/-Users-srirajkadimisetty-projects-orchestrator-demo/memory/project_bounded_context_redis_isolation.md | — | ~586 |
+| 10:53 | Edited ../orchestrator-chat/gateway/src/main/java/ai/conduit/gateway/domain/auth/RevocationChecker.java | 60s() → script() | ~316 |
+| 10:53 | Session end: 75 writes across 44 files (GatewayClient.java, AppProperties.java, application.yml, LlmSummaryService.java, LlmPolicyGenerationService.java) | 25 reads | ~81019 tok |
+| 10:56 | Session end: 75 writes across 44 files (GatewayClient.java, AppProperties.java, application.yml, LlmSummaryService.java, LlmPolicyGenerationService.java) | 25 reads | ~81019 tok |
+| 11:52 | Session end: 75 writes across 44 files (GatewayClient.java, AppProperties.java, application.yml, LlmSummaryService.java, LlmPolicyGenerationService.java) | 25 reads | ~81019 tok |
+| 11:58 | Session end: 75 writes across 44 files (GatewayClient.java, AppProperties.java, application.yml, LlmSummaryService.java, LlmPolicyGenerationService.java) | 25 reads | ~81019 tok |
+| 12:02 | Created docs/specs/AUDIT-RECORD-SPEC.md | — | ~2700 |
+| 12:02 | Edited docs/specs/AUDIT-RECORD-SPEC.md | expanded (+10 lines) | ~296 |
+| 12:03 | Edited docs/specs/AUDIT-RECORD-SPEC.md | expanded (+7 lines) | ~370 |
+| 12:03 | Session end: 78 writes across 45 files (GatewayClient.java, AppProperties.java, application.yml, LlmSummaryService.java, LlmPolicyGenerationService.java) | 25 reads | ~84625 tok |
+| 13:00 | Session end: 78 writes across 45 files (GatewayClient.java, AppProperties.java, application.yml, LlmSummaryService.java, LlmPolicyGenerationService.java) | 25 reads | ~84625 tok |
+| 13:05 | Session end: 78 writes across 45 files (GatewayClient.java, AppProperties.java, application.yml, LlmSummaryService.java, LlmPolicyGenerationService.java) | 25 reads | ~84625 tok |
+| 14:21 | Created gateway/src/test/java/ai/conduit/gateway/synthesis/input/EntityExtractorFallbackTest.java | — | ~940 |
+| 14:22 | Created gateway/src/test/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizerGroundingTest.java | — | ~874 |
+| 14:22 | Edited gateway/src/test/java/ai/conduit/gateway/synthesis/input/EntityExtractorFallbackTest.java | inline fix | ~15 |
+| 14:26 | Created tests/e2e/security_harness/test_prompt_injection.py | — | ~1392 |
+| 14:28 | Edited iam-service/src/main/java/com/openwolf/iam/exception/GlobalExceptionHandler.java | removed 9 lines | ~14 |
+| 14:34 | Edited iam-service/src/main/java/com/openwolf/iam/exception/GlobalExceptionHandler.java | added 2 import(s) | ~93 |
+| 14:34 | Edited iam-service/src/main/java/com/openwolf/iam/exception/GlobalExceptionHandler.java | modified handleMethodNotSupported() | ~491 |
+| 14:48 | Created ../../.claude/projects/-Users-srirajkadimisetty-projects-orchestrator-demo/memory/project_compose_profiles_and_backend.md | — | ~558 |
+| 14:49 | Edited CLAUDE.md | 5→9 lines | ~209 |
+| 14:50 | Edited CLAUDE.md | expanded (+22 lines) | ~1065 |
+| 14:50 | Edited CLAUDE.md | 2→7 lines | ~164 |
+| 14:50 | Edited CLAUDE.md | 8→11 lines | ~202 |
+| 14:51 | Edited CLAUDE.md | expanded (+6 lines) | ~213 |
+| 14:52 | Session end: 91 writes across 51 files (GatewayClient.java, AppProperties.java, application.yml, LlmSummaryService.java, LlmPolicyGenerationService.java) | 29 reads | ~105450 tok |
+| 15:00 | Edited gateway/pom.xml | expanded (+6 lines) | ~136 |
+| 15:00 | Created gateway/src/test/java/ai/conduit/gateway/testsupport/RedisContainerTest.java | — | ~469 |
+| 15:03 | Edited CLAUDE.md | hermetic() → Redis() | ~118 |
+| 15:03 | Session end: 94 writes across 53 files (GatewayClient.java, AppProperties.java, application.yml, LlmSummaryService.java, LlmPolicyGenerationService.java) | 30 reads | ~107719 tok |
+| 15:36 | Created gateway/src/main/java/ai/conduit/gateway/infrastructure/audit/AuditRecord.java | — | ~392 |
+| 15:36 | Created gateway/src/main/java/ai/conduit/gateway/infrastructure/audit/AuditRecordAssembler.java | — | ~1294 |
+| 15:37 | Created gateway/src/main/java/ai/conduit/gateway/infrastructure/audit/AuditRecordSink.java | — | ~172 |
+| 15:37 | Edited gateway/pom.xml | expanded (+13 lines) | ~140 |
+| 15:37 | Edited gateway/pom.xml | expanded (+6 lines) | ~122 |
+| 15:38 | Created gateway/src/main/java/ai/conduit/gateway/infrastructure/audit/ObjectStoreAuditSink.java | — | ~1625 |
+| 15:39 | Created gateway/src/main/java/ai/conduit/gateway/infrastructure/audit/AsyncAuditWriter.java | — | ~1661 |
+| 15:39 | Edited gateway/src/main/java/ai/conduit/gateway/infrastructure/telemetry/TraceEventPublisher.java | 19→23 lines | ~379 |
+| 15:39 | Edited gateway/src/main/java/ai/conduit/gateway/infrastructure/telemetry/TraceEventPublisher.java | added 1 condition(s) | ~196 |
+| 15:41 | Created gateway/src/test/java/ai/conduit/gateway/infrastructure/audit/AuditRecordAssemblerTest.java | — | ~914 |
+| 15:41 | Created gateway/src/test/java/ai/conduit/gateway/infrastructure/audit/AsyncAuditWriterTest.java | — | ~949 |
+| 15:44 | Edited docker-compose.yml | 3→4 lines | ~59 |
+| 15:44 | Edited docker-compose.yml | expanded (+14 lines) | ~525 |
+| 15:49 | Edited gateway/src/main/java/ai/conduit/gateway/infrastructure/audit/AuditRecordAssembler.java | added 2 condition(s) | ~476 |
+| 15:49 | Edited gateway/src/test/java/ai/conduit/gateway/infrastructure/audit/AuditRecordAssemblerTest.java | modified derivesCountsFromTheTrace() | ~371 |
+| 15:58 | Edited docs/specs/GATEWAY-PACKAGE-STRUCTURE.md | 11→16 lines | ~305 |
+| 15:58 | Session end: 110 writes across 63 files (GatewayClient.java, AppProperties.java, application.yml, LlmSummaryService.java, LlmPolicyGenerationService.java) | 35 reads | ~146158 tok |
+| 16:04 | Session end: 110 writes across 63 files (GatewayClient.java, AppProperties.java, application.yml, LlmSummaryService.java, LlmPolicyGenerationService.java) | 35 reads | ~146158 tok |
+
+## Session: 2026-07-10 16:04
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 16:07 | Created docs/UI-E2E-SCENARIOS-FOR-CODEX.md | — | ~1729 |
+| 16:07 | Session end: 1 writes across 1 files (UI-E2E-SCENARIOS-FOR-CODEX.md) | 0 reads | ~1852 tok |
+| 16:11 | Session end: 1 writes across 1 files (UI-E2E-SCENARIOS-FOR-CODEX.md) | 0 reads | ~1852 tok |
+| 16:27 | Session end: 1 writes across 1 files (UI-E2E-SCENARIOS-FOR-CODEX.md) | 0 reads | ~1852 tok |
+| 16:49 | Edited admin-ui/src/api/client.ts | added 2 condition(s) | ~232 |
+| 16:49 | Edited admin-ui/src/api/client.ts | 5→5 lines | ~63 |
+| 16:49 | Edited admin-ui/src/api/client.ts | 3→3 lines | ~59 |
+| 16:50 | Edited admin-ui/src/hooks/useAuth.tsx | added optional chaining | ~169 |
+| 16:50 | Edited admin-ui/src/hooks/useAuth.tsx | 3→3 lines | ~29 |
+| 16:50 | Edited admin-ui/src/App.tsx | inline fix | ~20 |
+| 16:50 | Edited admin-ui/src/App.tsx | CSS: denied | ~174 |
+| 16:50 | Edited admin-ui/src/pages/Login.tsx | 2→2 lines | ~28 |
+| 16:50 | Edited admin-ui/src/pages/Login.tsx | added 1 condition(s) | ~125 |
+| 16:53 | Created tests/e2e/tests/admin-ui.spec.ts | — | ~1486 |
+| 16:57 | Edited tests/e2e/tests/admin-ui.spec.ts | modified assertNoCrash() | ~164 |
+| 16:57 | Edited tests/e2e/tests/admin-ui.spec.ts | 5→5 lines | ~95 |
+| 17:01 | Edited tests/e2e/tests/admin-ui.spec.ts | waitForLoadState() → render() | ~122 |
+| 17:06 | Session end: 14 writes across 6 files (UI-E2E-SCENARIOS-FOR-CODEX.md, client.ts, useAuth.tsx, App.tsx, Login.tsx) | 1 reads | ~5578 tok |
+| 17:33 | Edited gateway/src/main/java/ai/conduit/gateway/resolver/service/AgentResolver.java | expanded (+11 lines) | ~220 |
+| 17:33 | Edited gateway/src/main/java/ai/conduit/gateway/resolver/service/AgentResolver.java | expanded (+8 lines) | ~199 |
+| 17:35 | Edited gateway/src/test/java/ai/conduit/gateway/resolver/service/AgentResolverRerankerTest.java | modified resolver() | ~709 |
+| 17:36 | Edited admin-ui/src/components/Sidebar.tsx | inline fix | ~28 |
+| 17:36 | Edited admin-ui/src/components/Sidebar.tsx | — | ~0 |
+| 17:37 | Edited admin-ui/src/App.tsx | modified Protected() | ~174 |
+| 17:37 | Edited admin-ui/src/App.tsx | removed 10 lines | ~6 |
+| 17:37 | Edited admin-ui/src/App.tsx | 3→2 lines | ~32 |
+| 17:38 | Edited tests/e2e/tests/admin-ui.spec.ts | render() → settle() | ~76 |
+| 17:42 | Session end: 23 writes across 9 files (UI-E2E-SCENARIOS-FOR-CODEX.md, client.ts, useAuth.tsx, App.tsx, Login.tsx) | 3 reads | ~7869 tok |
+| 17:53 | Session end: 23 writes across 9 files (UI-E2E-SCENARIOS-FOR-CODEX.md, client.ts, useAuth.tsx, App.tsx, Login.tsx) | 3 reads | ~7869 tok |
+
+## Session: 2026-07-10 17:56
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 21:56 | cold-start smoke on empty volumes: 8 core healthy, registry re-ingest 18/0, chat 3/3 (incl A2 Okafor denial), admin+chat+insights SPAs 200, /admin/agents 18, 9 WORM audit objs | docker-compose | PASS | ~4k |
+| 23:08 | rebuilt STALE admin-ui image (cold up -d recreates, does NOT rebuild); Codex saw pre-fix bytecode | admin-ui, buglog | FIXED: bundle clean, rm_jane 403 server-side, Playwright 8/8 | ~5k |
+| 19:48 | Created ../../.claude/projects/-Users-srirajkadimisetty-projects-orchestrator-demo/memory/project_branch_topology.md | — | ~661 |
+| 19:48 | Edited ../../.claude/projects/-Users-srirajkadimisetty-projects-orchestrator-demo/memory/MEMORY.md | 1→2 lines | ~131 |
+| 23:48 | deep branch diff: conduit-platform = strict superset of container-reduction (+111 commits) & sota; container work already in shared history; admin-ui/:5180 canonical, apps/admin abandoned split | git analysis | RESOLVED | ~7k |
+| 19:49 | Edited docker-compose.yml | removed 22 lines | ~3 |
+| 19:49 | Edited docker-compose.yml | inline fix | ~25 |
+| 19:49 | Edited iam-service/src/main/java/com/openwolf/iam/config/SecurityConfig.java | 5→4 lines | ~98 |
+| 19:50 | Edited README.md | inline fix | ~30 |
+| 19:50 | Edited iam-service/README.md | inline fix | ~64 |
+| 19:50 | Edited iam-service/README.md | 2→1 lines | ~24 |
+| 19:54 | Created docs/UI-E2E-SCENARIOS-FOR-CODEX-v2.md | — | ~2617 |
+| 23:54 | cleanup: deleted apps/admin split (2 commits), removed :5182 orphan, fixed 4 stale doc lines, dropped retired dashboards+18 tmp pngs; rebuilt iam; smoke green | apps/admin, docker-compose, iam | DONE | ~9k |
+| 23:54 | wrote docs/UI-E2E-SCENARIOS-FOR-CODEX-v2.md (supersedes v1) — A1-A8/B0-B7/C0-C3/D1-D5, incl 5 regression checks | docs | DONE | ~3k |
+| 19:55 | Session end: 9 writes across 6 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 3 reads | ~21976 tok |
+| 20:03 | Edited docs/UI-E2E-SCENARIOS-FOR-CODEX-v2.md | expanded (+86 lines) | ~1992 |
+| 20:03 | Edited docs/UI-E2E-SCENARIOS-FOR-CODEX-v2.md | expanded (+7 lines) | ~236 |
+| 20:03 | Created ../../.claude/projects/-Users-srirajkadimisetty-projects-orchestrator-demo/memory/project_entitlement_ground_truth.md | — | ~591 |
+| 00:03 | wrote business scenarios E1-E8/F1-F6/G1-G3 for Codex (persona-hat-driven, verified vs coverage-service ground truth); marquee Whitman/Sterling mirror confirmed both ways | UI-E2E-SCENARIOS-FOR-CODEX-v2.md | DONE | ~11k |
+| 20:04 | Session end: 12 writes across 7 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 3 reads | ~24996 tok |
+| 20:05 | Session end: 12 writes across 7 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 3 reads | ~24996 tok |
+| 20:08 | Session end: 12 writes across 7 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 3 reads | ~24996 tok |
+| 20:12 | Session end: 12 writes across 7 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 3 reads | ~24996 tok |
+| 20:53 | Created docs/CODEX-DOMAIN-TEST-STORIES.md | — | ~2254 |
+| 20:57 | Edited docs/CODEX-DOMAIN-TEST-STORIES.md | 3→3 lines | ~71 |
+| 20:57 | Edited docs/CODEX-DOMAIN-TEST-STORIES.md | expanded (+11 lines) | ~501 |
+| 20:57 | Edited docs/CODEX-DOMAIN-TEST-STORIES.md | policy() → mirror() | ~288 |
+| 20:57 | Edited docs/CODEX-DOMAIN-TEST-STORIES.md | inline fix | ~31 |
+| 00:58 | volume-down+cold-up (fresh); wrote CODEX-DOMAIN-TEST-STORIES.md (7 stories); verified wealth/insurance clean, servicing deep-path rough (bug logged) | docs, buglog | DONE | ~12k |
+| 20:58 | Session end: 17 writes across 8 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 3 reads | ~28366 tok |
+| 21:18 | Session end: 17 writes across 8 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 3 reads | ~28366 tok |
+| 21:20 | Session end: 17 writes across 8 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 3 reads | ~28366 tok |
+| 21:24 | Session end: 17 writes across 8 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 3 reads | ~28366 tok |
+| 21:35 | Session end: 17 writes across 8 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 3 reads | ~28366 tok |
+| 21:44 | Session end: 17 writes across 8 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 3 reads | ~28366 tok |
+| 21:48 | Edited admin-ui/nginx.conf | expanded (+10 lines) | ~132 |
+| 21:48 | Edited apps/insights/web/nginx.conf | expanded (+10 lines) | ~122 |
+| 21:49 | Session end: 19 writes across 9 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 7 reads | ~51181 tok |
+| 01:49 | no-cache SPA shell headers (admin-ui+insights nginx), verified served; Tesla msg traced to legit WITHHELD feature (folded into Fable scope); Fable design pass launched for clarify-path | nginx.conf x2 | DONE | ~6k |
+| 21:49 | Session end: 19 writes across 9 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 7 reads | ~51181 tok |
+| 21:54 | Created docs/specs/CLARIFY-ROUTING-DECOUPLE-FIX.md | — | ~1675 |
+| 21:55 | Session end: 20 writes across 10 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 8 reads | ~52976 tok |
+| 22:01 | Session end: 20 writes across 10 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 10 reads | ~63487 tok |
+| 22:08 | Edited gateway/src/main/java/ai/conduit/gateway/domain/manifest/DomainManifestStore.java | added 7 condition(s) | ~882 |
+| 22:09 | Created gateway/src/main/java/ai/conduit/gateway/domain/coverage/ReferenceGroundingService.java | — | ~2303 |
+| 22:09 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 2 import(s) | ~75 |
+| 22:09 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | expanded (+8 lines) | ~157 |
+| 22:09 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | 2→3 lines | ~48 |
+| 22:09 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | 3→4 lines | ~76 |
+| 22:09 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | 2→3 lines | ~42 |
+| 22:10 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | modified CLARIFY() | ~1421 |
+| 22:10 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | 2→7 lines | ~158 |
+| 22:11 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 1 condition(s) | ~609 |
+| 22:11 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | tenantId() → above() | ~75 |
+| 22:11 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 1 condition(s) | ~375 |
+| 22:12 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added error handling | ~1872 |
+| 22:12 | Edited gateway/src/main/java/ai/conduit/gateway/orchestration/executor/DagPlanExecutor.java | modified for() | ~228 |
+| 22:13 | Edited gateway/src/main/java/ai/conduit/gateway/orchestration/executor/DagPlanExecutor.java | modified coverageDenied() | ~300 |
+| 22:13 | Edited gateway/src/main/java/ai/conduit/gateway/resolver/service/AgentResolver.java | 15→12 lines | ~224 |
+| 22:13 | Edited gateway/src/main/java/ai/conduit/gateway/resolver/service/AgentResolver.java | 4→4 lines | ~53 |
+| 22:13 | Edited gateway/src/main/java/ai/conduit/gateway/resolver/service/AgentResolver.java | modified debug() | ~43 |
+| 22:13 | Edited gateway/src/main/java/ai/conduit/gateway/resolver/service/AgentResolver.java | modified select() | ~39 |
+| 22:13 | Edited gateway/src/main/java/ai/conduit/gateway/resolver/service/AgentResolver.java | modified score() | ~289 |
+| 22:14 | Edited gateway/src/test/java/ai/conduit/gateway/orchestration/executor/DagPlanExecutorTest.java | modified blankEntityIdIsBindFailureNotCoverageDenial() | ~322 |
+| 22:14 | Edited gateway/src/test/java/ai/conduit/gateway/resolver/service/AgentResolverRerankerTest.java | expanded (+24 lines) | ~1038 |
+| 22:16 | Created gateway/src/test/java/ai/conduit/gateway/domain/coverage/ReferenceGroundingServiceTest.java | — | ~3281 |
+| 22:17 | Created gateway/src/test/java/ai/conduit/gateway/domain/manifest/DomainManifestStoreReferenceTest.java | — | ~792 |
+| 22:21 | Created gateway/src/test/java/ai/conduit/gateway/domain/chat/ChatServiceGroundingClarifyTest.java | — | ~2842 |
+| 22:25 | CLARIFY-ROUTING-DECOUPLE-FIX: Stage-1 ReferenceGroundingService (4-way lattice) + abstain triage + DAG bind-failure + retired rerank pick-score-tolerance | ChatService.java, DomainManifestStore.java, ReferenceGroundingService.java(new), DagPlanExecutor.java, AgentResolver.java + 3 test files | 213/213 green, world-b CRITICAL 0→0 | ~90k |
+| 22:24 | Session end: 45 writes across 20 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 28 reads | ~100653 tok |
+| 02:27 | clarify-path class fix (Fable design→build→Opus verify): ground refs pre-routing, deny/clarify off the score gate, Tesla entity-type fix; committed 3d5265d; live smoke all-green | gateway x5 +tests | DONE | ~14k |
+| 22:27 | Session end: 45 writes across 20 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 28 reads | ~100653 tok |
+| 02:48 | user delegated ops->Okafor decision; TRACED: grounding fix already allows servicing facet + segment gate correctly denies wealth facet; no new service needed; bug-258 resolved | verification | DONE | ~5k |
+| 22:48 | Session end: 45 writes across 20 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 28 reads | ~100653 tok |
+| 23:32 | Session end: 45 writes across 20 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 28 reads | ~100653 tok |
+| 23:33 | Session end: 45 writes across 20 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 28 reads | ~100653 tok |
+| 23:42 | Session end: 45 writes across 20 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 28 reads | ~100653 tok |
+| 04:00 | Codex e2e: 95/96 pass (fail passed isolated); all session fixes confirmed in fresh browser; 1 intermittent multi-turn synth hedge logged as known non-blocker (my synthetic probe was unfaithful, discarded) | verification | DONE | ~6k |
+| 00:00 | Session end: 45 writes across 20 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 28 reads | ~100653 tok |
+| 00:40 | Created ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/multiturn_probe.py | — | ~628 |
+| 04:44 | faithful multi-turn probe: REFUTED depth hypothesis; isolated real cause = cross-domain unnamed follow-up under accumulated same-domain context (settlements after 5 wealth turns WITHHELD 3/3 vs 1 turn ok 2/2); bug-260 characterized | analysis | DONE | ~7k |
+| 00:44 | Session end: 46 writes across 21 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 28 reads | ~101281 tok |
+| 00:52 | Session end: 46 writes across 21 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 30 reads | ~120554 tok |
+| 04:59 | LAYERED VERIFICATION (Fable skeptic + code-tracer + my live trace): DISPROVED my cross-domain+depth diagnoses; PROVEN 4/4 = pending-settlements over-fans to settlement_risk(pii), classification gate correctly prunes it, surfaced as domain-withheld; bug-260 corrected | analysis | DONE | ~9k |
+| 00:59 | Session end: 46 writes across 21 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 34 reads | ~123778 tok |
+| 01:02 | Session end: 46 writes across 21 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 34 reads | ~123778 tok |
+| 08:29 | Session end: 46 writes across 21 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 34 reads | ~123778 tok |
+| 08:32 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | expanded (+7 lines) | ~381 |
+| 08:33 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | 7→2 lines | ~52 |
+| 08:33 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | modified computeWithheldDomains() | ~329 |
+| 08:34 | Created gateway/src/test/java/ai/conduit/gateway/domain/chat/ChatServiceWithheldScopingTest.java | — | ~802 |
+| 08:35 | Edited ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/multiturn_probe.py | modified classify() | ~268 |
+| 12:37 | FIXED bug-260 withheld-scoping: computeWithheldDomains (referenced-served); unit test 3/3; live-verified settlements served + risk pruned + no contradictory withheld; probe matcher fixed | ChatService, test | DONE | ~8k |
+| 08:38 | Session end: 51 writes across 22 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 34 reads | ~125810 tok |
+| 08:38 | Session end: 51 writes across 22 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 34 reads | ~125810 tok |
+| 08:45 | Session end: 51 writes across 22 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 34 reads | ~125810 tok |
+| 08:48 | Session end: 51 writes across 22 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 34 reads | ~125810 tok |
+| 08:55 | Session end: 51 writes across 22 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 34 reads | ~125810 tok |
+| 09:08 | Session end: 51 writes across 22 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 34 reads | ~125810 tok |
+| 09:13 | Session end: 51 writes across 22 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 34 reads | ~125810 tok |
+| 09:31 | Session end: 51 writes across 22 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 34 reads | ~125810 tok |
+| 10:30 | Created docs/specs/ENTITLEMENT-SWEEP-MATRIX.md | — | ~1795 |
+| 10:30 | Session end: 52 writes across 23 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 34 reads | ~127733 tok |
+| 10:32 | Session end: 52 writes across 23 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 37 reads | ~131833 tok |
+| 10:38 | Session end: 52 writes across 23 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 43 reads | ~137336 tok |
+| 10:47 | Created docs/specs/ENTITLEMENT-SWEEP-MATRIX.md | — | ~2807 |
+| 10:47 | Session end: 53 writes across 23 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 43 reads | ~140344 tok |
+| 10:51 | Edited docs/specs/ENTITLEMENT-SWEEP-MATRIX.md | modified rules() | ~166 |
+| 10:52 | Created docs/CODEX-ENTITLEMENT-SWEEP-HANDOFF.md | — | ~1077 |
+| 10:52 | Session end: 55 writes across 24 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 43 reads | ~141676 tok |
+| 11:27 | Created sweep/VERIFIED-VERDICT.md | — | ~1011 |
+| 15:28 | VERIFIED entitlement sweep (82 probes/10 classes, trace-joined by cid): ZERO leaks, all positive controls pass, bug-260 holds, over-gating clean; deviations all fail-safe (routing instability + L5 wrong-domain); L3 traces evicted (obs-only); verdict sweep/VERIFIED-VERDICT.md | verification | DONE | ~12k |
+| 11:28 | Session end: 56 writes across 25 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 45 reads | ~142759 tok |
+| 15:37 | RESPONSE-quality audit of allowed answers vs seed: stored facts EXACT (no fabrication); found concentration agent ex-cash bug (ranks T-Bill/cash as top single-name, wrong denominator) — grounded-but-wrong, in mock-agent not gateway | response-verification | DONE | ~7k |
+| 11:37 | Session end: 56 writes across 25 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 45 reads | ~142759 tok |
+| 11:41 | Session end: 56 writes across 25 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 45 reads | ~142759 tok |
+| 11:47 | Session end: 56 writes across 25 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 45 reads | ~142759 tok |
+| 12:06 | Session end: 56 writes across 25 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 45 reads | ~142759 tok |
+| 12:15 | Session end: 56 writes across 25 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 48 reads | ~149384 tok |
+| 12:16 | Session end: 56 writes across 25 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 48 reads | ~149384 tok |
+| 12:17 | Created docs/specs/ROUTING-PRECISION-CODEX-VERIFY.md | — | ~1677 |
+| 12:17 | Session end: 57 writes across 26 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 48 reads | ~151181 tok |
+| 12:18 | Edited docs/specs/ROUTING-PRECISION-CODEX-VERIFY.md | expanded (+6 lines) | ~144 |
+| 12:18 | Session end: 58 writes across 26 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 48 reads | ~151335 tok |
+| 12:24 | Completed independent routing-precision architecture verification; confirmed bug-261 class, challenged domain-only P0 and first-match entity-domain assumption, audited eval blind spots, and wrote the SOL report | docs/specs/ROUTING-PRECISION-CODEX-SOL-REPORT.md | DONE; World-B baseline CRITICAL 0 / REVIEW 0 | ~14k |
+| 12:28 | Session end: 58 writes across 26 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 49 reads | ~158385 tok |
+| 12:37 | Session end: 58 writes across 26 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 49 reads | ~158385 tok |
+| 13:01 | Session end: 58 writes across 26 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 49 reads | ~158385 tok |
+| 13:11 | Session end: 58 writes across 26 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 49 reads | ~158385 tok |
+| 13:38 | Session end: 58 writes across 26 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 49 reads | ~158385 tok |
+| 13:44 | Session end: 58 writes across 26 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 49 reads | ~158385 tok |
+| 13:47 | Session end: 58 writes across 26 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 49 reads | ~158385 tok |
+| 13:49 | Session end: 58 writes across 26 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 49 reads | ~158385 tok |
+| 13:51 | Session end: 58 writes across 26 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 49 reads | ~158385 tok |
+| 13:55 | Created docs/specs/ROUTING-LAYER-IMPL-SPEC.md | — | ~2220 |
+| 13:56 | Session end: 59 writes across 27 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 50 reads | ~162846 tok |
+| 14:05 | Completed adversarial code-level review of the routing-layer implementation spec; found scalar extraction/span provenance, mixed-domain partial fulfillment, FOLLOW_UP grounding, per-group coverage, DAG authz fallback, and eval-gate blockers | docs/specs/ROUTING-LAYER-CODEX-SOL-REVIEW.md | DONE; no application files changed | ~18k |
+| 14:05 | Created docs/specs/ROUTING-LAYER-FABLE-REVIEW.md | — | ~1223 |
+| 14:06 | Session end: 60 writes across 28 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 52 reads | ~164756 tok |
+| 14:08 | Created docs/specs/ROUTING-LAYER-RECONCILED.md | — | ~1381 |
+| 14:11 | Session end: 61 writes across 29 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 53 reads | ~175236 tok |
+| 14:11 | Session end: 61 writes across 29 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 53 reads | ~175236 tok |
+| 14:15 | Session end: 61 writes across 29 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 53 reads | ~175236 tok |
+| 14:19 | Session end: 61 writes across 29 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 53 reads | ~175236 tok |
+| 14:23 | Created docs/specs/ROUTING-LAYER-IMPL-SPEC-V2.md | — | ~3230 |
+| 14:23 | Session end: 62 writes across 30 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 53 reads | ~178696 tok |
+| 14:25 | Created docs/specs/MODEL-SELECTION.md | — | ~652 |
+| 14:25 | Created ../../.claude/projects/-Users-srirajkadimisetty-projects-orchestrator-demo/memory/project_model_selection.md | — | ~414 |
+| 14:26 | Edited ../../.claude/projects/-Users-srirajkadimisetty-projects-orchestrator-demo/memory/MEMORY.md | 1→2 lines | ~106 |
+| 14:27 | Session end: 65 writes across 32 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 56 reads | ~185419 tok |
+| 14:34 | Edited docs/specs/ROUTING-LAYER-IMPL-SPEC-V2.md | modified disposition() | ~629 |
+| 14:35 | Session end: 66 writes across 32 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 58 reads | ~193172 tok |
+| 14:42 | Created gateway/src/main/java/ai/conduit/gateway/synthesis/input/MentionSource.java | — | ~147 |
+| 14:42 | Created gateway/src/main/java/ai/conduit/gateway/synthesis/input/MentionSpan.java | — | ~318 |
+| 14:42 | Session end: 68 writes across 34 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 63 reads | ~194942 tok |
+| 14:42 | Created gateway/src/main/java/ai/conduit/gateway/synthesis/input/Mention.java | — | ~524 |
+| 14:43 | Created gateway/src/main/java/ai/conduit/gateway/synthesis/input/MentionAligner.java | — | ~1597 |
+| 14:43 | Session end: 70 writes across 36 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 63 reads | ~197214 tok |
+| 14:43 | Created gateway/src/main/java/ai/conduit/gateway/synthesis/input/MentionSet.java | — | ~1043 |
+| 14:43 | Created gateway/src/main/java/ai/conduit/gateway/synthesis/input/EntityBag.java | — | ~1253 |
+| 14:44 | Edited gateway/src/main/java/ai/conduit/gateway/domain/manifest/DomainManifestStore.java | 1→4 lines | ~103 |
+| 14:44 | Edited gateway/src/main/java/ai/conduit/gateway/domain/manifest/DomainManifestStore.java | added 3 condition(s) | ~408 |
+| 14:44 | Edited gateway/src/main/java/ai/conduit/gateway/domain/manifest/DomainManifestStore.java | compile() → compiledIdPattern() | ~46 |
+| 14:44 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | compile() → compiledIdPattern() | ~49 |
+| 14:44 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | compile() → compiledIdPattern() | ~70 |
+| 14:44 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | 2→2 lines | ~51 |
+| 14:44 | Edited gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java | compile() → compiledIdPattern() | ~51 |
+| 14:44 | Edited gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java | modified for() | ~182 |
+| 14:45 | Edited gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java | modified append() | ~383 |
+| 14:45 | Edited gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java | 5→9 lines | ~161 |
+| 14:45 | Edited gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java | added 5 import(s) | ~88 |
+| 14:45 | Edited gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java | added 18 condition(s) | ~1922 |
+| 14:47 | Created gateway/src/test/java/ai/conduit/gateway/synthesis/input/MentionAlignerTest.java | — | ~1150 |
+| 14:47 | Created gateway/src/test/java/ai/conduit/gateway/synthesis/input/MentionSetTest.java | — | ~760 |
+| 14:47 | Created gateway/src/test/java/ai/conduit/gateway/domain/intent/IntentClassifierMentionTest.java | — | ~1950 |
+
+| 14:50 | Piece 1 routing refactor: extractor mention/provenance model — added Mention/MentionSpan/MentionSet/MentionSource/MentionAligner (synthesis.input), extended EntityBag with derived MentionSet, added IntentClassifier.buildMentionSet + mentions-array prompt, hoisted id_pattern compile to DomainManifestStore.compiledIdPattern (used in ChatService x3 + IntentClassifier) | gateway/.../synthesis/input/*, IntentClassifier.java, DomainManifestStore.java, ChatService.java | 21 new unit tests pass (MentionAligner 9, MentionSet 5, IntentClassifierMention 7); affected suites green; world-b CRITICAL 0→0; not committed | ~40k |
+| 14:52 | Session end: 87 writes across 42 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 63 reads | ~207995 tok |
+| 14:58 | Edited gateway/src/main/java/ai/conduit/gateway/domain/manifest/DomainManifestStore.java | added 2 import(s) | ~66 |
+| 14:59 | Edited gateway/src/main/java/ai/conduit/gateway/domain/manifest/DomainManifestStore.java | added 11 condition(s) | ~2326 |
+| 14:59 | Created gateway/src/main/java/ai/conduit/gateway/domain/coverage/GroundingBudget.java | — | ~433 |
+| 14:59 | Created gateway/src/main/java/ai/conduit/gateway/config/GroundingConfig.java | — | ~307 |
+| 15:00 | Edited gateway/src/main/resources/application.yml | expanded (+8 lines) | ~193 |
+| 15:00 | Edited gateway/src/main/java/ai/conduit/gateway/domain/coverage/ReferenceGroundingService.java | added 15 import(s) | ~298 |
+| 15:00 | Edited gateway/src/main/java/ai/conduit/gateway/domain/coverage/ReferenceGroundingService.java | modified ReferenceGroundingService() | ~356 |
+| 15:01 | Edited gateway/src/main/java/ai/conduit/gateway/domain/coverage/ReferenceGroundingService.java | added 13 condition(s) | ~5146 |
+| 15:07 | Session end: 95 writes across 45 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 71 reads | ~226998 tok |
+| 15:08 | Created gateway/src/test/java/ai/conduit/gateway/domain/coverage/ReferenceGroundingMentionsTest.java | — | ~5156 |
+| 15:08 | Edited gateway/src/test/java/ai/conduit/gateway/domain/manifest/DomainManifestStoreReferenceTest.java | added 1 import(s) | ~35 |
+| 15:09 | Edited gateway/src/test/java/ai/conduit/gateway/domain/manifest/DomainManifestStoreReferenceTest.java | modified emptyOrNullBag_yieldsNoReference() | ~797 |
+
+| 15:10 | Routing Piece 2 — grounding over mentions: DomainManifestStore return-all + interpretationsForReference + matchesNonCoverageScopedResolvableId (V2.1#4); ReferenceGroundingService.groundMentions (per-mention × all-interpretations, budgets, bounded VT concurrency, dedupe, stage deadline, fail-closed); GroundingBudget+GroundingConfig; conduit.grounding.* yml | gateway coverage/manifest/config | 23 new tests green (13 mentions + 3 manifest); existing 10 grounding + 3 ChatServiceGroundingClarify green; world-b CRITICAL 0→0 | ~40k |
+| 15:13 | Session end: 98 writes across 46 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 72 reads | ~240463 tok |
+| 15:25 | Created gateway/src/main/java/ai/conduit/gateway/domain/chat/PreparedRoute.java | — | ~946 |
+| 15:25 | Created gateway/src/main/java/ai/conduit/gateway/domain/chat/RoutePreparationPolicy.java | — | ~512 |
+| 15:28 | Created gateway/src/main/java/ai/conduit/gateway/domain/chat/RoutePreparer.java | — | ~6059 |
+| 15:28 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/RoutePreparer.java | 5→4 lines | ~23 |
+| 15:28 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/RoutePreparer.java | 2→1 lines | ~8 |
+| 15:28 | Created gateway/src/main/java/ai/conduit/gateway/config/RoutePreparationConfig.java | — | ~496 |
+| 15:28 | Created gateway/src/main/java/ai/conduit/gateway/infrastructure/telemetry/event/RoutePreparedData.java | — | ~308 |
+| 15:29 | Edited gateway/src/main/resources/application.yml | modified policy() | ~416 |
+| 15:29 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 1 import(s) | ~41 |
+| 15:29 | Session end: 107 writes across 51 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 76 reads | ~264230 tok |
+| 15:29 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | 2→3 lines | ~48 |
+| 15:29 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | 2→3 lines | ~48 |
+| 15:29 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | 2→3 lines | ~42 |
+| 15:29 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | 2→3 lines | ~62 |
+| 15:29 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | 3→3 lines | ~73 |
+| 15:30 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | 3→3 lines | ~74 |
+| 15:30 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | modified pipeline() | ~401 |
+| 15:30 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | modified tenantId() | ~488 |
+| 15:31 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | removed 50 lines | ~103 |
+| 15:34 | Created gateway/src/test/java/ai/conduit/gateway/domain/chat/RoutePreparerTest.java | — | ~2941 |
+| 15:36 | Session end: 117 writes across 52 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 77 reads | ~268983 tok |
+| 15:37 | Created gateway/src/test/java/ai/conduit/gateway/domain/chat/RoutePreparedRoutingTest.java | — | ~2959 |
+| 15:40 | Created docs/CONDUIT-GATEWAY-INTERNALS-WHITEPAPER.md | — | ~5486 |
+| 15:42 | Session end: 119 writes across 54 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 77 reads | ~278400 tok |
+| 15:44 | Edited gateway/src/main/java/ai/conduit/gateway/resolver/service/RoutingRerankerClient.java | added 1 import(s) | ~29 |
+| 15:45 | Edited gateway/src/main/java/ai/conduit/gateway/resolver/service/RoutingRerankerClient.java | modified Decision() | ~743 |
+| 15:45 | Edited gateway/src/main/java/ai/conduit/gateway/resolver/service/RoutingRerankerClient.java | 2→1 lines | ~6 |
+| 15:45 | Edited gateway/src/main/java/ai/conduit/gateway/resolver/service/LlmRoutingRerankerClient.java | expanded (+7 lines) | ~481 |
+| 15:45 | Edited gateway/src/main/java/ai/conduit/gateway/resolver/service/LlmRoutingRerankerClient.java | added 2 condition(s) | ~356 |
+| 15:45 | Edited gateway/src/main/java/ai/conduit/gateway/resolver/service/LlmRoutingRerankerClient.java | added 1 import(s) | ~21 |
+| 15:46 | Edited gateway/src/main/java/ai/conduit/gateway/resolver/model/ResolverResult.java | modified ResolverResult() | ~476 |
+| 15:46 | Edited gateway/src/main/java/ai/conduit/gateway/resolver/service/AgentResolver.java | added 2 import(s) | ~34 |
+| 15:46 | Edited gateway/src/main/java/ai/conduit/gateway/resolver/service/AgentResolver.java | expanded (+14 lines) | ~294 |
+| 15:46 | Edited gateway/src/main/java/ai/conduit/gateway/resolver/service/AgentResolver.java | 4→4 lines | ~55 |
+| 15:46 | Edited gateway/src/main/java/ai/conduit/gateway/resolver/service/AgentResolver.java | modified resolveContextual() | ~342 |
+| 15:46 | Edited gateway/src/main/java/ai/conduit/gateway/resolver/service/AgentResolver.java | modified debug() | ~48 |
+| 15:46 | Edited gateway/src/main/java/ai/conduit/gateway/resolver/service/AgentResolver.java | modified select() | ~218 |
+| 15:47 | Edited gateway/src/main/java/ai/conduit/gateway/resolver/service/AgentResolver.java | added 6 condition(s) | ~2351 |
+| 15:47 | Edited gateway/src/main/java/ai/conduit/gateway/resolver/service/AgentResolver.java | modified RerankApplication() | ~745 |
+| 15:47 | Edited gateway/src/main/resources/application.yml | expanded (+7 lines) | ~217 |
+| 15:48 | Edited gateway/src/test/java/ai/conduit/gateway/resolver/service/AgentResolverRerankerTest.java | added 1 import(s) | ~22 |
+| 15:49 | Edited gateway/src/test/java/ai/conduit/gateway/resolver/service/AgentResolverRerankerTest.java | modified resolver() | ~2337 |
+| 15:50 | Piece 5: expanded reranker Decision.multiple([ids]) + conflict-trigger (config-off) + trigger-tag selective error handling | RoutingRerankerClient/LlmRoutingRerankerClient/AgentResolver/ResolverResult/AgentResolverRerankerTest/application.yml | 16/16 green, world-b CRITICAL 0 | ~9k |
+| 15:52 | Session end: 137 writes across 57 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 78 reads | ~289113 tok |
+| 16:03 | Created gateway/src/main/java/ai/conduit/gateway/domain/chat/RequestedPlan.java | — | ~1025 |
+| 16:04 | Edited gateway/src/main/java/ai/conduit/gateway/resolver/model/ResolverResult.java | modified ResolverResult() | ~843 |
+| 16:04 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | expanded (+7 lines) | ~521 |
+| 16:05 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | 17→22 lines | ~540 |
+| 16:05 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 1 condition(s) | ~443 |
+| 16:05 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | 3→8 lines | ~199 |
+| 16:05 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | expanded (+11 lines) | ~250 |
+| 16:08 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 2 import(s) | ~90 |
+| 16:08 | Session end: 145 writes across 58 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 80 reads | ~304988 tok |
+| 16:09 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added error handling | ~5382 |
+| 16:16 | Created gateway/src/test/java/ai/conduit/gateway/domain/chat/ChatServiceRequestedGroupTest.java | — | ~4639 |
+| 16:18 | Edited gateway/src/test/java/ai/conduit/gateway/domain/chat/ChatServiceRequestedGroupTest.java | 13→15 lines | ~259 |
+
+| 16:20 | Piece 4: requested-capability-group model + per-group disposition; grounding unified (double coverage-check removed); groundedDomainIds wired (config-gated); primaryCandidate diagnostic; capability_unavailable manifest copy | ChatService.java, RequestedPlan.java, ResolverResult.java, registry+test domain manifests, ChatServiceRequestedGroupTest.java | 78+41+21 gateway tests green; world-b CRITICAL 0 before/after | ~large |
+| 16:23 | Session end: 148 writes across 59 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 80 reads | ~316002 tok |
+| 16:29 | Created gateway/src/main/java/ai/conduit/gateway/domain/chat/RouteDecision.java | — | ~2470 |
+| 16:30 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | expanded (+8 lines) | ~168 |
+| 16:31 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 6 condition(s) | ~2587 |
+| 16:31 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 1 import(s) | ~31 |
+| 16:31 | Created gateway/src/main/java/ai/conduit/gateway/api/v1/admin/RouteDecisionController.java | — | ~958 |
+| 16:31 | Edited gateway/src/main/java/ai/conduit/gateway/config/SecurityConfig.java | expanded (+6 lines) | ~225 |
+| 16:32 | Edited gateway/src/main/resources/application.yml | 2→6 lines | ~164 |
+| 16:32 | Edited gateway/src/main/resources/application.yml | expanded (+8 lines) | ~189 |
+| 16:33 | Created gateway/src/test/java/ai/conduit/gateway/api/v1/admin/RouteDecisionControllerTest.java | — | ~2929 |
+| 16:36 | Created eval/goal-pick/measure_goal_pick.py | — | ~6346 |
+| 16:36 | Edited eval/goal-pick/measure_goal_pick.py | 4→5 lines | ~83 |
+| 16:37 | Edited eval/goal-pick/labeled_queries.json | 5→9 lines | ~144 |
+| 16:38 | Edited eval/multiturn-routing.json | modified BACKSTOP() | ~544 |
+| 16:39 | Session end: 161 writes across 65 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 84 reads | ~346518 tok |
+| 16:40 | Edited eval/goal-pick/measure_goal_pick.py | expanded (+8 lines) | ~192 |
+| 16:40 | Edited eval/goal-pick/measure_goal_pick.py | modified append() | ~602 |
+| 16:41 | Created eval/goal-pick/capability_entity_conflict.json | — | ~902 |
+| 16:41 | Created eval/goal-pick/name_invariance.json | — | ~1028 |
+| 16:41 | Created eval/goal-pick/routing_edge_cases.json | — | ~1537 |
+| 16:44 | Created eval/goal-pick/rebaseline.py | — | ~5120 |
+| 16:45 | Created eval/goal-pick/REBASELINE.md | — | ~1715 |
+| 16:47 | Piece 6 DONE: /debug/route decision endpoint (ChatService.decideRoute reuses prod RoutePreparer+resolver+plan+authz, no fork), harness→prod path+persona tokens+exact-cap/wrong-domain/OOS gates, 3 datasets + FND- multiturn row, rebaseline.py dump/search. world-b CRITICAL 0. Tests: RouteDecisionControllerTest 2 green + SecurityRejectionIT 17 + group/withheld green | multiple | ~done |
+| 16:58 | Session end: 168 writes across 70 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 91 reads | ~362751 tok |
+| 17:02 | Adversarial review of routing-layer V2 6-piece diff (read-only): 2 BLOCKERs (multi-group fail-open bind w/o coverage CHECK; /debug/route default-on), findings reported to user | gateway routing files | review delivered | ~90k |
+| 17:06 | Edited gateway/src/main/resources/application.yml | modified default() | ~110 |
+| 17:07 | Edited docker-compose.yml | 4→7 lines | ~176 |
+| 17:09 | Session end: 170 writes across 70 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 91 reads | ~363207 tok |
+| 17:17 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | modified findManifest() | ~259 |
+| 17:18 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added error handling | ~2474 |
+| 17:18 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 1 condition(s) | ~255 |
+| 17:18 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | 4→7 lines | ~140 |
+| 17:18 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 2 condition(s) | ~357 |
+| 17:18 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 1 condition(s) | ~373 |
+| 17:24 | Created gateway/src/test/java/ai/conduit/gateway/domain/chat/ChatServiceGroupCoverageFailClosedTest.java | — | ~5152 |
+| 17:24 | Session end: 177 writes across 71 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 91 reads | ~375195 tok |
+| 17:40 | Fixed B1/B3/S1 fail-open entitlement holes in per-group disposition + added adversarial tests | ChatService.java, ChatServiceGroupCoverageFailClosedTest.java | 14/14 ChatService tests green, world-b CRITICAL 0 | ~8000 |
+| 17:27 | Session end: 177 writes across 71 files (project_branch_topology.md, MEMORY.md, docker-compose.yml, SecurityConfig.java, README.md) | 91 reads | ~375195 tok |
+
+## Session: 2026-07-11 17:29
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 21:40 | Committed capability-first routing refactor (bug-261): 6-piece spec-V2 + B1/B3/S1/B2 blocker fixes. Rebuilt+deployed gateway; e2e via /debug/route CONFIRMED uw_sam "settlements for Continental Freight" -> settlement_status (asset-servicing), STRUCTURAL_DENIED, ZERO insurance; happy paths SERVED. 297 tests green, world-b 0. Logged Fable S2-S5+nits as bug-266..270. | commit 4604542; buglog.json | done | ~18k |
+| 18:18 | Edited docker-compose.yml | 2→7 lines | ~216 |
+| 18:19 | Edited docker-compose.yml | 3→5 lines | ~179 |
+| 18:23 | Edited gateway/src/main/java/ai/conduit/gateway/resolver/service/LlmRoutingRerankerClient.java | added 1 condition(s) | ~281 |
+| 18:23 | Edited gateway/src/main/java/ai/conduit/gateway/resolver/service/LlmRoutingRerankerClient.java | added 1 condition(s) | ~230 |
+| 18:25 | Session end: 4 writes across 2 files (docker-compose.yml, LlmRoutingRerankerClient.java) | 17 reads | ~74985 tok |
+| 18:37 | Session end: 4 writes across 2 files (docker-compose.yml, LlmRoutingRerankerClient.java) | 18 reads | ~75887 tok |
+| 18:39 | Created docs/specs/LITMUS-TEST-DESIGN-FABLE.md | — | ~6894 |
+| 18:39 | Session end: 5 writes across 3 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md) | 19 reads | ~83273 tok |
+| 18:41 | Edited scripts/smoke.sh | 7→5 lines | ~138 |
+| 18:43 | Created scripts/smoke-route.sh | — | ~1274 |
+| 18:48 | Session end: 7 writes across 5 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 24 reads | ~107401 tok |
+| 18:53 | Created docs/specs/PROMPT-EXTERNALIZATION-DESIGN.md | — | ~8301 |
+| 18:53 | Prompt externalization design review (5 LLM call sites vs 9-element framework) | docs/specs/PROMPT-EXTERNALIZATION-DESIGN.md | created | ~30k |
+| 18:57 | Session end: 8 writes across 6 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 28 reads | ~125349 tok |
+| 19:06 | Created gateway/src/main/resources/prompts/fragments/instruction-hierarchy.md | — | ~83 |
+| 19:06 | Created gateway/src/main/resources/prompts/routing-reranker.system.md | — | ~422 |
+| 19:06 | Created gateway/src/main/resources/prompts/intent-classifier.clarify-rule.md | — | ~85 |
+| 19:06 | Created gateway/src/main/resources/prompts/intent-classifier.system.md | — | ~1275 |
+| 19:06 | Created gateway/src/main/resources/prompts/entity-extractor.system.md | — | ~153 |
+| 19:07 | Created gateway/src/main/resources/prompts/answer-synthesizer.system.md | — | ~630 |
+| 19:07 | Created gateway/src/main/resources/prompts/answer-synthesizer.figures-block.md | — | ~136 |
+| 19:07 | Created gateway/src/main/resources/prompts/answer-synthesizer-history.system.md | — | ~196 |
+| 19:08 | Created gateway/src/main/resources/prompts/clarification-composer.system.md | — | ~385 |
+| 19:08 | Created gateway/src/main/resources/prompts/clarification-composer.default-question.md | — | ~10 |
+| 19:08 | Created gateway/src/main/java/ai/conduit/gateway/config/PromptLoader.java | — | ~1183 |
+| 19:08 | Edited gateway/src/main/java/ai/conduit/gateway/resolver/service/LlmRoutingRerankerClient.java | expanded (+14 lines) | ~727 |
+| 19:09 | Edited gateway/src/main/java/ai/conduit/gateway/resolver/service/LlmRoutingRerankerClient.java | reduced (-23 lines) | ~171 |
+| 19:09 | Edited gateway/src/main/java/ai/conduit/gateway/domain/clarify/ClarificationComposer.java | added 2 import(s) | ~188 |
+| 19:09 | Edited gateway/src/main/java/ai/conduit/gateway/domain/clarify/ClarificationComposer.java | 15→18 lines | ~203 |
+| 19:09 | Edited gateway/src/main/java/ai/conduit/gateway/domain/clarify/ClarificationComposer.java | reduced (-18 lines) | ~208 |
+| 19:09 | Edited gateway/src/main/java/ai/conduit/gateway/domain/clarify/ClarificationComposer.java | modified strip() | ~76 |
+| 19:09 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/input/EntityExtractor.java | added 1 import(s) | ~44 |
+| 19:10 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/input/EntityExtractor.java | reduced (-7 lines) | ~40 |
+| 19:10 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/input/EntityExtractor.java | modified EntityExtractor() | ~307 |
+| 19:10 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/input/EntityExtractor.java | modified buildSystemPrompt() | ~398 |
+| 19:10 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/input/EntityExtractor.java | modified for() | ~145 |
+| 19:10 | Edited gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java | added 1 import(s) | ~43 |
+| 19:10 | Edited gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java | added 1 import(s) | ~35 |
+| 19:11 | Edited gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java | modified buildSystemPrompt() | ~619 |
+| 19:11 | Edited gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java | 7→8 lines | ~79 |
+| 19:11 | Edited gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java | 6→7 lines | ~87 |
+| 19:11 | Edited gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java | 3→4 lines | ~43 |
+| 19:12 | Edited gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java | 4→7 lines | ~113 |
+| 19:12 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java | added 1 import(s) | ~57 |
+| 19:12 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java | added 1 import(s) | ~26 |
+| 19:12 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java | 12→17 lines | ~233 |
+| 19:12 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java | reduced (-12 lines) | ~327 |
+| 19:12 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java | 4→2 lines | ~24 |
+| 19:12 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java | removed 12 lines | ~41 |
+| 19:13 | Edited gateway/src/test/java/ai/conduit/gateway/synthesis/input/EntityExtractorFallbackTest.java | added 1 import(s) | ~81 |
+| 19:13 | Edited gateway/src/test/java/ai/conduit/gateway/synthesis/input/EntityExtractorFallbackTest.java | added error handling | ~136 |
+| 19:13 | Edited gateway/src/test/java/ai/conduit/gateway/domain/intent/IntentClassifierTest.java | added 1 import(s) | ~57 |
+| 19:13 | Edited gateway/src/test/java/ai/conduit/gateway/domain/intent/IntentClassifierTest.java | 6→7 lines | ~76 |
+| 19:13 | Edited gateway/src/test/java/ai/conduit/gateway/domain/intent/IntentClassifierTest.java | added error handling | ~105 |
+| 19:13 | Edited gateway/src/test/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizerGroundingTest.java | added 1 import(s) | ~53 |
+| 19:14 | Edited gateway/src/test/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizerGroundingTest.java | added error handling | ~148 |
+| 19:14 | Edited scripts/world-b-check.sh | 8→11 lines | ~124 |
+| 19:14 | Edited scripts/world-b-check.sh | modified scan() | ~217 |
+| 19:14 | Edited scripts/world-b-check.sh | 4→5 lines | ~81 |
+| 19:15 | Created gateway/src/test/java/ai/conduit/gateway/config/PromptResourcesTest.java | — | ~2268 |
+| 19:18 | Prompt externalization: 10 resources + PromptLoader; wired 5 call sites (S1-5,R1-3,I1-3,E1-2); world-b-check scans prompts; 37 tests pass; world-b CRITICAL 0→0 | gateway/src prompts+java, scripts/world-b-check.sh | done | ~9000 |
+| 19:28 | Session end: 54 writes across 26 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 33 reads | ~146339 tok |
+| 19:51 | Session end: 54 writes across 26 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 33 reads | ~146339 tok |
+| 20:21 | Session end: 54 writes across 26 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 34 reads | ~147897 tok |
+| 20:28 | Created docs/specs/AGENT-MANIFEST-DEEPDIVE.md | — | ~5654 |
+| 20:29 | Manifest deep-dive audit: wrote AGENT-MANIFEST-DEEPDIVE.md (3 NEEDs: domain/sub-domain schema validation, figure format enum, domain_context->manifest) | docs/specs/AGENT-MANIFEST-DEEPDIVE.md | done | ~60k |
+| 20:29 | Session end: 55 writes across 27 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 62 reads | ~166525 tok |
+| 20:30 | Session end: 55 writes across 27 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 62 reads | ~166525 tok |
+| 20:34 | Session end: 55 writes across 27 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 62 reads | ~166525 tok |
+| 20:34 | Session end: 55 writes across 27 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 62 reads | ~166525 tok |
+| 20:40 | Session end: 55 writes across 27 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 66 reads | ~174460 tok |
+| 20:44 | Edited agent-manifest.schema.json | 5→5 lines | ~140 |
+| 20:44 | Edited registry/agent-manifest.schema.json | 5→5 lines | ~140 |
+| 20:44 | Edited gateway/src/main/resources/agent-manifest.schema.json | 5→5 lines | ~140 |
+| 20:44 | Edited registry/domain-manifest.schema.json | 2→7 lines | ~133 |
+| 20:44 | Edited gateway/src/main/java/ai/conduit/gateway/domain/manifest/DomainManifest.java | 3→8 lines | ~142 |
+| 20:45 | Edited gateway/src/main/java/ai/conduit/gateway/domain/manifest/DomainManifestStore.java | added 5 import(s) | ~84 |
+| 20:45 | Edited gateway/src/main/java/ai/conduit/gateway/domain/manifest/DomainManifestStore.java | added 3 import(s) | ~89 |
+| 20:45 | Edited gateway/src/main/java/ai/conduit/gateway/domain/manifest/DomainManifestStore.java | expanded (+7 lines) | ~177 |
+| 20:45 | Edited gateway/src/main/java/ai/conduit/gateway/domain/manifest/DomainManifestStore.java | added 2 condition(s) | ~433 |
+| 20:45 | Edited gateway/src/main/java/ai/conduit/gateway/domain/manifest/DomainManifestStore.java | modified for() | ~292 |
+| 20:45 | Edited gateway/src/main/java/ai/conduit/gateway/domain/manifest/DomainManifestStore.java | 4→4 lines | ~81 |
+| 20:46 | Edited gateway/src/main/java/ai/conduit/gateway/domain/manifest/DomainManifestStore.java | modified catch() | ~624 |
+| 20:46 | Edited gateway/src/main/java/ai/conduit/gateway/domain/manifest/DomainManifestStore.java | added 2 condition(s) | ~539 |
+| 20:46 | Edited gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java | "${conduit.assistant.domai" → "${conduit.assistant.domai" | ~22 |
+| 20:46 | Edited gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java | 3→3 lines | ~67 |
+| 20:46 | Edited gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java | modified effectiveDomainContext() | ~237 |
+| 20:47 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java | added 1 import(s) | ~45 |
+| 20:47 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java | 7→11 lines | ~221 |
+| 20:47 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java | 3→4 lines | ~62 |
+| 20:47 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java | "${conduit.assistant.domai" → "${conduit.assistant.domai" | ~22 |
+| 20:47 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java | 3→5 lines | ~59 |
+| 20:47 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java | 5→10 lines | ~228 |
+| 20:47 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java | modified historySystemPrompt() | ~278 |
+| 20:47 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java | inline fix | ~25 |
+| 20:48 | Edited gateway/src/test/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizerGroundingTest.java | 5→7 lines | ~135 |
+| 20:48 | Edited gateway/src/main/resources/application.yml | 8→10 lines | ~204 |
+| 20:48 | Edited docker-compose.yml | modified phrases() | ~93 |
+| 20:48 | Edited registry/domains/wealth-management.json | 3→4 lines | ~43 |
+| 20:48 | Edited registry/domains/insurance.json | 3→4 lines | ~41 |
+| 20:48 | Edited registry/domains/hr.json | 3→4 lines | ~36 |
+| 20:48 | Edited registry/domains/asset-servicing.json | 3→4 lines | ~39 |
+| 20:49 | Created gateway/src/test/resources/domains/asset-servicing.json | — | ~134 |
+| 20:49 | Created gateway/src/test/resources/domains/insurance.json | — | ~222 |
+| 20:49 | Created gateway/src/test/resources/domains/wealth-management.json | — | ~229 |
+| 20:49 | Created docs/specs/ONBOARDING-DOCS-AUDIT.md | — | ~8371 |
+| 12:40 | Audited onboarding docs vs code; wrote prioritized STALE/INCOMPLETE/UNVERIFIED findings | docs/specs/ONBOARDING-DOCS-AUDIT.md | done | ~60k |
+| 20:50 | Edited gateway/src/test/java/ai/conduit/gateway/registry/loader/ManifestSchemaCopiesInSyncTest.java | modified for() | ~423 |
+| 20:51 | Created gateway/src/test/java/ai/conduit/gateway/registry/loader/AgentManifestFigureFormatEnumTest.java | — | ~1094 |
+| 20:51 | Session end: 92 writes across 39 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 74 reads | ~204181 tok |
+| 20:51 | Session end: 92 writes across 39 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 74 reads | ~204181 tok |
+| 20:51 | Created gateway/src/test/java/ai/conduit/gateway/domain/manifest/DomainManifestStoreValidationTest.java | — | ~1127 |
+| 20:52 | Created gateway/src/test/java/ai/conduit/gateway/domain/manifest/DomainManifestStoreContextTest.java | — | ~1013 |
+| 20:53 | Edited gateway/src/test/java/ai/conduit/gateway/domain/manifest/EffectiveManifestTest.java | inline fix | ~20 |
+| 20:53 | Edited gateway/src/test/java/ai/conduit/gateway/domain/manifest/EffectiveManifestTest.java | inline fix | ~29 |
+| 20:53 | Edited gateway/src/test/java/ai/conduit/gateway/domain/manifest/EffectiveManifestMergeTest.java | inline fix | ~10 |
+| 20:53 | Edited gateway/src/test/java/ai/conduit/gateway/domain/manifest/EffectiveManifestMergeTest.java | inline fix | ~28 |
+| 20:53 | Edited gateway/src/test/java/ai/conduit/gateway/domain/manifest/EffectiveManifestMergeTest.java | inline fix | ~18 |
+| 20:53 | Edited gateway/src/test/java/ai/conduit/gateway/domain/manifest/EffectiveManifestMergeTest.java | inline fix | ~27 |
+| 20:53 | Edited gateway/src/test/java/ai/conduit/gateway/registry/loader/AgentManifestFigureFormatEnumTest.java | 6→8 lines | ~109 |
+| 20:55 | manifest robustness: fail-loud domain/sub-domain schema validation in DomainManifestStore (+ classpath schema copies), figures[].format enum in agent schema (x3 copies), domain_context in domain manifests → composedDomainContext() wired into IntentClassifier + AnswerSynthesizer (render-time, lifecycle-safe); removed wealth-flavored domain-context default from yml/compose/Java | DomainManifestStore.java, DomainManifest.java, IntentClassifier.java, AnswerSynthesizer.java, agent/domain/sub-domain schemas, registry+test domain manifests, application.yml, docker-compose.yml, 4 new tests | 42/42 targeted tests pass; world-b CRITICAL 0→0 | ~14k |
+| 20:56 | Session end: 101 writes across 43 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 76 reads | ~206731 tok |
+| 21:01 | Edited scripts/smoke-route.sh | 4→6 lines | ~113 |
+| 21:04 | Session end: 102 writes across 43 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 77 reads | ~214700 tok |
+| 21:07 | Edited docs/AGENT-ONBOARDING-HANDBOOK.md | expanded (+9 lines) | ~349 |
+| 21:07 | Edited docs/AGENT-ONBOARDING-HANDBOOK.md | modified lines() | ~2447 |
+| 21:08 | Edited docs/AGENT-ONBOARDING-HANDBOOK.md | expanded (+8 lines) | ~216 |
+| 21:08 | Edited docs/AGENT-ONBOARDING-HANDBOOK.md | expanded (+7 lines) | ~244 |
+| 21:08 | Edited docs/AGENT-ONBOARDING-HANDBOOK.md | 2→2 lines | ~163 |
+| 21:08 | Edited docs/AGENT-ONBOARDING-HANDBOOK.md | inline fix | ~123 |
+| 21:09 | Edited docs/AGENT-ONBOARDING-HANDBOOK.md | expanded (+95 lines) | ~2093 |
+| 21:09 | Edited docs/AGENT-ONBOARDING-HANDBOOK.md | 5→10 lines | ~256 |
+| 21:09 | Edited docs/AGENT-ONBOARDING-HANDBOOK.md | expanded (+29 lines) | ~611 |
+| 21:10 | Edited docs/AGENT-ONBOARDING-HANDBOOK.md | expanded (+15 lines) | ~336 |
+| 21:10 | Edited docs/AGENT-ONBOARDING-HANDBOOK.md | expanded (+34 lines) | ~594 |
+| 21:10 | Edited docs/AGENT-ONBOARDING-HANDBOOK.md | expanded (+10 lines) | ~333 |
+| 21:11 | Edited docs/AGENT-ONBOARDING-HANDBOOK.md | modified copy() | ~1089 |
+| 21:11 | Edited docs/AGENT-ONBOARDING-HANDBOOK.md | expanded (+43 lines) | ~1170 |
+| 21:11 | Edited docs/AGENT-ONBOARDING-HANDBOOK.md | 8→10 lines | ~220 |
+| 21:11 | Edited docs/AGENT-ONBOARDING-HANDBOOK.md | 2→5 lines | ~135 |
+| 21:12 | Edited docs/AGENT-ONBOARDING-HANDBOOK.md | 3→8 lines | ~186 |
+| 21:12 | Edited docs/AGENT-ONBOARDING-HANDBOOK.md | 10→11 lines | ~111 |
+| 21:12 | Edited docs/AGENT-ONBOARDING-HANDBOOK.md | 9→9 lines | ~111 |
+| 21:12 | Edited docs/AGENT-ONBOARDING-HANDBOOK.md | 8→10 lines | ~131 |
+| 21:12 | Edited docs/AGENT-ONBOARDING-HANDBOOK.md | 4→9 lines | ~211 |
+| 21:14 | Edited docs/AGENT-ONBOARDING-HANDBOOK.md | expanded (+59 lines) | ~2649 |
+| 21:14 | Created docs/domain-onboarding-standard.md | — | ~441 |
+| 21:15 | Rewrote AGENT-ONBOARDING-HANDBOOK to super-solid (audit ONBOARDING-DOCS-AUDIT H1-H13/S1-S10): added §0 quickstart, §3.5 domain/sub-domain+entity_types, §4.1a capability-first masking, §5.5a figures enum, §7.5 coverage contract, rewrote §8 registry-service ingestion+fail-loud, §13 failure catalog, §14 3-level schema ref; retired domain-onboarding-standard.md to pointer stub | docs/AGENT-ONBOARDING-HANDBOOK.md, docs/domain-onboarding-standard.md | done | ~30k |

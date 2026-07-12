@@ -4329,5 +4329,392 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-07-10T00:00:00Z"
+  },
+  {
+    "id": "bug-257",
+    "timestamp": "2026-07-10T23:10:00Z",
+    "error_message": "Codex e2e: rm_jane can log into Admin UI; Users route 'segments.map is not a function'; Workbench-DfaxzVPV.js dynamic import fails",
+    "file": "docker-compose.yml / admin-ui image",
+    "root_cause": "Cold `docker compose up -d` from empty volumes RECREATES containers from EXISTING images; it does NOT rebuild. admin-ui image was built 17:38 EDT, before commits d5c638f (auth+segments fix) and b1f6616 (Workbench removal). Codex tested pre-fix bytecode; the Workbench-<hash>.js request was the tell (that chunk no longer exists in source).",
+    "fix": "docker compose -p orchestrator-demo build admin-ui && up -d admin-ui. Verified: served bundle has no Workbench chunk; server-side IAM returns 403 for rm_jane on all admin endpoints; Playwright admin-ui spec 8/8 green against fresh container.",
+    "tags": [
+      "docker-compose",
+      "stale-image",
+      "admin-ui",
+      "auth",
+      "false-negative",
+      "cold-start"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-10T23:10:00Z"
+  },
+  {
+    "id": "bug-258",
+    "timestamp": "2026-07-11T00:58:00Z",
+    "error_message": "ops_analyst_singh asking servicing questions about 'Okafor' gets confused/'outside your access' answers; deep failed-trade CSDR penalty flow won't demo cleanly in chat",
+    "file": "mock-agents/wealth-coverage + servicing name resolution",
+    "root_cause": "'Okafor' resolves via wealth-coverage aliases to the WEALTH entity (Okafor Family Trust), which the servicing/ops persona has no wealth segment for -> entitlement denial, even though REL-00188 exists in the servicing book with real failed-trade data. Name->entity resolution isn't domain-scoped to the asking context.",
+    "fix": "RESOLVED by the grounding class-fix (bug-259, commit 3d5265d). 'Okafor' now grounds->resolves->check(ops,REL-00188)=in-book->ALLOWED, so ops sees Okafor SERVICING data. Scoping is CORRECT and needs no new coverage service: the segment gate (Cerbos) denies the WEALTH facet (ops has no wealth segment) while the coverage book grants the relationship. Verified 2026-07-11: ops->Okafor settlements ALLOW, ops->Okafor wealth-holdings DENY, jane->Whitman settlements ALLOW. Residual: minor by-name synthesis phrasing wart (data still delivered).",
+    "tags": [
+      "servicing",
+      "entitlement",
+      "demo-readiness",
+      "not-fixed",
+      "csdr",
+      "resolved-by-grounding",
+      "domain-scoped-correct",
+      "entity-resolution"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-11T02:45:00Z",
+    "layer": "coverage-data"
+  },
+  {
+    "id": "bug-259",
+    "timestamp": "2026-07-11T02:30:00Z",
+    "error_message": "Vague/injection/possessive queries return soft 'no service' instead of deterministic CLARIFY or coverage DENY; security-name (Tesla) mislabeled 'outside your access'",
+    "file": "gateway ChatService/DomainManifestStore/DagPlanExecutor/AgentResolver + new ReferenceGroundingService",
+    "root_cause": "Deterministic dispositions (CLARIFY, coverage DENY) lived inside the coverage pipeline, gated behind the terminal route-abstain branch \u2014 so a continuous embedding score was a precondition for discrete security decisions whose inputs are ready pre-routing. Any score dip converted DENY/CLARIFY into no-service. DAG also turned unresolved entity-ref into coverageDenied (Tesla).",
+    "fix": "Stage-1 reference grounding: RESOLVE->CHECK pre-routing (resolved+denied=terminal DENY at any score; NOT_FOUND=demote to content, never a CHECK). Routing abstain demoted; deterministic required-entity CLARIFY on abstain (fail-closed). DAG blank entity-ref=bindFailure not coverageDenied. Retired rerankPickScoreTolerance. Commit 3d5265d; verified live A2/A6/injection/Tesla/fake-id + mirror; world-b 0; 213/213.",
+    "tags": [
+      "gateway",
+      "routing",
+      "clarify",
+      "entitlement",
+      "injection",
+      "class-fix",
+      "fable-designed",
+      "opus-verified"
+    ],
+    "related_bugs": [
+      "bug-041"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-07-11T02:30:00Z",
+    "layer": "gateway"
+  },
+  {
+    "id": "bug-260",
+    "timestamp": "2026-07-11T03:10:00Z",
+    "error_message": "10-coverage-flow.spec.ts:107 'second turn uses client-sent context (no re-clarification)' \u2014 intermittent: follow-up 'What about their YTD performance?' resolves Whitman in trace but answer occasionally appends 'please specify' clarification, tripping the no-reclarification assertion",
+    "file": "gateway synthesis / multi-turn focal-entity carry (NOT yet root-caused)",
+    "root_cause": "PROVEN (my live trace, 4/4) + independently corroborated (Fable skeptic) + code-traced. TWO distinct issues, do not conflate: (1) TURN-6 'pending settlements?' [PROVEN]: over-fans-out to settlement_status(confidential, allowed) AND settlement_risk(confidential-PII, pruned \u2014 rm_jane servicing=confidential). Classification gate correctly prunes settlement_risk; because ChatService.java:549-554 computes withheldDomains WITHOUT subtracting domains still served by an allowed sibling, the answer emits real settlement_status data PLUS a false 'asset-servicing data not included because outside your access'. Routing bias: settlement_risk's risk-vocabulary corpus is boosted by prior 'risk'-flavored turns in the 4-turn routing window + reranker variance. (2) TURN-2 'YTD?' 1/3 and TURN-7 [UNCONFIRMED \u2014 possibly a DIFFERENT mechanism]: Fable's alt hypothesis = FOLLOW_UP routes to history-only synthesis (ChatService ~1144-1177/482-488) whose prompt says data 'not included' when the fact isn't yet in the conversation (turn2: YTD not yet shown; turn7: YTD IS shown -> clean). NOT traced. MEASUREMENT FLAW (Fable, valid): my probe's WITHHELD matcher ('was not included'/'not included because') is too broad \u2014 it also matches the history-path copy, so some 'WITHHELD' labels may be history-path false positives, not real structural withholds. Ruled OUT: agent timeout (renders MISSING/'unavailable', distinct), coverage-carry (short-circuits to DENIED copy, never synthesis). || C TRACED (refutes history-path guess): the settlements follow-up is intent=FETCH_DATA every time, but routing is UNSTABLE \u2014 ~60% selects 2 servicing agents (fetches+serves), ~40% selects 0 (abstains -> bias-to-fetch history synth -> honest 'I don't have that' since settlements weren't in prior turns). B (over-fetch settlement_risk) and C (abstain to 0) are the SAME root: unstable embedding routing for 'What about any pending settlements?' near the score floor. NEITHER is a correctness bug post-Bug-A: no fabrication, no leak, fails safe. C is a UX INCONSISTENCY (same question answered ~60%, punted ~40%).",
+    "fix": "PARTIALLY FIXED (commit pending). Bug A (withheld-scoping) FIXED: ChatService.computeWithheldDomains now marks a domain withheld only when NONE of its selected agents survive the gate (withheld = referenced - served). Verified live: 'pending settlements?' now serves settlement_status data cleanly while settlement_risk stays correctly pruned; no contradictory 'outside your access'. Unit test ChatServiceWithheldScopingTest (3, green). world-b 0. REMAINING (lower priority, not user-visible-broken anymore): (B) routing over-fan-out \u2014 a settlements-STATUS query still sometimes pulls settlement_RISK (harmless now, just wasteful); (C) turn-2/iter-0 variance \u2014 a follow-up occasionally routes to history-only synthesis and says 'don't have that' instead of fetching (needs one trace to confirm the FOLLOW_UP history-path hypothesis). Probe matcher fixed (scratchpad) to stop the false-WITHHELD alarms. || B: no action needed (over-fetch is harmless post-Bug-A, just wasteful). C: routing-robustness, NOT a clean single-line fix. Cleanest World-B lever = strengthen settlement_status manifest example corpus for the bare-follow-up phrasing so it reliably clears the routing floor (manifest edit + re-ingest, no gateway code) \u2014 BUT must pass the routing-measurement-gate (a corpus add can shift other routing). Judgment call: polish, not correctness; recommend only if follow-up routing reliability is a priority.",
+    "tags": [
+      "needs-faithful-repro",
+      "not-fixed",
+      "proven-by-trace",
+      "synthesis",
+      "flake",
+      "characterized",
+      "withheld-scoping",
+      "two-prior-diagnoses-wrong",
+      "multi-turn",
+      "intermittent",
+      "classification-prune",
+      "routing-over-fanout"
+    ],
+    "related_bugs": [
+      "bug-259"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-07-11T03:10:00Z",
+    "layer": "gateway"
+  },
+  {
+    "id": "bug-261",
+    "timestamp": "2026-07-11T16:30:00Z",
+    "error_message": "uw_sam asks 'pending settlements for Continental Freight' \u2192 answered with his OWN insurance renewal/policy data (servicing correctly withheld); wrong-domain relevance",
+    "file": "gateway routing (entity-domain match)",
+    "root_cause": "Router selects agents by the entity the query names (Continental=insurance policy in uw_sam's book) even when the query asks a different domain (settlements/servicing). Servicing agents correctly pruned (no segment); insurance agents (owned) answer. NOT a leak \u2014 verified via trace: settlement_status/settlement_risk GATE-DENY, only claim_status/policy_details/renewal_risk agent_complete.",
+    "fix": "NOT FIXED \u2014 fail-safe relevance/quality issue, not security. Low priority. Would need routing to weigh the asked capability (settlements) vs the entity's domain (insurance).",
+    "tags": [
+      "routing",
+      "relevance",
+      "cross-domain",
+      "not-a-leak",
+      "sweep",
+      "not-fixed"
+    ],
+    "related_bugs": [
+      "bug-260"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-07-11T16:30:00Z",
+    "layer": "gateway"
+  },
+  {
+    "id": "bug-262",
+    "timestamp": "2026-07-11T17:00:00Z",
+    "error_message": "Concentration agent reports 'top single-name concentration of invested holdings (ex-cash)' = T-BILL-2026 at 25.4% for Whitman \u2014 includes cash despite the ex-cash label, and ranks a Treasury bill as the top single-name concentration",
+    "file": "mock-agents/wealth/concentration/compute.py",
+    "root_cause": "The basis is labeled 'invested holdings (ex-cash)' but basis_total = full total_value (1,967,000) not ex-cash (1,467,000), AND the per-position single-name ranking does not exclude cash instruments (T-BILL-2026 value 500000 is ranked #1). Real ex-cash top concentration = JPM 487500/1467000 = 33.2%.",
+    "fix": "NOT FIXED \u2014 response-correctness bug in the concentration mock-agent (NOT the gateway; LLM faithfully echoed the agent \u2014 grounding is honest). Fix: subtract cash/cash-equivalents from basis_total AND exclude cash instruments from the single-name ranking. Same cash-handling class as the earlier wealth allocation-vs-positions reconciliation gap. Also check X2a Sterling (56.1%) for the same.",
+    "tags": [
+      "response-correctness",
+      "wealth-agent",
+      "concentration",
+      "ex-cash",
+      "grounded-but-wrong",
+      "not-a-leak",
+      "not-gateway"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-11T17:00:00Z",
+    "layer": "agent"
+  },
+  {
+    "id": "bug-263",
+    "timestamp": "2026-07-11T12:24:00-04:00",
+    "error_message": "permission denied while trying to connect to the Docker API at unix:///Users/srirajkadimisetty/.docker/run/docker.sock",
+    "file": "N/A (read-only docker compose ps diagnostic)",
+    "root_cause": "The workspace sandbox does not permit access to the host Docker socket.",
+    "fix": "No repository fix required. Runtime inspection was supplementary, so the static architecture audit continued without escalation.",
+    "tags": [
+      "tooling",
+      "sandbox",
+      "docker",
+      "diagnostic-only"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-11T12:24:00-04:00",
+    "layer": "tooling"
+  },
+  {
+    "id": "bug-264",
+    "timestamp": "2026-07-11",
+    "error_message": "world-b-check jumped from CRITICAL 0 to 2 (ReferenceGroundingService.java flagged 'entity/client names' + 'ID prefixes'); `file` reported the .java as 'data', grep/ugrep treated it as binary.",
+    "file": "gateway/src/main/java/ai/conduit/gateway/domain/coverage/ReferenceGroundingService.java",
+    "root_cause": "An Edit wrote the dedupe-key separator string literals \" \" as NUL bytes (\\x00) instead of spaces. NUL made the file binary to (u)grep, so world-b-check's strip_comments() could not drop the pre-existing REL-00188/Okafor tokens in the class javadoc, counting them as CRITICAL.",
+    "fix": "Replaced the NUL delimiters with a proper \\u0001 escape in dedupeKey(); verified file is 'ASCII text' and world-b-check CRITICAL back to 0.",
+    "tags": [
+      "world-b",
+      "grounding",
+      "nul-byte",
+      "ugrep",
+      "encoding",
+      "routing-piece-2"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-11"
+  },
+  {
+    "id": "bug-265",
+    "timestamp": "2026-07-11",
+    "error_message": "Fail-open entitlement hole in ChatService.coverageForGroup: a resource-scoped group whose coverage interpretation was UNAVAILABLE/NOT_FOUND/AMBIGUOUS fell through to a non-denied 'no id' GroupCoverage, then disposeGroups bound+invoked an id-shaped reference verbatim (EntityResolver.resolveOne) that never passed the coverage CHECK. Also buildRequestedPlan could form a group from a below-floor (skipped) candidate.",
+    "file": "gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java",
+    "root_cause": "coverageForGroup only acted on isDenied()/isAllowed() interpretations; UNAVAILABLE and unresolved required entities returned PROCEED-with-null-id, and the group still bound+invoked. buildRequestedPlan.findManifest searched selected()+skipped(), so a reranker multiple([ids]) naming a below-floor id became an invokable group, bypassing the confidence floor.",
+    "fix": "coverageForGroup now: a sub-domain-matching UNAVAILABLE fails CLOSED (deny group, emit coverage-unavailable check_denied); an unresolved required entity with a bindable coverage reference CLARIFIES (reuse discover + buildClarificationQuestion) or WITHHOLDs, never binds; injectCoverage strips the coverage reference on any id-less PROCEED. disposeGroups gained CLARIFY/WITHHOLD dispositions and emits the clarify at merge only when no group served. findManifest searches selected() ONLY, so <2 above-floor facets collapse to the single flat group. Added ChatServiceGroupCoverageFailClosedTest (3 adversarial tests).",
+    "tags": [
+      "entitlement",
+      "world-b",
+      "fail-closed",
+      "coverage",
+      "routing-piece-4",
+      "confidence-floor",
+      "security"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-11"
+  },
+  {
+    "id": "bug-266",
+    "timestamp": "2026-07-11T21:40:00Z",
+    "error_message": "S2 (Fable review, SHOULD-FIX): coverage first-match roulette \u2014 when >1 candidate resolves a reference, ReferenceGroundingService binds the first coverage hit non-deterministically instead of a stable/typed disambiguation.",
+    "file": "gateway/src/main/java/ai/conduit/gateway/domain/coverage/ReferenceGroundingService.java",
+    "root_cause": "Grounding takes the first coverage service that returns a match; ordering is not stabilized, so equally-valid multi-domain resolutions can flip between runs.",
+    "fix": "OPEN follow-up (not a commit blocker; bug-261 fix is deterministic on the tested paths). Plan: stabilize candidate order + prefer capability-domain-compatible resolution; add a determinism test over a 2-domain-match reference.",
+    "tags": [
+      "routing",
+      "grounding",
+      "determinism",
+      "fable-review",
+      "follow-up",
+      "should-fix"
+    ],
+    "related_bugs": [
+      "bug-261"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-07-11T21:40:00Z"
+  },
+  {
+    "id": "bug-267",
+    "timestamp": "2026-07-11T21:40:00Z",
+    "error_message": "S3 (Fable review, SHOULD-FIX): single-group DAG flat-fallback path is inert but latent \u2014 dag-enabled:false means the multi-group DAG disposition branch is never exercised in prod.",
+    "file": "gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java",
+    "root_cause": "buildRequestedPlan/disposeGroups have a DAG branch gated off (conduit.routing.dag-enabled=false); the flat fallback is what runs. The DAG branch is unverified against live traffic.",
+    "fix": "OPEN follow-up. When DAG routing is turned on, add multi-group disposition tests (SERVED/PARTIAL/DENIED across groups) before enabling in any demo.",
+    "tags": [
+      "routing",
+      "dag",
+      "disposition",
+      "fable-review",
+      "follow-up",
+      "should-fix",
+      "latent"
+    ],
+    "related_bugs": [
+      "bug-261"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-07-11T21:40:00Z"
+  },
+  {
+    "id": "bug-268",
+    "timestamp": "2026-07-11T21:40:00Z",
+    "error_message": "S4 (Fable review, SHOULD-FIX): cosmetic cancellation \u2014 client-disconnect cancellation is write-triggered, not immediate (dup of task #35), surfaced again in routing review.",
+    "file": "gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java",
+    "root_cause": "Cancellation is observed on the next SSE write rather than propagated immediately, so in-flight agent fan-out keeps running briefly after the client goes away.",
+    "fix": "OPEN follow-up; tracked as task #35. Not a routing-correctness issue.",
+    "tags": [
+      "cancellation",
+      "sse",
+      "fable-review",
+      "follow-up",
+      "should-fix",
+      "duplicate-task-35"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-11T21:40:00Z"
+  },
+  {
+    "id": "bug-269",
+    "timestamp": "2026-07-11T21:40:00Z",
+    "error_message": "S5 (Fable review, SHOULD-FIX): /debug/route prod-drift for FOLLOW_UP/CHITCHAT \u2014 the decision endpoint mirrors FETCH_DATA/CLARIFY faithfully but does not fully reproduce FOLLOW_UP/CHITCHAT dispatch, so those intents are scored approximately.",
+    "file": "gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java",
+    "root_cause": "decideRoute reproduces the FETCH_DATA/CLARIFY window+masking path exactly; FOLLOW_UP/CHITCHAT take additional handleFollowUp/chitchat branches in the real chat path that decideRoute does not replay.",
+    "fix": "OPEN follow-up. Extend decideRoute (or annotate the projection) to mark FOLLOW_UP/CHITCHAT as approximate, or replay those branches. goal-pick rows are FETCH_DATA/CLARIFY so current scoring is faithful.",
+    "tags": [
+      "routing",
+      "debug-route",
+      "eval",
+      "fable-review",
+      "follow-up",
+      "should-fix"
+    ],
+    "related_bugs": [
+      "bug-261"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-07-11T21:40:00Z"
+  },
+  {
+    "id": "bug-270",
+    "timestamp": "2026-07-11T21:40:00Z",
+    "error_message": "Nits (Fable review, roll-up): (a) MentionAligner substring leaks() edge on repeated tokens; (b) demo-name javadoc references a concrete client; (c) application.yml stale comment; (d) 32-bit stableHash collision headroom on large corpora.",
+    "file": "gateway/src/main/java/ai/conduit/gateway/synthesis/input/MentionAligner.java",
+    "root_cause": "Cosmetic/robustness nits with no correctness impact on tested paths: substring alignment can mis-pick an occurrence when a token repeats (mitigated by occurrence arg); a javadoc example uses a client name (doc only, not a code literal \u2014 world-b clean); a yml comment is stale; stableHash is 32-bit.",
+    "fix": "OPEN follow-up (low priority). Prefer occurrence-indexed alignment everywhere, scrub the javadoc example to a placeholder, refresh the yml comment, widen stableHash to 64-bit if corpus grows.",
+    "tags": [
+      "nits",
+      "routing",
+      "mention-aligner",
+      "docs",
+      "follow-up",
+      "low-priority"
+    ],
+    "related_bugs": [
+      "bug-261"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-07-11T21:40:00Z"
+  },
+  {
+    "id": "bug-271",
+    "timestamp": "2026-07-11T22:05:00Z",
+    "error_message": "OpenAI 400 unsupported_value: \"temperature does not support 0.0 with this model. Only the default (1) value is supported\" \u2014 every routing-reranker call to gpt-5-mini (and any gpt-5*/o-series model) would 400.",
+    "file": "gateway/src/main/java/ai/conduit/gateway/resolver/service/LlmRoutingRerankerClient.java",
+    "root_cause": "gpt-5* and o1/o3/o4 reasoning models reject a non-default temperature (only 1 allowed) and reject max_tokens (require max_completion_tokens). The reranker client hardcoded temperature into the payload (config default 0.0). When we switched the rerank tier from gpt-4o-mini to the locked gpt-5-mini, every rerank would have failed silently. Surfaced by pre-reset live model probing, not by the test suite (tests use a stub reranker).",
+    "fix": "Added supportsCustomTemperature(model) guard (false for gpt-5*/o1/o3/o4) and build the payload imperatively so temperature is omitted for reasoning models; kept it for GLM/gpt-4.1*/gpt-4o*. Synthesizer already sent no temperature/max_tokens so it needed no change. Intent/extract/clarify run on gpt-4.1* which accept temperature.",
+    "tags": [
+      "llm",
+      "openai",
+      "gpt-5",
+      "reasoning-model",
+      "temperature",
+      "reranker",
+      "model-selection",
+      "compat"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-11T22:05:00Z"
+  },
+  {
+    "id": "bug-272",
+    "timestamp": "2026-07-11T22:45:00Z",
+    "error_message": "Switching the answer synthesizer off gpt-4o-mini (to the locked gpt-5-mini, or gpt-4.1-mini) makes grounded-figure validation fail 100% of the time -> every answer falls back to the robotic deterministic template instead of a narrative. WARN: 'Grounded figure validation failed; serving deterministic fallback: [unattributed numeral ...]'.",
+    "file": "gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java",
+    "root_cause": "The grounded-figure attribution/validation is format-coupled to gpt-4o-mini's output style. gpt-4o-mini writes figures adjacent to their labels ('Value: 318000') which the validator attributes; gpt-4.1/gpt-5 write the same grounded values in prose with $/comma formatting ('$318,000') or lightly reformatted, which the validator flags as unattributed numerals and rejects. Confirmed empirically: 4o-mini 0/2 failures (rich narratives); 4.1-mini 2/2; 5-mini 2/2. Not caused by the model computing new numbers \u2014 the values are grounded, just formatted/placed differently. | ROOT CAUSE FOUND (Fable, prompt review): the synthesizer system prompt commands 'copy every number EXACTLY as it appears' (AnswerSynthesizer.java:123-125) while the GROUNDED FIGURES user block commands 'do not type the figure's digits yourself \u2014 use placeholders' (:346-348). Contradictory instructions. gpt-4o-mini resolves it toward placeholders (passes); gpt-4.1-mini/gpt-5-mini follow 'copy exactly', type reformatted digits ($/commas) and derived totals, and GroundedFigureValidator rejects 100%. Fix = S1: make the placeholder protocol the single system-owned figure rule, delete the contradiction, add a self-check + few-shot (see docs/specs/PROMPT-EXTERNALIZATION-DESIGN.md Part 3.S1).",
+    "fix": "Interim: kept synth on gpt-4o-mini (the only synth model that passes today) so the demo produces real answers; intent/extract/rerank/clarify successfully moved to the locked 4.1/5 tiers. Proper fix (follow-up, user's call): harden the synthesis prompt + grounded-figure attribution to be format-robust (accept $/comma/prose placement, or force a placeholder-only output contract) so synth can move off 4o-mini per the 'off-4o' lock. | OUTCOME: S1 applied (prompt externalized to answer-synthesizer.system.md; contradiction deleted). gpt-5-mini fallback 100%->~20%; common queries (holdings/performance/cash/summary) now stream rich narratives. Residual ~20% is NOT prompt/model \u2014 see [[bug-273]] (validator label-scoping), model-agnostic (gpt-4o-mini also trips concentration queries). Synth left on locked gpt-5-mini.",
+    "tags": [
+      "judgment-call",
+      "s1-applied",
+      "resolved-mostly",
+      "root-cause-found",
+      "prompt-externalization",
+      "validation",
+      "prompt-contradiction",
+      "model-selection",
+      "gpt-5-mini",
+      "gpt-4o-mini",
+      "demo-quality",
+      "grounded-figures",
+      "synthesizer",
+      "llm"
+    ],
+    "related_bugs": [
+      "bug-271"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-07-11T22:45:00Z"
+  },
+  {
+    "id": "bug-273",
+    "timestamp": "2026-07-11T23:55:00Z",
+    "error_message": "GroundedFigureValidator rejects a correctly-grounded numeral when it shares a sentence with a DIFFERENT figure's label. E.g. 'Diversification HHI is 0.21 with 6 breaches' -> the sentence matches the HHI label, so candidates are scoped to the HHI figure only, and the grounded '6' (concentration breach count) is flagged 'unattributed numeral 6 near label(s) [Diversification HHI]' -> deterministic fallback served.",
+    "file": "gateway/src/main/java/ai/conduit/gateway/synthesis/answer/GroundedFigureValidator.java",
+    "root_cause": "validate() scopes candidate figures to those whose label tokens ALL appear in the sentence (labelMatches, :96-105); when a sentence names one figure's label, every other numeral in that sentence is checked ONLY against that label's value (:41-42), so a real grounded value belonging to a different (un-named-in-sentence) figure fails. Model-agnostic: hits concentration-style queries (breach-count + HHI together) across gpt-4o-mini/4.1-mini/5-mini, non-deterministically.",
+    "fix": "OPEN follow-up (Fable's 'cause #2'). NOT a safe one-liner: blindly accepting a numeral that matches ANY grounded value would let the model mis-attribute (state a wrong value for a label) and pass \u2014 worse than a robotic fallback. Needs real validator-precision work: per-numeral nearest-label matching, or sentence-splitting so each figure's value is checked against its own label. This is the path to gpt-5-mini synth at ~0 fallback. Correctness-sensitive; design before implementing.",
+    "tags": [
+      "synthesizer",
+      "grounded-figures",
+      "validator",
+      "label-scoping",
+      "precision",
+      "follow-up",
+      "demo-quality"
+    ],
+    "related_bugs": [
+      "bug-272"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-07-11T23:55:00Z"
+  },
+  {
+    "id": "bug-274",
+    "timestamp": "2026-07-11",
+    "error_message": "Malformed domain/sub-domain manifest silently dropped; typo'd figure format silently rendered as plain (grounding gate weakened)",
+    "file": "gateway/.../domain/manifest/DomainManifestStore.java; agent-manifest.schema.json",
+    "root_cause": "DomainManifestStore.loadSubDomains caught+debug-logged parse errors (silent drop) and domain/sub-domain manifests were schema-validated nowhere; figures[].format was any string with a plain fallthrough",
+    "fix": "Load domain-/sub-domain-manifest schemas from gateway classpath and fail loud on validation errors; narrowed sub-domain glob to domains/*/*.json to separate from domain files; added enum to figures[].format matching GroundedFigureRenderer/Validator supported formats",
+    "tags": [
+      "manifest",
+      "validation",
+      "world-b",
+      "schema",
+      "grounding"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-11"
   }
 ]

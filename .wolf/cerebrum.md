@@ -19,6 +19,7 @@
 
 ## Key Learnings
 
+- **Routing precision audit (2026-07-11):** `entityKnown` bypasses both contextual domain-margin and general min-score/min-margin abstention; it can be set by mere syntactic reference presence, not only successful allowed grounding. Post-entitlement correctness must preserve the requested primary capability/DAG goal, not merely any survivor in the same domain. The goal-pick harness ignores row personas, excludes cross-agent confusers from its release gate, and does not exercise the contextual/entitlement chat path.
 - **Project:** Enterprise AI gateway for a bank (Meridian brand on LibreChat). RM types plain-English; gateway routes to 9 specialist agents across HTTP (FastAPI/Wealth) and MCP (Asset Servicing), enforces Cerbos ABAC, synthesizes one grounded answer streamed back.
 - **Governed memory scaffold (2026-07-01):** Context compaction belongs outside the gateway. The gateway emits runtime events and consumes `context-envelope.v1`; an external memory service owns the append-only ledger, summaries, redaction/retention, and manifest-driven compaction policy. Domain/sub-domain/agent manifests plus gateway events are the inputs; no domain-specific memory logic belongs in gateway Java.
 - **Stateless gateway implemented (2026-07-02):** Gateway chat memory is gone. `ConversationSession`/`ConversationSessionStore` were deleted; `conversationId` is trace grouping only. The gateway derives entity context from client-sent `messages[]` + JWT every turn, latest explicit user mention wins, prior user mentions can seed fresh follow-ups, assistant text never seeds extraction, and coverage/entitlement is re-run every turn.
@@ -284,3 +285,26 @@ JWT/Axiom is the real public API path (gateway extracts principal from JWT claim
 ## Do-Not-Repeat (2026-07-03)
 - Lost-update: a background post-stream save of a stale, whole conversation entity (touchAndMaybeTitle) clobbered the concurrently-written rolling summary, nulling it every turn and silently killing compaction. When two async writers touch the same Mongo document, use field-scoped $set updates (MongoTemplate.updateFirst), never full-document save() of a stale entity. Fixed in ConversationService.touchAndMaybeTitle.
 - When querying conduit conversations in Mongo, _id is an ObjectId — use ObjectId('...'), not a string, or findOne returns null and looks like "no summary".
+
+## Bug layer classification (added 2026-07-11)
+Every bug MUST be tagged with a `layer` in buglog.json. Layers + ownership:
+- **gateway** — routing, clarify, entitlement DECISIONS, grounding FAITHFULNESS, partial-results, SSE (our Java).
+- **agent** — domain COMPUTATION & data (e.g. concentration math, CSDR penalties). External team's service (mock-agents/ in demo). Gateway CANNOT fix without violating World-B.
+- **coverage-data** — books, aliases, entity classification (coverage service data).
+- **manifest/config** — entity types, classifications, coverage URLs, example corpus (World-B config, not code).
+- **iam** — identity, segments, roles. **ui/bff** — rendering, sessions. **infra** — images, compose, trace store.
+Decision rule gateway-vs-agent: did the LLM faithfully echo the agent's output? If yes and the answer is still wrong → AGENT bug (grounding contract held). If the gateway routed/gated/altered wrongly → GATEWAY bug.
+
+## Key Learning — 2026-07-11 — Routing preparation and capability continuity
+- `EntityBag` is a scalar focal-entity carrier (`Map<String,String>`), not a mention/provenance model; multi-reference span masking requires generic per-message mention records before changing `GroundingResult` to a list.
+- The gateway's coverage path gates only the first resource-scoped surviving manifest and injects one canonical id into a shared bag. Genuine mixed resource-domain partial fulfillment therefore needs per-requested-group coverage/binding, not only a post-prune domain guard.
+- `handleFollowUp` uses the syntactic reference helper before entering the grounded fetch path. Removing syntactic `entityKnown` must introduce one shared pre-routing preparation result for FETCH_DATA, FOLLOW_UP, and production-path eval or terse/anaphoric fetch fallthrough regresses.
+
+## Key Learning — 2026-07-11 — LLM model tiers are env-driven; compose/yaml defaults are GLM
+- The gateway is provider-swappable per call site via `CONDUIT_LLM_*` env. The `docker-compose.yml`/`application.yml` **defaults are GLM** (glm-4.5-flash/glm-4.6); the real runtime models come from `.env` (gitignored), which points every request-path call site at OpenAI. Don't diagnose "which model runs" from the yaml — render `docker compose config` (it substitutes `.env`) or read `.env`.
+- Locked tiers (MODEL-SELECTION.md), wired in `.env` 2026-07-11: intent=gpt-4.1-nano, extract=gpt-4.1-mini, rerank=gpt-5-mini, clarify=gpt-4.1-nano, synth=gpt-5-mini, judge=o4-mini. Compose defaults stay GLM so perf/load can't bill OpenAI.
+- The gateway had **no `CONDUIT_LLM_ROUTING_RERANKER_*` passthrough** in compose — the reranker could only inherit the intent model. Added base-url/key (inherit intent) + independent model passthrough. Same inherit-intent fix applied to clarification composer (its model was selectable but base-url/key were stranded on the GLM default → mismatch).
+- **gpt-5* and o1/o3/o4 reasoning models** reject a non-default `temperature` (only 1) and reject `max_tokens` (need `max_completion_tokens`). Call sites that hardcode `temperature`/`max_tokens` break when pointed at these models. Fixed in the reranker (`supportsCustomTemperature`); intent/extract/clarify are on gpt-4.1* (temperature OK); synth sends neither param. See [[bug-271]].
+
+### Do-Not-Repeat (2026-07-11)
+- An Edit can silently write intended spaces in string literals as NUL bytes (`"\x00"`). This makes the .java "data" to `file` and BINARY to grep/ugrep, which defeats `world-b-check`'s `strip_comments()` and turns pre-existing in-comment domain tokens (e.g. REL-00188/Okafor in a class javadoc) into phantom CRITICAL violations. If world-b-check spikes and reports "Binary file matches", run `file <path>` — if it says "data", hunt NUL/control bytes (`python3 -c "print(open(p,'rb').read().count(0))"`), don't chase non-ASCII glyphs. This repo's `grep` is `ugrep`.
