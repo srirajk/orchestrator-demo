@@ -15,6 +15,40 @@
 
 ---
 
+> ## Progress update — 2026-07-12 (what shipped since the 2026-06-29 lockdown)
+>
+> The §2 maturity numbers and the §3 hardcoding audit are the **2026-06-29 snapshot**; the
+> genericity seam has since **shipped**. Current verified state:
+>
+> - **World B gate green:** `scripts/world-b-check.sh` reports **CRITICAL 0 / REVIEW 0**, and it
+>   now scans **both** `gateway/src/main/java` (comment-stripped) **and**
+>   `gateway/src/main/resources/prompts` — the externalized prompts are inside the gate.
+> - **LLM prompts are externalized** to `gateway/src/main/resources/prompts/*.md`, loaded by a
+>   fail-fast `PromptLoader` and **compiled from the manifest** (IntentClassifier, EntityExtractor,
+>   AnswerSynthesizer, ClarificationComposer, RoutingReranker), sharing one `instruction-hierarchy`
+>   fragment. No domain strings inline in Java.
+> - **Deterministic CLARIFY** (§4.2) is live; **entity context is map-based**; **`domain_context`
+>   moved into the domain manifest** and the gateway composes the assistant framing from the loaded
+>   domains (`DomainManifest`/`DomainManifestStore`).
+> - **Manifest hardening:** domain + sub-domain manifests are schema-validated at load and a
+>   malformed one **fails startup / exits the container** (`DomainManifestStore.validateSchema`);
+>   `io.produces[].figures[].format` is enum-constrained in the agent schema.
+> - **Onboarding a domain now touches zero gateway Java AND zero gateway config** — the coverage URL
+>   comes from the manifest (`coverage.resolve_url`), the last hand-edited env string is gone.
+> - **Routing is capability-first** (route on the *capability asked*, not the entity named — the
+>   bug-261 fix): `RoutePreparer` masks resolved entity spans with a neutral deictic
+>   (`conduit.routing.entity-mask-token`) so routing keys on the capability word, with canonical-name
+>   needle tightening. **Multi-turn:** a `FOLLOW_UP` carries the prior context; a client **SWITCH**
+>   re-scopes (`ChatService`).
+> - **Domains loaded: 4** (wealth-management, asset-servicing, insurance, HR) across **18 agent
+>   manifests** — the 2nd/3rd/4th domains were added by manifest alone.
+> - **Still open (§5 Risk 4 / §8):** multi-entity **COMPARE** — the multi-entity-binding validation —
+>   is designed and built but **PARKED on branch `feat/multi-entity-compare`, not on `main`** (blocked
+>   on a same-capability near-tie abstain). Treat it as roadmap, not a shipped `main` feature. The
+>   admission-gate and generated-Cerbos items below likewise remain forward-looking.
+
+---
+
 ## 0. The one-line strategy
 
 > **Don't sell "generic AI." Sell a paved road with an admission gate.**
@@ -507,8 +541,10 @@ anyone re-explaining it.
 
 ### Layer 1 — Deterministic gate (does not depend on remembering)
 
-**`scripts/world-b-check.sh`** greps `gateway/src/main/java` for domain coupling and prints
-every violation as a file:line worklist, with a CRITICAL count.
+**`scripts/world-b-check.sh`** greps `gateway/src/main/java` (comment-stripped) **and**
+`gateway/src/main/resources/prompts` for domain coupling and prints every violation as a file:line
+worklist, with a CRITICAL count. (The prompt corpus is now externalized to `resources/prompts/*.md`,
+so the gate scans it too — moving prompt text out of Java must not move it out of the gate.)
 
 - **Status — ACHIEVED 2026-06-29: CRITICAL 0, REVIEW 0 ("gateway carries no domain
   knowledge").** Countdown: 68 → 67 (Wave 1) → 43 (entity pipeline) → 9 (prompts/CLARIFY/copy)

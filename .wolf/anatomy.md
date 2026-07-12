@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-07-12T04:49:53.338Z
-> Files: 1123 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-07-12T14:56:06.811Z
+> Files: 1125 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/
 
@@ -500,7 +500,7 @@
 - `.gitignore` — Git ignore rules (~524 tok)
 - `agent-manifest.schema.json` — Declares used (~4210 tok)
 - `BUILD_REPORT.md` — Build Report — Conduit AI Gateway (~1028 tok)
-- `CLAUDE.md` — OpenWolf (~2865 tok)
+- `CLAUDE.md` — OpenWolf (~3070 tok)
 - `docker-compose.yml` — Docker Compose services (~12100 tok)
 - `MORNING-NOTES.md` — Morning notes — OIDC SSO is fixed ✅ (~1292 tok)
 - `README.md` — Project documentation (~4427 tok)
@@ -887,12 +887,13 @@
 - `EVAL-PRODUCT-VISION.md` — Eval — Product Vision (framework + app) (~1004 tok)
 - `execution-orchestration-layer.md` — Execution / Orchestration Layer — Spec (~1323 tok)
 - `gateway-domain-architecture.md` — Conduit AI Gateway — Domain Architecture (~7275 tok)
+- `GATEWAY-INTERNALS.md` — Conduit Gateway — Internals (the engine, end to end) (~17075 tok)
 - `harness-and-telemetry-deep-spec.md` — Harness & Telemetry — Deep Spec (~2123 tok)
 - `implementation-checklist.md` — Implementation Checklist — Pre-Build Validation Spec (~4638 tok)
 - `input-synthesis-deep-spec.md` — Input Synthesis — Deep Spec (the one unproven piece) (~1951 tok)
 - `master-build-plan-consolidated.md` — Enterprise Intelligence Platform — Master Build Plan (Meridian) (~3833 tok)
 - `MODEL-SELECTION.md` — Model Selection Guide — Conduit AI Gateway (~2289 tok)
-- `OPERATOR-RUNBOOK.md` — Conduit Gateway — Operator & Demo Runbook (~3446 tok)
+- `OPERATOR-RUNBOOK.md` — Conduit Gateway — Operator & Demo Runbook (~4053 tok)
 - `platform-vision-and-maturity-path.md` — Enterprise Intelligence Platform — Vision & Maturity Path (~1324 tok)
 - `PROJECT-OVERVIEW.md` — Conduit — Project Overview (~165 tok)
 - `PROMPT-AUDIT.md` — Prompt Contract Audit — every production prompt vs the 9-element framework (~1931 tok)
@@ -900,7 +901,7 @@
 - `technical-architecture-clear-boundaries.md` — Technical Architecture — Clear Boundaries (~1990 tok)
 - `UI-E2E-SCENARIOS-FOR-CODEX-v2.md` — Conduit UI — full end-to-end browser test plan v2 (for Codex) (~4370 tok)
 - `UI-E2E-SCENARIOS-FOR-CODEX.md` — Conduit UI — full end-to-end browser test plan (for Codex) (~1621 tok)
-- `WORLD-B-LOCKDOWN.md` — Conduit — World B Architecture Lockdown (~8940 tok)
+- `WORLD-B-LOCKDOWN.md` — Conduit — World B Architecture Lockdown (~9633 tok)
 
 ## docs/specs/
 
@@ -2140,8 +2141,8 @@
 - `domain/chat/ChatServiceEntityCompareTest.java` — Pure tests for the COMPARE decision statics: memo id-equality guard (security anchor), no-leak scan filter, expandPerEntity caps/product/inert. (~1000 tok)
 - `domain/coverage/EntityBinding.java` — One resolved entity (canonicalId + user verbatim + its grounded interpretations) that a turn named explicitly; the fan-out unit of multi-entity COMPARE. (~700 tok)
 - `domain/coverage/EntityBindingSet.java` — Derives per-entity bindings from an already-computed GroundedReferenceSet (zero new coverage calls); latest-turn EXPLICIT only; multiEntity = dominant entityKey has >=2 distinct ids. derive()=>=2 gate (compare); deriveAll()=single-binding-capable (Compare-CLARIFY predicate). (~1300 tok)
-- `domain/coverage/UnboundReference.java` — One user-named entity reference the pipeline did NOT bind (Compare-CLARIFY signal). verbatim=user's own words (only field rendered, SECURITY); resolvedId=Tier-B guard only, never disclosed. (~500 tok)
 - `domain/coverage/EntityBindingSetTest.java` — Pure derivation tests for EntityBindingSet (anaphora/prior-turn excluded, same-id dedupe, DENIED/UNAVAILABLE bind, NOT_FOUND/AMBIGUOUS don't). (~900 tok)
+- `domain/coverage/UnboundReference.java` — One user-named entity reference the pipeline did NOT bind (Compare-CLARIFY signal). verbatim=user's own words (only field rendered, SECURITY); resolvedId=Tier-B guard only, never disclosed. (~500 tok)
 - `DomainManifestStoreContextTest.java` — test: composedDomainContext joins domain_context by domain_id, neutral fallback (~600 tok)
 - `DomainManifestStoreValidationTest.java` — test: malformed domain/sub-domain manifests fail loud (schema validation) instead of silent drop (~700 tok)
 - `synthesis/answer/AnswerSynthesizerCompareTest.java` — Entity-qualified DATA headers, WITHHELD ENTITY (verbatim+manifest copy, no canonical leak), cap note, figure sourceAgent=nodeId. (~800 tok)

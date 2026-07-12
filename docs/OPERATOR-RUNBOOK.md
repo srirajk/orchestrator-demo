@@ -22,11 +22,12 @@ question into a chat UI; the gateway:
 ### The product thesis — "World B"
 
 The gateway carries **zero embedded domain knowledge**. A new business domain is onboarded
-by adding **manifest JSON + a CRM/coverage service URL — never by changing gateway Java**.
+by adding **manifest JSON + a coverage-service URL — never by changing gateway Java, and no
+gateway config edit** (the coverage URL and assistant framing now come from the manifest).
 This is proven in the stack today: alongside **wealth** and **asset-servicing**, an
-**insurance** domain was added by manifest alone (2 agents, its own coverage service, one
-line of authz config) and it routes, resolves, answers, and enforces entitlements with no
-gateway code change.
+**insurance** domain (3 agents, its own coverage service, one line of authz config) and an
+**HR** knowledge domain were added by manifest alone — they route, resolve, answer, and
+enforce entitlements with no gateway code change. Four domains are loaded.
 
 The deterministic gate `scripts/world-b-check.sh` greps `gateway/src/main/java` for any
 domain coupling and must report **CRITICAL: 0** (it does).
@@ -36,10 +37,10 @@ domain coupling and must report **CRITICAL: 0** (it does).
 ## 2. Architecture at a glance
 
 ```
-  LibreChat (chat UI)                         Glass-Box (live decision trace)
-        │  POST /v1/chat/completions (SSE)            ▲  GET /trace/stream (SSE)
+  Conduit Chat (React SPA + BFF)              Glass-box trace rail (inside Conduit Chat)
+        │  POST /v1/chat/completions (SSE)            ▲  GET /trace/stream (SSE, via BFF proxy)
         ▼                                             │
- ┌───────────────────────────── Gateway (Java 21, Spring Boot, virtual threads) ──────────┐
+ ┌───────────────────────────── Gateway (Java 25, Spring Boot, virtual threads) ──────────┐
  │  Intent+Entity (LLM) → Resolve (vector route) → Entitlement (Cerbos + coverage) →       │
  │  Fan-out (HTTP + MCP adapters, Resilience4j) → Synthesis (LLM, grounded) → SSE stream    │
  └─────────┬───────────────┬───────────────┬───────────────┬───────────────┬───────────────┘
@@ -49,6 +50,7 @@ domain coupling and must report **CRITICAL: 0** (it does).
         (HNSW + JSON)    RS256/JWKS)                       (wealth, insurance)  + Tempo/Loki/Prom
 
    Agents:  Wealth (FastAPI, HTTP) · Asset-Servicing (FastMCP, MCP) · Insurance (FastAPI, HTTP)
+            · HR (FastAPI, HTTP) — 4 domains loaded, all manifest-driven
 ```
 
 The glass-box renders six stages per request: **Request Received → Intent Classification →
@@ -66,25 +68,28 @@ N/M agents succeeded).
 
 | Service | URL | What it is | Login |
 |---|---|---|---|
-| **LibreChat** (Conduit-branded) | http://localhost:3080 | The chat UI the banker uses | OIDC via IAM — sign in with a seeded user, e.g. **`rm_jane` / `Meridian@2024`**. A "Demo User" session is typically already active. |
-| **Glass-Box** | http://localhost:4000 | Live decision trace for each request | None. Open it, confirm top-right says **"Connected"**, then send a prompt in LibreChat. |
+| **Conduit Chat** (React SPA + BFF) | http://localhost:8099 | The chat UI the banker uses — with the live **glass-box decision-trace rail built into the conversation** (collapsible, per-conversation; no separate window). | OIDC via IAM (Axiom) — sign in with a seeded user, e.g. **`rm_jane` / `Meridian@2024`**. |
+| **Conduit Insights** | http://localhost:5175 | Admin-gated analytics — **7 boards** (Executive Overview, Traffic & Intent, Governance, Agent Performance, Reliability, Live Trace, Cost & Quality) served from Prometheus + Langfuse | OIDC (PKCE) via IAM; access is Cerbos-gated (needs an admin/insights entitlement). |
 | **Langfuse** | http://localhost:3030 | LLM traces, sessions (conversation = session, 1→many turns), eval scores | **`admin@meridian.bank` / `changeme`** (`LANGFUSE_ADMIN_PASSWORD`). |
-| **Grafana** | http://localhost:3000 | Dashboards: JVM/CPU/mem (Prometheus), logs (Loki), distributed traces (Tempo) | **`admin` / `changeme`** (`GRAFANA_ADMIN_PASSWORD`). |
+| **Grafana** (opt-in `observability` profile) | http://localhost:3000 | Dashboards: JVM/CPU/mem (Prometheus), logs (Loki), distributed traces (Tempo) | **`admin` / `changeme`** (`GRAFANA_ADMIN_PASSWORD`). |
 | **Admin UI** | http://localhost:5180 | Agent/manifest registry admin | Served static; admin actions need a `domain_admin`/`platform_admin` token. |
 
 ### Supporting services (usually no need to open directly)
 
 | Service | Host port | What it is |
 |---|---|---|
-| Gateway | 8080 | The one JVM service (`/v1/chat/completions`, `/v1/models`, `/trace/**`, `/admin/**`, `/debug/**`) |
-| IAM service | 8084 | Identity provider — OIDC, RS256/JWKS; issues the signed token verified at every hop |
+| Gateway | 8080 | The one JVM service (`/v1/chat/completions`, `/v1/models`, `/trace/**`, `/admin/agents` (read-only), `/v1/insights/**`, `/debug/**`) |
+| Registry-service | (no host port) | Same JVM image, `registry` Spring profile. Ingests the manifests, embeds the corpus, builds the HNSW routing index; the gateway `depends_on` it and only *reads* the index. Fails ingestion loudly (`INGEST_FAIL_ON_INVALID=true`). |
+| IAM service (Axiom) | 8084 | Identity provider — OIDC, RS256/JWKS; issues the signed token verified at every hop |
 | Cerbos PDP | 3594 (HTTP) / 3595 (gRPC) | Structural authorization (role × resource class) |
-| Wealth agents (HTTP) | 8081 | FastAPI; auto-serves `/openapi.json`; 4 agents (holdings, performance, risk_profile, goal_planning) |
-| Asset-Servicing agents (MCP) | 8082 | FastMCP/SSE; 5 tools (custody_positions, settlement_status, cash_management, nav, corporate_actions) |
-| Insurance agents (HTTP) | 8087 | FastAPI; 2 agents (policy_details, claim_status) — the World B proof domain |
+| Wealth agents (HTTP) | 8081 | FastAPI; auto-serves `/openapi.json`; capabilities: holdings, performance, risk_profile, goal_planning, concentration (+ concentration_review) |
+| Wealth Market-Research (HTTP) | 8089 | FastAPI; wealth market_research capability (its own container) |
+| Asset-Servicing agents (MCP) | 8082 | FastMCP — **Streamable HTTP, spec `2025-11-25`** (single `/mcp` endpoint, not the deprecated HTTP+SSE); tools: custody_positions, settlement_status, cash_management, nav, corporate_actions (+ settlement_risk, trade_penalty) |
+| Insurance agents (HTTP) | 8087 | FastAPI; policy_details, claim_status, renewal_risk |
+| HR agent (HTTP) | 8091 | FastAPI; policy_qa (enterprise/knowledge agent — no per-user coverage gate) |
 | Wealth coverage | 8086 | Book-of-business for wealth (DISCOVER/CHECK/RESOLVE) |
 | Insurance coverage | 8088 | Book-of-business for insurance |
-| Embeddings | 8083 | In-JVM-adjacent MiniLM (384-dim) for routing |
+| Embeddings | 8083 | Python **sentence-transformers** sidecar (`all-MiniLM-L6-v2`, 384-dim) over HTTP — the one request-path Python hop, behind the `TextEmbedder` port |
 | Redis Stack | 6379 (+ RedisInsight 8001) | RediSearch HNSW vector index + RedisJSON (agents, principals, sessions) |
 | Langfuse worker / DB | — | Async ingestion + Postgres/ClickHouse/MinIO backing Langfuse |
 | OTel Collector | 4317/4318 (+ 8889) | Spans → Langfuse + Tempo |
@@ -105,11 +110,13 @@ N/M agents succeeded).
 ## 4. Run & verify
 
 ```bash
-# 0. Prereqs: Docker + Compose v2, open egress to OpenAI (and Docker Hub/GHCR).
-cp .env.example .env           # then set CONDUIT_LLM_SYNTHESIZER_API_KEY (OpenAI)
+# 0. Prereqs: Docker + Compose v2, open egress to the LLM provider (and Docker Hub/GHCR).
+cp .env.example .env           # set ZAI_API_KEY — the compose LLM defaults are GLM (Z.AI).
+                               # To run the gateway on OpenAI instead, set the CONDUIT_LLM_*_MODEL/
+                               # _BASE_URL/_API_KEY vars (locked tiers — see docs/MODEL-SELECTION.md).
 
-# 1. Bring up the core stack (everyday demo)
-docker compose up -d
+# 1. Bring up the core stack (everyday demo — no-profile core set)
+docker compose -p orchestrator-demo up -d
 
 # 2. Seed the demo principals (idempotent)
 REDIS_HOST=localhost REDIS_PORT=6379 bash scripts/seed-users.sh
@@ -121,13 +128,14 @@ docker compose --profile eval up -d eval-worker
 ./scripts/verify.sh            # includes scripts/world-b-check.sh as a hard gate
 ```
 
-Open **LibreChat** (3080) + **Glass-Box** (4000) side by side and you're ready to demo.
+Open **Conduit Chat** (8099); the glass-box decision-trace rail is built into the conversation
+(expand it from the chat pane) — you're ready to demo.
 
 ---
 
 ## 5. The demo script — four beats
 
-> Open Glass-Box (confirm "Connected") and LibreChat side by side. Log in as `rm_jane`.
+> Open Conduit Chat (8099), log in as `rm_jane`, and expand the built-in glass-box trace rail.
 
 ### Beat 1 — Hero (cross-protocol fan-out + grounded synthesis)
 **Prompt:** *"Give me a complete overview of the Whitman relationship: holdings, performance,
@@ -166,7 +174,9 @@ it proceeds to the grounded answer.
 
 ## 6. Observability & eval — the single-pane story
 
-- **Glass-Box (4000):** the live, per-request decision narrative (the demo's hero view).
+- **Glass-box rail (in Conduit Chat, 8099):** the live, per-request decision narrative
+  (the demo's hero view), streamed over `GET /trace/stream` and proxied by the chat BFF.
+- **Conduit Insights (5175):** admin-gated analytics — 7 boards over Prometheus + Langfuse.
 - **Langfuse (3030):** every turn is a trace; **a conversation is a session** (1→many
   traces). Each trace carries the prompt (input) **and** the streamed answer (output), the
   agent spans (HTTP + MCP), token usage, and `langfuse.metadata.domain` for cost-by-domain.
@@ -180,24 +190,32 @@ it proceeds to the grounded answer.
 - **Release gate (DeepEval):** `scripts/eval-gate.sh` runs the routing-accuracy + faithfulness
   gate offline (CI / pre-ship), separate from the always-on continuous loop.
 
-### Model / provider strategy (performance-driven)
+### Model / provider strategy (per-call-site, env-driven)
 
-| Use | Provider | Why |
+Every call site is provider- and model-swappable via env (`CONDUIT_LLM_*`, `JUDGE_*`). The
+**compose defaults are GLM** (Z.AI) — perf-safe and the everyday demo runs on them out of the box;
+the **real deployment selects the locked OpenAI tiers** via `.env` (see `docs/MODEL-SELECTION.md`).
+
+| Call site | Compose default (GLM / Z.AI) | Locked deployment (OpenAI) |
 |---|---|---|
-| Gateway intent/extraction/synthesis | **OpenAI** `gpt-4o-mini` | realtime, concurrency-critical |
-| Mock agents (wealth/servicing/insurance) | **OpenAI** `gpt-4o-mini` | per-request narratives under fan-out |
-| Continuous eval judge | **OpenAI** `gpt-4o-mini` | async + low-volume; reliable structured output |
-| DeepEval release gate | offline batch | not realtime |
+| Intent classifier | `glm-4.5-flash` | `gpt-4.1-nano` |
+| Entity extractor | `glm-4.5-flash` | `gpt-4.1-mini` |
+| Routing reranker | `glm-4.5-flash` | `gpt-5-mini` |
+| Answer synthesizer | `glm-4.6` | `gpt-5-mini` |
+| Clarification composer | `glm-4.5-flash` | `gpt-4.1-nano` |
+| Continuous eval judge (`JUDGE_*`) | `glm-4.5-flash` | `o4-mini` (compose default `gpt-4o-mini`) |
+| Mock agents (wealth/servicing/insurance/HR) | `glm-4.5-flash` | per-agent override |
+| DeepEval release gate | offline batch | offline batch |
 
-Every call site is provider-swappable via env (`CONDUIT_LLM_*`, `JUDGE_*`). To move the
-async judge back to GLM, point `JUDGE_BASE_URL/JUDGE_API_KEY/JUDGE_MODEL` at Z.AI and raise
+Reasoning models (`gpt-5*` / `o`-series) omit `temperature`. To move the async judge between
+providers, point `JUDGE_BASE_URL/JUDGE_API_KEY/JUDGE_MODEL` at the target and tune
 `EVAL_JUDGE_THROTTLE_MS` (the funnel — throttle + backoff — is retained either way).
 
 ---
 
 ## 7. Scale proof (k6)
 
-Light concurrent test (ramp to 10 VUs, full pipeline on OpenAI):
+Light concurrent test (ramp to 10 VUs, full pipeline through the configured LLM):
 ```bash
 docker run --rm --network orchestrator-demo_default -e GATEWAY_URL=http://gateway:8080 \
   -v "$(pwd)/tests/load:/scripts" grafana/k6 run /scripts/load-test-light.js
@@ -209,8 +227,9 @@ passed — virtual-thread gateway handled concurrent streaming with zero failure
 
 ## 8. Verified state (this stack)
 
-- **World B clean** — `scripts/world-b-check.sh`: CRITICAL 0; 11 agents across 3 domains
-  (4 wealth + 5 asset-servicing + 2 insurance).
+- **World B clean** — `scripts/world-b-check.sh`: CRITICAL 0 / REVIEW 0 (scans gateway Java **and**
+  `resources/prompts`); 18 agent manifests across 4 domains (7 wealth-management + 7 asset-servicing
+  + 3 insurance + 1 HR).
 - **Four demo beats** pass end-to-end (hero, resilience, deny, clarification) + multi-turn.
 - **Insurance entitlement** (uw_sam allow/deny) proves the authz model on a second domain.
 - **Glass-box** renders the full live trace (Connected, per-agent latencies, HTTP+MCP).
@@ -240,11 +259,11 @@ passed — virtual-thread gateway handled concurrent streaming with zero failure
 
 | Symptom | Cause / fix |
 |---|---|
-| LibreChat shows a blank reply | SSE format / gateway down — `docker compose ps gateway`; check `/v1/models`. |
+| Conduit Chat shows a blank reply | SSE format / gateway down — `docker compose ps gateway`; check `/v1/models`. |
 | Everything denied for a user | Principals not seeded — run `scripts/seed-users.sh` (Redis was wiped). |
 | Glass-box stuck "Connecting/Reconnecting" | Gateway restarting, or `CONDUIT_GLASSBOX_ALLOWED_ORIGINS` too strict (default `*`). Reload after gateway is healthy. |
 | Glass-box "Waiting for a request" after sending | It only shows traces that arrive *after* it connects — confirm "Connected", then send. |
-| Langfuse trace shows no logs for a convo | LibreChat doesn't forward a conversation id; the gateway derives its own `conv-…`. Grab it from gateway logs and search Langfuse/Loki by that. |
+| Langfuse trace shows no logs for a convo | If an OpenAI-compatible client doesn't forward a conversation id, the gateway derives its own `conv-…`. Grab it from gateway logs and search Langfuse/Loki by that. |
 | Grafana "No data" on first run | Click "Run query" a second time. |
 | Continuous eval scores all 0.50 | LLM judge failing (rate limit / balance) — check `JUDGE_*`; the funnel falls back to 0.5 only after exhausting retries. |
 | Insurance queries denied for uw_sam | Re-seed (`uw_sam`) + ensure Cerbos loaded the insurance segment line (`docker compose restart cerbos`). |

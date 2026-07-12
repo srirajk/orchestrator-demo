@@ -37,9 +37,15 @@ typing a domain name, client/entity name, ID pattern (`REL-`/`POL-`…), entity-
 user-facing domain copy into gateway code — stop; it belongs in a manifest.
 
 The invariants live in [`.claude/rules/world-b.md`](.claude/rules/world-b.md) (always in
-context). Before declaring any gateway work done, run **`scripts/world-b-check.sh`** — it greps
-`gateway/src/main/java` for domain coupling and must report **CRITICAL: 0**. Your change must
-not increase that count.
+context). Before declaring any gateway work done, run **`scripts/world-b-check.sh`** — the
+deterministic gate. It greps for domain coupling across **both** `gateway/src/main/java`
+(comment-stripped) **and** `gateway/src/main/resources/prompts`, so the externalized LLM prompts
+stay inside the gate and cannot smuggle domain knowledge out of it. It must report **CRITICAL: 0**,
+and your change must not increase that count.
+
+The manifest loader is the second half of the safety net: domain + sub-domain manifests are
+schema-validated at load, and a malformed one **fails startup / exits the container** — no silent
+drop (`DomainManifestStore.validateSchema` throws → Spring fails to start).
 
 ## 3. Locked stack — no substitutions
 
@@ -132,7 +138,9 @@ j. **Instrument from the first outbound call.** OTel trace context threads throu
 ## 6. How to extend — add a business domain (the World B workflow)
 
 1. Write the domain manifest (`registry/domains/<domain>.json`) — entity types, coverage-service
-   URLs, user-facing copy.
+   URLs, user-facing copy, and `domain_context` (the assistant framing the gateway composes from
+   the loaded domains). Domain + sub-domain manifests are schema-validated at load; a malformed one
+   fails container startup (`DomainManifestStore`).
 2. Write each agent manifest (`registry/manifests/<id>.json`), validated against the pinned
    `agent-manifest.schema.json` (keep all three copies in sync — see §5).
 3. Stand up the agent service(s) and a coverage service (book-of-business).
@@ -143,7 +151,8 @@ j. **Instrument from the first outbound call.** OTel trace context threads throu
    deregistered on the next ingest.
 6. Run `scripts/world-b-check.sh` (must stay CRITICAL 0) and `scripts/verify.sh`.
 
-No gateway Java changes. That's the whole point.
+No gateway Java changes — and no gateway config changes (the coverage URL and assistant framing
+now come from the manifest, not `application.yml`). That's the whole point.
 
 ## 7. Verify & run
 

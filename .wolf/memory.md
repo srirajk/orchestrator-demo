@@ -3092,3 +3092,34 @@
 | 09:58 | Session end: 218 writes across 71 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 105 reads | ~414618 tok |
 | 10:11 | Session end: 218 writes across 71 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 105 reads | ~414618 tok |
 | 10:17 | Session end: 218 writes across 71 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 105 reads | ~414618 tok |
+| 10:26 | Session end: 218 writes across 71 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 105 reads | ~414618 tok |
+| 10:30 | Session end: 218 writes across 71 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 105 reads | ~414618 tok |
+| 10:33 | Session end: 218 writes across 71 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 109 reads | ~419511 tok |
+| 10:38 | Session end: 218 writes across 71 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 173 reads | ~475989 tok |
+| 10:39 | Created docs/AGENT-MANIFEST-SPECIFICATION.md | — | ~16816 |
+| 10:41 | Session end: 219 writes across 72 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 177 reads | ~506557 tok |
+| 10:44 | Created docs/GATEWAY-INTERNALS.md | — | ~18148 |
+
+| 10:44 | wrote docs/GATEWAY-INTERNALS.md — self-contained gateway engine bible (10 sections + known-bugs) | docs/GATEWAY-INTERNALS.md | done (~8.5k words, path:line grounded, no prose sub-links) | ~40k |
+| 10:45 | Session end: 220 writes across 73 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 177 reads | ~526001 tok |
+| 10:46 | Edited CLAUDE.md | 2→4 lines | ~92 |
+| 10:46 | Edited CLAUDE.md | 1→2 lines | ~46 |
+| 10:46 | Session end: 222 writes across 74 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 178 reads | ~529014 tok |
+| 10:46 | Edited CLAUDE.md | expanded (+6 lines) | ~208 |
+| 10:47 | Edited docs/OPERATOR-RUNBOOK.md | 4→4 lines | ~89 |
+| 10:47 | Edited docs/OPERATOR-RUNBOOK.md | 7→8 lines | ~122 |
+| 10:48 | Edited docs/OPERATOR-RUNBOOK.md | 5→5 lines | ~314 |
+| 10:48 | Edited docs/OPERATOR-RUNBOOK.md | 10→13 lines | ~483 |
+| 10:48 | Edited docs/OPERATOR-RUNBOOK.md | 8→10 lines | ~161 |
+| 10:48 | Edited docs/OPERATOR-RUNBOOK.md | 1→2 lines | ~40 |
+| 10:49 | Edited docs/OPERATOR-RUNBOOK.md | "Connected" → "rm_jane" | ~26 |
+| 10:49 | Edited docs/OPERATOR-RUNBOOK.md | expanded (+8 lines) | ~327 |
+| 10:49 | Edited docs/OPERATOR-RUNBOOK.md | modified rail() | ~72 |
+| 10:49 | Edited docs/OPERATOR-RUNBOOK.md | 2→3 lines | ~60 |
+| 10:50 | Edited docs/OPERATOR-RUNBOOK.md | inline fix | ~22 |
+| 10:50 | Edited docs/OPERATOR-RUNBOOK.md | inline fix | ~31 |
+| 10:50 | Edited docs/OPERATOR-RUNBOOK.md | "t forward a conversation " → "t forward a conversation " | ~56 |
+| 10:51 | Edited docs/OPERATOR-RUNBOOK.md | alone() → domain() | ~163 |
+| 10:52 | Edited docs/WORLD-B-LOCKDOWN.md | modified open() | ~715 |
+| 10:52 | Edited docs/WORLD-B-LOCKDOWN.md | 2→4 lines | ~102 |
+| 10:56 | Edited docs/GATEWAY-INTERNALS.md | 18→22 lines | ~418 |
