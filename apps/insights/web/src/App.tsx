@@ -581,10 +581,7 @@ function AgentsView({ boards, onNavigate }: { boards: Record<number, Board>; onN
         <PanelShell className="col7" title="Runtime & resilience" badge="↗ Grafana">
           <div className="runs">
             <Runbox label="Virtual threads active" value={formatValue(panel(reliability, 'jvm_threads')?.value, panel(reliability, 'jvm_threads')?.unit)} />
-            <Runbox
-              label="Bulkhead exec / queued"
-              value={`${formatValue(panel(reliability, 'bulkhead_executing')?.value, panel(reliability, 'bulkhead_executing')?.unit)} / ${formatValue(panel(reliability, 'bulkhead_queued')?.value, panel(reliability, 'bulkhead_queued')?.unit)}`}
-            />
+            <Runbox label="Bulkhead exec / queued" value={bulkheadValue(reliability)} />
             <Runbox label="Open breakers" value={formatValue(panel(reliability, 'breakers_open')?.value, panel(reliability, 'breakers_open')?.unit)} />
             <Runbox label="Error rate" value={formatValue(panel(reliability, 'error_rate')?.value, panel(reliability, 'error_rate')?.unit)} />
           </div>
@@ -1139,7 +1136,7 @@ function CostBars({ empty, rows }: { empty: string; rows: CostSlice[] }) {
 function BarRow({ label, value, width }: { label: string; value: string; width: number }) {
   return (
     <div className="bar">
-      <span className="bl">{label}</span>
+      <span className="bl" title={label}>{label}</span>
       <div className="track">
         <div className="fill" style={{ width: `${Math.max(4, Math.min(100, width))}%` }} />
       </div>
@@ -1495,6 +1492,15 @@ function formatValue(value: unknown, unit?: string): string {
   if (unit === 'usd') return currency(number)
   if (unit === 'ms') return number >= 1000 ? `${(number / 1000).toFixed(2)}s` : `${Math.round(number)}ms`
   return compactNumber(number)
+}
+
+// Bulkhead is a paired gauge (executing / queued). When Grafana reports neither, show one honest
+// "Unavailable" rather than "N/A / N/A"; when only one side is present, render it and mark the gap.
+function bulkheadValue(reliability: Board | undefined): string {
+  const exec = panel(reliability, 'bulkhead_executing')
+  const queued = panel(reliability, 'bulkhead_queued')
+  if (exec?.value == null && queued?.value == null) return 'Unavailable'
+  return `${formatValue(exec?.value, exec?.unit)} / ${formatValue(queued?.value, queued?.unit)}`
 }
 
 function formatMaybeMs(value: string): string {
