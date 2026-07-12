@@ -352,10 +352,10 @@ function InsightsPlane({ initialBoard, session }: { initialBoard: Board; session
         {!error && loading && <SystemNotice tag="Syncing" message="Loading live Insights telemetry from the gateway." />}
 
         <section className={clsx('view', activeView === 'ov' && 'on')}>
-          <OverviewView boards={boards} cost={cost} range={range} onNavigate={setActiveView} />
+          <OverviewView boards={boards} cost={cost} range={range} onNavigate={setActiveView} onLoadTrace={loadTrace} />
         </section>
         <section className={clsx('view', activeView === 'tr' && 'on')}>
-          <TrustView boards={boards} />
+          <TrustView boards={boards} onLoadTrace={loadTrace} />
         </section>
         <section className={clsx('view', activeView === 'ag' && 'on')}>
           <AgentsView boards={boards} onNavigate={setActiveView} />
@@ -373,7 +373,7 @@ function InsightsPlane({ initialBoard, session }: { initialBoard: Board; session
           <ByUserSpendQualityView cost={cost} boards={boards} selectedLabel={selectedUser} onSelectUser={setSelectedUser} />
         </section>
         <section className={clsx('view', activeView === 'ua' && 'on')}>
-          <ByUserAuditView cost={cost} boards={boards} selectedLabel={selectedUser} onSelectUser={setSelectedUser} onNavigate={setActiveView} />
+          <ByUserAuditView cost={cost} boards={boards} selectedLabel={selectedUser} onSelectUser={setSelectedUser} onNavigate={setActiveView} onLoadTrace={loadTrace} />
         </section>
         <section className={clsx('view', activeView === 'iv' && 'on')}>
           <InvestigateView trace={trace} loading={traceLoading} error={traceError} onLoadTrace={loadTrace} />
@@ -419,11 +419,13 @@ function OverviewView({
   boards,
   cost,
   onNavigate,
+  onLoadTrace,
   range,
 }: {
   boards: Record<number, Board>
   cost: CostSummary | null
   onNavigate: (view: ViewId) => void
+  onLoadTrace: (conversationId: string) => void
   range: RangeKey
 }) {
   const overview = boards[1]
@@ -483,7 +485,7 @@ function OverviewView({
           {ledgerRows.length > 0 ? (
             <div className="feed">
               {ledgerRows.slice(0, 7).map((row, index) => (
-                <DecisionRow key={rowKey(row, index)} row={row} onClick={() => onNavigate('iv')} />
+                <DecisionRow key={rowKey(row, index)} row={row} onClick={() => onNavigate('iv')} onLoadTrace={onLoadTrace} />
               ))}
             </div>
           ) : (
@@ -502,7 +504,7 @@ function OverviewView({
   )
 }
 
-function TrustView({ boards }: { boards: Record<number, Board> }) {
+function TrustView({ boards, onLoadTrace }: { boards: Record<number, Board>; onLoadTrace: (conversationId: string) => void }) {
   const governance = boards[3]
   const decisions = panel(governance, 'decisions_24h')
   const allowRate = panel(governance, 'allow_rate')
@@ -531,7 +533,7 @@ function TrustView({ boards }: { boards: Record<number, Board> }) {
           {ledgerRows.length > 0 ? (
             <div className="feed">
               {ledgerRows.slice(0, 8).map((row, index) => (
-                <DecisionRow key={rowKey(row, index)} row={row} />
+                <DecisionRow key={rowKey(row, index)} row={row} onLoadTrace={onLoadTrace} />
               ))}
             </div>
           ) : (
@@ -782,14 +784,42 @@ function UserPicker({
   )
 }
 
-function UserIdentityCard({ selected }: { selected: CostSlice | undefined }) {
+function UserIdentityCard({
+  rank,
+  selected,
+  shareOfSpend,
+  spendVsTop,
+  total,
+}: {
+  rank?: number
+  selected: CostSlice | undefined
+  shareOfSpend?: number | null
+  spendVsTop?: number | null
+  total?: number
+}) {
+  const showRank = Boolean(selected) && rank !== undefined && rank > 0 && total !== undefined && total > 0
+
   return (
     <div className="card user-card">
       <div className="user-head">
         <span>{initialsFor(selected?.label ?? 'IA')}</span>
         {selected ? formatLabel(selected.label) : 'No user selected'}
+        {showRank ? <span className="rank-badge">#{rank} of {total} by spend</span> : null}
       </div>
-      <div className="user-meta">Per-principal analytics from live cost telemetry.</div>
+      <div className="user-meta">
+        {selected && shareOfSpend !== undefined && shareOfSpend !== null
+          ? `${percent(shareOfSpend)} of desk spend`
+          : 'Per-principal analytics from live cost telemetry.'}
+      </div>
+      {selected && spendVsTop !== undefined && spendVsTop !== null ? (
+        <div className="bar user-bar">
+          <span className="bl">vs top spender</span>
+          <div className="track">
+            <div className="fill" style={{ width: `${Math.max(4, Math.min(100, spendVsTop * 100))}%` }} />
+          </div>
+          <span className="bv">{percent(spendVsTop)}</span>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -809,12 +839,37 @@ function ByUserSpendQualityView({
   const selected = users.find((user) => user.label === selectedLabel) ?? users[0]
   const qualityScores = labeledRows(panel(boards[7], 'eval_scores')?.rows)
 
+  // Honest per-user derivations — computed from the already-fetched cost slice + totals.
+  const totalCostUsd = cost?.totalCostUsd ?? 0
+  const shareOfSpend = selected && totalCostUsd > 0 ? selected.costUsd / totalCostUsd : null
+  const rankedBySpend = [...users].sort((a, b) => b.costUsd - a.costUsd)
+  const rank = selected ? rankedBySpend.findIndex((user) => user.label === selected.label) + 1 : 0
+  const maxUserCostUsd = users.reduce((max, user) => Math.max(max, user.costUsd), 0)
+  const spendVsTop = selected && maxUserCostUsd > 0 ? selected.costUsd / maxUserCostUsd : null
+  const costPerQuestion = selected && selected.count > 0 ? selected.costUsd / selected.count : null
+  const tokensPerQuestion = selected && selected.count > 0 ? selected.tokens / selected.count : null
+
   return (
     <>
       <UserPicker users={users} selected={selected} onSelect={onSelectUser} />
-      <div className="strip user-strip">
-        <UserIdentityCard selected={selected} />
-        <KpiCard label="Cost" value={selected ? currency(selected.costUsd) : collecting()} detail="current range" />
+      <div className="strip user-strip spend-strip">
+        <UserIdentityCard
+          selected={selected}
+          rank={rank}
+          total={users.length}
+          shareOfSpend={shareOfSpend}
+          spendVsTop={spendVsTop}
+        />
+        <KpiCard
+          label="Cost"
+          value={selected ? currency(selected.costUsd) : collecting()}
+          detail={shareOfSpend !== null ? `${percent(shareOfSpend)} of desk spend` : 'current range'}
+        />
+        <KpiCard
+          label="$ / question"
+          value={costPerQuestion !== null ? currency(costPerQuestion) : collecting()}
+          detail={tokensPerQuestion !== null ? `${compactNumber(tokensPerQuestion)} tokens / question` : 'this user'}
+        />
         <KpiCard label="Questions" value={selected ? compactNumber(selected.count) : collecting()} detail="reported requests" />
         <KpiCard label="Avg grounding" value={formatScore(scoreFor(qualityScores, 'grounding'))} detail={qualityScores.length ? 'global score only' : 'no user endpoint'} />
       </div>
@@ -841,12 +896,14 @@ function ByUserAuditView({
   boards,
   cost,
   onNavigate,
+  onLoadTrace,
   onSelectUser,
   selectedLabel,
 }: {
   boards: Record<number, Board>
   cost: CostSummary | null
   onNavigate: (view: ViewId) => void
+  onLoadTrace: (conversationId: string) => void
   onSelectUser: (label: string) => void
   selectedLabel: string | null
 }) {
@@ -871,7 +928,7 @@ function ByUserAuditView({
           {ledgerRows.length > 0 ? (
             <div className="feed">
               {ledgerRows.slice(0, 8).map((row, index) => (
-                <DecisionRow key={rowKey(row, index)} row={row} onClick={() => onNavigate('iv')} />
+                <DecisionRow key={rowKey(row, index)} row={row} onClick={() => onNavigate('iv')} onLoadTrace={onLoadTrace} />
               ))}
             </div>
           ) : (
@@ -1288,13 +1345,20 @@ function Runbox({ label, value }: { label: string; value: string }) {
   )
 }
 
-function DecisionRow({ onClick, row }: { onClick?: () => void; row: TableRecord }) {
+function DecisionRow({ onClick, onLoadTrace, row }: { onClick?: () => void; onLoadTrace?: (conversationId: string) => void; row: TableRecord }) {
   const principal = stringField(row, ['principal', 'user', 'username', 'subject', 'actor']) ?? 'principal'
   const status = stringField(row, ['decision', 'outcome', 'status', 'result']) ?? 'recorded'
   const resource = stringField(row, ['resource', 'resourceId', 'resource_type', 'domain', 'agent']) ?? summarizeRow(row)
+  const traceId = stringField(row, ['conversationId', 'requestId', 'id'])
+  const clickable = Boolean((traceId && onLoadTrace) || onClick)
+
+  function handleClick() {
+    if (traceId && onLoadTrace) onLoadTrace(traceId)
+    else onClick?.()
+  }
 
   return (
-    <button type="button" className={clsx('row', onClick && 'clk')} onClick={onClick}>
+    <button type="button" className={clsx('row', clickable && 'clk')} onClick={handleClick}>
       <span className="av">{initialsFor(principal)}</span>
       <span className="q">
         <b>{formatLabel(principal)}</b> · <span className="t">{resource}</span>

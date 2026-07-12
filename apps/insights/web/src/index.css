@@ -329,6 +329,10 @@ svg {
   grid-template-columns: 1.4fr 1fr 1fr 1fr;
 }
 
+.spend-strip {
+  grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr;
+}
+
 .card {
   padding: 15px 16px;
   border: 1px solid var(--line);
@@ -1185,6 +1189,30 @@ svg {
   margin-top: 9px;
   color: var(--muted);
   font-size: 12px;
+}
+
+.rank-badge {
+  margin-left: auto;
+  padding: 2px 8px;
+  border: 1px solid rgba(232, 191, 79, 0.35);
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(232, 191, 79, 0.12), rgba(232, 191, 79, 0.04));
+  color: var(--gold);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.user-bar {
+  margin: 12px 0 0;
+  grid-template-columns: 84px 1fr 44px;
+  gap: 10px;
+}
+
+.user-bar .bl,
+.user-bar .bv {
+  font-size: 11px;
 }
 
 .replay-heading {
