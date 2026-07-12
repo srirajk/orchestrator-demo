@@ -4,6 +4,8 @@
 
 **White Paper | Version 1.5 | July 2026**
 
+**Author | Sriraj Kadimisetty**
+
 ![Illustrative banking relationship request flowing through Conduit to selected domain capabilities and a grounded response](assets/conduit-banking-relationship-flow.jpg)
 
 *Figure 1. Illustrative banking scenario: Conduit coordinates selected capabilities across independently

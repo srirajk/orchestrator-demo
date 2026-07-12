@@ -64,10 +64,17 @@ def cover_page() -> bytes:
     c.setFont("Helvetica", 10)
     c.drawString(42, 668, "A governed architecture for independently owned domain intelligence")
 
+    c.setFillColor(OFF_WHITE)
+    c.setFont("Helvetica-Bold", 8.5)
+    c.drawString(42, 649, "Sriraj Kadimisetty")
+    c.setFillColor(MUTED)
+    c.setFont("Helvetica", 7.5)
+    c.drawString(42, 636, "Author")
+
     fit_image(
         c,
         ASSETS / "conduit-banking-relationship-flow.jpg",
-        (72, 78, width - 144, 565),
+        (72, 68, width - 144, 555),
     )
 
     c.setFillColor(GOLD)
@@ -96,9 +103,24 @@ def figure_plate(image: Path, caption: str, figure_number: int) -> bytes:
     c.drawString(82, 44, caption)
     c.setFillColor(MUTED)
     c.setFont("Helvetica", 7)
-    c.drawRightString(width - 25, 22, "CONDUIT | GOVERNED ENTERPRISE INTELLIGENCE")
+    c.drawRightString(width - 25, 22, "SRIRAJ KADIMISETTY | CONDUIT WHITE PAPER")
     c.save()
     return buffer.getvalue()
+
+
+def add_author_footer(page) -> None:
+    """Replace the legacy left footer while preserving the existing page number."""
+    width = float(page.mediabox.width)
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=(width, float(page.mediabox.height)))
+    c.setFillColor(HexColor("#FFFFFF"))
+    c.rect(30, 14, 235, 18, fill=1, stroke=0)
+    c.setFillColor(HexColor("#6B7785"))
+    c.setFont("Helvetica", 6.5)
+    c.drawString(36, 20, "Sriraj Kadimisetty | Conduit White Paper")
+    c.save()
+    overlay = PdfReader(io.BytesIO(buffer.getvalue())).pages[0]
+    page.merge_page(overlay)
 
 
 def main() -> None:
@@ -132,6 +154,7 @@ def main() -> None:
     # Preserve the existing body. Figure plates are intentionally unnumbered,
     # so the body's established logical page numbering remains stable.
     for original_index, page in enumerate(base.pages[1:], start=1):
+        add_author_footer(page)
         writer.add_page(page)
         if original_index == 3:  # after the market-gap opening and local-fragmentation argument
             writer.add_page(federation)
@@ -141,7 +164,7 @@ def main() -> None:
     writer.add_metadata(
         {
             "/Title": "Conduit: From Agent Sprawl to Governed Enterprise Intelligence",
-            "/Author": "Conduit",
+            "/Author": "Sriraj Kadimisetty",
             "/Subject": "Governed enterprise orchestration",
         }
     )
