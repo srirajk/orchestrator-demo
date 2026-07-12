@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-07-12T01:14:36.054Z
-> Files: 1102 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-07-12T04:49:53.338Z
+> Files: 1123 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/
 
@@ -14,7 +14,9 @@
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/
 
+- `fixctrl.py` (~194 tok)
 - `multiturn_probe.py` — tok, ask, classify (~802 tok)
+- `wolf_update.py` (~972 tok)
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/probe/
 
@@ -905,10 +907,14 @@
 - `AGENT-MANIFEST-DEEPDIVE.md` — Agent Manifest Deep-Dive — Completeness, Candidate Additions, Hidden Coupling, Robustness (~5301 tok)
 - `AUDIT-RECORD-SPEC.md` — Audit Record — capture spec (WORM, adapter-based) (~2838 tok)
 - `CLARIFY-ROUTING-DECOUPLE-FIX.md` — Spec: Decouple request disposition from routing confidence (clarify-path class fix) (~1571 tok)
+- `COMPARE-CLARIFY-DESIGN.md` — Compare-CLARIFY — Deterministic clarify on incomplete multi-entity resolution (~5411 tok)
 - `ENTITLEMENT-SWEEP-MATRIX.md` — Entitlement / correctness sweep — v2 (double-hat verified; FOR FINAL REVIEW, not yet run) (~2724 tok)
 - `GATEWAY-PACKAGE-STRUCTURE.md` — Gateway package structure — the convention of record (~1741 tok)
 - `LITMUS-TEST-DESIGN-FABLE.md` — Litmus-Test Design Review — Faithfulness Audit & Minimal Set (Fable) (~6463 tok)
 - `MODEL-SELECTION.md` — Gateway LLM model selection (locked 2026-07-11) (~611 tok)
+- `MULTI-ENTITY-COMPARE-DESIGN.md` — Multi-Entity Compare — Design Spec (~6619 tok)
+- `MULTI-ENTITY-COMPARE-DESIGN.md` — Design spec: per-entity requested groups for multi-client compare (grounding-all-mentions, independent coverage CHECK, capability×entity product, no-leak proof, S10-S12 smoke rows) (~5200 tok)
+- `MULTITURN-SWITCH-ROUTING-FIX.md` — Multi-turn client-switch misroute — validated diagnosis + surgical fix (~4823 tok)
 - `ONBOARDING-DOCS-AUDIT.md` — Onboarding Docs Audit — AGENT-ONBOARDING-HANDBOOK.md + domain-onboarding-standard.md (~7848 tok)
 - `PROMPT-EXTERNALIZATION-DESIGN.md` — Prompt Externalization Design — Framework Conformance & Resource Layout (~7782 tok)
 - `ROUTING-LAYER-CODEX-SOL-REVIEW.md` — Adversarial SOL code-level review of the capability-first routing implementation spec against the current grounding, masking, reranking, pruning, DAG, and eval paths. (~9000 tok)
@@ -918,6 +924,7 @@
 - `ROUTING-LAYER-RECONCILED.md` — Routing layer — reconciled review (Fable + Codex-SOL + Opus) (~1295 tok)
 - `ROUTING-PRECISION-CODEX-SOL-REPORT.md` — Independent architecture verification of routing precision, post-prune intent preservation, corpus contamination, masking, reranking, eval coverage, and World-B compliance. (~7050 tok)
 - `ROUTING-PRECISION-CODEX-VERIFY.md` — Codex verification brief — generic routing precision (flagship design) (~1681 tok)
+- `ROUTING-QUALITY-GAPS.md` — Routing Quality Gaps — Root-Cause Analysis (pre-fix) (~4430 tok)
 
 ## e2e/test-results/.playwright-artifacts-0/traces/
 
@@ -1073,19 +1080,19 @@
 
 ## gateway/src/main/java/ai/conduit/gateway/config/
 
-- `GroundingConfig.java` — Binds the multi-reference grounding budgets from {@code conduit.grounding.*} (routing spec V2.1 / (~307 tok)
+- `GroundingConfig.java` — Binds the multi-reference grounding budgets from {@code conduit.grounding.*} (routing spec V2.1 / (~344 tok)
 - `PromptLoader.java` — Loads the gateway's LLM prompt skeletons from {@code classpath:prompts/**&#47;*.md} once, at bean (~1183 tok)
 - `RoutePreparationConfig.java` — Binds the pre-routing preparation pipeline (routing spec V2 Piece 3) from {@code conduit.routing.*} (~496 tok)
 - `SecurityConfig.java` — Spring Security resource server + role-based URL authorization. (~3859 tok)
 
 ## gateway/src/main/java/ai/conduit/gateway/domain/chat/
 
-- `ChatService.java` — How many recent user turns (including the current one) are concatenated into the routing (~41883 tok)
+- `ChatService.java` — How many recent user turns (including the current one) are concatenated into the routing (~48644 tok)
 - `PreparedRoute.java` — The shared, span-aware output of the pre-routing preparation pipeline (routing spec V2 Piece 3). (~946 tok)
-- `RequestedPlan.java` — The requested-capability-group model (routing spec V2 Piece 4). A request is a set of (~1025 tok)
-- `RouteDecision.java` — The read-only diagnostic view of ONE production pre-routing decision (routing spec V2 Piece 6). (~2470 tok)
+- `RequestedPlan.java` — The requested-capability-group model (routing spec V2 Piece 4). A request is a set of (~1368 tok)
+- `RouteDecision.java` — The read-only diagnostic view of ONE production pre-routing decision (routing spec V2 Piece 6). (~2582 tok)
 - `RoutePreparationPolicy.java` — Config-driven knobs for the pre-routing preparation pipeline (routing spec V2 Piece 3). Bound from (~512 tok)
-- `RoutePreparer.java` — The shared pre-routing preparation pipeline (routing spec V2 Piece 3): one component every (~6043 tok)
+- `RoutePreparer.java` — The shared pre-routing preparation pipeline (routing spec V2 Piece 3): one component every (~6787 tok)
 
 ## gateway/src/main/java/ai/conduit/gateway/domain/clarify/
 
@@ -1093,12 +1100,15 @@
 
 ## gateway/src/main/java/ai/conduit/gateway/domain/coverage/
 
-- `GroundingBudget.java` — Config-driven budgets for multi-reference grounding (routing spec V2.1 / Piece 2). Grounding each (~433 tok)
-- `ReferenceGroundingService.java` — Stage-1 reference grounding — the deterministic, PRE-ROUTING step that resolves a human reference (~7755 tok)
+- `EntityBinding.java` — One entity (one resolved {@code canonicalId} of one manifest {@code entityKey}) that a single turn (~1118 tok)
+- `EntityBindingSet.java` — The per-entity bindings derived from an ALREADY-computed {@link GroundedReferenceSet} — the substrat (~2335 tok)
+- `GroundingBudget.java` — Config-driven budgets for multi-reference grounding (routing spec V2.1 / Piece 2). Grounding each (~553 tok)
+- `ReferenceGroundingService.java` — Stage-1 reference grounding - the deterministic, PRE-ROUTING step that resolves a human reference (~11564 tok)
+- `UnboundReference.java` — One entity reference the user named this turn that the pipeline did NOT bind — the signal that a (~629 tok)
 
 ## gateway/src/main/java/ai/conduit/gateway/domain/intent/
 
-- `IntentClassifier.java` — Stage A of the request pipeline: classifies the user's intent before routing. (~11158 tok)
+- `IntentClassifier.java` — Stage A of the request pipeline: classifies the user's intent before routing. (~11210 tok)
 
 ## gateway/src/main/java/ai/conduit/gateway/domain/manifest/
 
@@ -1177,7 +1187,8 @@
 
 ## gateway/src/main/java/ai/conduit/gateway/synthesis/answer/
 
-- `AnswerSynthesizer.java` — Synthesizes a grounded, streamed answer from agent outputs using Z.AI GLM. (~12908 tok)
+- `AnswerSynthesizer.java` — Synthesizes a grounded, streamed answer from agent outputs using Z.AI GLM. (~14157 tok)
+- `GroundedFigureRenderer.java` — Component: GroundedFigureRenderer (~1870 tok)
 
 ## gateway/src/main/java/ai/conduit/gateway/synthesis/input/
 
@@ -1385,7 +1396,7 @@
 ## gateway/src/main/resources/
 
 - `agent-manifest.schema.json` — Declares used (~4210 tok)
-- `application.yml` — Declares display (~6119 tok)
+- `application.yml` — Declares display (~6388 tok)
 
 ## gateway/src/main/resources/domains/
 
@@ -1418,12 +1429,12 @@
 
 - `answer-synthesizer-history.system.md` (~183 tok)
 - `answer-synthesizer.figures-block.md` — Declares the (~128 tok)
-- `answer-synthesizer.system.md` — Declares a (~590 tok)
+- `answer-synthesizer.system.md` — Declares a (~726 tok)
 - `clarification-composer.default-question.md` (~9 tok)
 - `clarification-composer.system.md` (~361 tok)
 - `entity-extractor.system.md` (~143 tok)
 - `intent-classifier.clarify-rule.md` (~80 tok)
-- `intent-classifier.system.md` (~1196 tok)
+- `intent-classifier.system.md` (~1471 tok)
 - `routing-reranker.system.md` (~395 tok)
 
 ## gateway/src/main/resources/prompts/fragments/
@@ -1440,16 +1451,20 @@
 
 ## gateway/src/test/java/ai/conduit/gateway/domain/chat/
 
+- `ChatServiceCompareClarifyTest.java` — Pure test for the Compare-CLARIFY copy composition ({@link ChatService#composeComparePartial}). The (~992 tok)
+- `ChatServiceEntityCompareTest.java` — Pure unit tests for the multi-entity COMPARE decision logic that lives as static helpers on (~2228 tok)
 - `ChatServiceGroundingClarifyTest.java` — End-to-end (full-context) tests for the clarify-routing decouple through the real {@link ChatService (~2842 tok)
-- `ChatServiceGroupCoverageFailClosedTest.java` — Adversarial full-context tests for the entitlement fail-closed behaviour of the routing-spec V2 (~5152 tok)
+- `ChatServiceGroupCoverageFailClosedTest.java` — Adversarial full-context tests for the entitlement fail-closed behaviour of the routing-spec V2 (~5153 tok)
 - `ChatServiceRequestedGroupTest.java` — End-to-end (full-context) tests for the routing-spec V2 Piece-4 requested-capability-group model and (~4706 tok)
 - `ChatServiceWithheldScopingTest.java` — bug-260: a domain must be labeled "withheld" (outside your access) ONLY when NONE of its selected (~802 tok)
 - `RoutePreparedRoutingTest.java` — Full-context wiring tests for the Piece-3 shared preparation pipeline as it reaches the router. (~2959 tok)
-- `RoutePreparerTest.java` — Unit tests for the Piece-3 preparation pipeline ({@link RoutePreparer}) with the grounding service (~2941 tok)
+- `RoutePreparerTest.java` — Unit tests for the Piece-3 preparation pipeline ({@link RoutePreparer}) with the grounding service (~4073 tok)
 
 ## gateway/src/test/java/ai/conduit/gateway/domain/coverage/
 
-- `ReferenceGroundingMentionsTest.java` — Unit tests for Piece 2 multi-reference grounding ({@link ReferenceGroundingService#groundMentions}): (~5156 tok)
+- `EntityBindingSetTest.java` — Pure derivation tests for {@link EntityBindingSet} — the substrate of multi-entity COMPARE. No Sprin (~2333 tok)
+- `ReferenceGroundingMentionsTest.java` — Unit tests for Piece 2 multi-reference grounding ({@link ReferenceGroundingService#groundMentions}): (~5725 tok)
+- `ReferenceGroundingServiceDetectUnboundTest.java` — Pure tests for {@link ReferenceGroundingService#detectUnboundReferences} — the Compare-CLARIFY predi (~3695 tok)
 - `ReferenceGroundingServiceTest.java` — Unit tests for the Stage-1 reference-grounding lattice — the security-visible core of the (~3281 tok)
 
 ## gateway/src/test/java/ai/conduit/gateway/domain/intent/
@@ -1502,6 +1517,7 @@
 
 ## gateway/src/test/java/ai/conduit/gateway/synthesis/answer/
 
+- `AnswerSynthesizerCompareTest.java` — Multi-entity COMPARE synthesis attribution: two calls to the SAME agent for two clients must produce (~1679 tok)
 - `AnswerSynthesizerGroundingTest.java` — When the synthesizer LLM produces a figure that fails grounding validation, the answer is not (~1010 tok)
 
 ## gateway/src/test/java/ai/conduit/gateway/synthesis/input/
@@ -1550,7 +1566,7 @@
 
 ## gateway/src/test/resources/domains/wealth-management/
 
-- `private-banking.json` (~769 tok)
+- `private-banking.json` (~857 tok)
 
 ## htmls/
 
@@ -1982,7 +1998,7 @@
 
 ## registry/domains/wealth-management/
 
-- `private-banking.json` (~769 tok)
+- `private-banking.json` (~936 tok)
 
 ## registry/manifests/
 
@@ -2013,7 +2029,7 @@
 - `seed-demo.sh` — Meridian Gateway — Phoenix/Tempo demo seed (~176 tok)
 - `seed-langfuse-dashboard.sh` — Idempotently seeds the "Conduit — LLM Quality & Cost" Langfuse dashboard by applying seed-data/langfuse-dashboard.sql to Langfuse Postgres. Env-driven (LANGFUSE_DB_*); uses psql (now in the seeder image) else `docker exec`. Called as step (f) of seed-all.sh. (~500 tok)
 - `seed-users.sh` — Idempotently seed demo principals into Redis. PRINCIPALS ONLY now (price/convo/dataset/dashboard tails moved to seed-all.sh). Runs as seed-all.sh step (b) and standalone on host. (~700 tok)
-- `smoke-route.sh` — smoke-route.sh — trace-truth routing + entitlement smoke. (~1321 tok)
+- `smoke-route.sh` — smoke-route.sh — trace-truth routing + entitlement smoke. (~3302 tok)
 - `smoke-ui.sh` — Tier-1 fast gate (invoked first by smoke.sh): 10 health URLs 200, CORS preflights per browser origin (chat→BFF :8099, admin→iam :5182→:8084), 4 personas mint JWT. No LLM/sleeps; exit=#failures. (~550 tok)
 - `smoke.sh` — smoke.sh — full API/CLI smoke for Conduit. Run against a live stack (docker compose up). (~1818 tok)
 - `verify-telemetry-e2e.sh` — ───────────────────────────────────────────────────────────────────────────── (~1151 tok)
@@ -2121,6 +2137,12 @@
 ## user-mgmt/tests/
 
 - `AgentManifestFigureFormatEnumTest.java` — test: figures[].format enum rejects bogus values, accepts all supported formats (~600 tok)
+- `domain/chat/ChatServiceEntityCompareTest.java` — Pure tests for the COMPARE decision statics: memo id-equality guard (security anchor), no-leak scan filter, expandPerEntity caps/product/inert. (~1000 tok)
+- `domain/coverage/EntityBinding.java` — One resolved entity (canonicalId + user verbatim + its grounded interpretations) that a turn named explicitly; the fan-out unit of multi-entity COMPARE. (~700 tok)
+- `domain/coverage/EntityBindingSet.java` — Derives per-entity bindings from an already-computed GroundedReferenceSet (zero new coverage calls); latest-turn EXPLICIT only; multiEntity = dominant entityKey has >=2 distinct ids. derive()=>=2 gate (compare); deriveAll()=single-binding-capable (Compare-CLARIFY predicate). (~1300 tok)
+- `domain/coverage/UnboundReference.java` — One user-named entity reference the pipeline did NOT bind (Compare-CLARIFY signal). verbatim=user's own words (only field rendered, SECURITY); resolvedId=Tier-B guard only, never disclosed. (~500 tok)
+- `domain/coverage/EntityBindingSetTest.java` — Pure derivation tests for EntityBindingSet (anaphora/prior-turn excluded, same-id dedupe, DENIED/UNAVAILABLE bind, NOT_FOUND/AMBIGUOUS don't). (~900 tok)
 - `DomainManifestStoreContextTest.java` — test: composedDomainContext joins domain_context by domain_id, neutral fallback (~600 tok)
 - `DomainManifestStoreValidationTest.java` — test: malformed domain/sub-domain manifests fail loud (schema validation) instead of silent drop (~700 tok)
+- `synthesis/answer/AnswerSynthesizerCompareTest.java` — Entity-qualified DATA headers, WITHHELD ENTITY (verbatim+manifest copy, no canonical leak), cap note, figure sourceAgent=nodeId. (~800 tok)
 - `test_user_mgmt.py` — Tests: jwks_has_correct_structure, jwks_e_is_65537, jwks_n_length, issue_token_returns_rs256_jwt + 20 more (~7203 tok)

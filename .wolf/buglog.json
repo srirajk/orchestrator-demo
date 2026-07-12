@@ -4716,5 +4716,186 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-07-11"
+  },
+  {
+    "id": "bug-262",
+    "timestamp": "2026-07-11T22:30:00.000Z",
+    "error_message": "Multi-turn client SWITCH misroutes: after Whitman turns, 'show me the Calderon Trust holdings' routes to meridian.wealth.concentration instead of meridian.wealth.holdings",
+    "file": "gateway/src/main/java/ai/conduit/gateway/domain/chat/RoutePreparer.java",
+    "root_cause": "LLM greedily extracted the facet noun into the reference verbatim ('Calderon Trust holdings'); the entity mask faithfully masked the whole greedy span, deleting the capability word 'holdings'. The near-empty latest turn ('show me the the subject') then correctly triggered widen-to-history, which routed on the prior turn's 'concentration' text.",
+    "fix": "Threaded the resolver's canonical_name (CoverageResolveResult.canonicalName) through the grounding lattice (LatticeOutcome + GroundedInterpretation), and in RoutePreparer.prepare tighten the mask needle to the canonical name when it is a PROVABLE proper sub-phrase of the verbatim (MentionAligner.align != null and normalized canonical != normalized verbatim); skip the recorded greedy span for tightened mentions so only the name region is masked and the action word survives. On any miss (no sole canonical, no sub-phrase alignment, equality) falls back byte-identical to masking the full verbatim. Prompt hardening in intent-classifier.system.md + IntentClassifier scalar rule (belt).",
+    "tags": [
+      "routing",
+      "multi-turn",
+      "masking",
+      "world-b",
+      "grounding",
+      "canonical-name"
+    ],
+    "related_bugs": [
+      "bug-261"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-07-11"
+  },
+  {
+    "id": "bug-275",
+    "timestamp": "2026-07-12T02:55:00Z",
+    "error_message": "Multi-entity compare ('Compare Calderon's concentration to Whitman's') returns generic clarify; ABSTAIN at topScore ~0.31",
+    "file": "gateway/src/main/resources/prompts/entity-extractor.system.md",
+    "root_cause": "LLM entity extractor fragile on possessive/coordinated names: extracts 0 mentions or mis-types bare surname as fund; grounding never calls RESOLVE; names stay unmasked; embedding lands in junk band < routing.min-score 0.40 (AgentResolver.java:309); rerank pick cannot override absolute floor. RESOLVE itself handles bare surnames fine (alias substring).",
+    "fix": "NOT YET FIXED - root cause documented in docs/specs/ROUTING-QUALITY-GAPS.md; fix order: extractor prompt hardening, tightening fallback, per-entity groups",
+    "tags": [
+      "routing",
+      "extraction",
+      "masking",
+      "abstain",
+      "multi-entity"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-12"
+  },
+  {
+    "id": "bug-276",
+    "timestamp": "2026-07-12T02:55:00Z",
+    "error_message": "'compare Whitman's performance and risk profile' masks to 'compare the subject' - capability words swallowed; rerank 'multiple' starved",
+    "file": "gateway/src/main/java/ai/conduit/gateway/domain/chat/RoutePreparer.java",
+    "root_cause": "Greedy extractor verbatim resolved via coverage alias substring match, but needle tightening (RoutePreparer.java:122-124) requires canonical name to align as sub-phrase of verbatim; 'Whitman Family Office' does not align inside \"Whitman's performance and risk profile\" so whole span masked, facet nouns destroyed, topScore 0.305, reranker abstains",
+    "fix": "NOT YET FIXED - proposed deterministic fallback: align longest canonical prefix/token subsequence ('Whitman') and mask only that; see docs/specs/ROUTING-QUALITY-GAPS.md",
+    "tags": [
+      "routing",
+      "masking",
+      "needle-tightening",
+      "rerank-multiple"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-12"
+  },
+  {
+    "id": "bug-compare-ctrlbyte",
+    "timestamp": "2026-07-11T23:49:42.793300",
+    "error_message": "world-b-check risk: a control byte (\\u0001) was inserted into EntityBindingSet.java where an empty string separator was intended (Edit produced \"\\x01\" instead of \"::\").",
+    "file": "gateway/src/main/java/ai/conduit/gateway/domain/coverage/EntityBindingSet.java",
+    "root_cause": "Writing a map key separator as two adjacent double-quotes rendered as a literal 0x01 control char in the file (recurrence of the known NUL/control-byte-in-edits class).",
+    "fix": "Replaced with a printable '::' separator via a byte-safe Python rewrite; added a control-byte scan over all new/edited files (all clean).",
+    "tags": [
+      "world-b",
+      "control-byte",
+      "multi-entity-compare",
+      "edit-hazard"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-11T23:49:42.793304"
+  },
+  {
+    "id": "bug-277",
+    "timestamp": "2026-07-12T00:20:00Z",
+    "error_message": "Multi-entity COMPARE silently drops a VALID (covered) client when the query can't resolve all named entities. rm_jane (covers Whitman REL-00042 AND Calderon REL-00099): 'compare ... Whitman ... and the Calderon account' -> Calderon dropped, one-sided SERVED; 'compare Whitman's concentration and Calderon's' -> both dropped, ABSTAIN. NOT coverage-dependent (fails for covered clients too); phrasing-dependent (alias/possessive/coordinated second entity). Only clean full-name 'compare X and Y' resolves both.",
+    "file": "gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java",
+    "root_cause": "The extractor (gpt-4.1-nano) misses the second entity on possessive/alias/coordinated phrasings, so it never resolves to a binding. The compare feature only handles resolved+covered (SERVED) and resolved+denied (PARTIAL) \u2014 it has NO branch for 'named but unresolved', so it silently degrades to one-sided SERVED or ABSTAIN. Chasing perfect extraction is whack-a-mole (endless phrasings).",
+    "fix": "OPEN \u2014 primary fix is [[bug-278]] clarify-on-incomplete-resolution (Sriraj's insight): when named>=2 but resolved fewer, CLARIFY (name what we found, ask about what we couldn't) instead of silently dropping/abstaining. Deterministic, World-B clean. Design validated in docs/specs/COMPARE-CLARIFY-DESIGN.md. Compare feature is IMPLEMENTED+verified (no-leak airtight) but HELD (uncommitted) pending this fix so it never silently drops a valid client.",
+    "tags": [
+      "routing",
+      "compare",
+      "multi-entity",
+      "extractor",
+      "silent-drop",
+      "held",
+      "flagship"
+    ],
+    "related_bugs": [
+      "bug-278",
+      "bug-273"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-07-12T00:20:00Z"
+  },
+  {
+    "id": "bug-278",
+    "timestamp": "2026-07-12T00:20:00Z",
+    "error_message": "FEATURE/fix: clarify-on-incomplete-resolution. When a request names >=2 distinct entities but the gateway resolves fewer into bindings, it should CLARIFY deterministically rather than silently serve one-sided or abstain. Extends the existing single-entity invariant (unresolved -> clarify, never guess) to the multi-entity case.",
+    "file": "gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java",
+    "root_cause": "The multi-entity compare path lacked the 'ask when unsure' branch the single-entity path already has. Detection: an explicit mention that failed to resolve (reliable) or a coordination cue with fewer bindings than implied (harder \u2014 Fable validating). World-B rule 2: CLARIFY is deterministic gateway code; copy from manifest.",
+    "fix": "IN PROGRESS \u2014 Fable validating detection predicate + over-clarify guardrails (COMPARE-CLARIFY-DESIGN.md); then implement + verify (must not over-clarify on single-entity/off-topic/both-resolved; must not regress bug-261/switch/carry/denials). Lands together with the held compare feature so it goes in green.",
+    "tags": [
+      "routing",
+      "compare",
+      "clarify",
+      "world-b",
+      "deterministic",
+      "in-progress"
+    ],
+    "related_bugs": [
+      "bug-277"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-07-12T00:20:00Z"
+  },
+  {
+    "id": "bug-279",
+    "timestamp": "2026-07-12T00:20:00Z",
+    "error_message": "Multi-entity COMPARE answer falls to the deterministic grounded-figure fallback (robotic figure list) on gpt-5-mini synth, so the explicit 'withheld client' message is lost \u2014 the DATA no-leak holds (uncovered client's figures absent) but the answer doesn't clearly SAY it withheld the other client.",
+    "file": "gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java",
+    "root_cause": "Same synth grounded-figure validator label-scoping residual as [[bug-273]] (gpt-5-mini types/reformats a numeral the validator rejects), dropping the narrative \u2014 which for compare also drops the WithheldEntity acknowledgement. Data absence (no-leak) is enforced structurally before synthesis, so this is a UX/messaging gap, not a leak.",
+    "fix": "OPEN follow-up \u2014 tied to bug-273 (validator per-numeral attribution). For compare specifically, ensure the withheld-entity line survives the fallback path (the deterministic fallback template should still include the withhold acknowledgement).",
+    "tags": [
+      "routing",
+      "compare",
+      "synthesizer",
+      "withhold-ux",
+      "grounded-figures",
+      "follow-up"
+    ],
+    "related_bugs": [
+      "bug-273",
+      "bug-277"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-07-12T00:20:00Z"
+  },
+  {
+    "id": "bug-280",
+    "timestamp": "2026-07-12T00:33:12",
+    "error_message": "Multi-entity COMPARE fails silently when the 2nd entity reference doesn't bind: alias form ('the Calderon account') -> one-sided SERVED with no withhold/clarify; possessive both -> ABSTAIN. Hits valid covered clients.",
+    "file": "gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java",
+    "root_cause": "Extractor (gpt-4.1-nano) flakily drops/mis-types alias+possessive 2nd mentions; a mention with zero manifest interpretations never reaches RESOLVE, forms no EntityBinding, and nothing downstream detects named>bound (verified live: mentionCount=4, only Whitman grounded, Calderon never hit wealth-coverage RESOLVE).",
+    "fix": "DESIGNED (not yet implemented): docs/specs/COMPARE-CLARIFY-DESIGN.md \u2014 deterministic CLARIFY when allowedCount>=1 and unbound named references exist (tier-A grounding statuses NOT_FOUND/AMBIGUOUS; tier-B principal-agnostic RESOLVE-confirmation of residual proper-noun phrases, unique-resolve-to-unbound-id only). Hook after expandPerEntity, before disposeGroups.",
+    "tags": [
+      "compare",
+      "multi-entity",
+      "clarify",
+      "extractor-fragility",
+      "grounding",
+      "silent-failure"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-12T00:33:12"
+  },
+  {
+    "id": "bug-281",
+    "timestamp": "2026-07-12T05:05:00Z",
+    "error_message": "Multi-entity COMPARE of the SAME capability ('compare the concentration of Whitman and Calderon') near-tie-ABSTAINS ~75% (topScore ~0.45-0.47). Both clients bind (entity-facet=2) but the resolver abstains on the near-tie BEFORE the entity fan-out, reading two near-identical-scoring groups as ambiguous. The compare's primary shape (same capability, two clients) is unreliable.",
+    "file": "gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java",
+    "root_cause": "expandPerEntity runs on buildRequestedPlan(resolved) AFTER resolveContextual. When two entities share one capability, the masked routing text ('compare the concentration of the subject and the subject') yields two near-identical candidate scores -> the resolver's near-tie/margin abstain fires and returns fallback -> nothing to expand -> ABSTAIN. The margin-abstain is designed for 'which single agent?' and misfires for a compare, where the near-tie IS the intended two-way fan-out.",
+    "fix": "OPEN (blocks merging feat/multi-entity-compare to main). Direction: when the binding set has >=2 explicit entity bindings (a compare), the pre-expansion near-tie/margin abstain must NOT kill the request \u2014 the near-tie candidates are the fan-out targets, not an ambiguity. Likely: detect the compare shape before resolveContextual's abstain, or let expandPerEntity proceed on the near-tie candidate set. Fable-validate the resolver-abstain vs compare-expansion interaction before implementing (it touches the abstain floor \u2014 must not regress S6 off-topic abstain or bug-261).",
+    "tags": [
+      "routing",
+      "compare",
+      "multi-entity",
+      "near-tie-abstain",
+      "resolver",
+      "held",
+      "blocks-merge"
+    ],
+    "related_bugs": [
+      "bug-277",
+      "bug-278"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-07-12T05:05:00Z"
   }
 ]

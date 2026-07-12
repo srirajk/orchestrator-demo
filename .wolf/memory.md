@@ -2949,3 +2949,146 @@
 | 21:14 | Edited docs/AGENT-ONBOARDING-HANDBOOK.md | expanded (+59 lines) | ~2649 |
 | 21:14 | Created docs/domain-onboarding-standard.md | — | ~441 |
 | 21:15 | Rewrote AGENT-ONBOARDING-HANDBOOK to super-solid (audit ONBOARDING-DOCS-AUDIT H1-H13/S1-S10): added §0 quickstart, §3.5 domain/sub-domain+entity_types, §4.1a capability-first masking, §5.5a figures enum, §7.5 coverage contract, rewrote §8 registry-service ingestion+fail-loud, §13 failure catalog, §14 3-level schema ref; retired domain-onboarding-standard.md to pointer stub | docs/AGENT-ONBOARDING-HANDBOOK.md, docs/domain-onboarding-standard.md | done | ~30k |
+| 21:23 | Session end: 125 writes across 45 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 77 reads | ~256889 tok |
+| 21:24 | Session end: 125 writes across 45 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 77 reads | ~256889 tok |
+| 21:26 | Session end: 125 writes across 45 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 77 reads | ~256889 tok |
+| 21:31 | Session end: 125 writes across 45 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 77 reads | ~256889 tok |
+| 21:37 | Session end: 125 writes across 45 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 77 reads | ~256889 tok |
+| 21:55 | Session end: 125 writes across 45 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 77 reads | ~256889 tok |
+| 22:02 | Session end: 125 writes across 45 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 77 reads | ~256889 tok |
+| 22:04 | Session end: 125 writes across 45 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 77 reads | ~256889 tok |
+| 22:06 | Session end: 125 writes across 45 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 77 reads | ~256889 tok |
+| 22:15 | Created docs/specs/MULTITURN-SWITCH-ROUTING-FIX.md | — | ~5144 |
+| 22:15 | Validated multi-turn switch misroute diagnosis (LLM greedy verbatim → over-mask → near-empty widen); wrote fix spec | docs/specs/MULTITURN-SWITCH-ROUTING-FIX.md | root cause pinpointed; canonical-name needle tightening designed | ~60k |
+| 22:18 | Session end: 126 writes across 46 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 88 reads | ~290126 tok |
+| 22:19 | Edited gateway/src/main/java/ai/conduit/gateway/domain/coverage/ReferenceGroundingService.java | 6→6 lines | ~108 |
+| 22:19 | Edited gateway/src/main/java/ai/conduit/gateway/domain/coverage/ReferenceGroundingService.java | modified LatticeOutcome() | ~249 |
+| 22:19 | Edited gateway/src/main/java/ai/conduit/gateway/domain/coverage/ReferenceGroundingService.java | expanded (+7 lines) | ~291 |
+| 22:19 | Edited gateway/src/main/java/ai/conduit/gateway/domain/coverage/ReferenceGroundingService.java | 3→6 lines | ~160 |
+| 22:19 | Edited gateway/src/main/java/ai/conduit/gateway/domain/coverage/ReferenceGroundingService.java | 3→4 lines | ~37 |
+| 22:19 | Session end: 131 writes across 47 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 89 reads | ~296187 tok |
+| 22:20 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/RoutePreparer.java | added 1 condition(s) | ~545 |
+| 22:20 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/RoutePreparer.java | 2→2 lines | ~51 |
+| 22:20 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/RoutePreparer.java | 2→2 lines | ~56 |
+| 22:20 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/RoutePreparer.java | modified maskedJoin() | ~225 |
+| 22:20 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/RoutePreparer.java | modified collectMaskSpans() | ~226 |
+| 22:20 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/RoutePreparer.java | added 3 condition(s) | ~312 |
+| 22:20 | Edited gateway/src/main/resources/prompts/intent-classifier.system.md | inline fix | ~87 |
+| 22:20 | Edited gateway/src/main/java/ai/conduit/gateway/domain/intent/IntentClassifier.java | 5→7 lines | ~181 |
+| 22:21 | Edited gateway/src/test/java/ai/conduit/gateway/domain/chat/RoutePreparerTest.java | modified resolved() | ~392 |
+| 22:21 | Edited gateway/src/test/java/ai/conduit/gateway/domain/chat/RoutePreparerTest.java | 3→3 lines | ~75 |
+| 22:21 | Edited gateway/src/test/java/ai/conduit/gateway/domain/chat/ChatServiceGroupCoverageFailClosedTest.java | 3→3 lines | ~69 |
+| 22:22 | Edited gateway/src/test/java/ai/conduit/gateway/domain/chat/RoutePreparerTest.java | 3→3 lines | ~63 |
+| 22:22 | Edited gateway/src/test/java/ai/conduit/gateway/domain/chat/RoutePreparerTest.java | modified greedyExtraction_masksOnlyCanonicalName_keepsFacetWord() | ~979 |
+| 22:22 | Edited gateway/src/test/java/ai/conduit/gateway/domain/coverage/ReferenceGroundingMentionsTest.java | modified canonicalName_present_onResolvedAndDenied_null_onNonResolving() | ~639 |
+| 22:23 | Edited scripts/smoke-route.sh | modified assert_route_msgs() | ~366 |
+| 22:23 | Session end: 146 writes across 51 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 89 reads | ~300757 tok |
+| 22:23 | Edited scripts/smoke-route.sh | modified SWITCH() | ~510 |
+| 22:24 | Session end: 147 writes across 51 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 89 reads | ~301304 tok |
+| 22:30 | Multi-turn SWITCH routing fix: thread resolver canonicalName through grounding lattice; tighten mask needle to canonical name when it's a proper sub-phrase of greedy verbatim (byte-identical fallback on any miss) | ReferenceGroundingService.java, RoutePreparer.java, IntentClassifier.java, intent-classifier.system.md, RoutePreparerTest.java, ReferenceGroundingMentionsTest.java, ChatServiceGroupCoverageFailClosedTest.java, smoke-route.sh | 36 tests green, world-b CRITICAL 0 | ~9000 |
+| 22:25 | Session end: 147 writes across 51 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 89 reads | ~301304 tok |
+| 22:27 | Session end: 147 writes across 51 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 89 reads | ~301304 tok |
+| 22:38 | Session end: 147 writes across 51 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 89 reads | ~301304 tok |
+| 22:52 | Created docs/specs/ROUTING-QUALITY-GAPS.md | — | ~4725 |
+| 02:55 | Root-caused 3 routing-quality gaps via /debug/route probes + code; wrote spec | docs/specs/ROUTING-QUALITY-GAPS.md | gaps 1&3 share extraction/masking root; floors correct; hypothesis refuted | ~45k |
+| 22:54 | Edited gateway/src/main/resources/prompts/intent-classifier.system.md | expanded (+6 lines) | ~176 |
+| 22:55 | Edited gateway/src/main/resources/prompts/intent-classifier.system.md | inline fix | ~94 |
+| 22:55 | Edited gateway/src/main/resources/prompts/intent-classifier.system.md | 1→2 lines | ~90 |
+| 22:55 | Session end: 151 writes across 52 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 90 reads | ~315824 tok |
+| 22:59 | Session end: 151 writes across 52 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 90 reads | ~315824 tok |
+| 23:15 | Session end: 151 writes across 52 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 93 reads | ~323109 tok |
+| 23:18 | Session end: 151 writes across 52 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 93 reads | ~323109 tok |
+| 23:23 | Created docs/specs/MULTI-ENTITY-COMPARE-DESIGN.md | — | ~7060 |
+| 2026-07-11 | Designed multi-entity compare (per-entity requested groups); live-probed /debug/route: MC-1 both-served substrate works, MC-2/MC-3 order-dependence bug (focal DENIED kills covered sibling) | docs/specs/MULTI-ENTITY-COMPARE-DESIGN.md | design spec written, no code changed | ~60k |
+| 23:25 | Session end: 152 writes across 53 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 94 reads | ~337293 tok |
+| 23:33 | Created gateway/src/main/java/ai/conduit/gateway/domain/coverage/EntityBinding.java | — | ~1118 |
+| 23:33 | Created gateway/src/main/java/ai/conduit/gateway/domain/coverage/EntityBindingSet.java | — | ~1955 |
+| 23:34 | Created ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/fixctrl.py | — | ~194 |
+| 23:34 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/RequestedPlan.java | added 1 import(s) | ~37 |
+| 23:34 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/RequestedPlan.java | modified RequestedGroup() | ~572 |
+| 23:35 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java | modified synthesize() | ~563 |
+| 23:35 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java | 3→4 lines | ~93 |
+| 23:35 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java | added 1 condition(s) | ~382 |
+| 23:35 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java | added 3 condition(s) | ~369 |
+| 23:35 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java | modified WithheldEntity() | ~158 |
+| 23:36 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/answer/GroundedFigureRenderer.java | modified of() | ~294 |
+| 23:36 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/answer/GroundedFigureRenderer.java | modified nodeId() | ~75 |
+| 23:36 | Edited gateway/src/main/resources/prompts/answer-synthesizer.system.md | 1→3 lines | ~269 |
+| 23:36 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | expanded (+13 lines) | ~230 |
+| 23:36 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 2 import(s) | ~66 |
+| 23:36 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | modified GroupCoverage() | ~375 |
+| 23:37 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 1 condition(s) | ~454 |
+| 23:37 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | 6→6 lines | ~126 |
+| 23:37 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | 6→6 lines | ~115 |
+| 23:37 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | modified GUARD() | ~215 |
+| 23:38 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | modified attribution() | ~508 |
+| 23:38 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 1 condition(s) | ~383 |
+| 23:38 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 1 condition(s) | ~353 |
+| 23:38 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | modified fix() | ~357 |
+| 23:38 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | expanded (+8 lines) | ~260 |
+| 23:39 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 5 condition(s) | ~1099 |
+| 23:39 | Session end: 178 writes across 59 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 97 reads | ~357526 tok |
+| 23:40 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 5 condition(s) | ~1680 |
+| 23:40 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | modified expansion() | ~219 |
+| 23:40 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 2 condition(s) | ~635 |
+| 23:40 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 5 condition(s) | ~580 |
+| 23:41 | Edited gateway/src/main/resources/application.yml | 5→10 lines | ~193 |
+| 23:42 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | modified SECURITY() | ~141 |
+| 23:42 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | modified GUARD() | ~206 |
+| 23:42 | Session end: 185 writes across 59 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 97 reads | ~362577 tok |
+| 23:42 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 2 condition(s) | ~396 |
+| 23:42 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | modified expandPerEntity() | ~192 |
+| 23:43 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | inline fix | ~18 |
+| 23:43 | Created gateway/src/test/java/ai/conduit/gateway/domain/coverage/EntityBindingSetTest.java | — | ~2333 |
+| 23:44 | Created gateway/src/test/java/ai/conduit/gateway/domain/chat/ChatServiceEntityCompareTest.java | — | ~2228 |
+| 23:45 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizer.java | modified renderer() | ~294 |
+| 23:46 | Created gateway/src/test/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizerCompareTest.java | — | ~1677 |
+| 23:46 | Edited gateway/src/test/java/ai/conduit/gateway/synthesis/answer/AnswerSynthesizerCompareTest.java | 3→3 lines | ~61 |
+| 23:47 | Edited scripts/smoke-route.sh | modified covered() | ~719 |
+| 23:49 | Created ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/wolf_update.py | — | ~972 |
+| 23:49 | Implemented multi-entity COMPARE (EntityBindingSet + expandPerEntity + per-entity coverage/memo-guard + synthesis attribution + S10-S12 smoke) | ChatService.java, EntityBinding(Set).java, RequestedPlan.java, AnswerSynthesizer.java, GroundedFigureRenderer.java | 326/326 gateway tests pass, world-b CRITICAL 0 | ~large |
+| 23:51 | Session end: 195 writes across 63 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 98 reads | ~373100 tok |
+| 23:59 | Session end: 195 writes across 63 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 98 reads | ~373100 tok |
+| 00:01 | Session end: 195 writes across 63 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 98 reads | ~373100 tok |
+| 00:04 | Session end: 195 writes across 63 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 98 reads | ~373100 tok |
+| 00:12 | Session end: 195 writes across 63 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 98 reads | ~373100 tok |
+| 00:16 | Session end: 195 writes across 63 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 99 reads | ~376077 tok |
+| 00:20 | Session end: 195 writes across 63 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 99 reads | ~376733 tok |
+| 00:27 | Session end: 195 writes across 63 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 99 reads | ~376785 tok |
+| 00:32 | Created docs/specs/COMPARE-CLARIFY-DESIGN.md | — | ~5772 |
+| 00:33 | Validated compare-clarify design: probed alias-2nd silent drop (mentionCount=4, 1 grounded), possessive (0 bindings), resolve FP surface (Office→REL-00042 leak; Trust/Family AMBIGUOUS; junk NOT_FOUND); wrote spec | docs/specs/COMPARE-CLARIFY-DESIGN.md | done | ~60k |
+| 00:35 | Session end: 196 writes across 64 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 101 reads | ~389498 tok |
+| 00:42 | Created gateway/src/main/java/ai/conduit/gateway/domain/coverage/UnboundReference.java | — | ~629 |
+| 00:42 | Edited gateway/src/main/java/ai/conduit/gateway/domain/coverage/EntityBindingSet.java | added 2 condition(s) | ~1230 |
+| 00:42 | Edited gateway/src/main/java/ai/conduit/gateway/domain/coverage/GroundingBudget.java | modified GroundingBudget() | ~289 |
+| 00:43 | Edited gateway/src/main/java/ai/conduit/gateway/config/GroundingConfig.java | 4→6 lines | ~114 |
+| 00:43 | Edited gateway/src/main/java/ai/conduit/gateway/domain/coverage/ReferenceGroundingService.java | added 6 import(s) | ~278 |
+| 00:43 | Edited gateway/src/main/java/ai/conduit/gateway/domain/coverage/ReferenceGroundingService.java | 4→3 lines | ~43 |
+| 00:44 | Edited gateway/src/main/java/ai/conduit/gateway/domain/coverage/ReferenceGroundingService.java | added error handling | ~3505 |
+| 00:44 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | expanded (+9 lines) | ~179 |
+| 00:44 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 3 condition(s) | ~523 |
+| 00:44 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 1 import(s) | ~39 |
+| 00:45 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 2 condition(s) | ~905 |
+| 00:45 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/RouteDecision.java | modified RouteDecision() | ~299 |
+| 00:45 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 2 condition(s) | ~419 |
+| 00:45 | Edited gateway/src/main/java/ai/conduit/gateway/domain/chat/ChatService.java | added 1 condition(s) | ~391 |
+| 00:46 | Edited gateway/src/main/resources/application.yml | modified CLARIFY() | ~236 |
+| 00:46 | Edited registry/domains/wealth-management/private-banking.json | 3→4 lines | ~159 |
+| 00:46 | Edited gateway/src/test/resources/domains/wealth-management/private-banking.json | 3→4 lines | ~130 |
+| 00:48 | Created gateway/src/test/java/ai/conduit/gateway/domain/coverage/ReferenceGroundingServiceDetectUnboundTest.java | — | ~3695 |
+| 00:48 | Created gateway/src/test/java/ai/conduit/gateway/domain/chat/ChatServiceCompareClarifyTest.java | — | ~992 |
+| 00:49 | Edited scripts/smoke-route.sh | modified resolution() | ~497 |
+| 00:49 | Edited scripts/smoke-route.sh | 3→3 lines | ~74 |
+| 00:49 | Edited scripts/smoke-route.sh | 3→3 lines | ~74 |
+| 00:55 | Implemented Compare-CLARIFY: detectUnboundReferences (tier A+B), ChatService hook + decideRoute mirror, compare_partial_resolution manifest key, config+tests+smoke S13/S14 | ReferenceGroundingService.java, EntityBindingSet.java(+deriveAll), UnboundReference.java, ChatService.java, RouteDecision.java, GroundingBudget/Config, application.yml, private-banking.json(x2), smoke-route.sh | world-b CRITICAL 0; 35 unit tests green | ~60k |
+| 00:53 | Session end: 218 writes across 71 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 105 reads | ~414618 tok |
+| 01:00 | Session end: 218 writes across 71 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 105 reads | ~414618 tok |
+| 06:12 | Session end: 218 writes across 71 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 105 reads | ~414618 tok |
+| 06:15 | Session end: 218 writes across 71 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 105 reads | ~414618 tok |
+| 06:29 | Session end: 218 writes across 71 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 105 reads | ~414618 tok |
+| 08:25 | Session end: 218 writes across 71 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 105 reads | ~414618 tok |
+| 09:49 | Session end: 218 writes across 71 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 105 reads | ~414618 tok |
+| 09:54 | Session end: 218 writes across 71 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 105 reads | ~414618 tok |
+| 09:58 | Session end: 218 writes across 71 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 105 reads | ~414618 tok |
+| 10:11 | Session end: 218 writes across 71 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 105 reads | ~414618 tok |
+| 10:17 | Session end: 218 writes across 71 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 105 reads | ~414618 tok |
