@@ -28,7 +28,7 @@ type AppState =
   | { name: 'denied'; session: AuthSession }
   | { name: 'error'; message: string }
 
-type ViewId = 'ov' | 'tr' | 'ag' | 'or' | 'ec' | 'aq' | 'us' | 'iv'
+type ViewId = 'ov' | 'tr' | 'ag' | 'or' | 'ec' | 'aq' | 'us' | 'ua' | 'iv'
 
 type ViewMeta = {
   id: ViewId
@@ -63,7 +63,8 @@ const EVALUATE_VIEWS: ViewMeta[] = [
 ]
 
 const AUDIT_VIEWS: ViewMeta[] = [
-  { id: 'us', icon: '◉', title: 'By user', subtitle: 'Per-principal audit — cost, quality, entitlements, and every conversation' },
+  { id: 'us', icon: '◉', title: 'By user — spend & quality', subtitle: 'Per-principal cost and answer quality' },
+  { id: 'ua', icon: '◍', title: 'By user — audit & conversations', subtitle: 'Per-principal authorization trail and conversation replay' },
   { id: 'iv', icon: '⌕', title: 'Decision replay', subtitle: 'What happened here? — replay any decision by conversation id' },
 ]
 
@@ -219,9 +220,14 @@ function InsightsPlane({ initialBoard, session }: { initialBoard: Board; session
   const [trace, setTrace] = useState<ConversationTrace | null>(null)
   const [traceLoading, setTraceLoading] = useState(false)
   const [traceError, setTraceError] = useState<string | null>(null)
+  const [selectedUser, setSelectedUser] = useState<string | null>(null)
 
   const activeMeta = ALL_VIEWS.find((view) => view.id === activeView) ?? ALL_VIEWS[0]
   const initials = useMemo(() => initialsFor(session.profile.name), [session.profile.name])
+
+  useEffect(() => {
+    if (!selectedUser && cost?.byUser[0]) setSelectedUser(cost.byUser[0].label)
+  }, [cost, selectedUser])
 
   useEffect(() => {
     let cancelled = false
@@ -364,7 +370,10 @@ function InsightsPlane({ initialBoard, session }: { initialBoard: Board; session
           <AnswerQualityView boards={boards} cost={cost} onNavigate={setActiveView} />
         </section>
         <section className={clsx('view', activeView === 'us' && 'on')}>
-          <UserView cost={cost} boards={boards} />
+          <ByUserSpendQualityView cost={cost} boards={boards} selectedLabel={selectedUser} onSelectUser={setSelectedUser} />
+        </section>
+        <section className={clsx('view', activeView === 'ua' && 'on')}>
+          <ByUserAuditView cost={cost} boards={boards} selectedLabel={selectedUser} onSelectUser={setSelectedUser} onNavigate={setActiveView} />
         </section>
         <section className={clsx('view', activeView === 'iv' && 'on')}>
           <InvestigateView trace={trace} loading={traceLoading} error={traceError} onLoadTrace={loadTrace} />
@@ -746,56 +755,74 @@ function AnswerQualityView({
   )
 }
 
-function UserView({
+function UserPicker({
+  onSelect,
+  selected,
+  users,
+}: {
+  onSelect: (label: string) => void
+  selected: CostSlice | undefined
+  users: CostSlice[]
+}) {
+  return (
+    <div className="upick">
+      {users.length > 0 ? (
+        users.slice(0, 8).map((user) => (
+          <button
+            key={user.label}
+            type="button"
+            className={clsx('uchip', user.label === selected?.label && 'on')}
+            onClick={() => onSelect(user.label)}
+          >
+            <span className="av">{initialsFor(user.label)}</span>
+            {formatLabel(user.label)}
+          </button>
+        ))
+      ) : (
+        <span className="uchip on">User spend is collecting</span>
+      )}
+    </div>
+  )
+}
+
+function UserIdentityCard({ selected }: { selected: CostSlice | undefined }) {
+  return (
+    <div className="card user-card">
+      <div className="user-head">
+        <span>{initialsFor(selected?.label ?? 'IA')}</span>
+        {selected ? formatLabel(selected.label) : 'No user selected'}
+      </div>
+      <div className="user-meta">Per-principal analytics from live cost telemetry.</div>
+    </div>
+  )
+}
+
+function ByUserSpendQualityView({
   boards,
   cost,
+  onSelectUser,
+  selectedLabel,
 }: {
   boards: Record<number, Board>
   cost: CostSummary | null
+  onSelectUser: (label: string) => void
+  selectedLabel: string | null
 }) {
   const users = cost?.byUser ?? []
-  const [selectedLabel, setSelectedLabel] = useState<string | null>(null)
   const selected = users.find((user) => user.label === selectedLabel) ?? users[0]
   const qualityScores = labeledRows(panel(boards[7], 'eval_scores')?.rows)
-  const compaction = tableRows(panel(boards[7], 'compaction')?.rows)[0] ?? null
-
-  useEffect(() => {
-    if (!selectedLabel && users[0]) setSelectedLabel(users[0].label)
-  }, [selectedLabel, users])
 
   return (
     <>
-      <div className="upick">
-        {users.length > 0 ? (
-          users.slice(0, 8).map((user) => (
-            <button
-              key={user.label}
-              type="button"
-              className={clsx('uchip', user.label === selected?.label && 'on')}
-              onClick={() => setSelectedLabel(user.label)}
-            >
-              <span className="av">{initialsFor(user.label)}</span>
-              {formatLabel(user.label)}
-            </button>
-          ))
-        ) : (
-          <span className="uchip on">User spend is collecting</span>
-        )}
-      </div>
+      <UserPicker users={users} selected={selected} onSelect={onSelectUser} />
       <div className="strip user-strip">
-        <div className="card user-card">
-          <div className="user-head">
-            <span>{initialsFor(selected?.label ?? 'IA')}</span>
-            {selected ? formatLabel(selected.label) : 'No user selected'}
-          </div>
-          <div className="user-meta">Per-principal analytics from live cost telemetry.</div>
-        </div>
+        <UserIdentityCard selected={selected} />
         <KpiCard label="Cost" value={selected ? currency(selected.costUsd) : collecting()} detail="current range" />
         <KpiCard label="Questions" value={selected ? compactNumber(selected.count) : collecting()} detail="reported requests" />
         <KpiCard label="Avg grounding" value={formatScore(scoreFor(qualityScores, 'grounding'))} detail={qualityScores.length ? 'global score only' : 'no user endpoint'} />
       </div>
       <div className="grid">
-        <PanelShell className="col7" title="Continuous eval — this user" badge="◐ Near real-time" caption="Every answer sampled + scored by the independent evaluator">
+        <PanelShell className="col12" title="Continuous eval — this user" badge="◐ Near real-time" caption="Every answer sampled + scored by the independent evaluator">
           {qualityScores.length > 0 ? (
             <div className="scores">
               {qualityScores.slice(0, 5).map((score) => (
@@ -806,6 +833,52 @@ function UserView({
             </div>
           ) : (
             <EmptyState>No user-level eval scores for this range.</EmptyState>
+          )}
+        </PanelShell>
+      </div>
+    </>
+  )
+}
+
+function ByUserAuditView({
+  boards,
+  cost,
+  onNavigate,
+  onSelectUser,
+  selectedLabel,
+}: {
+  boards: Record<number, Board>
+  cost: CostSummary | null
+  onNavigate: (view: ViewId) => void
+  onSelectUser: (label: string) => void
+  selectedLabel: string | null
+}) {
+  const users = cost?.byUser ?? []
+  const selected = users.find((user) => user.label === selectedLabel) ?? users[0]
+  const compaction = tableRows(panel(boards[7], 'compaction')?.rows)[0] ?? null
+  const ledgerRows = tableRows(panel(boards[3], 'authz_ledger')?.rows)
+  const attachedPct = compaction ? numericField(compaction, ['attachedPct']) ?? 0 : null
+  const compactions = compaction ? numericField(compaction, ['events']) ?? 0 : null
+
+  return (
+    <>
+      <UserPicker users={users} selected={selected} onSelect={onSelectUser} />
+      <div className="strip user-strip">
+        <UserIdentityCard selected={selected} />
+        <KpiCard label="Conversations" value={selected ? compactNumber(selected.count) : collecting()} detail="requests in range" />
+        <KpiCard label="Compactions" value={compactions === null ? collecting() : compactNumber(compactions)} detail="long sessions summarized" />
+        <KpiCard label="Summary attached" value={attachedPct === null ? collecting() : percent(attachedPct / 100)} detail="context retention" />
+      </div>
+      <div className="grid">
+        <PanelShell className="col7" title="Authorization ledger — audit trail" badge="Live" caption="Every authorization decision · click to replay the conversation">
+          {ledgerRows.length > 0 ? (
+            <div className="feed">
+              {ledgerRows.slice(0, 8).map((row, index) => (
+                <DecisionRow key={rowKey(row, index)} row={row} onClick={() => onNavigate('iv')} />
+              ))}
+            </div>
+          ) : (
+            <EmptyState>No authorization-ledger rows for this range.</EmptyState>
           )}
         </PanelShell>
         <PanelShell className="col5" title="Memory compactions" caption="Long sessions summarized to fit context">
