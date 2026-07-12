@@ -103,13 +103,31 @@ public class RoutePreparer {
 
         String maskToken = effectiveMaskToken();
 
-        // Distinct resolved needles — every resolved mention's verbatim name plus every resolved
-        // canonical id — masked at ALL in-window occurrences (name + id: "Name (ID)").
+        // Distinct resolved needles — every resolved mention's (possibly tightened) name plus every
+        // resolved canonical id — masked at ALL in-window occurrences (name + id: "Name (ID)").
+        //
+        // Needle tightening: when the LLM extracted a GREEDY verbatim ("Calderon Trust holdings") and
+        // the resolver's own canonical name ("Calderon Trust") is a PROVABLE proper sub-phrase of it
+        // (aligns via MentionAligner AND is not the whole verbatim), mask only the canonical name so
+        // the user's action word ("holdings") survives into the routing text. On ANY miss (no single
+        // canonical name, no sub-phrase alignment, or equality) this is byte-identical to masking the
+        // full verbatim — the safety property that keeps all single-turn masking untouched.
         Set<String> resolvedNeedles = new LinkedHashSet<>();
+        Set<String> tightenedVerbatims = new LinkedHashSet<>();   // greedy verbatims replaced by canonical
         int mentionCount = groundedSet.mentions().size();
         for (GroundedMention gm : groundedSet.mentions()) {
             if (!isResolved(gm)) continue;
-            if (gm.mention().verbatimText() != null) resolvedNeedles.add(gm.mention().verbatimText());
+            String verbatim = gm.mention().verbatimText();
+            String canonical = soleResolvedCanonicalName(gm);     // exactly ONE distinct resolved name, else null
+            boolean tightened = verbatim != null && canonical != null
+                    && !MentionAligner.normalizeNeedle(verbatim).equals(MentionAligner.normalizeNeedle(canonical))
+                    && MentionAligner.align(verbatim, canonical) != null;   // canonical is a proper sub-phrase
+            if (tightened) {
+                resolvedNeedles.add(canonical);
+                tightenedVerbatims.add(verbatim);
+            } else if (verbatim != null) {
+                resolvedNeedles.add(verbatim);
+            }
             for (GroundedInterpretation gi : gm.interpretations()) {
                 if (gi.isResolved() && gi.canonicalId() != null) resolvedNeedles.add(gi.canonicalId());
             }
@@ -131,7 +149,7 @@ public class RoutePreparer {
         }
 
         List<Integer> baseIdx = lastUserTurnIndices(request, baseWindow);
-        MaskedText base = maskedJoin(request, baseIdx, groundedSet, resolvedNeedles, maskToken);
+        MaskedText base = maskedJoin(request, baseIdx, groundedSet, resolvedNeedles, tightenedVerbatims, maskToken);
 
         // Stage 5 — residual / widen. Only a context-carrying turn may widen; a CLARIFY turn stays
         // on its bare masked residual so it cannot inherit a confident domain from history.
@@ -141,7 +159,7 @@ public class RoutePreparer {
         boolean baseNearEmpty = isNearEmpty(base.masked, maskToken);
         if (carryContext && baseNearEmpty) {
             List<Integer> fullIdx = lastUserTurnIndices(request, routingContextTurns);
-            MaskedText widened = maskedJoin(request, fullIdx, groundedSet, resolvedNeedles, maskToken);
+            MaskedText widened = maskedJoin(request, fullIdx, groundedSet, resolvedNeedles, tightenedVerbatims, maskToken);
             chosen = widened;
             maskMode = "masked-widened";
             residualClass = isNearEmpty(widened.masked, maskToken)
@@ -180,7 +198,7 @@ public class RoutePreparer {
      */
     private MaskedText maskedJoin(ChatRequest request, List<Integer> indices,
                                   GroundedReferenceSet groundedSet, Set<String> resolvedNeedles,
-                                  String maskToken) {
+                                  Set<String> tightenedVerbatims, String maskToken) {
         List<Message> msgs = request.messages();
         if (msgs == null || indices.isEmpty()) return new MaskedText("", "", 0, indices);
         boolean single = indices.size() == 1;
@@ -190,7 +208,7 @@ public class RoutePreparer {
         for (int idx : indices) {
             String original = msgs.get(idx).content();
             if (original == null) original = "";
-            List<MentionSpan> maskSpans = collectMaskSpans(original, idx, groundedSet, resolvedNeedles);
+            List<MentionSpan> maskSpans = collectMaskSpans(original, idx, groundedSet, resolvedNeedles, tightenedVerbatims);
             List<MentionSpan> merged = mergeSpans(maskSpans);
             spanCount += merged.size();
             String masked = applyMask(original, merged, maskToken);
@@ -208,11 +226,15 @@ public class RoutePreparer {
      * this message. Duplicates/overlaps are reconciled by {@link #mergeSpans}.
      */
     private List<MentionSpan> collectMaskSpans(String original, int idx,
-                                               GroundedReferenceSet groundedSet, Set<String> resolvedNeedles) {
+                                               GroundedReferenceSet groundedSet, Set<String> resolvedNeedles,
+                                               Set<String> tightenedVerbatims) {
         List<MentionSpan> spans = new ArrayList<>();
         for (GroundedMention gm : groundedSet.mentions()) {
             if (!isResolved(gm)) continue;
-            if (gm.mention().messageIndex() == idx && gm.mention().span() != null) {
+            // Skip the recorded GREEDY span for a tightened mention — the canonical-occurrence pass
+            // below masks just the name region inside it, so the action word survives.
+            if (gm.mention().messageIndex() == idx && gm.mention().span() != null
+                    && !tightenedVerbatims.contains(gm.mention().verbatimText())) {
                 spans.add(gm.mention().span());
             }
         }
@@ -349,6 +371,26 @@ public class RoutePreparer {
 
     private static boolean isResolved(GroundedMention gm) {
         return gm.interpretations().stream().anyMatch(GroundedInterpretation::isResolved);
+    }
+
+    /**
+     * The single distinct resolved canonical name across this mention's interpretations, or
+     * {@code null} when there is none, it is blank, or more than one DISTINCT name resolved (a
+     * cross-domain homonym). Deterministic — tightening never picks a name arbitrarily, so an
+     * ambiguous mention keeps its greedy verbatim mask (byte-identical to today).
+     */
+    private static String soleResolvedCanonicalName(GroundedMention gm) {
+        String sole = null;
+        for (GroundedInterpretation gi : gm.interpretations()) {
+            if (!gi.isResolved() || gi.canonicalName() == null || gi.canonicalName().isBlank()) continue;
+            if (sole == null) {
+                sole = gi.canonicalName();
+            } else if (!MentionAligner.normalizeNeedle(sole)
+                    .equals(MentionAligner.normalizeNeedle(gi.canonicalName()))) {
+                return null;   // multiple distinct canonical names → skip tightening
+            }
+        }
+        return sole;
     }
 
     // ── Window + reference helpers (manifest-driven ports of the fetch path) ─────────────────────

@@ -262,7 +262,36 @@ class ReferenceGroundingMentionsTest {
         GroundedInterpretation gi = only(set.mentions().get(0));
         assertThat(gi.status()).isEqualTo(GroundStatus.NOT_FOUND);
         assertThat(gi.canonicalId()).isNull();
+        assertThat(gi.canonicalName()).isNull();      // no canonical resolution → nothing to tighten
         assertThat(set.focalVerdict().verdict()).isEqualTo(Verdict.NOT_FOUND);
+    }
+
+    // ── canonicalName threads through the lattice on RESOLVED_ALLOWED + DENIED, null otherwise ─────
+
+    @Test
+    void canonicalName_present_onResolvedAndDenied_null_onNonResolving() {
+        // The resolver's canonical_name is DISTINCT from the id, proving it is the canonical_name field
+        // that flows (Piece 3 masking tightens greedy verbatims down to it), not the id echoed back.
+        when(manifestStore.interpretationsForReference("relationship_reference", "Calderon Trust holdings"))
+                .thenReturn(List.of(new IdentifiedReference("Calderon Trust holdings", REL, SUB_A, COVERAGE_A)));
+        when(coverageClient.resolve(eq("Calderon Trust holdings"), eq("relationship"), anyString(), eq(COVERAGE_A), any()))
+                .thenReturn(new CoverageResolveResult(true, "REL-00099", "Calderon Trust", List.of()));
+        when(coverageClient.check(eq("rm_jane"), anyString(), eq("REL-00099"), eq(COVERAGE_A), any()))
+                .thenReturn(CoverageCheckResult.ofAllowed());
+
+        GroundedInterpretation allowed = only(grounding.groundMentions(
+                bag(explicit("Calderon Trust holdings", 0)), RM, "default", "tok").mentions().get(0));
+        assertThat(allowed.status()).isEqualTo(GroundStatus.RESOLVED_ALLOWED);
+        assertThat(allowed.canonicalName()).isEqualTo("Calderon Trust");
+
+        // Same reference, but the CHECK now denies → DENIED must ALSO carry the canonical name, or the
+        // deny-path mask would silently diverge from the allow-path (greedy on denials).
+        when(coverageClient.check(eq("rm_jane"), anyString(), eq("REL-00099"), eq(COVERAGE_A), any()))
+                .thenReturn(CoverageCheckResult.denied("not-covered"));
+        GroundedInterpretation denied = only(grounding.groundMentions(
+                bag(explicit("Calderon Trust holdings", 0)), RM, "default", "tok").mentions().get(0));
+        assertThat(denied.status()).isEqualTo(GroundStatus.DENIED);
+        assertThat(denied.canonicalName()).isEqualTo("Calderon Trust");
     }
 
     // ── budget: interpretations-per-mention cap ──────────────────────────────────────────────────

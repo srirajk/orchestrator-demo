@@ -133,6 +133,8 @@ public class IntentClassifier {
                 : "";
         return "- " + et.extractAs() + ": the " + label + " name OR ID EXACTLY as stated by the user."
                 + patternHint + " Copy verbatim — do NOT normalize, expand, or look up the name."
+                + " The reference is ONLY the entity's name or identifier — never include the"
+                + " surrounding request words or the words for WHAT data is being asked about it."
                 + " If the user wrote a NAME, output that name text; do NOT output an identifier code"
                 + " you recall from an earlier answer — outputting a remembered identifier for a"
                 + " user-typed name is forbidden. Use null if none is mentioned.";

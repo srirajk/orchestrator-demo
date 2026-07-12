@@ -194,7 +194,7 @@ class ChatServiceGroupCoverageFailClosedTest extends RedisContainerTest {
         Mention m = new Mention("relationship_id", "relationship_reference", "REL-99999", 0, null,
                 MentionSource.EXPLICIT);
         GroundedInterpretation gi = new GroundedInterpretation(
-                canonicalId, null, subDomainId, "iid:" + subDomainId, status, null,
+                canonicalId, null, null, subDomainId, "iid:" + subDomainId, status, null,
                 GroundSourceKind.EXTRACTED_REFERENCE, MentionSource.EXPLICIT, "0", 0, null, null, null);
         GroundedMention gm = new GroundedMention(m, List.of(gi), false, false);
         return new GroundedReferenceSet(List.of(gm), GroundingResult.none());

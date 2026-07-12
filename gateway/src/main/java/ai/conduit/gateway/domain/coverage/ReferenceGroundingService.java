@@ -282,8 +282,8 @@ public class ReferenceGroundingService {
             if (rr.resolved() && rr.id() != null) {
                 CoverageCheckResult check = coverageClient.check(
                         principalId, tenantId, rr.id(), t.coverage(), callerToken);
-                if (!check.allowed()) return LatticeOutcome.denied(rr.id(), check.reason());
-                return LatticeOutcome.allowed(rr.id());
+                if (!check.allowed()) return LatticeOutcome.denied(rr.id(), rr.canonicalName(), check.reason());
+                return LatticeOutcome.allowed(rr.id(), rr.canonicalName());
             }
             if (rr.isAmbiguous()) return LatticeOutcome.ambiguous();
             return LatticeOutcome.notFound();
@@ -303,8 +303,15 @@ public class ReferenceGroundingService {
             case UNAVAILABLE -> ref.id();                 // carry the raw reference for the trace
             case AMBIGUOUS, NOT_FOUND -> null;
         };
+        // The resolver's own canonical name for the entity — carried ONLY when a canonical resolution
+        // exists (ALLOWED/DENIED). Piece 3 masking uses it to tighten a greedy verbatim mask down to
+        // the true entity name; null on every non-resolving status so nothing to tighten against.
+        String canonicalName = switch (outcome.status()) {
+            case RESOLVED_ALLOWED, DENIED -> outcome.canonicalName();
+            case AMBIGUOUS, NOT_FOUND, UNAVAILABLE -> null;
+        };
         return new GroundedInterpretation(
-                canonicalId, et.key(), subDomainId, dedupeKey(ref), outcome.status(),
+                canonicalId, canonicalName, et.key(), subDomainId, dedupeKey(ref), outcome.status(),
                 outcome.denialReason(), sourceKind, m.source(),
                 String.valueOf(m.messageIndex()), m.messageIndex(), m.span(), et, ref.coverage());
     }
@@ -364,12 +371,12 @@ public class ReferenceGroundingService {
     private record CoverageTask(String reference, String resolveType, DomainManifest.Coverage coverage) {}
 
     /** The terminal outcome of running one {@link CoverageTask} through the lattice. */
-    private record LatticeOutcome(GroundStatus status, String resolvedId, String denialReason) {
-        static LatticeOutcome allowed(String id)          { return new LatticeOutcome(GroundStatus.RESOLVED_ALLOWED, id, null); }
-        static LatticeOutcome denied(String id, String r) { return new LatticeOutcome(GroundStatus.DENIED, id, r); }
-        static LatticeOutcome ambiguous()                 { return new LatticeOutcome(GroundStatus.AMBIGUOUS, null, null); }
-        static LatticeOutcome notFound()                  { return new LatticeOutcome(GroundStatus.NOT_FOUND, null, null); }
-        static LatticeOutcome unavailable(String ref)     { return new LatticeOutcome(GroundStatus.UNAVAILABLE, ref, null); }
+    private record LatticeOutcome(GroundStatus status, String resolvedId, String canonicalName, String denialReason) {
+        static LatticeOutcome allowed(String id, String name)          { return new LatticeOutcome(GroundStatus.RESOLVED_ALLOWED, id, name, null); }
+        static LatticeOutcome denied(String id, String name, String r) { return new LatticeOutcome(GroundStatus.DENIED, id, name, r); }
+        static LatticeOutcome ambiguous()                              { return new LatticeOutcome(GroundStatus.AMBIGUOUS, null, null, null); }
+        static LatticeOutcome notFound()                               { return new LatticeOutcome(GroundStatus.NOT_FOUND, null, null, null); }
+        static LatticeOutcome unavailable(String ref)                  { return new LatticeOutcome(GroundStatus.UNAVAILABLE, ref, null, null); }
     }
 
     // -- Public multi-reference grounding contract (Piece 3 consumes this) --------------------------
@@ -389,6 +396,9 @@ public class ReferenceGroundingService {
      *
      * @param canonicalId      resolved id for {@code RESOLVED_ALLOWED}/{@code DENIED}; the raw
      *                         reference for {@code UNAVAILABLE} (for the trace); {@code null} otherwise.
+     * @param canonicalName    the resolver's canonical entity name for {@code RESOLVED_ALLOWED}/
+     *                         {@code DENIED}; {@code null} on every non-resolving status. Piece 3
+     *                         masking uses it to tighten a greedy verbatim mask to the true name.
      * @param entityKey        manifest {@code EntityType.key()} this interpretation resolves into.
      * @param subDomainId      owning sub-domain of this interpretation.
      * @param interpretationId stable dedupe/interpretation id - the coverage contract this grounded
@@ -405,6 +415,7 @@ public class ReferenceGroundingService {
      */
     public record GroundedInterpretation(
             String canonicalId,
+            String canonicalName,
             String entityKey,
             String subDomainId,
             String interpretationId,

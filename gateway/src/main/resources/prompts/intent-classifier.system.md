@@ -39,7 +39,7 @@ Entity extraction rules (populate whenever the latest message concerns a specifi
 
 "mentions" list — capture EVERY entity reference in the conversation (do not drop duplicates of the same kind):
 - entity: which field this reference belongs to — EXACTLY one of: {{entity_field_list}}
-- text: the reference verbatim, exactly as the user wrote it (a name or an identifier the user typed). Never invent, normalize, or substitute an identifier for a name.
+- text: the reference verbatim, exactly as the user wrote it (a name or an identifier the user typed). Never invent, normalize, or substitute an identifier for a name. The reference text is ONLY the entity's name or identifier — never include the surrounding request words or the words for WHAT data is being asked about it.
 - source: "explicit" when the LATEST user message states the reference; "anaphora" when the latest message only back-references it (a pronoun) and the text comes from an earlier user turn.
 - Emit one element per DISTINCT reference. For "compare A and B" of the same kind, emit two elements. Use [] when the conversation names no entity.
 
