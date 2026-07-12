@@ -109,3 +109,7 @@ volumes/
 feedback/
 /images/
 *.tmp
+tmp/
+.codex/
+output/pdf/
+*.DS_Store
