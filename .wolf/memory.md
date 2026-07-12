@@ -3146,3 +3146,63 @@
 | 11:14 | Edited README.md | live() → manifests() | ~157 |
 | 11:14 | Edited README.md | inline fix | ~72 |
 | 11:15 | Refreshed README/.env.example/MODEL-SELECTION to current state (Conduit Chat+Insights, 18 agents/4 domains, Java25, MCP 2025-11-25, GPT tiers) | README.md, .env.example, docs/MODEL-SELECTION.md | done | ~9k |
+| 11:17 | Session end: 260 writes across 78 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 182 reads | ~561539 tok |
+| 11:20 | Session end: 260 writes across 78 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 182 reads | ~561539 tok |
+| 11:25 | Session end: 260 writes across 78 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 182 reads | ~561539 tok |
+| 11:31 | Session end: 260 writes across 78 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 182 reads | ~561539 tok |
+| 11:33 | Edited gateway/src/main/java/ai/conduit/gateway/domain/insights/BoardCatalog.java | 10→11 lines | ~204 |
+| 11:33 | Edited gateway/src/main/java/ai/conduit/gateway/domain/insights/BoardCatalog.java | 5→6 lines | ~60 |
+| 11:33 | Edited gateway/src/main/java/ai/conduit/gateway/domain/insights/BoardCatalog.java | modified round1() | ~843 |
+| 11:34 | Edited apps/insights/web/src/App.tsx | inline fix | ~20 |
+| 11:34 | Edited apps/insights/web/src/App.tsx | 2→3 lines | ~128 |
+| 11:34 | Edited apps/insights/web/src/App.tsx | inline fix | ~37 |
+| 11:34 | Edited apps/insights/web/src/App.tsx | 4→7 lines | ~106 |
+| 11:34 | Edited apps/insights/web/src/App.tsx | added optional chaining | ~596 |
+| 11:36 | Session end: 268 writes across 80 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 183 reads | ~576612 tok |
+| 11:38 | Session end: 268 writes across 80 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 183 reads | ~576612 tok |
+| 11:41 | Session end: 268 writes across 80 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 183 reads | ~576612 tok |
+| 12:29 | Session end: 268 writes across 80 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 183 reads | ~576612 tok |
+| 13:09 | Created tmp/codex-insights-visual-qc.md | — | ~452 |
+| 13:09 | Session end: 269 writes across 81 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 183 reads | ~577096 tok |
+| 13:23 | Session end: 269 writes across 81 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 183 reads | ~577096 tok |
+| 13:27 | Session end: 269 writes across 81 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 183 reads | ~577096 tok |
+| 13:43 | Session end: 269 writes across 81 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 183 reads | ~577096 tok |
+| 13:57 | Session end: 269 writes across 81 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 183 reads | ~577096 tok |
+| 14:28 | Session end: 269 writes across 81 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 183 reads | ~580375 tok |
+| 14:31 | Edited apps/insights/web/src/App.tsx | inline fix | ~22 |
+| 14:31 | Edited apps/insights/web/src/App.tsx | 4→5 lines | ~119 |
+| 14:31 | Edited apps/insights/web/src/App.tsx | 5→6 lines | ~101 |
+| 14:31 | Edited apps/insights/web/src/App.tsx | added optional chaining | ~85 |
+| 14:31 | Edited apps/insights/web/src/App.tsx | 3→6 lines | ~129 |
+| 14:32 | Edited apps/insights/web/src/App.tsx | modified UserPicker() | ~1429 |
+| 14:32 | Split Insights "By user" board into two tabs (spend&quality / audit&conversations) | apps/insights/web/src/App.tsx | tsc pass, world-b CRITICAL 0 | ~9k |
+
+## Session: 2026-07-12 14:35
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 14:54 | Created tmp/codex-insights-byuser-split-qc.md | — | ~887 |
+| 14:54 | Session end: 1 writes across 1 files (codex-insights-byuser-split-qc.md) | 0 reads | ~950 tok |
+| 15:10 | Edited apps/insights/web/src/App.tsx | 2→2 lines | ~24 |
+| 15:10 | Edited apps/insights/web/src/App.tsx | 4→1 lines | ~26 |
+| 15:11 | Edited apps/insights/web/src/App.tsx | added optional chaining | ~170 |
+| 15:11 | Session end: 4 writes across 2 files (codex-insights-byuser-split-qc.md, App.tsx) | 3 reads | ~18242 tok |
+| 15:11 | Session end: 4 writes across 2 files (codex-insights-byuser-split-qc.md, App.tsx) | 4 reads | ~18242 tok |
+| 15:30 | Session end: 4 writes across 2 files (codex-insights-byuser-split-qc.md, App.tsx) | 5 reads | ~18336 tok |
+| 15:32 | Edited apps/insights/web/src/App.tsx | added optional chaining | ~360 |
+| 15:32 | Edited apps/insights/web/src/App.tsx | CSS: onLoadTrace, conversationId | ~72 |
+| 15:32 | Edited apps/insights/web/src/App.tsx | 5→5 lines | ~73 |
+| 15:33 | Edited apps/insights/web/src/App.tsx | inline fix | ~37 |
+| 15:33 | Edited apps/insights/web/src/App.tsx | 2→2 lines | ~41 |
+| 15:33 | Edited apps/insights/web/src/App.tsx | 2→2 lines | ~32 |
+| 15:33 | Edited apps/insights/web/src/App.tsx | CSS: onLoadTrace, conversationId | ~95 |
+| 15:33 | Edited apps/insights/web/src/App.tsx | 5→5 lines | ~75 |
+| 15:33 | Edited apps/insights/web/src/App.tsx | 4→4 lines | ~79 |
+| 15:33 | Edited apps/insights/web/src/App.tsx | inline fix | ~48 |
+| 15:34 | Edited apps/insights/web/src/App.tsx | CSS: width | ~376 |
+| 15:34 | Edited apps/insights/web/src/App.tsx | modified return() | ~606 |
+| 15:34 | Edited apps/insights/web/src/index.css | 3→7 lines | ~36 |
+| 15:34 | Edited apps/insights/web/src/index.css | expanded (+24 lines) | ~156 |
+| 15:35 | Insights by-user UI: ledger-row replay pre-fill + honest per-user KPIs | apps/insights/web/src/App.tsx, index.css | tsc 0, world-b CRITICAL 0 | ~9k |
+| 15:36 | Session end: 18 writes across 3 files (codex-insights-byuser-split-qc.md, App.tsx, index.css) | 5 reads | ~20422 tok |
+| 15:36 | Session end: 18 writes across 3 files (codex-insights-byuser-split-qc.md, App.tsx, index.css) | 6 reads | ~20422 tok |

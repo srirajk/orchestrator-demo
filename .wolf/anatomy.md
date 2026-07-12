@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-07-12T15:14:38.461Z
-> Files: 1125 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-07-12T19:34:37.238Z
+> Files: 1129 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/
 
@@ -862,7 +862,8 @@
 
 ## apps/insights/web/src/
 
-- `App.tsx` — Conduit Insights React SPA (SSO login, 7 views). AnswerQualityView binds `grounding_distribution`→`<ScoreHistogram>` (vertical binned bars + 0→1 axis) and `grounding_by_model`→`<Bars unit="score">`. UserView binds `compaction`→`<CompactionStat>` (summary-attached bar + compactions/tokens-saved/avg-messages stat tiles). Unbuilt-endpoint placeholder panels have been removed (no stubs shown): TrustView dropped the 'Fabricated IDs' KPI card (trust-strip now 3 cols); AgentsView dropped 'Latency by stage' (Agent fleet now col12); UserView dropped 'Their conversations' + 'Entitlement decisions' (backend conversation-store adapter seam left intact — UI only). Awaiting-data panels (breakers, request volume, cost-over-time, bulkhead) kept. (~13000 tok)
+- `App.tsx` — RANGE_OPTIONS (~17984 tok)
+- `index.css` — Styles: 111 rules, 17 vars (~6672 tok)
 
 ## docs/
 
@@ -1106,6 +1107,10 @@
 - `GroundingBudget.java` — Config-driven budgets for multi-reference grounding (routing spec V2.1 / Piece 2). Grounding each (~553 tok)
 - `ReferenceGroundingService.java` — Stage-1 reference grounding - the deterministic, PRE-ROUTING step that resolves a human reference (~11564 tok)
 - `UnboundReference.java` — One entity reference the user named this turn that the pipeline did NOT bind — the signal that a (~629 tok)
+
+## gateway/src/main/java/ai/conduit/gateway/domain/insights/
+
+- `BoardCatalog.java` — Declarative catalog of the 8 Insights boards and their panels, each bound to a PromQL query (~7355 tok)
 
 ## gateway/src/main/java/ai/conduit/gateway/domain/intent/
 
@@ -2111,6 +2116,11 @@
 
 - `requirements.txt` — Python dependencies for registry schema checks (~8 tok)
 - `test_registry_contracts.py` — Validates registry schemas, manifests, cross-references, context envelope and ledger event examples (~1100 tok)
+
+## tmp/
+
+- `codex-insights-byuser-split-qc.md` — Codex task — Conduit Insights: verify the "By user" board split + clipping check (front-end only) (~832 tok)
+- `codex-insights-visual-qc.md` — Codex task — Conduit Insights visual verification (front-end only) (~424 tok)
 
 ## user-mgmt/
 
