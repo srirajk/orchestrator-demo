@@ -53,13 +53,11 @@ grep -qE '^data: \{' /tmp/_smoke_sse.txt && pass "data: {json} (space)" || fail 
 grep -qE '^data: \[DONE\]$' /tmp/_smoke_sse.txt && pass "data: [DONE] (space)" || fail "[DONE] framing"
 grep -q '"finish_reason":"stop"' /tmp/_smoke_sse.txt && pass "terminal finish_reason:stop" || fail "no finish_reason:stop"
 
-echo "═══ D. WORLD B SCENARIOS ═══"
-echo "$(ask rm_jane 'Give me a complete overview of the Whitman relationship: holdings, performance, settlement status, and cash position')" | grep -qiE "whitman|holding|portfolio|cash|settle|[0-9],[0-9]{3}" && pass "hero grounded" || fail "hero"
-echo "$(ask rm_jane 'Show me the Okafor relationship holdings')" | grep -qiE "denied|deny|not.*(cover|access|book)" && pass "denial (Okafor blocked for rm_jane)" || fail "denial"
-echo "$(ask rm_jane 'What is the latest on my client')" | grep -qiE "which|clarif|specify|by (id|name)|\?" && pass "clarify (no guess)" || fail "clarify"
-echo "$(ask uw_sam 'Give me the policy details for POL-77001')" | grep -qiE "continental|policy|premium|coverage|limit|[0-9],[0-9]{3}" && pass "insurance grounded (uw_sam POL-77001)" || fail "insurance grounded"
-echo "$(ask uw_sam 'Show me POL-88003')" | grep -qiE "polic(y|ies)" && pass "insurance denial says 'policy' (bug 238)" || fail "insurance denial copy"
-echo "$(ask rm_guest 'Show me the Whitman relationship holdings')" | grep -qiE "denied|deny|not.*(cover|access|book)|empty|no (client|coverage)" && pass "rm_guest denied (no coverage)" || fail "rm_guest denial"
+echo "═══ D. ROUTING + ENTITLEMENT (trace-truth via /debug/route) ═══"
+# The old §D grepped answer PROSE for domain words — it false-greened on any degraded answer that
+# happened to contain "holding"/"denied". Routing/entitlement correctness is now asserted
+# deterministically against the RouteDecision (primary agent id + disposition), not the narrative.
+if bash "$(dirname "$0")/smoke-route.sh"; then pass "routing+entitlement smoke (smoke-route.sh)"; else fail "routing+entitlement smoke (smoke-route.sh)"; fi
 
 echo "═══ E. LANGFUSE (traces/tags/datasets) ═══"
 sleep 8
