@@ -28,7 +28,7 @@ type AppState =
   | { name: 'denied'; session: AuthSession }
   | { name: 'error'; message: string }
 
-type ViewId = 'ov' | 'tr' | 'ag' | 'ec' | 'aq' | 'us' | 'iv'
+type ViewId = 'ov' | 'tr' | 'ag' | 'or' | 'ec' | 'aq' | 'us' | 'iv'
 
 type ViewMeta = {
   id: ViewId
@@ -54,6 +54,7 @@ const OPERATE_VIEWS: ViewMeta[] = [
   { id: 'ov', icon: '◎', title: 'Overview', question: 'working?', subtitle: 'Is the gateway working? — live state across all traffic' },
   { id: 'tr', icon: '⛨', title: 'Trust & Governance', question: 'safe?', subtitle: 'Is it safe? — the three-gate ABAC in action' },
   { id: 'ag', icon: '⚙', title: 'Agents & Pipeline', question: 'running?', subtitle: 'How is it running? — fleet health and where the time goes' },
+  { id: 'or', icon: '⌘', title: 'Orchestration', question: 'how does it decide?', subtitle: 'The decision intelligence — intent, fan-out, and outcomes' },
   { id: 'ec', icon: '◆', title: 'Economics', question: 'cost?', subtitle: 'What is it costing? — cost per question, by segment / model / user' },
 ]
 
@@ -230,7 +231,7 @@ function InsightsPlane({ initialBoard, session }: { initialBoard: Board; session
       setError(null)
       try {
         const [nextBoards, nextCost] = await Promise.all([
-          Promise.all([1, 2, 3, 4, 5, 6, 7].map(async (id) => [id, await fetchInsightsBoard(session, id, range)] as const)),
+          Promise.all([1, 2, 3, 4, 5, 6, 7, 8].map(async (id) => [id, await fetchInsightsBoard(session, id, range)] as const)),
           fetchInsightsCost(session, range),
         ])
 
@@ -352,6 +353,9 @@ function InsightsPlane({ initialBoard, session }: { initialBoard: Board; session
         </section>
         <section className={clsx('view', activeView === 'ag' && 'on')}>
           <AgentsView boards={boards} onNavigate={setActiveView} />
+        </section>
+        <section className={clsx('view', activeView === 'or' && 'on')}>
+          <OrchestrationView boards={boards} />
         </section>
         <section className={clsx('view', activeView === 'ec' && 'on')}>
           <EconomicsView boards={boards} cost={cost} range={range} />
@@ -585,6 +589,42 @@ function AgentsView({ boards, onNavigate }: { boards: Record<number, Board>; onN
         </PanelShell>
         <PanelShell className="col6" title="Intent mix" caption="chat_intent_total · by type">
           <Bars rows={intent} empty="No intent-mix samples for this range." />
+        </PanelShell>
+      </div>
+    </>
+  )
+}
+
+function OrchestrationView({ boards }: { boards: Record<number, Board> }) {
+  const orchestration = boards[8]
+  const degradation = panel(orchestration, 'degradation_rate')
+  const followupShare = panel(orchestration, 'followup_share')
+  const dagPlans = panel(orchestration, 'dag_plans')
+  const intentMix = labeledRows(panel(orchestration, 'intent_mix')?.rows)
+  const outcomeTaxonomy = labeledRows(panel(orchestration, 'outcome_taxonomy')?.rows)
+  const fanoutShape = labeledRows(panel(orchestration, 'fanout_shape')?.rows)
+
+  return (
+    <>
+      <SystemNotice
+        tone="nom"
+        tag="Decision intelligence"
+        message="How the gateway routes every question — one plain-English ask fans out across specialist agents, and every step here is a metric it already emits."
+      />
+      <div className="strip">
+        <KpiCard label="Follow-up share" panel={followupShare} detail="multi-turn conversations" />
+        <KpiCard label="Graceful degradation" panel={degradation} detail="answered from a partial fan-out" />
+        <KpiCard label="Multi-step plans" panel={dagPlans} detail="composable DAG orchestration" />
+      </div>
+      <div className="grid grid-gap-top">
+        <PanelShell className="col6" title="Intent mix" caption="chat_intent_total — how questions are classified">
+          <Bars rows={intentMix} empty="No intent-classification samples for this range." />
+        </PanelShell>
+        <PanelShell className="col6" title="Outcome taxonomy" caption="conduit_request_outcome_total — how every request resolved">
+          <Bars rows={outcomeTaxonomy} empty="No request-outcome samples for this range." />
+        </PanelShell>
+        <PanelShell className="col12" title="Fan-out shape" caption="conduit_fanout_duration_seconds_count — agents dispatched per question (1 vs 2 vs 3+)">
+          <Bars rows={fanoutShape} empty="No fan-out samples for this range." />
         </PanelShell>
       </div>
     </>

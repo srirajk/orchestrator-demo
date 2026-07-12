@@ -14,16 +14,17 @@ import java.util.OptionalDouble;
 import java.util.function.Function;
 
 /**
- * Declarative catalog of the 7 Insights boards and their panels, each bound to a PromQL query
- * (boards 1–6, ops — Prometheus) or a Langfuse query (board 7, cost/quality). One board = one
+ * Declarative catalog of the 8 Insights boards and their panels, each bound to a PromQL query
+ * (boards 1–6 + 8, ops — Prometheus) or a Langfuse query (board 7, cost/quality). One board = one
  * {@code GET /v1/insights/boards/{id}}.
  *
  * <h3>World B</h3>
  * Not one domain/agent/entity name appears here. Every "by X" breakdown aggregates on a metric
  * <em>label</em> ({@code agentId}, {@code outcome}, {@code decision}, {@code protocol},
- * {@code type}, {@code resource_type}, {@code role}) whose values are discovered dynamically from
- * the series Prometheus returns. Onboarding a new domain adds label values automatically; nothing
- * here changes. The only literals are query windows and metric names — infrastructure, not domain.
+ * {@code type}, {@code resource_type}, {@code role}, {@code agent_count}) whose values are
+ * discovered dynamically from the series Prometheus returns. Onboarding a new domain adds label
+ * values automatically; nothing here changes. The only literals are query windows and metric
+ * names — infrastructure, not domain.
  *
  * <p>A panel whose metric has no data yet (e.g. a just-added counter, or Langfuse with no traces)
  * degrades to {@code status:"unavailable"} at render time rather than showing a fabricated value.
@@ -47,10 +48,11 @@ public class BoardCatalog {
             4, this::boardAgentPerformance,
             5, this::boardReliability,
             6, this::boardLiveTrace,
-            7, this::boardCostQuality
+            7, this::boardCostQuality,
+            8, this::boardOrchestration
     );
 
-    /** Panels for a board id at the given {@link Range}, or {@code null} if the id is not 1–7. */
+    /** Panels for a board id at the given {@link Range}, or {@code null} if the id is not 1–8. */
     public List<PanelSpec> panelsFor(int boardId, Range range) {
         Function<Range, List<PanelSpec>> builder = boards.get(boardId);
         return builder == null ? null : builder.apply(range);
@@ -308,6 +310,45 @@ public class BoardCatalog {
 
     private static double round1(double v) {
         return Math.round(v * 10.0) / 10.0;
+    }
+
+    // ── Board 8 — Orchestration (decision intelligence) ──────────────────────────
+    // The gateway's routing brain, surfaced from meters it already emits (chat.intent,
+    // conduit.request.outcome, conduit.fanout.duration, conduit.request.partial,
+    // conduit.dag.plan). Every breakdown aggregates on a metric label whose values are
+    // discovered from the series Prometheus returns — no domain/agent literal appears here.
+    // A panel whose counter has not incremented yet degrades to "unavailable" (honest empty
+    // state), never a fabricated figure.
+    private List<PanelSpec> boardOrchestration(Range range) {
+        String w = range.promWindow();
+        return List.of(
+                // Graceful-degradation rate: answered-from-a-partial-fan-out as a share of all
+                // resolved requests. `or vector(0)` keeps the numerator defined before the first
+                // partial fires; the whole panel is unavailable only when no request has resolved.
+                statDelta(range, "degradation_rate", "Graceful-degradation rate", "%",
+                        "(sum(increase(conduit_request_partial_total[" + w + "])) or vector(0))"
+                      + " / clamp_min(sum(increase(conduit_request_outcome_total[" + w + "])),1) * 100"),
+                // Multi-turn signal: FOLLOW_UP as a fraction of all classified intents.
+                statDelta(range, "followup_share", "Follow-up share", "%",
+                        "sum(increase(chat_intent_total{type=\"FOLLOW_UP\"}[" + w + "]))"
+                      + " / clamp_min(sum(increase(chat_intent_total[" + w + "])),1) * 100"),
+                // Composable-orchestration share: count of multi-step DAG plans that actually fired.
+                // The counter only exists once a DAG has executed, so no traffic → unavailable.
+                stat("dag_plans", "Multi-step plans executed", "count",
+                        "sum(increase(conduit_dag_plan_total[" + w + "]))"),
+                // Intent mix: FETCH_DATA / FOLLOW_UP / CLARIFY / CHITCHAT over the window.
+                bars("intent_mix", "Intent mix", "count",
+                        "sum by (type) (increase(chat_intent_total[" + w + "]))", "type"),
+                // Outcome taxonomy: how requests resolve (label values are metric data, not domain
+                // literals) — served, denied, clarified, failed.
+                bars("outcome_taxonomy", "Outcome taxonomy", "count",
+                        "sum by (outcome) (increase(conduit_request_outcome_total[" + w + "]))", "outcome"),
+                // Fan-out shape: how many agents a question fans out to (1 vs 2 vs 3+), read off the
+                // fan-out timer's per-agent_count sample count.
+                bars("fanout_shape", "Fan-out shape (agents per question)", "count",
+                        "sum by (agent_count) (increase(conduit_fanout_duration_seconds_count[" + w + "]))",
+                        "agent_count")
+        );
     }
 
     // ── PanelSpec builders (Prometheus) ──────────────────────────────────────────
