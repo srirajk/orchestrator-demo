@@ -7,6 +7,7 @@ import ai.conduit.gateway.domain.manifest.DomainManifestStore.IdentifiedReferenc
 import ai.conduit.gateway.domain.manifest.EntityType;
 import ai.conduit.gateway.synthesis.input.EntityBag;
 import ai.conduit.gateway.synthesis.input.Mention;
+import ai.conduit.gateway.synthesis.input.MentionAligner;
 import ai.conduit.gateway.synthesis.input.MentionSource;
 import ai.conduit.gateway.synthesis.input.MentionSpan;
 import jakarta.annotation.PreDestroy;
@@ -17,15 +18,19 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Stage-1 reference grounding - the deterministic, PRE-ROUTING step that resolves a human reference
@@ -216,6 +221,226 @@ public class ReferenceGroundingService {
                 ? GroundingResult.none()
                 : toFocalVerdict(grounded.get(focalIndex), principalId);
         return new GroundedReferenceSet(List.copyOf(grounded), focalVerdict);
+    }
+
+    /**
+     * Detects entity references the user named THIS turn that the pipeline did NOT bind — the Compare-CLARIFY
+     * signal (spec §1). Returns the unbound references so the caller can ask ONE deterministic question
+     * instead of silently serving a one-sided compare. Never binds, never CHECKs, never reaches an agent.
+     *
+     * <p>Two deterministic tiers over an ALREADY-computed grounded set:
+     * <ul>
+     *   <li><b>Tier A</b> (no new I/O): an EXPLICIT latest-turn mention that formed no binding, whose
+     *       interpretations are non-empty and all {@code NOT_FOUND}/{@code AMBIGUOUS}, whose verbatim carries a
+     *       proper-noun token and does not overlap a bound/masked span. Extends the single-entity
+     *       {@code reference_not_found}/ambiguous verdict→clarify mappings to a non-focal reference.</li>
+     *   <li><b>Tier B</b> (extractor-dropped, incl. possessives): residual candidates = zero-interpretation
+     *       EXPLICIT latest-turn mentions + maximal capitalized runs of the RAW latest message, minus
+     *       bound/masked overlaps. Each is RESOLVEd principal-agnostically (NO coverage CHECK) against the
+     *       bound entities' own coverage endpoints; it confirms ONLY on a UNIQUE resolution to an id ∉ the
+     *       bound ids. {@code AMBIGUOUS}/{@code NOT_FOUND} never confirm; a resolve to a bound id never
+     *       confirms; {@code UNAVAILABLE}/exception is ignored (fail-open-to-today — this is clarify
+     *       detection, not an entitlement gate).</li>
+     * </ul>
+     *
+     * <p><b>SECURITY.</b> Each {@link UnboundReference#verbatim} is the user's OWN words; Tier-B's resolved
+     * id is carried only for the ∉-bound guard and is NEVER surfaced. RESOLVE stays principal-agnostic
+     * (World-B rule f); no CHECK runs on this path.
+     *
+     * @param groundedSet  the turn's full grounding result (statuses already computed).
+     * @param bindings     the bound entities (from {@link EntityBindingSet#deriveAll}) — supplies the bound
+     *                     ids/verbatims/canonical names AND the coverage endpoints Tier B resolves against.
+     * @param latestPrompt the RAW latest user message (Tier-B's proper-noun-phrase source).
+     * @param tenantId     the tenant scope for RESOLVE.
+     * @param callerToken  the caller's verified bearer token, threaded to the coverage service for RESOLVE.
+     */
+    public List<UnboundReference> detectUnboundReferences(GroundedReferenceSet groundedSet,
+                                                          EntityBindingSet bindings, String latestPrompt,
+                                                          String tenantId, String callerToken) {
+        if (groundedSet == null || groundedSet.isEmpty() || bindings == null
+                || bindings.bindings().isEmpty()) {
+            return List.of();
+        }
+
+        // Latest user turn = highest messageIndex among EXPLICIT mentions (same rule as EntityBindingSet).
+        int latestTurn = Integer.MIN_VALUE;
+        for (GroundedMention gm : groundedSet.mentions()) {
+            Mention m = gm.mention();
+            if (m != null && m.source() == MentionSource.EXPLICIT) {
+                latestTurn = Math.max(latestTurn, m.messageIndex());
+            }
+        }
+        if (latestTurn == Integer.MIN_VALUE) return List.of();
+
+        // Needles that mean "already accounted for": every bound verbatim + canonical name, and every
+        // resolved (masked) mention's verbatim across the whole set. A candidate overlapping any of these
+        // is the same entity named twice (or an already-masked span) → never a residual (no over-clarify).
+        Set<String> accounted = new LinkedHashSet<>();
+        Set<String> boundIds = new LinkedHashSet<>();
+        for (EntityBinding b : bindings.bindings()) {
+            boundIds.add(b.canonicalId());
+            addNeedle(accounted, b.userVerbatim());
+            addNeedle(accounted, b.canonicalName());
+        }
+        for (GroundedMention gm : groundedSet.mentions()) {
+            boolean resolved = gm.interpretations().stream().anyMatch(gi -> gi.canonicalId() != null);
+            if (resolved && gm.mention() != null) addNeedle(accounted, gm.mention().verbatimText());
+        }
+
+        List<UnboundReference> out = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();      // dedupe across tiers, by normalized needle
+
+        // ── Tier A — extractor-asserted, grounding-status case (zero new I/O) ─────────────────────
+        for (GroundedMention gm : groundedSet.mentions()) {
+            Mention m = gm.mention();
+            if (m == null || m.source() != MentionSource.EXPLICIT || m.messageIndex() != latestTurn) continue;
+            List<GroundedInterpretation> interps = gm.interpretations();
+            if (interps.isEmpty()) continue;           // zero-interp is Tier B, not Tier A
+            boolean allUnbindable = interps.stream().allMatch(
+                    gi -> gi.status() == GroundStatus.NOT_FOUND || gi.status() == GroundStatus.AMBIGUOUS);
+            if (!allUnbindable) continue;              // it formed (or could form) a binding
+            String verbatim = m.verbatimText();
+            if (verbatim == null || !PROPER_NOUN.matcher(verbatim).find()) continue; // kills capability nouns
+            String needle = MentionAligner.normalizeNeedle(verbatim);
+            if (needle.isEmpty() || overlaps(needle, accounted)) continue;  // entity-named-two-ways guard
+            if (!seen.add(needle)) continue;
+            boolean ambiguous = interps.stream().anyMatch(gi -> gi.status() == GroundStatus.AMBIGUOUS);
+            out.add(UnboundReference.tierA(verbatim, ambiguous, List.of()));
+        }
+
+        // ── Tier B — extractor-dropped, resolve-confirmation case ─────────────────────────────────
+        // Distinct coverage endpoints among the bound entities' own interpretations (dedupe like dedupeKey).
+        Map<String, CoverageTask> endpoints = new LinkedHashMap<>();
+        for (EntityBinding b : bindings.bindings()) {
+            for (GroundedInterpretation gi : b.interpretations()) {
+                if (gi.coverage() == null || gi.entityType() == null) continue;
+                String key = gi.coverage().resolveUrl() + "" + gi.entityType().resolveType();
+                endpoints.putIfAbsent(key, new CoverageTask(null, gi.entityType().resolveType(), gi.coverage()));
+            }
+        }
+        if (!endpoints.isEmpty()) {
+            // Candidate residual phrases (deduped, capped): zero-interp EXPLICIT latest-turn mentions, then
+            // the raw message's maximal capitalized runs. Overlap-filtered and not already a Tier-A/seen hit.
+            List<String> candidates = new ArrayList<>();
+            for (GroundedMention gm : groundedSet.mentions()) {
+                Mention m = gm.mention();
+                if (m == null || m.source() != MentionSource.EXPLICIT || m.messageIndex() != latestTurn) continue;
+                if (!gm.interpretations().isEmpty()) continue;   // zero-interp only
+                addCandidate(candidates, seen, accounted, m.verbatimText());
+            }
+            for (String phrase : properNounPhrases(latestPrompt)) {
+                addCandidate(candidates, seen, accounted, phrase);
+            }
+            int cap = Math.max(0, budget.residualMaxResolves());
+            List<String> capped = candidates.subList(0, Math.min(candidates.size(), cap));
+            out.addAll(resolveResiduals(capped, List.copyOf(endpoints.values()), boundIds, tenantId, callerToken));
+        }
+        return out;
+    }
+
+    /** Adds {@code phrase} as a Tier-B candidate iff its needle is non-empty, unseen, and unaccounted-for. */
+    private static void addCandidate(List<String> candidates, Set<String> seen, Set<String> accounted, String phrase) {
+        if (phrase == null || phrase.isBlank()) return;
+        String needle = MentionAligner.normalizeNeedle(phrase);
+        if (needle.isEmpty() || overlaps(needle, accounted) || !seen.add(needle)) return;
+        candidates.add(phrase);
+    }
+
+    /**
+     * RESOLVEs each residual candidate principal-agnostically (NO CHECK) against the bound entities'
+     * endpoints, in a bounded VT fan-out with the grounding stage deadline. A candidate confirms iff it
+     * resolves UNIQUELY (one distinct id across all its endpoints) to an id ∉ {@code boundIds}. Ambiguous,
+     * not-found, resolve-to-bound-id, and coverage-unavailable candidates do NOT confirm (fail-open-to-today).
+     */
+    private List<UnboundReference> resolveResiduals(List<String> candidates, List<CoverageTask> endpoints,
+                                                    Set<String> boundIds, String tenantId, String callerToken) {
+        if (candidates.isEmpty() || endpoints.isEmpty()) return List.of();
+        Semaphore gate = new Semaphore(Math.max(1, budget.concurrency()));
+        Map<String, CompletableFuture<UnboundReference>> futures = new LinkedHashMap<>();
+        for (String phrase : candidates) {
+            futures.put(phrase, CompletableFuture.supplyAsync(() -> {
+                try {
+                    gate.acquire();
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    return null;                       // fail-open-to-today
+                }
+                try {
+                    return confirmResidual(phrase, endpoints, boundIds, tenantId, callerToken);
+                } finally {
+                    gate.release();
+                }
+            }, groundingExecutor));
+        }
+        List<UnboundReference> out = new ArrayList<>();
+        long deadlineNanos = System.nanoTime() + budget.stageDeadlineMillis() * 1_000_000L;
+        for (Map.Entry<String, CompletableFuture<UnboundReference>> e : futures.entrySet()) {
+            long remaining = deadlineNanos - System.nanoTime();
+            UnboundReference r;
+            try {
+                r = remaining > 0 ? e.getValue().get(remaining, TimeUnit.NANOSECONDS) : null;
+            } catch (Exception ex) {
+                r = null;                              // timeout/exception → ignore candidate (fail-open)
+            }
+            if (r == null) e.getValue().cancel(true);
+            else out.add(r);
+        }
+        return out;
+    }
+
+    /** One residual candidate's confirm decision. Returns the {@link UnboundReference} on confirm, else null. */
+    private UnboundReference confirmResidual(String phrase, List<CoverageTask> endpoints,
+                                             Set<String> boundIds, String tenantId, String callerToken) {
+        String foundId = null;
+        for (CoverageTask ep : endpoints) {
+            try {
+                CoverageResolveResult r = coverageClient.resolve(
+                        phrase, ep.resolveType(), tenantId, ep.coverage(), callerToken);
+                if (r.resolved() && r.id() != null) {
+                    if (foundId != null && !foundId.equals(r.id())) return null; // two distinct ids → ambiguous
+                    foundId = r.id();
+                } else if (r.isAmbiguous()) {
+                    return null;                       // AMBIGUOUS never confirms in Tier B
+                }
+            } catch (CoverageClient.CoverageUnavailableException e) {
+                return null;                           // fail-open-to-today
+            }
+        }
+        // Confirm ONLY on a unique resolution to an id we did NOT already bind.
+        return (foundId != null && !boundIds.contains(foundId))
+                ? UnboundReference.tierB(phrase, foundId) : null;
+    }
+
+    /** Normalized-substring overlap (either direction) against any accounted-for needle. */
+    private static boolean overlaps(String needle, Set<String> accounted) {
+        for (String a : accounted) {
+            if (a.isEmpty()) continue;
+            if (needle.contains(a) || a.contains(needle)) return true;
+        }
+        return false;
+    }
+
+    private static void addNeedle(Set<String> set, String verbatim) {
+        if (verbatim == null || verbatim.isBlank()) return;
+        String n = MentionAligner.normalizeNeedle(verbatim);
+        if (!n.isEmpty()) set.add(n);
+    }
+
+    /**
+     * Capitalized proper-noun token (length ≥ 3) — a cheap, language-generic entity-name heuristic (no
+     * domain vocabulary). Mirrors the coverage-pipeline backstop's pattern; kills the mis-typed capability
+     * noun class ("performance" can never match) in Tier A and sources Tier B's residual candidates.
+     */
+    private static final Pattern PROPER_NOUN =
+            Pattern.compile("[A-Z][A-Za-z]{2,}(?:\\s+[A-Z][A-Za-z]{2,})*");
+
+    /** Maximal runs of consecutive capitalized words in {@code text} — candidate entity names. */
+    private static List<String> properNounPhrases(String text) {
+        List<String> out = new ArrayList<>();
+        if (text == null || text.isBlank()) return out;
+        Matcher m = PROPER_NOUN.matcher(text);
+        while (m.find()) out.add(m.group());
+        return out;
     }
 
     private static String dedupeKey(IdentifiedReference ref) {

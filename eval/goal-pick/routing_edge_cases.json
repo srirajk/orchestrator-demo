@@ -1,6 +1,6 @@
 {
   "thresholds": {
-    "_note": "The Codex-SOL failure-mode edge rows for the production-path gate: multi-reference (two ids, one capability), same-name-cross-domain (a name valid in two domains, disambiguated by the capability), multi-turn/facet-carry (a terse follow-up inherits the prior facet), an intended entity-only abstain, and an alignment-miss (oblique reference). multi_reference / same_name_cross_domain / multi_turn are gated on exact-capability; entity_only is gated on the 100% abstain invariant; alignment_miss is report-only (routing may legitimately abstain when masking is incomplete). Test data — domain literals allowed.",
+    "_note": "The Codex-SOL failure-mode edge rows for the production-path gate: multi-reference (two ids, one capability), same-name-cross-domain (a name valid in two domains, disambiguated by the capability), multi-turn/facet-carry (a terse follow-up inherits the prior facet), an intended entity-only abstain, and an alignment-miss (oblique reference). multi_reference / same_name_cross_domain / multi_turn are gated on exact-capability; entity_only is gated on the 100% abstain invariant; alignment_miss is report-only (routing may legitimately abstain when masking is incomplete). Test data \u2014 domain literals allowed.",
     "capability_accuracy": 0.9,
     "abstain_rate": 1.0,
     "topk_recall": 0.9,
@@ -13,7 +13,7 @@
       "persona": "rm_jane",
       "query": "Compare the settlement status for REL-00042 and REL-00099.",
       "expected_goal": "meridian.servicing.settlement_status",
-      "note": "Two references of the same entity type (two rel ids) with ONE capability — both spans mask, routing keys on 'settlement status' and lands on settlement_status once (not two competing routes)."
+      "note": "Two references of the same entity type (two rel ids) with ONE capability \u2014 both spans mask, routing keys on 'settlement status' and lands on settlement_status once (not two competing routes)."
     },
     {
       "id": "mr_two_names_one_capability",
@@ -21,7 +21,7 @@
       "persona": "rm_jane",
       "query": "Show the holdings for both the Whitman Family Office and the Calderon Trust.",
       "expected_goal": "meridian.wealth.holdings",
-      "note": "Two names, one wealth capability — must route to holdings, not split into noise."
+      "note": "Two names, one wealth capability \u2014 must route to holdings, not split into noise."
     },
     {
       "id": "sncd_settlement_risk_shared_name",
@@ -29,7 +29,7 @@
       "persona": "rm_jane",
       "query": "What is the settlement risk on the Whitman Family Office?",
       "expected_goal": "meridian.servicing.settlement_risk",
-      "note": "Whitman (REL-00042) is a relationship visible in BOTH wealth and servicing. The capability 'settlement risk' disambiguates to the asset-servicing capability — the shared name must not drag the route to a wealth capability."
+      "note": "Whitman (REL-00042) is a relationship visible in BOTH wealth and servicing. The capability 'settlement risk' disambiguates to the asset-servicing capability \u2014 the shared name must not drag the route to a wealth capability."
     },
     {
       "id": "sncd_concentration_shared_name",
@@ -37,28 +37,46 @@
       "persona": "rm_jane",
       "query": "Show portfolio concentration risk for the Whitman Family Office.",
       "expected_goal": "meridian.wealth.concentration",
-      "note": "Same shared name, but 'portfolio concentration risk' is a wealth capability — disambiguates the OTHER way. The pair (with sncd_settlement_risk_shared_name) proves the capability, not the name, decides the domain."
+      "note": "Same shared name, but 'portfolio concentration risk' is a wealth capability \u2014 disambiguates the OTHER way. The pair (with sncd_settlement_risk_shared_name) proves the capability, not the name, decides the domain."
     },
     {
       "id": "mt_facet_carry_settlement_terse_id",
       "category": "multi_turn",
       "persona": "rm_jane",
       "messages": [
-        {"role": "user", "content": "Settlement status for REL-00042?"},
-        {"role": "assistant", "content": "REL-00042 has 2 pending and 1 failed settlement."},
-        {"role": "user", "content": "and for REL-00099?"}
+        {
+          "role": "user",
+          "content": "Settlement status for REL-00042?"
+        },
+        {
+          "role": "assistant",
+          "content": "REL-00042 has 2 pending and 1 failed settlement."
+        },
+        {
+          "role": "user",
+          "content": "and for REL-00099?"
+        }
       ],
       "expected_goal": "meridian.servicing.settlement_status",
-      "note": "Facet-carry (bug-233 / spec Piece 3): the terse 'and for REL-00099?' inherits the prior turn's settlement facet — the window carries an explicit grounded id, so routing does not margin-abstain into a clarify — and routes to settlement_status again."
+      "note": "Facet-carry (bug-233 / spec Piece 3): the terse 'and for REL-00099?' inherits the prior turn's settlement facet \u2014 the window carries an explicit grounded id, so routing does not margin-abstain into a clarify \u2014 and routes to settlement_status again."
     },
     {
       "id": "mt_facet_carry_anaphora_new_facet",
       "category": "multi_turn",
       "persona": "rm_jane",
       "messages": [
-        {"role": "user", "content": "Pull up the Whitman Family Office holdings."},
-        {"role": "assistant", "content": "Whitman holds 14 positions across 3 asset classes."},
-        {"role": "user", "content": "and the performance on that portfolio?"}
+        {
+          "role": "user",
+          "content": "Pull up the Whitman Family Office holdings."
+        },
+        {
+          "role": "assistant",
+          "content": "Whitman holds 14 positions across 3 asset classes."
+        },
+        {
+          "role": "user",
+          "content": "and the performance on that portfolio?"
+        }
       ],
       "expected_goal": "meridian.wealth.performance",
       "note": "Anaphora + new facet: 'that portfolio' resolves to the last focal entity (Whitman); the NEW facet 'performance' must re-route to performance, not stay on holdings."
@@ -69,7 +87,7 @@
       "persona": "rm_jane",
       "query": "The Whitman Family Office.",
       "expected_goal": "abstain",
-      "note": "Entity with NO capability action — after masking the residual is near-empty, so routing must abstain into a clarify rather than guess a capability from the name alone."
+      "note": "Entity with NO capability action \u2014 after masking the residual is near-empty, so routing must abstain into a clarify rather than guess a capability from the name alone."
     },
     {
       "id": "entity_only_with_stopwords_abstains",
@@ -77,7 +95,7 @@
       "persona": "ops_analyst_singh",
       "query": "Can you show me REL-00188 please?",
       "expected_goal": "abstain",
-      "note": "Entity + stopwords/request-verbs only — masking the id leaves 'can you show me please', which the near-empty policy treats as no action → abstain/clarify, not a blind route."
+      "note": "Entity + stopwords/request-verbs only \u2014 masking the id leaves 'can you show me please', which the near-empty policy treats as no action \u2192 abstain/clarify, not a blind route."
     },
     {
       "id": "alignment_miss_oblique_reference",
@@ -85,7 +103,78 @@
       "persona": "rm_jane",
       "query": "What's the risk tolerance for the family office we discussed earlier?",
       "expected_goal": "meridian.wealth.risk_profile",
-      "note": "Report-only. An oblique reference ('the family office we discussed') has no alignable verbatim id/name, so masking is INCOMPLETE and relaxation is forfeited — routing may still key on 'risk tolerance' (capability-first) or abstain. This row surfaces the alignment-miss behaviour for the operator; it is not a hard gate."
+      "note": "Report-only. An oblique reference ('the family office we discussed') has no alignable verbatim id/name, so masking is INCOMPLETE and relaxation is forfeited \u2014 routing may still key on 'risk tolerance' (capability-first) or abstain. This row surfaces the alignment-miss behaviour for the operator; it is not a hard gate."
+    },
+    {
+      "id": "mt_switch_wealth_facet",
+      "category": "multi_turn",
+      "persona": "rm_jane",
+      "messages": [
+        {
+          "role": "user",
+          "content": "give me a summary of the Whitman Family Office holdings"
+        },
+        {
+          "role": "assistant",
+          "content": "Whitman Family Office (REL-00042): five positions across equities and fixed income."
+        },
+        {
+          "role": "user",
+          "content": "whats the concentration risk there"
+        },
+        {
+          "role": "assistant",
+          "content": "Whitman Family Office (REL-00042) concentration: top-5 are 38% of the book."
+        },
+        {
+          "role": "user",
+          "content": "show me the Calderon Trust holdings"
+        }
+      ],
+      "expected_goal": "meridian.wealth.holdings",
+      "note": "Client SWITCH with a facet: latest names a NEW covered client (Calderon) + a capability (holdings). Must route on the latest turn (holdings), NOT inherit the prior concentration topic. Guards the canonical-name needle-tightening fix (bug-262/switch)."
+    },
+    {
+      "id": "mt_switch_wealth_crossfacet",
+      "category": "multi_turn",
+      "persona": "rm_jane",
+      "messages": [
+        {
+          "role": "user",
+          "content": "what are the holdings for the Whitman Family Office"
+        },
+        {
+          "role": "assistant",
+          "content": "Whitman Family Office (REL-00042): AAPL, MSFT, GOOGL, JPM, and a T-Bill."
+        },
+        {
+          "role": "user",
+          "content": "now Calderon's concentration risk"
+        }
+      ],
+      "expected_goal": "meridian.wealth.concentration",
+      "note": "Client SWITCH to a new facet: possessive new-client reference (Calderon's) + a different capability (concentration). Must route to concentration for the switched client."
+    },
+    {
+      "id": "mt_switch_insurance_crossdomain",
+      "category": "multi_turn",
+      "persona": "uw_sam",
+      "messages": [
+        {
+          "role": "user",
+          "content": "policy details for Continental Freight Liability"
+        },
+        {
+          "role": "assistant",
+          "content": "Continental Freight Liability (POL-77001): commercial auto liability, active."
+        },
+        {
+          "role": "user",
+          "content": "now show me the Aurora Mfg Property claims"
+        }
+      ],
+      "expected_goal": "meridian.insurance.claim_status",
+      "note": "Cross-domain proof of the switch fix: insurance client SWITCH (Aurora) + capability (claims). Must route on the latest turn to claim_status. Proves the fix is domain-agnostic."
     }
   ]
 }

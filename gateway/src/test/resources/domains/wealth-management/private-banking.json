@@ -56,7 +56,8 @@
     "specify_entity": "Please specify the client name or relationship ID.",
     "missing_entity_question": "Which client relationship are you asking about? Please provide the relationship ID or client name to continue.",
     "followup_clarification": "Could you clarify what you'd like to know about {entity}? For example: holdings, performance, settlements, or corporate actions.",
-    "capability_unavailable": "That capability isn't available to you right now."
+    "capability_unavailable": "That capability isn't available to you right now.",
+    "compare_partial_resolution": "I found {resolved}. I couldn't confidently identify the other client you mentioned ({unresolved}). Please give the client name or relationship ID and I'll compare them."
   },
   "clarification_schema": {
     "relationship_id": {

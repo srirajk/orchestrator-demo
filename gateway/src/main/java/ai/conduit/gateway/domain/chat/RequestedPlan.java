@@ -1,5 +1,6 @@
 package ai.conduit.gateway.domain.chat;
 
+import ai.conduit.gateway.domain.coverage.EntityBinding;
 import ai.conduit.gateway.registry.model.AgentManifest;
 
 import java.util.List;
@@ -51,7 +52,11 @@ public record RequestedPlan(List<RequestedGroup> groups) {
      * @param requiredEntityKeys     manifest-declared required entity keys across the group's candidates
      *                               (diagnostic; the coverage/bind stages read the effective manifest).
      * @param routingEvidence        a short, domain-agnostic diagnostic tag describing why this group was
-     *                               formed (e.g. {@code "rerank-facet"} / {@code "single-selection"}).
+     *                               formed (e.g. {@code "rerank-facet"} / {@code "single-selection"} /
+     *                               {@code "entity-facet"}).
+     * @param binding                the entity this group is bound to for a multi-entity COMPARE fan-out
+     *                               ({@code null} on every non-COMPARE group — the feature is inert below
+     *                               two bindings, so every existing group keeps {@code binding == null}).
      */
     public record RequestedGroup(
             List<String> requestedCapabilityIds,
@@ -59,12 +64,26 @@ public record RequestedPlan(List<RequestedGroup> groups) {
             Kind kind,
             String goalId,
             List<String> requiredEntityKeys,
-            String routingEvidence) {
+            String routingEvidence,
+            EntityBinding binding) {
 
         public RequestedGroup {
             requestedCapabilityIds = requestedCapabilityIds == null ? List.of() : List.copyOf(requestedCapabilityIds);
             candidates = candidates == null ? List.of() : List.copyOf(candidates);
             requiredEntityKeys = requiredEntityKeys == null ? List.of() : List.copyOf(requiredEntityKeys);
+        }
+
+        /** Legacy constructor — every existing call site keeps its 6-arg shape with {@code binding == null}. */
+        public RequestedGroup(List<String> requestedCapabilityIds, List<AgentManifest> candidates,
+                              Kind kind, String goalId, List<String> requiredEntityKeys,
+                              String routingEvidence) {
+            this(requestedCapabilityIds, candidates, kind, goalId, requiredEntityKeys, routingEvidence, null);
+        }
+
+        /** A copy of this group bound to {@code b} and re-tagged as an entity facet (COMPARE expansion). */
+        public RequestedGroup withEntityBinding(EntityBinding b) {
+            return new RequestedGroup(requestedCapabilityIds, candidates, kind, goalId,
+                    requiredEntityKeys, "entity-facet", b);
         }
 
         public boolean isDag() {

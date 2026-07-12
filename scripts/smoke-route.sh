@@ -143,5 +143,52 @@ assert_route_msgs "S9 CARRY rm_jane concentration anaphora → SERVED wealth.con
   "$S9_MSGS" \
   "disp=='SERVED' and primary=='meridian.wealth.concentration'"
 
+# ── MULTI-ENTITY COMPARE (Multi-Entity Compare spec — S10/S11/S12) ───────────────────────────────
+# The per-entity fan-out: one query naming ≥2 resolvable clients coverage-CHECKs EACH independently,
+# forms one entity-facet group per client, and composes SERVED / PARTIAL / COVERAGE_DENIED from the SET
+# of entity verdicts (never the focal mention alone — the MC-3 order-dependence bug fix).
+
+# S10 — both clients covered (rm_jane covers Whitman/REL-00042 AND Calderon/REL-00099): both served.
+S10_MSGS='[{"role":"user","content":"compare the concentration of Whitman Family Office and Calderon Trust"}]'
+assert_route_msgs "S10 COMPARE both-covered → SERVED, 2 entity-facet groups" "$JANE" \
+  "$S10_MSGS" \
+  "disp=='SERVED' and pdom=='wealth-management' and len([g for g in d.get('requestedGroups',[]) if g.get('routingEvidence')=='entity-facet'])>=2"
+
+# S11 — one covered, one denied, DENIED-FIRST (pins the MC-3 fix): "the Okafor account" (REL-00188,
+# OUT of jane's book) named FIRST, then Whitman. Must PARTIAL: serve Whitman, WITHHOLD Okafor — the
+# covered half is NOT killed by the uncovered focal. No-leak proxy: exactly one entity group DENIED,
+# ≥1 SERVED (the /debug/route projection carries no canonical ids; the live E2E asserts data absence).
+S11_MSGS='[{"role":"user","content":"compare the concentration of the Okafor account and the Whitman Family Office"}]'
+assert_route_msgs "S11 COMPARE one-denied (Okafor first) → PARTIAL, 1 entity group withheld" "$JANE" \
+  "$S11_MSGS" \
+  "disp=='PARTIAL' and pdom=='wealth-management' and len([g for g in d.get('requestedGroups',[]) if g.get('routingEvidence')=='entity-facet'])>=2 and len([x for x in d.get('disposition',[]) if x.get('disposition')=='DENIED'])==1 and len([x for x in d.get('disposition',[]) if x.get('disposition')=='SERVED'])>=1"
+
+# S12 — order flip (Whitman FIRST, Okafor second): SAME PARTIAL outcome → pins order independence.
+S12_MSGS='[{"role":"user","content":"compare the concentration of the Whitman Family Office and the Okafor account"}]'
+assert_route_msgs "S12 COMPARE order-flip (Whitman first) → PARTIAL (order independent)" "$JANE" \
+  "$S12_MSGS" \
+  "disp=='PARTIAL' and pdom=='wealth-management' and len([g for g in d.get('requestedGroups',[]) if g.get('routingEvidence')=='entity-facet'])>=2 and len([x for x in d.get('disposition',[]) if x.get('disposition')=='DENIED'])==1 and len([x for x in d.get('disposition',[]) if x.get('disposition')=='SERVED'])>=1"
+
+# ── COMPARE-CLARIFY (Compare-CLARIFY spec — S13/S14) ─────────────────────────────────────────────
+# When a request names ≥2 distinct clients but binds FEWER, the gateway ASKS (deterministic CLARIFY)
+# instead of silently serving one-sided. These rows are written FLAKE-PROOF against extractor variance
+# (PC-3 proved the same phrasing can legitimately two-side-serve): they pin the INVARIANT — CLARIFY or a
+# TWO-SIDED served (≥2 entity-facet groups) — and FAIL only on a one-sided SERVED (a lone single-selection
+# group). `ef` = count of entity-facet groups.
+
+# S13 — incomplete resolution (alias 2nd, rm_jane): "the Calderon account" is the flaky/possessive form
+# the extractor sometimes drops. NEVER one-sided: CLARIFY, or SERVED with both clients (≥2 entity-facet).
+S13_MSGS='[{"role":"user","content":"compare the concentration of the Whitman Family Office and the Calderon account"}]'
+assert_route_msgs "S13 COMPARE-CLARIFY incomplete-resolution → CLARIFY or two-sided SERVED (never one-sided)" "$JANE" \
+  "$S13_MSGS" \
+  "(disp=='CLARIFY') or (disp=='SERVED' and len([g for g in d.get('requestedGroups',[]) if g.get('routingEvidence')=='entity-facet'])>=2)"
+
+# S14 — out-of-book dropped (rm_jane): the second client (Okafor) is out of book. Either CLARIFY (the
+# extractor dropped it → unbound) or PARTIAL (it bound and was withheld) — never a plain one-sided SERVED.
+S14_MSGS='[{"role":"user","content":"compare the concentration of the Whitman Family Office and the Okafor account"}]'
+assert_route_msgs "S14 COMPARE out-of-book dropped → CLARIFY or PARTIAL (never one-sided SERVED)" "$JANE" \
+  "$S14_MSGS" \
+  "(disp in ('CLARIFY','PARTIAL')) or (disp=='SERVED' and len([g for g in d.get('requestedGroups',[]) if g.get('routingEvidence')=='entity-facet'])>=2)"
+
 echo "── smoke-route: $PASS passed / $FAIL failed ──"
 [ "$FAIL" -eq 0 ]

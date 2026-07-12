@@ -18,7 +18,9 @@ public class GroundingConfig {
             @Value("${conduit.grounding.max-mentions:8}") int maxMentions,
             @Value("${conduit.grounding.max-interpretations-per-mention:4}") int maxInterpretationsPerMention,
             @Value("${conduit.grounding.concurrency:8}") int concurrency,
-            @Value("${conduit.grounding.stage-deadline-ms:8000}") long stageDeadlineMillis) {
-        return new GroundingBudget(maxMentions, maxInterpretationsPerMention, concurrency, stageDeadlineMillis);
+            @Value("${conduit.grounding.stage-deadline-ms:8000}") long stageDeadlineMillis,
+            @Value("${conduit.grounding.residual-detection.max-resolves:3}") int residualMaxResolves) {
+        return new GroundingBudget(maxMentions, maxInterpretationsPerMention, concurrency,
+                stageDeadlineMillis, residualMaxResolves);
     }
 }

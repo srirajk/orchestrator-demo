@@ -40,6 +40,10 @@ import java.util.List;
  * @param requestedGroups    the requested-capability groups the plan partitioned.
  * @param disposition        per-group post-authorization disposition (structural authz only; no invoke).
  * @param overallDisposition the merged terminal disposition class for the whole request.
+ * @param unresolvedReferenceCount how many entity references the user named this turn that the pipeline
+ *                           did NOT bind (Compare-CLARIFY) — a COUNT only, never the verbatim text. When
+ *                           positive with {@code overallDisposition == "CLARIFY"} the request would ask
+ *                           rather than serve a one-sided compare.
  */
 public record RouteDecision(
         String path,
@@ -54,7 +58,8 @@ public record RouteDecision(
         List<CandidateView> candidates,
         List<GroupView> requestedGroups,
         List<GroupDisposition> disposition,
-        String overallDisposition) {
+        String overallDisposition,
+        int unresolvedReferenceCount) {
 
     public RouteDecision {
         grounded = grounded == null ? List.of() : List.copyOf(grounded);

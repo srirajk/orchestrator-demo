@@ -37,6 +37,10 @@ public class GroundedFigureRenderer {
         List<GroundedFigure> figures = new ArrayList<>();
         for (NodeResult result : results) {
             if (result == null || !result.isOk() || result.data() == null) continue;
+            // Manifest lookup is keyed by the bare agentId; the figure's sourceAgent LABEL is the nodeId
+            // so a multi-entity COMPARE (two calls to the same agent under distinct entity-qualified
+            // nodeIds) attributes each figure to its own client. Single-entity: nodeId == agentId, so
+            // both the lookup and the label are byte-identical to before.
             AgentManifest manifest = manifestLookup.apply(result.agentId()).orElse(null);
             AgentManifest.Io io = manifest == null ? null : manifest.io();
             List<AgentManifest.Produce> produces =
@@ -44,8 +48,9 @@ public class GroundedFigureRenderer {
             for (AgentManifest.Produce produce : produces) {
                 List<AgentManifest.ProducedFigure> declared =
                         (produce == null || produce.figures() == null) ? List.of() : produce.figures();
+                String sourceLabel = result.nodeId() != null ? result.nodeId() : result.agentId();
                 for (AgentManifest.ProducedFigure figure : declared) {
-                    GroundedFigure rendered = renderOne(result.agentId(), figure, result.data(), figures.size());
+                    GroundedFigure rendered = renderOne(sourceLabel, figure, result.data(), figures.size());
                     if (rendered != null) figures.add(rendered);
                 }
             }

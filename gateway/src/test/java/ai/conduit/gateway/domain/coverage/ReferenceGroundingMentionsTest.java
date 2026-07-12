@@ -299,7 +299,7 @@ class ReferenceGroundingMentionsTest {
     @Test
     void budget_capsInterpretationsPerMention() {
         grounding = new ReferenceGroundingService(manifestStore, coverageClient,
-                new GroundingBudget(8, 1, 8, 8000));
+                new GroundingBudget(8, 1, 8, 8000, 3));
         when(manifestStore.interpretationsForReference("relationship_reference", "Sterling"))
                 .thenReturn(List.of(
                         new IdentifiedReference("Sterling", REL, SUB_A, COVERAGE_A),
@@ -318,7 +318,7 @@ class ReferenceGroundingMentionsTest {
     @Test
     void budget_capsMentions() {
         grounding = new ReferenceGroundingService(manifestStore, coverageClient,
-                new GroundingBudget(1, 4, 8, 8000));
+                new GroundingBudget(1, 4, 8, 8000, 3));
         interpretation("Whitman", REL, SUB_A, COVERAGE_A);
         interpretation("Calderon", REL, SUB_A, COVERAGE_A);
         resolvesAllowed(COVERAGE_A, "Whitman", "REL-00042");

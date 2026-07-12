@@ -15,15 +15,20 @@ package ai.conduit.gateway.domain.coverage;
  * @param stageDeadlineMillis          wall-clock budget for the whole grounding stage; unfinished
  *                                     interpretations are aggregated as {@code UNAVAILABLE}
  *                                     (fail-closed), deterministically.
+ * @param residualMaxResolves          Compare-CLARIFY Tier-B cap: most residual (extractor-dropped)
+ *                                     candidate phrases the detector will principal-agnostically RESOLVE
+ *                                     to DECIDE a clarify. Bounds the extra fan-out on affected shapes
+ *                                     only; innocent single-entity queries filter to zero candidates.
  */
 public record GroundingBudget(
         int maxMentions,
         int maxInterpretationsPerMention,
         int concurrency,
-        long stageDeadlineMillis) {
+        long stageDeadlineMillis,
+        int residualMaxResolves) {
 
     /** Safe defaults for hand-built (test) construction, mirroring the shipped config values. */
     public static GroundingBudget defaults() {
-        return new GroundingBudget(8, 4, 8, 8000);
+        return new GroundingBudget(8, 4, 8, 8000, 3);
     }
 }

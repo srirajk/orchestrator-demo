@@ -203,6 +203,18 @@ conduit:
     max-interpretations-per-mention: ${CONDUIT_GROUNDING_MAX_INTERPRETATIONS_PER_MENTION:4}
     concurrency: ${CONDUIT_GROUNDING_CONCURRENCY:8}
     stage-deadline-ms: ${CONDUIT_GROUNDING_STAGE_DEADLINE_MS:8000}
+    # Compare-CLARIFY (spec §3): when a request binds ≥1 entity but names MORE than it bound, ask ONE
+    # deterministic question instead of a silent one-sided compare. `enabled` is the kill-switch (OFF ⇒
+    # pre-feature behaviour, byte-identical); `max-resolves` caps the Tier-B residual RESOLVE fan-out on
+    # affected shapes only (innocent single-entity queries filter to zero candidates).
+    residual-detection:
+      enabled: ${CONDUIT_GROUNDING_RESIDUAL_DETECTION:true}
+      max-resolves: ${CONDUIT_GROUNDING_RESIDUAL_MAX_RESOLVES:3}
+  groups:
+    # Multi-entity COMPARE fan-out caps (Multi-Entity Compare §D4). Capping is deterministic (mention
+    # order) and never silent — it is logged, traced, and stated in the answer.
+    max-entity-bindings: ${CONDUIT_GROUPS_MAX_ENTITY_BINDINGS:3}   # entities compared per request
+    max-total-groups: ${CONDUIT_GROUPS_MAX_TOTAL:6}                # facet×entity groups after expansion
   chat:
     # Recent user turns (incl. current) concatenated into the routing query so keyword-less
     # follow-ups inherit the conversation's domain vocabulary. Bounded to limit domain drift.

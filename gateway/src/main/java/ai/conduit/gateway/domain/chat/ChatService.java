@@ -10,10 +10,13 @@ import ai.conduit.gateway.domain.coverage.CoverageCheckResult;
 import ai.conduit.gateway.domain.coverage.CoverageClient;
 import ai.conduit.gateway.domain.coverage.CoverageResolveResult;
 import ai.conduit.gateway.domain.coverage.CoverageResource;
+import ai.conduit.gateway.domain.coverage.EntityBinding;
+import ai.conduit.gateway.domain.coverage.EntityBindingSet;
 import ai.conduit.gateway.domain.coverage.ReferenceGroundingService;
 import ai.conduit.gateway.domain.coverage.ReferenceGroundingService.GroundedInterpretation;
 import ai.conduit.gateway.domain.coverage.ReferenceGroundingService.GroundedReferenceSet;
 import ai.conduit.gateway.domain.coverage.ReferenceGroundingService.GroundingResult;
+import ai.conduit.gateway.domain.coverage.UnboundReference;
 import ai.conduit.gateway.domain.intent.Intent;
 import ai.conduit.gateway.domain.intent.IntentClassifier;
 import ai.conduit.gateway.domain.intent.IntentResult;
@@ -171,6 +174,28 @@ public class ChatService {
      */
     @org.springframework.beans.factory.annotation.Value("${conduit.routing.preparation-version:route-prep-v2}")
     private String preparationVersion;
+
+    /**
+     * Multi-entity COMPARE fan-out caps (routing spec — Multi-Entity Compare §D4). Config, never Java
+     * constants (CLAUDE.md §5). {@code max-entity-bindings} bounds the entities per request;
+     * {@code max-total-groups} bounds the facet×entity product after expansion. Capping is deterministic
+     * (mention order = the order the user named them) and NEVER silent — it is logged, traced, and stated
+     * in the answer.
+     */
+    @org.springframework.beans.factory.annotation.Value("${conduit.groups.max-entity-bindings:3}")
+    private int maxEntityBindings;
+
+    @org.springframework.beans.factory.annotation.Value("${conduit.groups.max-total-groups:6}")
+    private int maxTotalGroups;
+
+    /**
+     * Compare-CLARIFY kill-switch (Compare-CLARIFY spec §3). When ON (default), a request that binds ≥1
+     * entity but names MORE than it bound asks ONE deterministic question instead of silently serving a
+     * one-sided compare. OFF restores the pre-feature behaviour byte-for-byte (the detector never runs).
+     * Config, never a Java constant (CLAUDE.md §5).
+     */
+    @org.springframework.beans.factory.annotation.Value("${conduit.grounding.residual-detection.enabled:true}")
+    private boolean residualDetectionEnabled;
 
     public ChatService(ObjectMapper mapper,
                        IntentClassifier intentClassifier,
@@ -429,7 +454,58 @@ public class ChatService {
             GroundingResult grounding = focalVerdict.verdict() != ReferenceGroundingService.Verdict.NONE
                     ? focalVerdict
                     : referenceGrounding.ground(preExtracted, latestPrompt, principal, tenantId, callerToken);
+            // ── MULTI-ENTITY COMPARE — per-entity bindings (Multi-Entity Compare §D1) ──────────────
+            // Derived from the ALREADY-computed grounded set (no new coverage calls); only latest-turn
+            // EXPLICIT mentions form bindings (anaphora never multiplies fan-out → S8/S9 unchanged). Below
+            // two bindings the feature is INERT and the terminal lattice is byte-identical.
+            EntityBindingSet bindingSet = EntityBindingSet.derive(prepared.groundedSet());
+            boolean multiEntity = bindingSet.multiEntity();
+
             GroundingResult groundedMemo = null;
+            if (multiEntity) {
+                // Generalized terminal lattice (D2 — the MC-3 fix): disposition derives from the SET of
+                // bindings, not the focal mention. A focal DENY no longer kills the whole request when a
+                // sibling client is covered.
+                if (bindingSet.allowedCount() == 0) {
+                    if (bindingSet.anyDenied()) {
+                        // ALL bindings denied (zero allowed) → terminal COVERAGE_DENIED. Emit one
+                        // gate/check_denied pair per binding, stream the manifest coverage copy once (S4).
+                        emitRequestOutcome("DENIED");
+                        for (EntityBinding b : bindingSet.bindings()) {
+                            if (!b.hasDenied() && !b.hasUnavailable()) continue;
+                            String reason = b.terminalDenialReason();
+                            String sub = b.terminalDeniedSubDomainId();
+                            tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
+                                GateData.deny(GateData.GATE_COVERAGE,
+                                    b.canonicalId() + " not in " + principal.id() + "'s book", sub)));
+                            tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
+                                new CheckDeniedData("coverage", b.canonicalId(), principal.id(), reason, "coverage")));
+                        }
+                        EntityBinding first = bindingSet.firstWithheld();
+                        streamTextAndComplete(emitter, mapDenialReason(
+                            first != null ? first.terminalDenialReason() : null,
+                            first != null ? first.terminalDeniedSubDomainId() : null), streamId);
+                        tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
+                            new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                        return;
+                    }
+                    // ALL bindings UNAVAILABLE → fail closed (existing UNAVAILABLE terminal semantics).
+                    emitRequestOutcome("DENIED");
+                    tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
+                        new CheckDeniedData("coverage", null, principal.id(), "coverage-unavailable", "coverage")));
+                    streamTextAndComplete(emitter,
+                        "I am unable to verify your coverage right now, so I cannot provide that data.", streamId);
+                    tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
+                        new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                    return;
+                }
+                // ≥1 allowed → proceed to routing. The focal verdict still seeds the memo ONLY when it is
+                // itself RESOLVED_ALLOWED; the memo id-equality guard (coverageForGroup) then prevents it
+                // from ever binding a non-focal entity group.
+                if (grounding.verdict() == ReferenceGroundingService.Verdict.RESOLVED_ALLOWED) {
+                    groundedMemo = grounding;
+                }
+            } else {
             switch (grounding.verdict()) {
                 case DENIED -> {
                     emitRequestOutcome("DENIED");
@@ -463,6 +539,7 @@ public class ChatService {
                     // re-resolving/re-checking, and route with entityKnown=true (subject is known).
                     groundedMemo = grounding;
                 default -> { /* AMBIGUOUS / NOT_FOUND / NONE — normal pipeline runs unchanged. */ }
+            }
             }
 
             // ── CONTEXT-AWARE ROUTING (Piece 3 prepared route + Piece 5 conflict-trigger wiring) ──
@@ -549,11 +626,40 @@ public class ChatService {
             // while a denied facet is withheld honestly instead of first-survivor roulette. The
             // single-group path falls through to the pre-Piece-4 flat disposition below UNCHANGED, so the
             // overwhelmingly common single-capability request is byte-identical to today.
-            RequestedPlan plan = buildRequestedPlan(resolved);
+            // Multi-entity COMPARE expansion (§D3): cross-product facet groups × entity bindings AFTER
+            // routing, on the untouched masked text. A no-op below two bindings, so the plan (and every
+            // single-entity path) is byte-identical. ≥2 entity groups ⇒ the per-group disposition engine.
+            ExpandResult expansion = expandPerEntity(buildRequestedPlan(resolved), bindingSet);
+            RequestedPlan plan = expansion.plan();
+
+            // ── COMPARE-CLARIFY (spec §3): the user named more entity references than we bound ──────────
+            // Deterministic clarify (World-B rules 2/6) instead of a silent one-sided serve. Fires ONLY
+            // post-routing (a real route exists) and ONLY when ≥1 entity is bound-and-covered. Precedence
+            // deny > clarify holds by construction: a coverage-denied entity FORMS a binding, so it is
+            // never in `unbound` — the existing PARTIAL/deny paths own it; this fires only for UNBOUND
+            // references. Zero agent/synth spend. Sits before BOTH the multi-group engine and the flat
+            // path, since a one-sided PC-1 lands in a flat single-selection group.
+            if (residualDetectionEnabled) {
+                EntityBindingSet clarifyBindings = EntityBindingSet.deriveAll(prepared.groundedSet());
+                if (clarifyBindings.allowedCount() >= 1) {
+                    List<UnboundReference> unbound = referenceGrounding.detectUnboundReferences(
+                            prepared.groundedSet(), clarifyBindings, latestPrompt, tenantId, callerToken);
+                    if (!unbound.isEmpty()) {
+                        emitRequestOutcome("CLARIFIED");
+                        streamTextAndComplete(emitter,
+                                buildCompareClarification(clarifyBindings, unbound,
+                                        clarifyScopeSubDomain(resolved, clarifyBindings)), streamId);
+                        tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
+                                new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                        return;
+                    }
+                }
+            }
+
             if (plan.isMultiGroup()) {
                 disposeGroups(plan, request, emitter, latestPrompt, conversationId, userId, principal,
                         tenantId, groundedMemo, preExtracted, requestId, requestStart, rootSpan,
-                        streamId, callerToken, prepared);
+                        streamId, callerToken, prepared, expansion.cappedNote());
                 return;
             }
 
@@ -1261,10 +1367,14 @@ public class ChatService {
                         groundedDomainIds);
         resolved = withPrimaryCandidate(resolved);
 
-        // 4) Requested-capability groups (production partitioner).
-        RequestedPlan plan = buildRequestedPlan(resolved);
+        // 4) Requested-capability groups (production partitioner) + multi-entity COMPARE expansion, so the
+        //    probe projects the SAME entity-facet groups the fetch path disposes.
+        EntityBindingSet bindingSet = EntityBindingSet.derive(prepared.groundedSet());
+        boolean multiEntity = bindingSet.multiEntity();
+        RequestedPlan plan = expandPerEntity(buildRequestedPlan(resolved), bindingSet).plan();
 
-        // 5) Per-group structural authorization — no agent invocation.
+        // 5) Per-group disposition — structural authorization, plus (for an entity group) THIS entity's own
+        //    coverage CHECK result (consumed from the grounded set; no agent invocation, no new coverage call).
         List<RouteDecision.GroupDisposition> dispositions = new ArrayList<>();
         int servedGroups = 0;
         int deniedGroups = 0;
@@ -1279,10 +1389,31 @@ public class ChatService {
             }
             String disp = allowedList.isEmpty() ? "DENIED"
                     : (deniedList.isEmpty() ? "SERVED" : "PARTIAL");
+            // An entity group structurally allowed but whose bound client is NOT covered is withheld →
+            // DENIED (the S11/S12 PARTIAL projection). Fail-closed: no covered interpretation ⇒ denied.
+            if (group.binding() != null && !"DENIED".equals(disp)
+                    && !entityGroupCovered(group, group.binding())) {
+                disp = "DENIED";
+                if (deniedList.isEmpty()) { deniedList = new ArrayList<>(group.requestedCapabilityIds()); }
+                allowedList = new ArrayList<>();
+            }
             if ("DENIED".equals(disp)) deniedGroups++; else servedGroups++;
             dispositions.add(new RouteDecision.GroupDisposition(
                     group.requestedCapabilityIds(), allowedList, deniedList, disp));
         }
+
+        // 6) Compare-CLARIFY mirror (spec §3): the SAME detection the fetch path runs, surfaced as
+        //    overallDisposition="CLARIFY" + a count so smoke can assert the never-one-sided invariant. Runs
+        //    only on a real route with ≥1 bound-and-covered entity; single-entity queries filter to zero.
+        int unresolvedCount = 0;
+        if (residualDetectionEnabled && !resolved.fallback() && !resolved.selected().isEmpty()) {
+            EntityBindingSet clarifyBindings = EntityBindingSet.deriveAll(prepared.groundedSet());
+            if (clarifyBindings.allowedCount() >= 1) {
+                unresolvedCount = referenceGrounding.detectUnboundReferences(
+                        prepared.groundedSet(), clarifyBindings, latestPrompt, tenantId, callerToken).size();
+            }
+        }
+        boolean clarify = unresolvedCount > 0;
 
         return new RouteDecision(
                 RouteDecision.PRODUCTION_PATH,
@@ -1297,19 +1428,48 @@ public class ChatService {
                 projectCandidates(resolved),
                 projectGroups(plan),
                 dispositions,
-                overallDisposition(grounding, resolved, servedGroups, deniedGroups));
+                overallDisposition(grounding, resolved, servedGroups, deniedGroups, multiEntity, clarify),
+                unresolvedCount);
+    }
+
+    /**
+     * True when an entity group's bound client passed its OWN coverage CHECK for the group's routed
+     * sub-domain (a RESOLVED_ALLOWED interpretation of THIS binding's canonicalId). A DENIED/UNAVAILABLE
+     * or non-matching interpretation is NOT covered — fail closed. Consumes the binding's grounded
+     * interpretations; makes no coverage call. Used by the {@code /debug/route} probe projection only.
+     */
+    private boolean entityGroupCovered(RequestedPlan.RequestedGroup group, EntityBinding binding) {
+        for (AgentManifest m : group.candidates()) {
+            String sd = subDomainIdOf(m);
+            if (sd == null) continue;
+            for (GroundedInterpretation gi : binding.interpretations()) {
+                if (!sd.equals(gi.subDomainId())) continue;
+                if (!binding.canonicalId().equals(gi.canonicalId())) continue;
+                if (gi.isAllowed()) return true;
+            }
+        }
+        return false;
     }
 
     /** Terminal disposition class: coverage verdict first, then abstain, then the merged group verdict. */
     private static String overallDisposition(GroundingResult grounding, ResolverResult resolved,
-                                             int servedGroups, int deniedGroups) {
-        switch (grounding.verdict()) {
-            case DENIED -> { return "COVERAGE_DENIED"; }
-            case UNAVAILABLE -> { return "COVERAGE_UNAVAILABLE"; }
-            default -> { /* fall through */ }
+                                             int servedGroups, int deniedGroups, boolean multiEntity,
+                                             boolean clarify) {
+        // For a multi-entity COMPARE the focal verdict does NOT short-circuit — disposition derives from the
+        // SET of entity-group verdicts (§D2). Single-entity keeps the focal coverage verdict first (S4).
+        if (!multiEntity) {
+            switch (grounding.verdict()) {
+                case DENIED -> { return "COVERAGE_DENIED"; }
+                case UNAVAILABLE -> { return "COVERAGE_UNAVAILABLE"; }
+                default -> { /* fall through */ }
+            }
         }
         if (resolved.fallback() || resolved.selected().isEmpty()) return "ABSTAIN";
-        if (servedGroups == 0) return "STRUCTURAL_DENIED";
+        // Compare-CLARIFY (deny > clarify): only ever true when a real route exists and ≥1 entity is
+        // bound-and-covered AND the detector confirmed a truly UNBOUND reference (a denied entity forms a
+        // binding, so it can never make `clarify` true). A one-turn question beats a wrong scope.
+        if (clarify) return "CLARIFY";
+        if (servedGroups == 0) return multiEntity ? "COVERAGE_DENIED" : "STRUCTURAL_DENIED";
         if (deniedGroups > 0) return "PARTIAL";
         return "SERVED";
     }
@@ -1429,6 +1589,79 @@ public class ChatService {
                 .findFirst().orElse(null);
     }
 
+    /**
+     * Multi-entity COMPARE expansion (Multi-Entity Compare §D3/D4): cross-product the reranker's facet
+     * groups × the per-entity bindings into {@code entity-facet} groups, each carrying its OWN binding.
+     * A NO-OP below two bindings — every existing plan is returned unchanged, so the single-entity path is
+     * byte-identical and the whole feature is inert. Capping is deterministic (mention order) and NEVER
+     * silent: {@code max-entity-bindings} bounds entities, {@code max-total-groups} bounds F·E, and a cap
+     * is logged, traced, and surfaced in the answer.
+     */
+    private ExpandResult expandPerEntity(RequestedPlan plan, EntityBindingSet bindings) {
+        return expandPerEntity(plan, bindings, maxEntityBindings, maxTotalGroups);
+    }
+
+    /** Pure core of {@link #expandPerEntity(RequestedPlan, EntityBindingSet)} with explicit caps (testable). */
+    static ExpandResult expandPerEntity(RequestedPlan plan, EntityBindingSet bindings,
+                                        int maxEntityBindings, int maxTotalGroups) {
+        if (bindings == null || !bindings.multiEntity()) {
+            return new ExpandResult(plan, null);
+        }
+        List<EntityBinding> all = bindings.bindings();
+        int keptBindings = Math.min(all.size(), Math.max(1, maxEntityBindings));
+        List<EntityBinding> useBindings = all.subList(0, keptBindings);
+        int requested = plan.groups().size() * all.size();
+
+        List<RequestedPlan.RequestedGroup> expanded = new ArrayList<>();
+        for (RequestedPlan.RequestedGroup g : plan.groups()) {
+            for (EntityBinding b : useBindings) {
+                if (expanded.size() >= Math.max(1, maxTotalGroups)) break;
+                expanded.add(g.withEntityBinding(b));
+            }
+        }
+        boolean capped = keptBindings < all.size() || expanded.size() < requested;
+        String note = null;
+        if (capped) {
+            int keptEntities = (int) expanded.stream()
+                    .map(gr -> gr.binding().canonicalId()).distinct().count();
+            log.warn("Multi-entity COMPARE capped: {} entities named, compared {} (max-entity-bindings={}, "
+                            + "max-total-groups={}); {} of {} facet×entity groups kept",
+                    all.size(), keptEntities, maxEntityBindings, maxTotalGroups, expanded.size(), requested);
+            note = "The request named more entities than can be compared at once; only the first "
+                    + keptEntities + " were compared. State this and invite the user to ask again for the rest.";
+        }
+        return new ExpandResult(new RequestedPlan(expanded), note);
+    }
+
+    /** The expanded plan plus a non-null cap note when the fan-out was capped (surfaced in the answer). */
+    record ExpandResult(RequestedPlan plan, String cappedNote) {}
+
+    /**
+     * Entity-qualify each served node's {@code nodeId} to {@code agentId#canonicalId} for a COMPARE group
+     * so two calls to the SAME agent (two clients) are distinguishable in synthesis and trace. The bare
+     * {@code agentId} is retained (manifest lookups / trace tags), so figures and DATA headers attribute
+     * per client while numeric validation stays per-figure. A NO-OP for non-entity groups (binding null),
+     * keeping {@code nodeId == agentId} byte-identical on the single-entity path.
+     */
+    private static List<NodeResult> qualifyEntityNodeIds(List<NodeResult> results, EntityBinding binding) {
+        if (binding == null || binding.canonicalId() == null || results == null) return results;
+        List<NodeResult> out = new ArrayList<>(results.size());
+        for (NodeResult r : results) {
+            out.add(new NodeResult(r.agentId() + "#" + binding.canonicalId(), r.agentId(), r.protocol(),
+                    r.status(), r.data(), r.latencyMs(), r.errorMessage()));
+        }
+        return out;
+    }
+
+    /** The per-client DATA-header label for a served entity: resolver-produced id + canonical name. */
+    private static String entityLabel(EntityBinding binding) {
+        if (binding == null) return null;
+        String name = binding.canonicalName();
+        return (name == null || name.isBlank())
+                ? binding.canonicalId()
+                : binding.canonicalId() + " \"" + name + "\"";
+    }
+
     /** Attaches the diagnostic {@link ResolverResult.PrimaryCandidate} (post-rerank leader, pre-filter). */
     private ResolverResult withPrimaryCandidate(ResolverResult resolved) {
         if (resolved == null || resolved.selected() == null || resolved.selected().isEmpty()) return resolved;
@@ -1487,7 +1720,7 @@ public class ChatService {
                                String latestPrompt, String conversationId, String userId, Principal principal,
                                String tenantId, GroundingResult groundedMemo, EntityBag preExtracted,
                                String requestId, long requestStart, Span rootSpan, String streamId,
-                               String callerToken, PreparedRoute prepared) throws Exception {
+                               String callerToken, PreparedRoute prepared, String cappedNote) throws Exception {
         markGatewayPath("groups");
         List<NodeResult> merged = new ArrayList<>();
         java.util.Set<String> servedDomains = new java.util.LinkedHashSet<>();
@@ -1496,6 +1729,15 @@ public class ChatService {
         // "which resource?" questions from entitled groups whose required entity is unresolved. Emitted
         // at merge ONLY when no group served — a served answer is never pre-empted by a clarify.
         List<String> clarifyQuestions = new ArrayList<>();
+        // Multi-entity COMPARE attribution (empty on every non-COMPARE request → single-entity byte-identical):
+        //  • entityLabels: nodeId → "<canonicalId> \"<canonicalName>\"" for each served entity-qualified node.
+        //  • withheldEntities: uncovered clients — user's verbatim + the exact manifest denial copy (S4 parity).
+        Map<String, String> entityLabels = new java.util.LinkedHashMap<>();
+        List<AnswerSynthesizer.WithheldEntity> withheldEntities = new ArrayList<>();
+        // Merge-copy fix (D3): track whether the denials that produced an all-denied merge were coverage
+        // denials (→ coverage copy, S4) rather than structural (→ capability-unavailable copy).
+        boolean[] anyCoverageDenied = {false};
+        String[] lastCoverageDenial = {null, null}; // [reason, subDomainId]
 
         for (RequestedPlan.RequestedGroup group : plan.groups()) {
             allCandidates.addAll(group.candidates());
@@ -1519,11 +1761,23 @@ public class ChatService {
             }
 
             // (3) Coverage — consume the memoized grounded set for this group's sub-domain (no re-resolve).
+            //     For an entity group the binding filters coverage to THIS client's own CHECK result.
             GroupCoverage cov = coverageForGroup(allowed, prepared.groundedSet(), groundedMemo, principal,
-                    tenantId, callerToken, requestId, conversationId, preExtracted, request);
+                    tenantId, callerToken, requestId, conversationId, preExtracted, request, group.binding());
             if (cov.denied()) {
                 recordGroupDenied(group, requestId, conversationId, userId, false);
                 deniedUserVisible.add(group.candidates().get(0));
+                anyCoverageDenied[0] = true;
+                lastCoverageDenial[0] = cov.denialReason();
+                lastCoverageDenial[1] = cov.deniedSubDomainId();
+                // WITHHELD BEFORE BINDING (no-leak): an uncovered entity's data never enters synthesis —
+                // the ONLY text about it is the user's own verbatim + the same manifest denial copy a
+                // standalone ask streams. Attribution uses the user's words, never the resolver's name/id.
+                if (group.binding() != null) {
+                    withheldEntities.add(new AnswerSynthesizer.WithheldEntity(
+                            group.binding().userVerbatim(),
+                            mapDenialReason(cov.denialReason(), cov.deniedSubDomainId())));
+                }
                 continue;
             }
             if (cov.outcome() == GroupCoverageOutcome.CLARIFY) {
@@ -1562,7 +1816,15 @@ public class ChatService {
                                 conversationId, new AgentStartData(n.nodeId(), n.agent().protocol()))));
                         return executor.execute(new Plan(nodes), callerToken);
                     });
-            results.forEach(r -> {
+            // Entity-qualify the served nodes so two calls to the SAME agent (two clients) are
+            // distinguishable in synthesis (DATA headers + figures keyed by nodeId = agentId#canonicalId),
+            // and record each node's entity label. No-op for non-entity groups (binding == null).
+            List<NodeResult> groupResults = qualifyEntityNodeIds(results, group.binding());
+            if (group.binding() != null) {
+                String label = entityLabel(group.binding());
+                groupResults.forEach(r -> entityLabels.put(r.nodeId(), label));
+            }
+            groupResults.forEach(r -> {
                 String prev = r.isOk() && r.data() != null
                         ? r.data().toString().substring(0, Math.min(80, r.data().toString().length()))
                         : r.status().name();
@@ -1570,7 +1832,7 @@ public class ChatService {
                 tracePublisher.publish(TraceEvent.of("agent_complete", requestId, conversationId,
                         new AgentCompleteData(r.agentId(), r.latencyMs(), status, prev)));
             });
-            merged.addAll(results);
+            merged.addAll(groupResults);
             allowed.stream().map(AgentManifest::domain).filter(d -> d != null && !d.isBlank())
                     .forEach(servedDomains::add);
         }
@@ -1592,9 +1854,16 @@ public class ChatService {
             emitRequestOutcome("DENIED");
             tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
                     new CheckDeniedData("structural", null, userId, "no-covered-groups", "cerbos")));
-            streamTextAndComplete(emitter, msg("capability_unavailable",
-                    "You do not have access to any of the required services for this query.",
-                    subDomainOf(allCandidates)), streamId);
+            // Merge-copy fix (D3): when every denial was an entity-COVERAGE denial (comparing clients you
+            // cover NONE of), stream the manifest coverage copy — the same S4 wording — not the structural
+            // "you lack the service" copy. (Multi-entity all-denied is normally pre-empted before routing;
+            // this defends the case where routing still forms entity groups that all deny.)
+            String denyCopy = (anyCoverageDenied[0] && deniedUserVisible.size() == plan.groups().size())
+                    ? mapDenialReason(lastCoverageDenial[0], lastCoverageDenial[1])
+                    : msg("capability_unavailable",
+                            "You do not have access to any of the required services for this query.",
+                            subDomainOf(allCandidates));
+            streamTextAndComplete(emitter, denyCopy, streamId);
             tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                     new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
             return;
@@ -1618,8 +1887,16 @@ public class ChatService {
         publishGroundedFigures(requestId, conversationId, merged);
 
         long synthesisStart = System.nanoTime();
-        String answer = answerSynthesizer.synthesize(merged, latestPrompt, request.messages(), emitter,
-                streamId, withheldDomains, requestStart);
+        // Single-entity / non-COMPARE multi-group: no entity attribution → the 7-arg overload keeps the
+        // synthesis prompt byte-identical. A COMPARE request threads per-client DATA labels, withheld-entity
+        // blocks, and the cap note through the entity-aware overload.
+        boolean entityCompare = !entityLabels.isEmpty() || !withheldEntities.isEmpty()
+                || (cappedNote != null && !cappedNote.isBlank());
+        String answer = entityCompare
+                ? answerSynthesizer.synthesize(merged, latestPrompt, request.messages(), emitter, streamId,
+                        withheldDomains, requestStart, entityLabels, withheldEntities, cappedNote)
+                : answerSynthesizer.synthesize(merged, latestPrompt, request.messages(), emitter,
+                        streamId, withheldDomains, requestStart);
         recordGatewayStage("synthesis", System.nanoTime() - synthesisStart);
         setTraceOutput(rootSpan, answer);
         emitRequestOutcome(noAgentData ? "FAILED" : "ANSWERED");
@@ -1644,19 +1921,25 @@ public class ChatService {
      * </ul>
      */
     private record GroupCoverage(GroupCoverageOutcome outcome, String coverageRelId,
-                                 EntityType coverageEntity, String clarifyQuestion) {
+                                 EntityType coverageEntity, String clarifyQuestion,
+                                 String denialReason, String deniedSubDomainId) {
         boolean denied() { return outcome == GroupCoverageOutcome.DENIED; }
         static GroupCoverage proceed(String id, EntityType e) {
-            return new GroupCoverage(GroupCoverageOutcome.PROCEED, id, e, null);
+            return new GroupCoverage(GroupCoverageOutcome.PROCEED, id, e, null, null, null);
         }
         static GroupCoverage denied(EntityType e) {
-            return new GroupCoverage(GroupCoverageOutcome.DENIED, null, e, null);
+            return new GroupCoverage(GroupCoverageOutcome.DENIED, null, e, null, null, null);
+        }
+        /** A coverage DENY carrying the reason code + owning sub-domain so an entity withhold can quote
+         *  the exact same manifest denial copy a standalone ask for that client streams (S4 parity). */
+        static GroupCoverage denied(EntityType e, String reason, String subDomainId) {
+            return new GroupCoverage(GroupCoverageOutcome.DENIED, null, e, null, reason, subDomainId);
         }
         static GroupCoverage clarify(String question, EntityType e) {
-            return new GroupCoverage(GroupCoverageOutcome.CLARIFY, null, e, question);
+            return new GroupCoverage(GroupCoverageOutcome.CLARIFY, null, e, question, null, null);
         }
         static GroupCoverage withhold(EntityType e) {
-            return new GroupCoverage(GroupCoverageOutcome.WITHHOLD, null, e, null);
+            return new GroupCoverage(GroupCoverageOutcome.WITHHOLD, null, e, null, null, null);
         }
     }
 
@@ -1678,7 +1961,7 @@ public class ChatService {
     private GroupCoverage coverageForGroup(List<AgentManifest> allowed, GroundedReferenceSet groundedSet,
                                            GroundingResult groundedMemo, Principal principal, String tenantId,
                                            String callerToken, String requestId, String conversationId,
-                                           EntityBag preExtracted, ChatRequest request) {
+                                           EntityBag preExtracted, ChatRequest request, EntityBinding binding) {
         for (AgentManifest m : allowed) {
             if (!entitlementService.requiresCoverage(m)) continue;
             EffectiveManifest em = manifestStore.getEffective(m.agentId(), m.domain(), m.subDomain());
@@ -1688,6 +1971,11 @@ public class ChatService {
                 if (!em.subDomainId().equals(gi.subDomainId())) continue;
                 if (coverageEntity != null && gi.entityType() != null
                         && !coverageEntity.key().equals(gi.entityType().key())) continue;
+                // SECURITY (rule 4f): an entity group's coverage verdict is THIS entity's own CHECK result
+                // for the routed sub-domain and NOTHING else. The scan is filtered to the group's own bound
+                // canonicalId so a sibling client's ALLOWED interpretation can never serve this group — the
+                // core no-leak filter. Null binding = the single-entity path, unchanged.
+                if (!bindingSelectsInterpretation(binding, gi)) continue;
                 if (gi.isDenied()) {
                     tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
                             GateData.deny(GateData.GATE_COVERAGE,
@@ -1695,7 +1983,7 @@ public class ChatService {
                     tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
                             new CheckDeniedData("coverage", gi.canonicalId(), principal.id(),
                                     gi.denialReason(), "coverage")));
-                    return GroupCoverage.denied(coverageEntity);
+                    return GroupCoverage.denied(coverageEntity, gi.denialReason(), gi.subDomainId());
                 }
                 if (gi.status() == ReferenceGroundingService.GroundStatus.UNAVAILABLE) {
                     // FAIL CLOSED — the coverage service was unreachable for THIS group's own sub-domain,
@@ -1707,7 +1995,7 @@ public class ChatService {
                     tracePublisher.publish(TraceEvent.of("check_denied", requestId, conversationId,
                             new CheckDeniedData("coverage", gi.canonicalId(), principal.id(),
                                     "coverage-unavailable", "coverage")));
-                    return GroupCoverage.denied(coverageEntity);
+                    return GroupCoverage.denied(coverageEntity, "coverage-unavailable", gi.subDomainId());
                 }
                 if (gi.isAllowed()) {
                     tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
@@ -1717,7 +2005,13 @@ public class ChatService {
                 }
                 // NOT_FOUND / AMBIGUOUS for this sub-domain — keep scanning; resolved after the loop.
             }
-            if (consumeGroundingMemo(groundedMemo, em, coverageEntity)) {
+            // MEMO ID-EQUALITY GUARD (SECURITY-CRITICAL): the focal grounding memo may seed this group's
+            // binding ONLY when it is the SAME entity. For an entity group (binding != null), consume the
+            // memo iff its resolved id equals this group's own bound canonicalId — otherwise the focal
+            // client's memoized id would bind a sibling entity group (Calderon's group serving Whitman's
+            // id: wrong data under a right entitlement). Null binding = single-entity path, unchanged.
+            if (consumeGroundingMemo(groundedMemo, em, coverageEntity)
+                    && focalMemoBindsEntity(groundedMemo, binding)) {
                 return GroupCoverage.proceed(groundedMemo.resolvedId(), coverageEntity);
             }
             // No ALLOWED interpretation and no allowed focal memo → the required coverage entity is
@@ -1736,6 +2030,28 @@ public class ChatService {
             return GroupCoverage.proceed(null, coverageEntity);
         }
         return GroupCoverage.proceed(null, null);
+    }
+
+    /**
+     * The core no-leak scan filter: an entity group's coverage scan considers ONLY interpretations of its
+     * OWN bound canonicalId, so a sibling client's interpretation can never decide this group's coverage.
+     * A null binding (single-entity path) selects every interpretation — byte-identical to before.
+     */
+    static boolean bindingSelectsInterpretation(EntityBinding binding, GroundedInterpretation gi) {
+        if (binding == null) return true;
+        return gi.canonicalId() != null && binding.canonicalId().equals(gi.canonicalId());
+    }
+
+    /**
+     * The memo id-equality guard: the focal grounding memo may seed an entity group's binding ONLY when it
+     * is the SAME entity (its resolved id equals the group's own bound canonicalId). Prevents the focal
+     * client's memoized id from binding a sibling entity group — the one cross-entity hole this feature
+     * could open. A null binding (single-entity path) always consumes the memo — unchanged behaviour.
+     */
+    static boolean focalMemoBindsEntity(GroundingResult memo, EntityBinding binding) {
+        if (binding == null) return true;
+        return memo != null && memo.resolvedId() != null
+                && memo.resolvedId().equals(binding.canonicalId());
     }
 
     /**
@@ -1990,6 +2306,62 @@ public class ChatService {
         String noun = (entityNoun != null && !entityNoun.isBlank()) ? entityNoun.strip() + " " : "";
         sb.append("\nReply with the ").append(noun).append("name or identifier.");
         return sb.toString();
+    }
+
+    /**
+     * The Compare-CLARIFY question (spec §4): a manifest-sourced template with {@code {resolved}} = the
+     * bound-and-covered clients' display (resolver data — discloses exactly what a SERVED answer would) and
+     * {@code {unresolved}} = the user's OWN verbatim words. The gateway holds only a domain-neutral fallback.
+     *
+     * <p><b>SECURITY (non-negotiable).</b> {@code {unresolved}} is rendered from {@link
+     * UnboundReference#verbatim} — the user's own words — NEVER from Tier-B's resolved canonical name. We do
+     * not disclose that a partially/wrongly named reference resolves to a real client.
+     */
+    private String buildCompareClarification(EntityBindingSet bindings, List<UnboundReference> unbound,
+                                             String subDomainId) {
+        String template = msg("compare_partial_resolution",
+                "I found {resolved}. I couldn't identify the other reference you mentioned ({unresolved}). "
+                + "Please provide the name or identifier.",
+                subDomainId);
+        return composeComparePartial(template, bindings, unbound);
+    }
+
+    /**
+     * Pure {@code {resolved}}/{@code {unresolved}} substitution — factored out so the SECURITY property
+     * ({@code {unresolved}} = user verbatim, never a resolved canonical name) is unit-testable without Spring.
+     * {@code {resolved}} lists the ALLOWED bindings' canonical names (falling back to the id); {@code
+     * {unresolved}} lists the unbound references' user verbatims, in order, de-duplicated.
+     */
+    static String composeComparePartial(String template, EntityBindingSet bindings,
+                                        List<UnboundReference> unbound) {
+        String resolved = bindings.bindings().stream()
+                .filter(EntityBinding::hasAllowed)
+                .map(b -> {
+                    String n = b.canonicalName();
+                    return (n != null && !n.isBlank()) ? n : b.canonicalId();
+                })
+                .collect(Collectors.joining(", "));
+        String unresolved = unbound.stream()
+                .map(UnboundReference::verbatim)          // user's OWN words — never the resolved canonical name
+                .filter(v -> v != null && !v.isBlank())
+                .distinct()
+                .collect(Collectors.joining(", "));
+        return template.replace("{resolved}", resolved).replace("{unresolved}", unresolved);
+    }
+
+    /**
+     * The sub-domain to scope the Compare-CLARIFY copy to: the routed primary candidate's sub-domain, else
+     * the first ALLOWED binding interpretation's sub-domain (spec §4). Manifest-driven; no domain literal.
+     */
+    private String clarifyScopeSubDomain(ResolverResult resolved, EntityBindingSet bindings) {
+        ResolverResult.PrimaryCandidate pc = resolved != null ? resolved.primaryCandidate() : null;
+        if (pc != null && pc.subDomainId() != null) return pc.subDomainId();
+        for (EntityBinding b : bindings.bindings()) {
+            for (GroundedInterpretation gi : b.interpretations()) {
+                if (gi.isAllowed() && gi.subDomainId() != null) return gi.subDomainId();
+            }
+        }
+        return null;
     }
 
     /** The routed sub-domain's primary required RESOLVABLE entity type, or null (manifest-driven). */

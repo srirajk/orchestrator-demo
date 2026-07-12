@@ -57,6 +57,13 @@ public class AnswerSynthesizer {
 
     private static final Pattern NUMBER_PATTERN = Pattern.compile("\\b\\d+(?:[.,]\\d+)*\\b");
 
+    /**
+     * An uncovered client withheld from a multi-entity COMPARE answer. Attribution is the user's own
+     * verbatim words plus the manifest coverage-denial copy — never the resolver's canonical name/id, so
+     * the disclosure about a withheld client is identical to asking about that client alone (S4 parity).
+     */
+    public record WithheldEntity(String userVerbatim, String denialCopy) {}
+
     private final ObjectMapper mapper;
     private final String baseUrl;
     private final String apiKey;
@@ -199,6 +206,27 @@ public class AnswerSynthesizer {
     public String synthesize(List<NodeResult> results, String originalPrompt,
                            List<Message> history, SseEmitter emitter, String completionIdOverride,
                            List<String> withheldDomains, long requestStartMillis) {
+        return synthesize(results, originalPrompt, history, emitter, completionIdOverride,
+                withheldDomains, requestStartMillis, Map.of(), List.of(), null);
+    }
+
+    /**
+     * Multi-entity COMPARE overload. Two entity groups can invoke the SAME agent, so DATA blocks and
+     * figures must be attributed per client and a withheld (uncovered) client must be stated with the
+     * user's own words plus the manifest denial copy — never the resolver's canonical name.
+     *
+     * @param entityLabels    {@code NodeResult.nodeId() -> "<canonicalId> \"<canonicalName>\""} for each
+     *                        entity-qualified served node; empty on every non-COMPARE request.
+     * @param withheldEntities the uncovered clients: each carries the user's verbatim mention + the exact
+     *                        same manifest coverage-denial copy a standalone ask for that client streams.
+     * @param cappedNote      a domain-neutral note (or {@code null}) telling the model the fan-out was
+     *                        capped so it states which entities it compared and that the rest can be re-asked.
+     */
+    public String synthesize(List<NodeResult> results, String originalPrompt,
+                           List<Message> history, SseEmitter emitter, String completionIdOverride,
+                           List<String> withheldDomains, long requestStartMillis,
+                           Map<String, String> entityLabels, List<WithheldEntity> withheldEntities,
+                           String cappedNote) {
         String completionId = completionIdOverride != null
                 ? completionIdOverride
                 : "chatcmpl-" + UUID.randomUUID().toString().replace("-", "");
@@ -225,7 +253,8 @@ public class AnswerSynthesizer {
 
             List<GroundedFigure> groundedFigures = figureRenderer.render(results, registry::find);
             llmSpan.setAttribute("conduit.grounding.figure_count", groundedFigures.size());
-            String userContent = buildUserContent(results, withheldDomains, groundedFigures);
+            String userContent = buildUserContent(results, withheldDomains, groundedFigures,
+                    entityLabels, withheldEntities, cappedNote);
             String requestBody = buildRequestBody(userContent, originalPrompt, history);
 
             log.debug("AnswerSynthesizer: calling {} model={} agents={}",
@@ -333,12 +362,32 @@ public class AnswerSynthesizer {
     // ── Prompt builders ──────────────────────────────────────────────────────
 
     private String buildUserContent(List<NodeResult> results, List<String> withheldDomains,
-                                    List<GroundedFigure> groundedFigures) throws Exception {
+                                    List<GroundedFigure> groundedFigures,
+                                    Map<String, String> entityLabels,
+                                    List<WithheldEntity> withheldEntities,
+                                    String cappedNote) throws Exception {
+        return renderUserContent(mapper, figuresBlock, results, withheldDomains, groundedFigures,
+                entityLabels, withheldEntities, cappedNote);
+    }
+
+    /** Pure user-message renderer (testable): DATA blocks, WITHHELD (domain + entity), cap note, figures. */
+    static String renderUserContent(ObjectMapper mapper, String figuresBlock, List<NodeResult> results,
+                                    List<String> withheldDomains, List<GroundedFigure> groundedFigures,
+                                    Map<String, String> entityLabels, List<WithheldEntity> withheldEntities,
+                                    String cappedNote) throws Exception {
         StringBuilder sb = new StringBuilder();
         for (NodeResult r : results) {
             if (r.isOk()) {
+                // For a multi-entity COMPARE, two DATA blocks can share an agentId; the entity label
+                // (resolver-produced DATA — no domain literal in Java) disambiguates which client each
+                // block belongs to. Empty on every single-entity request → the header is byte-identical.
+                String entity = entityLabels == null ? null : entityLabels.get(r.nodeId());
                 sb.append("--- DATA: ").append(r.agentId())
-                  .append(" (").append(r.protocol()).append(") ---\n");
+                  .append(" (").append(r.protocol()).append(")");
+                if (entity != null && !entity.isBlank()) {
+                    sb.append(" [entity: ").append(entity).append("]");
+                }
+                sb.append(" ---\n");
                 sb.append(mapper.writerWithDefaultPrettyPrinter()
                         .writeValueAsString(r.data()));
                 sb.append("\n--- END DATA ---\n\n");
@@ -364,6 +413,23 @@ public class AnswerSynthesizer {
                   .append("access and was not retrieved. State plainly that ").append(d)
                   .append(" data was not included because it is outside the user's access. ---\n\n");
             }
+        }
+        // Uncovered clients in a multi-entity COMPARE. Attribution is the user's OWN verbatim words +
+        // the exact manifest coverage-denial copy a standalone ask for that client streams (S4 parity) —
+        // the resolver's canonical name/id is NEVER disclosed here, and the withheld client's data never
+        // enters the prompt at all (its group never executed). Empty on every non-COMPARE request.
+        if (withheldEntities != null) {
+            for (WithheldEntity we : withheldEntities) {
+                if (we == null || we.userVerbatim() == null) continue;
+                sb.append("--- WITHHELD ENTITY: \"").append(we.userVerbatim()).append("\" --- ")
+                  .append(we.denialCopy() == null ? "" : we.denialCopy())
+                  .append(" State this plainly and do not report any data for this entity. ---\n\n");
+            }
+        }
+        // Fan-out was capped: tell the model to say which entities it compared and that the rest can be
+        // re-asked. Domain-neutral instruction; the note itself carries no domain literal.
+        if (cappedNote != null && !cappedNote.isBlank()) {
+            sb.append("--- NOTE --- ").append(cappedNote).append(" ---\n\n");
         }
         if (groundedFigures != null && !groundedFigures.isEmpty()) {
             sb.append("--- GROUNDED FIGURES ---\n")
