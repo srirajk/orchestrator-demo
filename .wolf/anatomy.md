@@ -1,6 +1,6 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-07-12T14:56:06.811Z
+> Auto-maintained by OpenWolf. Last scanned: 2026-07-12T15:14:38.461Z
 > Files: 1125 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/
@@ -503,7 +503,7 @@
 - `CLAUDE.md` — OpenWolf (~3070 tok)
 - `docker-compose.yml` — Docker Compose services (~12100 tok)
 - `MORNING-NOTES.md` — Morning notes — OIDC SSO is fixed ✅ (~1292 tok)
-- `README.md` — Project documentation (~4427 tok)
+- `README.md` — Project documentation (~5213 tok)
 - `TODO.md` — Conduit — Open TODO / Backlog (~823 tok)
 - `z.ai-tiers.md` — Declares Model (~778 tok)
 
@@ -892,7 +892,7 @@
 - `implementation-checklist.md` — Implementation Checklist — Pre-Build Validation Spec (~4638 tok)
 - `input-synthesis-deep-spec.md` — Input Synthesis — Deep Spec (the one unproven piece) (~1951 tok)
 - `master-build-plan-consolidated.md` — Enterprise Intelligence Platform — Master Build Plan (Meridian) (~3833 tok)
-- `MODEL-SELECTION.md` — Model Selection Guide — Conduit AI Gateway (~2289 tok)
+- `MODEL-SELECTION.md` — Model Selection Guide — Conduit AI Gateway (~2693 tok)
 - `OPERATOR-RUNBOOK.md` — Conduit Gateway — Operator & Demo Runbook (~4053 tok)
 - `platform-vision-and-maturity-path.md` — Enterprise Intelligence Platform — Vision & Maturity Path (~1324 tok)
 - `PROJECT-OVERVIEW.md` — Conduit — Project Overview (~165 tok)

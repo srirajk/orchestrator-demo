@@ -32,17 +32,29 @@ puts each task on the model that fits the axis it's bound on.
 
 ---
 
-## Per-call-site recommendation (and what's configured today)
+## Per-call-site recommendation (defaults vs. the selected deployment)
 
-| Call site | Runs | Volume | Latency-critical | Blocks? | User-facing | **Tier** | Model | Config key |
-|---|---|---|---|---|---|---|---|---|
-| **Intent classification + entity extraction** | every turn | High | **Yes** (p99) | — | No | **Fast** | `glm-4.5-flash` | `CONDUIT_LLM_INTENT_CLASSIFIER_MODEL`, `CONDUIT_LLM_ENTITY_EXTRACTOR_MODEL` |
-| **Answer synthesis** | every answered turn | Medium | TTFT (streamed) | — | **Yes** | **Quality** | `glm-4.6` | `CONDUIT_LLM_SYNTHESIZER_MODEL` |
-| **Domain agents (mock)** | per fan-out | High | Yes | — | No | **Fast** | `glm-4.5-flash` | `WEALTH_AGENT_LLM_MODEL`, `SERVICING_AGENT_LLM_MODEL` |
-| **DeepEval faithfulness judge** (release gate) | offline, on a change | Low | No | **Yes — blocks deploy** | No | **Max** | `glm-4.6` | `DEEPEVAL_JUDGE_MODEL` |
-| **Langfuse continuous judge** (drift monitor) | async, off live traces | High (sampled) | No | No | No | **Fast/Mid** | `glm-4.6` | `JUDGE_MODEL` / `ZAI_EVAL_MODEL` |
-| **IAM policy generation** | admin drafts a policy | Very low | No | No (human-approved) | No (internal) | **Quality** | `glm-4.6` | `IAM_POLICY_GENERATION_MODEL` |
-| **Embeddings** (routing) | every turn | High | **Yes** | — | No | (non-LLM) | `all-MiniLM-L6-v2` (384d) | `CONDUIT_EMBEDDING_*` |
+> **Two layers.** The **`application.yml` / compose defaults are Z.AI GLM** — deliberately, so a
+> load or smoke run can never bill OpenAI. The **GPT tiers below are selected at deployment via
+> `.env`** (each `CONDUIT_LLM_*_MODEL` override), which is the locked production profile. The
+> "Default" column is what ships unset; the "Deployment (GPT)" column is what the GPT profile pins.
+>
+> **Reasoning-model caveat:** `gpt-5*` and the o-series reject a non-default `temperature` (they
+> 400 on `temperature != 1`) — omit the sampling parameter for those call sites. The routing
+> reranker already does this in code (`LlmRoutingRerankerClient.supportsCustomTemperature`).
+
+| Call site | Runs | Latency-critical | Blocks? | **Tier** | Default (GLM) | **Deployment (GPT)** | Config key |
+|---|---|---|---|---|---|---|---|
+| **Intent classification** | every turn | **Yes** (p99) | — | **Fast** | `glm-4.5-flash` | `gpt-4.1-nano` | `CONDUIT_LLM_INTENT_CLASSIFIER_MODEL` |
+| **Entity extraction** | every turn | **Yes** (p99) | — | **Fast** | `glm-4.5-flash` | `gpt-4.1-mini` | `CONDUIT_LLM_ENTITY_EXTRACTOR_MODEL` |
+| **Routing reranker** (LLM tie-break) | on close routes | Yes | — | **Fast/reasoning** | `glm-4.5-flash` | `gpt-5-mini` | `CONDUIT_LLM_ROUTING_RERANKER_MODEL` |
+| **Clarification composer** | on clarify | Yes | — | **Fast** | `glm-4.5-flash` | `gpt-4.1-nano` | `CONDUIT_LLM_CLARIFICATION_COMPOSER_MODEL` |
+| **Answer synthesis** | every answered turn | TTFT (streamed) | — | **Quality/reasoning** | `glm-4.6` | `gpt-5-mini` | `CONDUIT_LLM_SYNTHESIZER_MODEL` |
+| **Domain agents (mock)** | per fan-out | Yes | — | **Fast** | `glm-4.5-flash` | (stays GLM) | `WEALTH_AGENT_LLM_MODEL`, `SERVICING_AGENT_LLM_MODEL` |
+| **DeepEval faithfulness judge** (release gate) | offline, on a change | No | **Yes — blocks deploy** | **Max** | `glm-4.6` | `o4-mini` | `DEEPEVAL_JUDGE_MODEL` |
+| **Langfuse continuous judge** (drift monitor) | async, off live traces | No | No | **Max** | `glm-4.6` | `o4-mini` | `JUDGE_MODEL` / `ZAI_EVAL_MODEL` |
+| **IAM policy generation** | admin drafts a policy | No | No (human-approved) | **Quality** | `glm-4.6` | `glm-4.6` | `IAM_POLICY_GENERATION_MODEL` |
+| **Embeddings** (routing) | every turn | **Yes** | — | (non-LLM) | `all-MiniLM-L6-v2` (384d) | (same) | `CONDUIT_EMBEDDING_*` |
 
 ---
 
@@ -112,15 +124,17 @@ Isolate providers by component so one vendor's outage degrades, not kills.
 
 | Component | Provider | Models |
 |---|---|---|
-| **Gateway** (routing + synthesis) | **OpenAI** | `gpt-4o-mini` (routing/extraction) · `gpt-4o`/`gpt-4.1` (synthesis) |
+| **Gateway** (routing + synthesis) | **OpenAI** | `gpt-4.1-nano` (intent/clarify) · `gpt-4.1-mini` (extraction) · `gpt-5-mini` (routing rerank + synthesis) |
 | **Domain agents** | **GLM (Z.AI)** | `glm-4.5-flash` (in prod: domain team's choice) |
 | **Axiom / IAM policy gen** | **GLM (Z.AI)** | `glm-4.6` |
-| **Eval (DeepEval / Langfuse)** | **GLM (Z.AI)** | `glm-4.6` / flash |
+| **Eval (DeepEval / Langfuse)** | **OpenAI** | `o4-mini` (judge) |
 
 Why: the gateway is the user-facing critical path — OpenAI's instruction-following + grounding
 on the answer the RM reads, plus a single SLA / key / failure mode on the path that must always
-work. Cost-tiering stays *within* OpenAI (mini for routing, full for synthesis). GLM economy
-lives downstream where a provider blip degrades but doesn't black out the request.
+work. Cost-tiering stays *within* OpenAI (`gpt-4.1-nano`/`-mini` for the bounded routing/extraction
+tasks, `gpt-5-mini` for the reasoning-heavy rerank + synthesis). GLM economy lives downstream where
+a provider blip degrades but doesn't black out the request. Remember the `gpt-5*`/o-series
+temperature caveat above when pinning these.
 
 **Caveat:** OpenAI on every turn's routing costs more than GLM-flash. If synthesis is on OpenAI,
 add a **provider fallback** (OpenAI primary → `glm-4.6` on failure) so an OpenAI outage degrades
@@ -139,16 +153,21 @@ on the user-facing answer. This is the current default in `application.yml`.
 
 ## Quick reference — environment overrides
 
+# Locked GPT deployment profile (overrides the GLM defaults in application.yml). Reasoning
+# models (gpt-5* / o-series) must omit `temperature` — the reranker handles this in code.
 ```bash
-# Fast tier (routing + extraction) — every turn, latency-critical
-CONDUIT_LLM_INTENT_CLASSIFIER_MODEL=glm-4.5-flash
-CONDUIT_LLM_ENTITY_EXTRACTOR_MODEL=glm-4.5-flash
-# Quality tier (synthesis) — user-facing
-CONDUIT_LLM_SYNTHESIZER_MODEL=glm-4.6
+# Fast tier (routing + extraction, clarify) — every turn, latency-critical
+CONDUIT_LLM_INTENT_CLASSIFIER_MODEL=gpt-4.1-nano
+CONDUIT_LLM_ENTITY_EXTRACTOR_MODEL=gpt-4.1-mini
+CONDUIT_LLM_CLARIFICATION_COMPOSER_MODEL=gpt-4.1-nano
+# Reasoning (routing tie-break) — omit temperature
+CONDUIT_LLM_ROUTING_RERANKER_MODEL=gpt-5-mini
+# Quality/reasoning tier (synthesis) — user-facing, streamed
+CONDUIT_LLM_SYNTHESIZER_MODEL=gpt-5-mini
 # Max tier (release-gate judge) — blocks deploys, strongest model
-DEEPEVAL_JUDGE_MODEL=glm-4.6
-# Fast/Mid (async drift judge)
-ZAI_EVAL_MODEL=glm-4.6
-# Quality (rare, human-approved policy drafting)
+DEEPEVAL_JUDGE_MODEL=o4-mini
+# Max tier (async drift judge)
+JUDGE_MODEL=o4-mini
+# Quality (rare, human-approved policy drafting) — stays GLM
 IAM_POLICY_GENERATION_MODEL=glm-4.6
 ```

@@ -3123,3 +3123,26 @@
 | 10:52 | Edited docs/WORLD-B-LOCKDOWN.md | modified open() | ~715 |
 | 10:52 | Edited docs/WORLD-B-LOCKDOWN.md | 2→4 lines | ~102 |
 | 10:56 | Edited docs/GATEWAY-INTERNALS.md | 18→22 lines | ~418 |
+| 10:58 | Session end: 240 writes across 76 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 179 reads | ~549884 tok |
+| 11:08 | Edited docs/MODEL-SELECTION.md | expanded (+12 lines) | ~640 |
+| 11:08 | Edited docs/MODEL-SELECTION.md | 6→6 lines | ~113 |
+| 11:09 | Edited docs/MODEL-SELECTION.md | 8→10 lines | ~196 |
+| 11:09 | Edited docs/MODEL-SELECTION.md | 13→18 lines | ~230 |
+| 11:10 | Edited README.md | 4→4 lines | ~102 |
+| 11:10 | Session end: 245 writes across 78 files (docker-compose.yml, LlmRoutingRerankerClient.java, LITMUS-TEST-DESIGN-FABLE.md, smoke.sh, smoke-route.sh) | 182 reads | ~557973 tok |
+| 11:10 | Edited README.md | 8→8 lines | ~74 |
+| 11:10 | Edited README.md | inline fix | ~23 |
+| 11:10 | Edited README.md | inline fix | ~23 |
+| 11:11 | Edited README.md | 2→2 lines | ~46 |
+| 11:11 | Edited README.md | 3→3 lines | ~64 |
+| 11:12 | Edited README.md | 2→2 lines | ~43 |
+| 11:12 | Edited README.md | 20→21 lines | ~343 |
+| 11:13 | Edited README.md | 14→16 lines | ~307 |
+| 11:13 | Edited README.md | modified FastAPI() | ~255 |
+| 11:13 | Edited README.md | modified chat() | ~414 |
+| 11:13 | Edited README.md | 11→13 lines | ~345 |
+| 11:14 | Edited README.md | 5→8 lines | ~216 |
+| 11:14 | Edited README.md | added 1 import(s) | ~234 |
+| 11:14 | Edited README.md | live() → manifests() | ~157 |
+| 11:14 | Edited README.md | inline fix | ~72 |
+| 11:15 | Refreshed README/.env.example/MODEL-SELECTION to current state (Conduit Chat+Insights, 18 agents/4 domains, Java25, MCP 2025-11-25, GPT tiers) | README.md, .env.example, docs/MODEL-SELECTION.md | done | ~9k |
