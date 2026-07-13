@@ -38,8 +38,12 @@ public class GroundedFigureValidator {
                 Token parsed = new Token(token, value,
                         token.contains("%") || hasCharAt(sentence.text(), matcher.end(), '%'),
                         token.contains("$"));
-                List<GroundedFigure> candidates = labelled.isEmpty() ? figures : labelled;
-                boolean matched = candidates.stream().anyMatch(f -> valueMatches(parsed, f));
+                // A numeral is grounded if it matches ANY real figure — a natural sentence may
+                // legitimately combine two figures (e.g. "threshold is 10%, breached 6 times"),
+                // so we must not scope the check to the sentence's nearest label. The `labelled`
+                // set still drives strictness below: a plain numeral sitting next to a label is
+                // held to the same bar as a load-bearing one. (bug-273)
+                boolean matched = figures.stream().anyMatch(f -> valueMatches(parsed, f));
                 if (!matched) {
                     if (!labelled.isEmpty() || isLoadBearing(parsed)) {
                         errors.add("unattributed numeral '" + token + "' near label(s) "

@@ -50,8 +50,13 @@ class GroundedFigureTest {
         assertThat(result.errors()).anySatisfy(e -> assertThat(e).contains("49.48"));
     }
 
+    // Contract (hard-rule-c): the validator guarantees the model never INVENTS a number — every
+    // numeral must equal a real grounded figure. It deliberately does NOT police label attachment:
+    // a real value stated next to a different figure's label is not a fabrication, and enforcing
+    // exclusive label ownership false-flags legitimate multi-figure sentences (bug-273). So a real
+    // number attached to another label PASSES; only numbers with no grounded source are flagged.
     @Test
-    void validatorFlagsRightNumberWrongLabel() {
+    void validatorPassesRealNumberEvenWhenAttachedToAnotherLabel() {
         GroundedFigure observed = renderer.renderOne("a",
                 new AgentManifest.ProducedFigure("Observed breach percent", "observed", "percent1"),
                 MAPPER.createObjectNode().put("observed", 31.4), 0);
@@ -61,8 +66,45 @@ class GroundedFigureTest {
 
         var result = validator.validate("Threshold percent is 31.4%.", List.of(observed, threshold));
 
+        assertThat(result.ok()).isTrue();
+    }
+
+    // bug-273: a natural sentence may combine two real figures. The label "single-name threshold"
+    // matches, but the sentence also carries the (differently-labelled) breach count. Both are
+    // grounded, so the whole answer must validate — the pre-fix label scoping wrongly flagged '6'.
+    @Test
+    void validatorPassesMultiFigureSentence() {
+        GroundedFigure threshold = renderer.renderOne("a",
+                new AgentManifest.ProducedFigure("Single-name threshold", "threshold", "percent1"),
+                MAPPER.createObjectNode().put("threshold", 10.0), 0);
+        GroundedFigure breaches = renderer.renderOne("a",
+                new AgentManifest.ProducedFigure("Concentration breach count", "breaches", "count"),
+                MAPPER.createObjectNode().put("breaches", 6), 1);
+
+        var result = validator.validate(
+                "The single-name threshold is 10%, and it was breached 6 times.",
+                List.of(threshold, breaches));
+
+        assertThat(result.ok()).isTrue();
+    }
+
+    // The safety property still holds in that same sentence: an invented count (7, no grounded
+    // source) is flagged even though a real label is present.
+    @Test
+    void validatorFlagsInventedCountInMultiFigureSentence() {
+        GroundedFigure threshold = renderer.renderOne("a",
+                new AgentManifest.ProducedFigure("Single-name threshold", "threshold", "percent1"),
+                MAPPER.createObjectNode().put("threshold", 10.0), 0);
+        GroundedFigure breaches = renderer.renderOne("a",
+                new AgentManifest.ProducedFigure("Concentration breach count", "breaches", "count"),
+                MAPPER.createObjectNode().put("breaches", 6), 1);
+
+        var result = validator.validate(
+                "The single-name threshold is 10%, and it was breached 7 times.",
+                List.of(threshold, breaches));
+
         assertThat(result.ok()).isFalse();
-        assertThat(result.errors()).anySatisfy(e -> assertThat(e).contains("31.4"));
+        assertThat(result.errors()).anySatisfy(e -> assertThat(e).contains("7"));
     }
 
     @Test
