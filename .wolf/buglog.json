@@ -4920,5 +4920,51 @@
     ],
     "occurrences": 1,
     "last_seen": "2026-07-13T00:00:00Z"
+  },
+  {
+    "id": "bug-283",
+    "timestamp": "2026-07-13T00:00:00Z",
+    "error_message": "Hero synthesis (Whitman holdings) non-deterministically returns the terse 'grounded figures are: ...' fallback instead of prose (~1 in 4). Log: \"Grounded figure validation failed; serving deterministic fallback: [unattributed numeral '4.7709' near label(s) [Diversification HHI]]\".",
+    "file": "gateway/src/main/resources/prompts (synthesis) + GroundedFigureValidator.java",
+    "root_cause": "NOT a validator bug — the guard is CORRECT. The synth LLM occasionally COMPUTES a derived statistic 'effective number of positions' = 1/HHI = 1/0.209603 = 4.7709, which is not a grounded figure from any agent. GroundedFigureValidator (rightly, per hard-rule-c 'the model never computes') flags 4.7709 as unattributed and refuses the whole answer -> deterministic fallback. Distinct from bug-273 (that was a real figure mis-scoped by label; this is a genuinely computed number correctly rejected). Non-deterministic because the model only sometimes adds the derived-stat flourish.",
+    "fix": "FIXED 2026-07-13 (Fable-reviewed). Hardened the answer-synthesizer system prompt (answer-synthesizer.system.md, line 4): the model must never VOLUNTEER a derived statistic (ratio, reciprocal, rescaling, index transform, 'effective number') unless that exact value is present verbatim in DATA/GROUNDED FIGURES; otherwise omit it. Explicit carve-out keeps legitimate counting of listed items ('two accounts'). world-b-check CRITICAL still 0. Verified: hero query 0/5 fallbacks post-fix (was ~1/4). Value-restoring follow-up -> bug-284 (emit effective-position-count as a grounded figure).",
+    "tags": [
+      "synthesizer",
+      "grounded-figures",
+      "validator",
+      "computed-number",
+      "prompt",
+      "non-deterministic",
+      "demo-quality",
+      "fixed"
+    ],
+    "related_bugs": [
+      "bug-273",
+      "bug-282",
+      "bug-284"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-07-13T00:00:00Z"
+  },
+  {
+    "id": "bug-284",
+    "timestamp": "2026-07-13T00:00:00Z",
+    "error_message": "'Effective number of positions' (1/HHI) is a genuinely useful concentration metric, but the bug-283 prompt fix now forbids the model from computing/stating it (correctly). The value is lost from answers rather than surfaced.",
+    "file": "agents/ (wealth concentration agent) + its manifest produced-figures",
+    "root_cause": "World-B: an analytic derived from data belongs in the specialist agent, not computed by the synthesis LLM. The wealth.concentration agent computes HHI but does not emit its reciprocal (effective number of positions) as a first-class grounded figure, so the model has no grounded way to state it.",
+    "fix": "OPEN (value-restoring, post-demo). Have meridian.wealth.concentration emit 'effective_number_of_positions' as a produced-figure (format plain/count) in its output + manifest. Then the synthesizer can state it legitimately (it becomes a grounded figure the validator accepts). No gateway change; agent + manifest only, then re-run registry ingestion.",
+    "tags": [
+      "agent",
+      "grounded-figures",
+      "concentration",
+      "value-restore",
+      "world-b",
+      "follow-up"
+    ],
+    "related_bugs": [
+      "bug-283"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-07-13T00:00:00Z"
   }
 ]
