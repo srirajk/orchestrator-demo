@@ -68,6 +68,8 @@ public class AnswerSynthesizer {
     private final int maxRetries;
     private final int retryInitialDelayMs;
     private final int retryBackoffMultiplier;
+    /** HTTP status codes that are retried (transient). Config-driven so ops can tune without a rebuild. */
+    private final java.util.Set<Integer> retryOnStatus;
     private final int requestTimeoutSeconds;
     private final int streamIdleTimeoutSeconds;
     private final AgentRegistry registry;
@@ -109,6 +111,9 @@ public class AnswerSynthesizer {
             @Value("${conduit.llm.max-retries:3}") int maxRetries,
             @Value("${conduit.llm.retry-initial-delay-ms:2000}") int retryInitialDelayMs,
             @Value("${conduit.llm.retry-backoff-multiplier:2}") int retryBackoffMultiplier,
+            // Transient HTTP statuses to retry (comma-separated). 429 = rate limit; 502/503/504 =
+            // transient upstream errors (e.g. an OpenAI edge "connection termination"). Config-driven.
+            @Value("${conduit.llm.retry-on-status:429,502,503,504}") String retryOnStatus,
             // Per-request timeout (time to receive response headers) and inter-token idle
             // deadline — without these a stalled LLM pins the synthesis thread + SSE emitter
             // until the 120s emitter timeout. Defaults fall back to the shared LLM budget.
@@ -130,6 +135,7 @@ public class AnswerSynthesizer {
         this.maxRetries = maxRetries;
         this.retryInitialDelayMs = retryInitialDelayMs;
         this.retryBackoffMultiplier = retryBackoffMultiplier;
+        this.retryOnStatus = parseStatusList(retryOnStatus);
         this.requestTimeoutSeconds = requestTimeoutSeconds;
         this.streamIdleTimeoutSeconds = streamIdleTimeoutSeconds;
         // System prompts and the GROUNDED FIGURES instruction live under prompts/*.md; the domain-
@@ -858,6 +864,25 @@ public class AnswerSynthesizer {
         return " " + m.writeValueAsString(root);  // leading space → OpenAI-exact "data: {json}" (Spring omits it)
     }
 
+    /** Parse a comma-separated list of HTTP status codes (e.g. "429,502,503,504") into a set. */
+    private static java.util.Set<Integer> parseStatusList(String csv) {
+        java.util.Set<Integer> out = new java.util.LinkedHashSet<>();
+        if (csv != null) {
+            for (String part : csv.split(",")) {
+                String t = part.trim();
+                if (t.isEmpty()) continue;
+                try {
+                    out.add(Integer.parseInt(t));
+                } catch (NumberFormatException e) {
+                    // Fail fast (repo posture): a typo must not silently disable the retry.
+                    throw new IllegalArgumentException(
+                            "Invalid status in conduit.llm.retry-on-status: '" + t + "'", e);
+                }
+            }
+        }
+        return java.util.Set.copyOf(out);
+    }
+
     private HttpResponse<java.io.InputStream> sendWithRetry(String endpoint, String requestBody) throws Exception {
         int delayMs = retryInitialDelayMs;
         Exception lastTimeout = null;
@@ -878,8 +903,12 @@ public class AnswerSynthesizer {
             try {
                 HttpResponse<java.io.InputStream> resp =
                         httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
-                if (resp.statusCode() != 429 || attempt == maxRetries) return resp;
-                log.warn("LLM rate limited (429), retry {}/{} in {}ms", attempt, maxRetries, delayMs);
+                int sc = resp.statusCode();
+                if (!retryOnStatus.contains(sc) || attempt == maxRetries) return resp;
+                // Release the connection before the retry. close() can itself throw on a half-dead
+                // upstream (exactly the case we're retrying) — swallow it so the retry still runs.
+                try { resp.body().close(); } catch (java.io.IOException ignored) { /* retry anyway */ }
+                log.warn("LLM transient HTTP {} — retry {}/{} in {}ms", sc, attempt, maxRetries, delayMs);
             } catch (HttpTimeoutException e) {
                 lastTimeout = e;
                 if (attempt == maxRetries) throw e;

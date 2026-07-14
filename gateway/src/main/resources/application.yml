@@ -262,6 +262,9 @@ conduit:
     max-retries: ${CONDUIT_LLM_MAX_RETRIES:3}
     retry-initial-delay-ms: ${CONDUIT_LLM_RETRY_INITIAL_DELAY_MS:2000}
     retry-backoff-multiplier: ${CONDUIT_LLM_RETRY_BACKOFF_MULTIPLIER:2}
+    # Transient HTTP statuses the synthesizer retries (comma-separated): 429 rate-limit +
+    # 502/503/504 transient upstream errors. Bounded by max-retries and the end-to-end deadline.
+    retry-on-status: ${CONDUIT_LLM_RETRY_ON_STATUS:429,502,503,504}
     request-timeout-seconds: ${CONDUIT_LLM_REQUEST_TIMEOUT_SECONDS:25}
   orchestration:
     fan-out-deadline-ms: ${CONDUIT_FANOUT_DEADLINE_MS:60000}
