@@ -150,6 +150,11 @@ services:
       # Routing-diagnostic endpoint (/debug/route) for the eval harness — OFF in the image default (B2),
       # enabled here for the demo/eval only. Never enable in a production deployment.
       CONDUIT_DEBUG_ROUTE_DECISION_ENABLED: ${CONDUIT_DEBUG_ROUTE_DECISION_ENABLED:-true}
+      # Slow-provider tolerance (raised for the demo): give a slow synthesis LLM response room to
+      # finish instead of hitting the end-to-end deadline and surfacing an empty bubble. The BFF's
+      # GATEWAY_REQUEST_TIMEOUT_MS is raised in lockstep so it never cuts the stream first.
+      CONDUIT_REQUEST_DEADLINE_MS: ${CONDUIT_REQUEST_DEADLINE_MS:-180000}
+      CONDUIT_LLM_REQUEST_TIMEOUT_SECONDS: ${CONDUIT_LLM_REQUEST_TIMEOUT_SECONDS:-90}
       CONDUIT_LLM_INTENT_CLASSIFIER_BASE_URL: ${CONDUIT_LLM_INTENT_CLASSIFIER_BASE_URL:-https://api.z.ai/api/paas/v4}
       CONDUIT_LLM_INTENT_CLASSIFIER_API_KEY: ${CONDUIT_LLM_INTENT_CLASSIFIER_API_KEY:-${ZAI_API_KEY:-}}
       CONDUIT_LLM_INTENT_CLASSIFIER_MODEL: ${CONDUIT_LLM_INTENT_CLASSIFIER_MODEL:-glm-4.5-flash}
@@ -618,6 +623,10 @@ services:
       MONGODB_URI: ${CHAT_MONGODB_URI:-mongodb://mongodb:27017/conduitchat}
       GATEWAY_BASE: ${CHAT_GATEWAY_BASE:-http://gateway:8080}
       GATEWAY_MODEL: ${CHAT_GATEWAY_MODEL:-conduit-assistant}
+      # Header-wait bound for the gateway response; must exceed the gateway's own end-to-end
+      # deadline (CONDUIT_REQUEST_DEADLINE_MS, raised to 180s) so the BFF never cuts a slow answer
+      # first. SSE body streams unbounded regardless.
+      GATEWAY_REQUEST_TIMEOUT_MS: ${CHAT_GATEWAY_REQUEST_TIMEOUT_MS:-185000}
       # ── OIDC / Axiom ───────────────────────────────────────────────────────────
       # Must be reachable by BOTH the browser and this container, and must match the issuer
       # advertised by Axiom's discovery document. Do NOT use iam-service or localhost here.
