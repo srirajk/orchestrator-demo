@@ -26,6 +26,10 @@
 
 | Time | Action | File(s) | Outcome | ~Tokens |
 |------|--------|---------|---------|--------|
+| 18:40 | Consolidated the onboarding design into an implementation folder and revised the runtime after inspecting actual Java condition, JMESPath, DAG, map and concurrency semantics | docs/implementation/onboarding-studio/, .wolf/anatomy.md, .wolf/cerebrum.md | Java/Spring Studio + React selected; shared Java admission module and gateway shadow oracle prevent cross-language drift; execution waves, package structure, ADR and Codex handoff added | ~18000 |
+| 18:55 | Critically designed the Conduit onboarding/admission agent and wrote a build-grade PRD, engineering specification, and phased lower-cost-model implementation plan; recorded the control-plane boundary and deterministic dossier-to-manifest compiler decision | docs/ONBOARDING-AGENT-PRD.md, docs/ONBOARDING-AGENT-ENGINEERING-SPEC.md, docs/ONBOARDING-AGENT-BUILD-PLAN.md, .wolf/anatomy.md, .wolf/cerebrum.md | Complete; v1 explicitly scoped to three proven archetypes with unsupported-requirement and human-approval gates | ~30000 |
+| 19:15 | Hardened onboarding design to an explicit production-grade claim: added OpenAPI/MCP/A2A, NIST AI RMF, OWASP and ISO 42001 crosswalks; separated hard, measured and human-authority decisions; locked the generation agreement; added eleven production implementation scenarios | docs/ONBOARDING-AGENT-PRD.md, docs/ONBOARDING-AGENT-ENGINEERING-SPEC.md, docs/ONBOARDING-AGENT-BUILD-PLAN.md, .wolf/anatomy.md | Complete; diff clean and World-B CRITICAL 0 / REVIEW 0 | ~12000 |
+| 20:05 | Expanded onboarding into a separate Conduit Onboarding Studio and split the design into focused architecture, UX, Axiom authorization/promotion, OpenAI Agents SDK runtime, deterministic compiler, certification, index, PRD and implementation-plan specs | docs/ONBOARDING-STUDIO-*.md, docs/ONBOARDING-AGENT-RUNTIME-SPEC.md, docs/ONBOARDING-MANIFEST-COMPILER-SPEC.md, docs/ONBOARDING-CERTIFICATION-SPEC.md, existing onboarding specs, .wolf/anatomy.md, .wolf/cerebrum.md | Complete; official SDK guidance incorporated, links/diff clean, World-B CRITICAL 0 / REVIEW 0 | ~30000 |
 | 19:46 | Ran full Java test suite to audit Phase 12 compatibility | gateway/src/test/ (9 files) | 44 tests, 0 failures — all tests already match Phase 12 APIs | ~300 |
 | 19:46 | Verified TypeScript E2E tests compile clean | e2e/tests/ | `npx tsc --noEmit` exits 0 — no TS errors | ~50 |
 | 19:46 | Confirmed Principal, EffectiveManifest, DomainManifest tests use correct Phase 12 signatures | gateway/src/test/ | Principal has tenantId 2nd arg; EffectiveManifest uses coverage()/resourceScoped()/requiresRelationship(); no deleted methods referenced | ~2000 |
@@ -3206,3 +3210,57 @@
 | 15:35 | Insights by-user UI: ledger-row replay pre-fill + honest per-user KPIs | apps/insights/web/src/App.tsx, index.css | tsc 0, world-b CRITICAL 0 | ~9k |
 | 15:36 | Session end: 18 writes across 3 files (codex-insights-byuser-split-qc.md, App.tsx, index.css) | 5 reads | ~20422 tok |
 | 15:36 | Session end: 18 writes across 3 files (codex-insights-byuser-split-qc.md, App.tsx, index.css) | 6 reads | ~20422 tok |
+| 16:35 | Session end: 18 writes across 3 files (codex-insights-byuser-split-qc.md, App.tsx, index.css) | 6 reads | ~20422 tok |
+| 16:36 | Session end: 18 writes across 3 files (codex-insights-byuser-split-qc.md, App.tsx, index.css) | 6 reads | ~20422 tok |
+| 16:37 | Session end: 18 writes across 3 files (codex-insights-byuser-split-qc.md, App.tsx, index.css) | 6 reads | ~20422 tok |
+| 16:38 | Session end: 18 writes across 3 files (codex-insights-byuser-split-qc.md, App.tsx, index.css) | 7 reads | ~32522 tok |
+| 16:39 | Session end: 18 writes across 3 files (codex-insights-byuser-split-qc.md, App.tsx, index.css) | 7 reads | ~32522 tok |
+| 16:41 | Session end: 18 writes across 3 files (codex-insights-byuser-split-qc.md, App.tsx, index.css) | 7 reads | ~32522 tok |
+
+## Session: 2026-07-12 17:42
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+
+## Session: 2026-07-13 14:48
+
+| Time | Action | File(s) | Outcome | ~Tokens |
+|------|--------|---------|---------|--------|
+| 14:54 | Edited gateway/src/main/java/ai/conduit/gateway/synthesis/answer/GroundedFigureValidator.java | isEmpty() → figures() | ~208 |
+| 14:58 | Edited gateway/src/test/java/ai/conduit/gateway/synthesis/answer/GroundedFigureTest.java | modified Contract() | ~852 |
+| 15:00 | bug-273 validator false-positive fixed (label-scoping → figures.anyMatch); Fable-reviewed; mislabel detection deferred→bug-282/task#47; test rewritten + 2 regression tests (10/10 green); world-b CRITICAL 0 | GroundedFigureValidator.java, GroundedFigureTest.java, buglog.json | done | ~14k |
+| 15:01 | Session end: 2 writes across 2 files (GroundedFigureValidator.java, GroundedFigureTest.java) | 2 reads | ~1136 tok |
+| 15:21 | Session end: 2 writes across 2 files (GroundedFigureValidator.java, GroundedFigureTest.java) | 3 reads | ~1136 tok |
+| 15:34 | Created ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/tempo_check.py | — | ~160 |
+| 15:38 | Created ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/control-plane-layers.html | — | ~4597 |
+| 15:38 | Edited ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/control-plane-layers.html | inline fix | ~13 |
+| 15:39 | Session end: 5 writes across 4 files (GroundedFigureValidator.java, GroundedFigureTest.java, tempo_check.py, control-plane-layers.html) | 3 reads | ~6235 tok |
+| 16:03 | Created demo-ready-scripts/LEADERSHIP-DEMO-RUNBOOK.md | — | ~2055 |
+| 16:03 | created demo runbook doc + published "Control Plane in Layers" artifact; verified all demo creds live (grafana admin/changeme, langfuse admin@meridian.bank/changeme, personas/Meridian@2024); brought up conduit-grafana (7 dashboards, Tempo+Loki+Prom green) | demo-ready-scripts/LEADERSHIP-DEMO-RUNBOOK.md, control-plane-layers.html | done | ~30k |
+| 16:04 | Session end: 6 writes across 5 files (GroundedFigureValidator.java, GroundedFigureTest.java, tempo_check.py, control-plane-layers.html, LEADERSHIP-DEMO-RUNBOOK.md) | 3 reads | ~8437 tok |
+| 16:07 | Created ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/swap_probe.sh | — | ~375 |
+| 16:09 | Created ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/coverage_probe.sh | — | ~331 |
+| 16:10 | Edited demo-ready-scripts/LEADERSHIP-DEMO-RUNBOOK.md | modified Result() | ~483 |
+| 16:11 | Session end: 9 writes across 7 files (GroundedFigureValidator.java, GroundedFigureTest.java, tempo_check.py, control-plane-layers.html, LEADERSHIP-DEMO-RUNBOOK.md) | 3 reads | ~9710 tok |
+| 16:36 | Edited demo-ready-scripts/LEADERSHIP-DEMO-RUNBOOK.md | modified visual() | ~758 |
+| 16:36 | Edited demo-ready-scripts/LEADERSHIP-DEMO-RUNBOOK.md | expanded (+23 lines) | ~674 |
+| 16:36 | Edited demo-ready-scripts/LEADERSHIP-DEMO-RUNBOOK.md | 3→3 lines | ~66 |
+| 16:36 | Edited demo-ready-scripts/LEADERSHIP-DEMO-RUNBOOK.md | 2→3 lines | ~61 |
+| 16:36 | Edited demo-ready-scripts/LEADERSHIP-DEMO-RUNBOOK.md | inline fix | ~27 |
+| 16:37 | runbook: added business primer (Meridian domains/entities/personas) + restructured Lens 1 into 4-turn convo (holdings→concentration→servicing/MCP→house view) mapped to real agents; verified persona books live (jane→Whitman, carlos→Sterling, guest→empty), carlos/Whitman chat denial "not in your coverage" | demo-ready-scripts/LEADERSHIP-DEMO-RUNBOOK.md | done | ~22k |
+| 16:37 | Session end: 14 writes across 7 files (GroundedFigureValidator.java, GroundedFigureTest.java, tempo_check.py, control-plane-layers.html, LEADERSHIP-DEMO-RUNBOOK.md) | 3 reads | ~11408 tok |
+| 16:40 | Created ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/dryrun.py | — | ~820 |
+| 16:43 | Created ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/dryrun2.py | — | ~581 |
+| 16:46 | Edited demo-ready-scripts/LEADERSHIP-DEMO-RUNBOOK.md | modified quirk() | ~767 |
+| 16:47 | Session end: 17 writes across 9 files (GroundedFigureValidator.java, GroundedFigureTest.java, tempo_check.py, control-plane-layers.html, LEADERSHIP-DEMO-RUNBOOK.md) | 3 reads | ~13630 tok |
+| 16:52 | Edited gateway/src/main/resources/prompts/answer-synthesizer.system.md | inline fix | ~173 |
+| 16:52 | Created ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/hero_stress.py | — | ~512 |
+| 16:55 | Edited demo-ready-scripts/LEADERSHIP-DEMO-RUNBOOK.md | modified reliability() | ~155 |
+| 16:56 | Session end: 20 writes across 11 files (GroundedFigureValidator.java, GroundedFigureTest.java, tempo_check.py, control-plane-layers.html, LEADERSHIP-DEMO-RUNBOOK.md) | 4 reads | ~15220 tok |
+| 16:56 | Session end: 20 writes across 11 files (GroundedFigureValidator.java, GroundedFigureTest.java, tempo_check.py, control-plane-layers.html, LEADERSHIP-DEMO-RUNBOOK.md) | 4 reads | ~15220 tok |
+| 16:59 | Edited demo-ready-scripts/LEADERSHIP-DEMO-RUNBOOK.md | 2→3 lines | ~106 |
+| 16:59 | Session end: 21 writes across 11 files (GroundedFigureValidator.java, GroundedFigureTest.java, tempo_check.py, control-plane-layers.html, LEADERSHIP-DEMO-RUNBOOK.md) | 4 reads | ~15333 tok |
+| 17:04 | Session end: 21 writes across 11 files (GroundedFigureValidator.java, GroundedFigureTest.java, tempo_check.py, control-plane-layers.html, LEADERSHIP-DEMO-RUNBOOK.md) | 4 reads | ~15333 tok |
+| 17:06 | Session end: 21 writes across 11 files (GroundedFigureValidator.java, GroundedFigureTest.java, tempo_check.py, control-plane-layers.html, LEADERSHIP-DEMO-RUNBOOK.md) | 4 reads | ~15333 tok |
+| 17:11 | Session end: 21 writes across 11 files (GroundedFigureValidator.java, GroundedFigureTest.java, tempo_check.py, control-plane-layers.html, LEADERSHIP-DEMO-RUNBOOK.md) | 4 reads | ~15333 tok |
+| 08:24 | Session end: 21 writes across 11 files (GroundedFigureValidator.java, GroundedFigureTest.java, tempo_check.py, control-plane-layers.html, LEADERSHIP-DEMO-RUNBOOK.md) | 4 reads | ~15333 tok |

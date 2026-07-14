@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-07-12T19:34:37.238Z
-> Files: 1129 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-07-13T20:59:24.093Z
+> Files: 1139 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/
 
@@ -14,8 +14,15 @@
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/
 
+- `control-plane-layers.html` — Conduit — The Control Plane in Layers (~4592 tok)
+- `coverage_probe.sh` (~331 tok)
+- `dryrun.py` — token, ask, contains_any (~820 tok)
+- `dryrun2.py` — token, ask (~581 tok)
 - `fixctrl.py` (~194 tok)
+- `hero_stress.py` — token, ask (~512 tok)
 - `multiturn_probe.py` — tok, ask, classify (~802 tok)
+- `swap_probe.sh` (~375 tok)
+- `tempo_check.py` (~160 tok)
 - `wolf_update.py` (~972 tok)
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/probe/
@@ -865,6 +872,10 @@
 - `App.tsx` — RANGE_OPTIONS (~17984 tok)
 - `index.css` — Styles: 111 rules, 17 vars (~6672 tok)
 
+## demo-ready-scripts/
+
+- `LEADERSHIP-DEMO-RUNBOOK.md` — Conduit — Leadership Demo Runbook (~3989 tok)
+
 ## docs/
 
 - `agent-catalog.md` — Agent Catalog — The 9 Demo Agents (Conduit demo) (~1479 tok)
@@ -1195,6 +1206,7 @@
 
 - `AnswerSynthesizer.java` — Synthesizes a grounded, streamed answer from agent outputs using Z.AI GLM. (~14157 tok)
 - `GroundedFigureRenderer.java` — Component: GroundedFigureRenderer (~1870 tok)
+- `GroundedFigureValidator.java` — Component: GroundedFigureValidator (~1691 tok)
 
 ## gateway/src/main/java/ai/conduit/gateway/synthesis/input/
 
@@ -1435,7 +1447,7 @@
 
 - `answer-synthesizer-history.system.md` (~183 tok)
 - `answer-synthesizer.figures-block.md` — Declares the (~128 tok)
-- `answer-synthesizer.system.md` — Declares a (~726 tok)
+- `answer-synthesizer.system.md` — Declares a (~686 tok)
 - `clarification-composer.default-question.md` (~9 tok)
 - `clarification-composer.system.md` (~361 tok)
 - `entity-extractor.system.md` (~143 tok)
@@ -1525,6 +1537,7 @@
 
 - `AnswerSynthesizerCompareTest.java` — Multi-entity COMPARE synthesis attribution: two calls to the SAME agent for two clients must produce (~1679 tok)
 - `AnswerSynthesizerGroundingTest.java` — When the synthesizer LLM produces a figure that fails grounding validation, the answer is not (~1010 tok)
+- `GroundedFigureTest.java` — Class: GroundedFigureTest (~2104 tok)
 
 ## gateway/src/test/java/ai/conduit/gateway/synthesis/input/
 
