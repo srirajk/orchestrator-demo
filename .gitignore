@@ -113,3 +113,6 @@ tmp/
 .codex/
 output/pdf/
 *.DS_Store
+
+# Private strategy / vision docs — internal only, NEVER check in (name real prospects + GTM)
+vision/
