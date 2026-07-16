@@ -38,8 +38,20 @@ public class AsyncAuditWriter {
 
     private static final Logger log = LoggerFactory.getLogger(AsyncAuditWriter.class);
 
-    /** occurredAt is stamped at request completion, not at drain time, so the record is stable. */
-    private record Job(List<TraceEvent> events, Instant occurredAt) {}
+    /**
+     * occurredAt is stamped at request completion, not at drain time, so the record is stable.
+     * {@code mustKeep} marks a record that carries an authorization DENY verdict: it must survive
+     * queue pressure (it is never the victim of drop-oldest eviction). Full per-invocation WORM
+     * durability remains an OPEN PREREQUISITE on the audit-outbox story — this only guarantees that
+     * a deny record is preferred over droppable records when the queue is under pressure.
+     */
+    private record Job(List<TraceEvent> events, Instant occurredAt, boolean mustKeep) {}
+
+    /**
+     * Event type the {@code GovernedInvoker} (and the coverage/structural gates) emit on a deny. A
+     * request whose buffer carries one is a must-keep audit record.
+     */
+    private static final String DENY_EVENT = "check_denied";
 
     private final AuditRecordAssembler assembler;
     private final AuditRecordSink sink;
@@ -86,20 +98,42 @@ public class AsyncAuditWriter {
     /** Hand a completed request's events over for audit persistence. Never blocks, never throws. */
     public void submit(List<TraceEvent> events) {
         if (events == null || events.isEmpty()) return;
-        Job job = new Job(events, Instant.now());
+        Job job = new Job(events, Instant.now(), carriesDeny(events));
         if (queue.offer(job)) return;
 
-        Job evicted = queue.poll();      // drop-oldest
+        // Queue full. Make room by evicting the OLDEST DROPPABLE (non-must-keep) record — a deny
+        // verdict is never the victim of eviction. Fall back to plain drop-oldest only if every queued
+        // record is itself must-keep (all-deny backlog), and even then never evict to admit a droppable.
+        Job evicted = pollOldestDroppable();
         if (evicted != null) {
             dropped.increment();
-            log.warn("AsyncAuditWriter: queue full — dropped an audit record (txn={})",
-                    firstRequestId(evicted.events()));
+            log.warn("AsyncAuditWriter: queue full — evicted an audit record (txn={}, mustKeep={})",
+                    firstRequestId(evicted.events()), evicted.mustKeep());
+            if (queue.offer(job)) return;
         }
-        if (!queue.offer(job)) {
-            dropped.increment();
-            log.warn("AsyncAuditWriter: queue still full — dropped an audit record (txn={})",
-                    firstRequestId(events));
+        // Could not make room without dropping a deny record. Drop the incoming record; if it is itself
+        // a deny verdict this is the WORM-durability gap the outbox story closes — count it as an incident.
+        dropped.increment();
+        log.warn("AsyncAuditWriter: queue still full — dropped an audit record (txn={}, mustKeep={})",
+                firstRequestId(events), job.mustKeep());
+    }
+
+    /** Remove and return the oldest non-must-keep job, or null if every queued job is must-keep. */
+    private Job pollOldestDroppable() {
+        for (Job j : queue) {          // ArrayBlockingQueue iterates in FIFO (oldest-first) order
+            if (!j.mustKeep() && queue.remove(j)) {
+                return j;
+            }
         }
+        return null;
+    }
+
+    /** A request whose buffer carries an authorization DENY verdict yields a must-keep audit record. */
+    private static boolean carriesDeny(List<TraceEvent> events) {
+        for (TraceEvent e : events) {
+            if (DENY_EVENT.equals(e.type())) return true;
+        }
+        return false;
     }
 
     private void drain() {

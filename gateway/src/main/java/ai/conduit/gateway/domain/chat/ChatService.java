@@ -1179,8 +1179,14 @@ public class ChatService {
                 .distinct()
                 .map(agentId -> AuthorizationGrant.structural(principal.id(), agentId, "cerbos", requestId))
                 .collect(Collectors.toList());
-        return new Plan(nodes, InvocationContext.of(principal.id(), conversationId, requestId,
-                callerToken, grants));
+        // On-path fail-closed fallback for the checkpoint: if a grant is ever missing/stale, re-derive
+        // the structural verdict through the SAME Cerbos-backed entitlement bean. Never hit on the green
+        // path (a fresh grant is always present), so it adds zero PDP calls to a normal request.
+        InvocationContext ctx = InvocationContext.of(principal.id(), conversationId, requestId,
+                        callerToken, grants)
+                .withReverifier(node ->
+                        !entitlementService.filterAgents(principal, List.of(node.agent())).isEmpty());
+        return new Plan(nodes, ctx);
     }
 
     private String statusForPlan(PlanNode node, List<NodeResult> results) {

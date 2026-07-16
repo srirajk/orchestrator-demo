@@ -32,6 +32,7 @@ public final class InvocationContext {
     private final String callerToken;
     private final List<AuthorizationGrant> grants = new CopyOnWriteArrayList<>();
     private final Map<String, String> boundResources = new ConcurrentHashMap<>();
+    private volatile InvocationReverifier reverifier;   // optional on-path PDP re-check (sub-step b)
 
     private InvocationContext(String principalId, String conversationId, String requestId,
                               String callerToken, List<AuthorizationGrant> seed) {
@@ -78,6 +79,15 @@ public final class InvocationContext {
     /** Add a grant minted mid-flight (e.g. a resource-scoped grant from the coverage gate). */
     public void addGrant(AuthorizationGrant grant) {
         if (grant != null) grants.add(grant);
+    }
+
+    /** The on-path PDP re-check used when no fresh grant is found, or {@code null} if none was wired. */
+    public InvocationReverifier reverifier() { return reverifier; }
+
+    /** Wire the on-path PDP re-check (sub-step b). Fluent so ChatService can attach it inline. */
+    public InvocationContext withReverifier(InvocationReverifier reverifier) {
+        this.reverifier = reverifier;
+        return this;
     }
 
     /** Record the resource id a node's input actually bound to, for the invoker's TOCTOU closure. */
