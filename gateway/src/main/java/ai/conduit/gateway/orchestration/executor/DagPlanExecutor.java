@@ -6,6 +6,10 @@ import ai.conduit.gateway.domain.coverage.CoverageClient;
 import ai.conduit.gateway.domain.manifest.DomainManifest;
 import ai.conduit.gateway.domain.manifest.EffectiveManifest;
 import ai.conduit.gateway.orchestration.harness.AgentHarness;
+import ai.conduit.gateway.orchestration.invoke.AllowAllInvocationAuthorizer;
+import ai.conduit.gateway.orchestration.invoke.AuthorizationGrant;
+import ai.conduit.gateway.orchestration.invoke.GovernedInvoker;
+import ai.conduit.gateway.orchestration.invoke.InvocationContext;
 import ai.conduit.gateway.infrastructure.telemetry.TraceEvent;
 import ai.conduit.gateway.infrastructure.telemetry.TraceEventPublisher;
 import ai.conduit.gateway.infrastructure.telemetry.event.CheckDeniedData;
@@ -75,7 +79,7 @@ public class DagPlanExecutor {
     private static final Logger log = LoggerFactory.getLogger(DagPlanExecutor.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final AgentHarness harness;
+    private final GovernedInvoker governedInvoker;
     private final Tracer tracer;
     private final MeterRegistry meterRegistry;
     private final TraceEventPublisher tracePublisher;
@@ -84,18 +88,25 @@ public class DagPlanExecutor {
     private final int globalMapMaxItems;
     private final int globalMapMaxConcurrency;
 
+    /**
+     * Test-convenience constructor (NOT {@code @Autowired}): wraps the harness in a
+     * {@link GovernedInvoker} with an {@link AllowAllInvocationAuthorizer} so pre-existing executor
+     * unit tests exercise fan-out/DAG/map mechanics without minting grants. The production wiring uses
+     * the {@code @Autowired} constructor below with the fail-closed grant/Cerbos authorizer bean.
+     */
     public DagPlanExecutor(
             AgentHarness harness,
             Tracer tracer,
             MeterRegistry meterRegistry,
-            @Value("${conduit.orchestration.fan-out-deadline-ms:60000}") long overallDeadlineMs) {
-        this(harness, tracer, meterRegistry, null, overallDeadlineMs, 100, 8,
+            long overallDeadlineMs) {
+        this(new GovernedInvoker(new AllowAllInvocationAuthorizer(), harness, null),
+                tracer, meterRegistry, null, overallDeadlineMs, 100, 8,
                 new ai.conduit.gateway.infrastructure.expression.CelEvalEngine(MAPPER));
     }
 
     @Autowired
     public DagPlanExecutor(
-            AgentHarness harness,
+            GovernedInvoker governedInvoker,
             Tracer tracer,
             MeterRegistry meterRegistry,
             TraceEventPublisher tracePublisher,
@@ -103,7 +114,7 @@ public class DagPlanExecutor {
             @Value("${conduit.orchestration.map.max-items:100}") int globalMapMaxItems,
             @Value("${conduit.orchestration.map.max-concurrency:8}") int globalMapMaxConcurrency,
             EvalEngine evalEngine) {
-        this.harness = harness;
+        this.governedInvoker = governedInvoker;
         this.tracer = tracer;
         this.meterRegistry = meterRegistry;
         this.tracePublisher = tracePublisher;
@@ -150,6 +161,16 @@ public class DagPlanExecutor {
         List<PlanNode> allNodes = plan.nodes();
         log.info("DagPlanExecutor: executing {} nodes by topological layers (deadline={}ms)",
                 allNodes.size(), overallDeadlineMs);
+
+        // Authorization envelope for every governed hop in this plan. Production: ChatService attaches
+        // it (structural grants minted from filterAgents). Legacy/no-mint: build one carrying the
+        // caller token so the harness still receives identity; grants stay empty (fail-closed unless
+        // the convenience allow-all authorizer is wired). The coverage gate below mints resource-scoped
+        // grants into THIS instance, which the invoker's authorize phase then verifies.
+        final InvocationContext ctx = plan.context() != null
+                ? plan.context()
+                : InvocationContext.of(coverageContext != null ? coverageContext.principalId() : null,
+                        conversationId, requestId, callerToken, java.util.List.of());
 
         // Resolver-SELECTION counter — parity with FlatPlanExecutor (agentId is manifest-declared).
         allNodes.forEach(n -> Counter.builder("conduit.resolver.selection")
@@ -213,7 +234,7 @@ public class DagPlanExecutor {
                 }
 
                 runLayer(ready, blackboard, results, exec, parentContext, mdcContext, deadline,
-                        requestId, conversationId, callerToken, coverageContext);
+                        requestId, conversationId, callerToken, coverageContext, ctx);
             }
         } finally {
             exec.close();
@@ -266,7 +287,8 @@ public class DagPlanExecutor {
                           String requestId,
                           String conversationId,
                           String callerToken,
-                          CoverageContext coverageContext) {
+                          CoverageContext coverageContext,
+                          InvocationContext ctx) {
 
         // Bind + gate on the caller thread (deterministic) before releasing the layer.
         List<PlanNode> bound = new ArrayList<>();
@@ -292,7 +314,7 @@ public class DagPlanExecutor {
             }
             if (candidate.hasMap()) {
                 NodeResult mapResult = executeMapNode(candidate, exec, parentContext, deadline,
-                        requestId, conversationId, callerToken);
+                        requestId, conversationId, callerToken, ctx);
                 results.put(n.nodeId(), mapResult);
                 if (mapResult.isOk()) {
                     blackboard.project(candidate, mapResult.data());
@@ -313,7 +335,7 @@ public class DagPlanExecutor {
                         span.setAttribute("agent.id", node.agent().agentId());
                         span.setAttribute("agent.protocol", node.agent().protocol());
                         try (Scope ignored = span.makeCurrent()) {
-                            NodeResult result = harness.execute(node, exec, callerToken);
+                            NodeResult result = governedInvoker.invoke(ctx, node, exec);
                             span.setAttribute("agent.status", result.status().name());
                             span.setAttribute("agent.latency_ms", result.latencyMs());
                             if (!result.isOk()) {
@@ -364,7 +386,8 @@ public class DagPlanExecutor {
                                       long deadline,
                                       String requestId,
                                       String conversationId,
-                                      String callerToken) {
+                                      String callerToken,
+                                      InvocationContext ctx) {
         long start = System.currentTimeMillis();
         AgentManifest.MapSpec map = node.agent().io().map();
         JsonNode collection;
@@ -415,7 +438,7 @@ public class DagPlanExecutor {
             final int index = i;
             final JsonNode rawItem = collection.get(i);
             futures.add(CompletableFuture.supplyAsync(() -> invokeMapItem(
-                    node, map, rawItem, index, permits, exec, parentContext, callerToken), exec));
+                    node, map, rawItem, index, permits, exec, parentContext, callerToken, ctx), exec));
         }
 
         long remaining = Math.max(1, deadline - System.currentTimeMillis());
@@ -452,7 +475,8 @@ public class DagPlanExecutor {
                                          Semaphore permits,
                                          ExecutorService exec,
                                          Context parentContext,
-                                         String callerToken) {
+                                         String callerToken,
+                                         InvocationContext ctx) {
         try {
             permits.acquire();
         } catch (InterruptedException e) {
@@ -479,7 +503,7 @@ public class DagPlanExecutor {
                     itemInput,
                     node.dependsOn(),
                     node.condition());
-            NodeResult result = harness.execute(itemNode, exec, callerToken);
+            NodeResult result = governedInvoker.invoke(ctx, itemNode, exec);
             span.setAttribute("agent.status", result.status().name());
             span.setAttribute("agent.latency_ms", result.latencyMs());
             if (!result.isOk()) {

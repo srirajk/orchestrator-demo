@@ -342,7 +342,12 @@ public class AgentHarness {
                 message);
     }
 
-    private String identityProblem(String callerToken) {
+    /**
+     * The caller-identity guard, also re-invoked by {@link ai.conduit.gateway.orchestration.invoke.GovernedInvoker}
+     * as defense-in-depth. Static + self-contained (no instance state) so the checkpoint can call the
+     * SAME logic without moving this enforcing copy — {@code AgentHarnessResilienceIT} stays byte-unmodified.
+     */
+    public static String identityProblem(String callerToken) {
         if (callerToken == null || callerToken.isBlank()) {
             return null;
         }

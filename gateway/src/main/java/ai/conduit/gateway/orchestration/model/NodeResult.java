@@ -36,7 +36,15 @@ public record NodeResult(
         /** Declared node condition failed at runtime; visible failure. */
         CONDITION_ERROR,
         /** Caller identity expired or was absent before this hop was dispatched. */
-        AUTH_EXPIRED
+        AUTH_EXPIRED,
+        /**
+         * The governed-invocation checkpoint refused this hop: no fresh matching authorization
+         * grant (fail-closed) or an on-path PDP deny. Distinct from a Cerbos-pruned agent — a
+         * pruned agent produces NO NodeResult, whereas a DENIED one flows to results, gets an
+         * {@code agent_complete} frame, and reaches synthesis as missing-data. Treated as a failure
+         * ({@link #isFailure()} is already true for any non-OK, non-clean-skip status).
+         */
+        DENIED
     }
 
     /** Convenience: true when the call completed successfully with data. */

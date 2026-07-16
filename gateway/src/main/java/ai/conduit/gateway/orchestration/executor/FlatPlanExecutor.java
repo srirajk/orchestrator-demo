@@ -1,7 +1,8 @@
 package ai.conduit.gateway.orchestration.executor;
 
 import ai.conduit.gateway.infrastructure.telemetry.MdcPropagation;
-import ai.conduit.gateway.orchestration.harness.AgentHarness;
+import ai.conduit.gateway.orchestration.invoke.GovernedInvoker;
+import ai.conduit.gateway.orchestration.invoke.InvocationContext;
 import ai.conduit.gateway.orchestration.model.NodeResult;
 import ai.conduit.gateway.orchestration.model.Plan;
 import ai.conduit.gateway.orchestration.model.PlanNode;
@@ -37,17 +38,17 @@ public class FlatPlanExecutor {
 
     private static final Logger log = LoggerFactory.getLogger(FlatPlanExecutor.class);
 
-    private final AgentHarness harness;
+    private final GovernedInvoker governedInvoker;
     private final Tracer tracer;
     private final MeterRegistry meterRegistry;
     private final long overallDeadlineMs;
 
     public FlatPlanExecutor(
-            AgentHarness harness,
+            GovernedInvoker governedInvoker,
             Tracer tracer,
             MeterRegistry meterRegistry,
             @Value("${conduit.orchestration.fan-out-deadline-ms:60000}") long overallDeadlineMs) {
-        this.harness = harness;
+        this.governedInvoker = governedInvoker;
         this.tracer = tracer;
         this.meterRegistry = meterRegistry;
         this.overallDeadlineMs = overallDeadlineMs;
@@ -74,6 +75,12 @@ public class FlatPlanExecutor {
 
         log.info("FlatPlanExecutor: fanning out {} nodes in parallel (deadline={}ms)",
                 plan.nodes().size(), overallDeadlineMs);
+
+        // Authorization envelope minted by ChatService from the structural verdicts it already computed.
+        // Absent (legacy/no-mint path) ⇒ an empty fail-closed context: the governed invoker denies.
+        final InvocationContext ctx = plan.context() != null
+                ? plan.context()
+                : InvocationContext.empty(null, null);
 
         // Resolver-SELECTION counter (distinct from agent_calls): each node in the plan is an
         // agent the resolver picked for this request. agentId is manifest-declared (World B).
@@ -116,7 +123,7 @@ public class FlatPlanExecutor {
                         span.setAttribute("agent.id", node.agent().agentId());
                         span.setAttribute("agent.protocol", node.agent().protocol());
                         try (Scope ignored = span.makeCurrent()) {
-                            NodeResult result = harness.execute(node, exec, callerToken);
+                            NodeResult result = governedInvoker.invoke(ctx, node, exec);
                             span.setAttribute("agent.status", result.status().name());
                             span.setAttribute("agent.latency_ms", result.latencyMs());
                             if (!result.isOk()) {

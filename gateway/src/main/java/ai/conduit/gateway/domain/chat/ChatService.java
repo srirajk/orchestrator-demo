@@ -40,6 +40,8 @@ import ai.conduit.gateway.infrastructure.telemetry.event.PlanGraphData;
 import ai.conduit.gateway.orchestration.executor.Blackboard;
 import ai.conduit.gateway.orchestration.executor.DagPlanExecutor;
 import ai.conduit.gateway.orchestration.executor.FlatPlanExecutor;
+import ai.conduit.gateway.orchestration.invoke.AuthorizationGrant;
+import ai.conduit.gateway.orchestration.invoke.InvocationContext;
 import ai.conduit.gateway.orchestration.model.NodeResult;
 import ai.conduit.gateway.orchestration.model.Plan;
 import ai.conduit.gateway.orchestration.model.PlanNode;
@@ -931,7 +933,8 @@ public class ChatService {
                 nodes.forEach(n -> tracePublisher.publish(TraceEvent.of("agent_start", requestId, conversationId,
                         new AgentStartData(n.nodeId(), n.agent().protocol()))));
 
-                return executor.execute(new Plan(nodes), callerToken);
+                return executor.execute(
+                        governedPlan(nodes, principal, requestId, conversationId, callerToken), callerToken);
             });
             span.setAttribute("conduit.plan.node_count", results.size());
             rootSpan.setAttribute("conduit.plan.node_count", results.size());
@@ -1151,14 +1154,33 @@ public class ChatService {
                 callerToken,
                 m -> manifestStore.getEffective(m.agentId(), m.domain(), m.subDomain()),
                 coverageClient::check);
-        List<NodeResult> results = dagExecutor.execute(plan, blackboard, requestId, conversationId,
-                callerToken, coverageContext);
+        List<NodeResult> results = dagExecutor.execute(
+                plan.withContext(governedPlan(plan.nodes(), principal, requestId, conversationId, callerToken).context()),
+                blackboard, requestId, conversationId, callerToken, coverageContext);
         tracePublisher.publish(TraceEvent.of("plan_graph", requestId, conversationId,
                 new PlanGraphData(plan.nodes().stream()
                         .map(n -> new PlanGraphData.Node(n.nodeId(), n.agent().agentId(),
                                 n.agent().protocol(), n.dependsOn(), statusForPlan(n, results)))
                         .collect(Collectors.toList()))));
         return Optional.of(results);
+    }
+
+    /**
+     * Mint the per-request authorization envelope the executors thread into the {@code GovernedInvoker}.
+     * A structural grant is minted for each agent that appears in the plan — every such agent already
+     * survived {@code entitlementService.filterAgents} (the Cerbos structural verdict), so the fail-closed
+     * checkpoint verifies a verdict this request already computed. Nothing else is granted, so an agent
+     * that was pruned (and therefore never planned) has no grant and would be denied at the checkpoint.
+     */
+    private Plan governedPlan(List<PlanNode> nodes, Principal principal, String requestId,
+                              String conversationId, String callerToken) {
+        List<AuthorizationGrant> grants = nodes.stream()
+                .map(n -> n.agent().agentId())
+                .distinct()
+                .map(agentId -> AuthorizationGrant.structural(principal.id(), agentId, "cerbos", requestId))
+                .collect(Collectors.toList());
+        return new Plan(nodes, InvocationContext.of(principal.id(), conversationId, requestId,
+                callerToken, grants));
     }
 
     private String statusForPlan(PlanNode node, List<NodeResult> results) {
@@ -1563,7 +1585,8 @@ public class ChatService {
                                 .collect(Collectors.toList());
                         nodes.forEach(n -> tracePublisher.publish(TraceEvent.of("agent_start", requestId,
                                 conversationId, new AgentStartData(n.nodeId(), n.agent().protocol()))));
-                        return executor.execute(new Plan(nodes), callerToken);
+                        return executor.execute(
+                                governedPlan(nodes, principal, requestId, conversationId, callerToken), callerToken);
                     });
             results.forEach(r -> {
                 String prev = r.isOk() && r.data() != null
