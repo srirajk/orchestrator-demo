@@ -33,6 +33,18 @@ clear_toxics() {
 }
 add() { api -X POST "$ADMIN/proxies/$P/toxics" -H 'Content-Type: application/json' -d "$1" >/dev/null; }
 
+# ── F3 authz/coverage legs: apply a toxic to a SET of proxies at once ─────────────
+# The two request-path legs that are not agents (coverage + Cerbos) are disturbed together so a
+# single profile reproduces the whole slow-dependency picture the OutboundGate must survive.
+AUTHZ_PROXIES=${AUTHZ_PROXIES:-coverage coverage-insurance cerbos}
+clear_proxy() {
+  api "$ADMIN/proxies/$1" | python3 -c 'import sys,json;[print(t["name"]) for t in json.load(sys.stdin).get("toxics",[])]' \
+    | while read -r t; do [ -n "$t" ] && api -X DELETE "$ADMIN/proxies/$1/toxics/$t" >/dev/null; done
+  api -X POST "$ADMIN/proxies/$1" -d '{"enabled":true}' >/dev/null
+}
+add_authz() { for pr in $AUTHZ_PROXIES; do clear_proxy "$pr"; api -X POST "$ADMIN/proxies/$pr/toxics" -H 'Content-Type: application/json' -d "$1" >/dev/null; done; }
+clear_authz() { for pr in $AUTHZ_PROXIES; do clear_proxy "$pr"; done; }
+
 case "${1:-show}" in
   gateway-only|clear) clear_toxics ;;
   realistic) clear_toxics; add '{"name":"lat","type":"latency","stream":"downstream","attributes":{"latency":1800,"jitter":400}}' ;;
@@ -48,6 +60,18 @@ case "${1:-show}" in
   slow-body) clear_toxics; add '{"name":"bw","type":"bandwidth","stream":"downstream","attributes":{"rate":4}}' ;;
   truncate)  clear_toxics; add '{"name":"cut","type":"limit_data","stream":"downstream","attributes":{"bytes":512}}' ;;
   reset)     clear_toxics; add '{"name":"rst","type":"reset_peer","stream":"downstream","attributes":{"timeout":0}}' ;;
+  # ── F3: the authz/coverage legs ─────────────────────────────────────────────────
+  # slow-authz      latency 2000–8000ms on coverage + Cerbos. Proves the OutboundGate deadline +
+  #                 fail-closed path: a slow-but-alive PDP (>read-timeout) fail-closes, a slow coverage
+  #                 fails closed as CoverageUnavailable — WITHOUT parking carriers or draining permits.
+  # slow-authz-body bandwidth 4 B/s on coverage + Cerbos. The trickle-body class: headers arrive, the
+  #                 BODY streams under the socket read timeout forever — only the body-phase deadline
+  #                 catches it. This is the leg a header-timeout-only fix would fail.
+  slow-authz)      clear_authz; add_authz '{"name":"lat","type":"latency","stream":"downstream","attributes":{"latency":5000,"jitter":3000}}'
+                   echo "slow-authz applied to: $AUTHZ_PROXIES"; exit 0 ;;
+  slow-authz-body) clear_authz; add_authz '{"name":"bw","type":"bandwidth","stream":"downstream","attributes":{"rate":4}}'
+                   echo "slow-authz-body applied to: $AUTHZ_PROXIES"; exit 0 ;;
+  clear-authz)     clear_authz; echo "cleared authz toxics on: $AUTHZ_PROXIES"; exit 0 ;;
   down)      api -X POST "$ADMIN/proxies/$P" -d '{"enabled":false}' >/dev/null ;;
   show)      : ;;
   *) echo "unknown profile: $1" >&2; exit 2 ;;

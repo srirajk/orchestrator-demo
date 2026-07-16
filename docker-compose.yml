@@ -147,6 +147,11 @@ services:
     ports:
       - "8080:8080"
     environment:
+      # F3 VT-pinning discipline: pin the virtual-thread scheduler's carrier parallelism explicitly so
+      # the everyday demo runs the same carrier config the perf overlay tests against (default :-12).
+      # maxPoolSize is left at the JDK default (256) — only parallelism (the # of carriers) is set here.
+      # A carrier-starvation regression then shows up in the demo, not only under the scale profile.
+      JAVA_TOOL_OPTIONS: ${GATEWAY_JAVA_TOOL_OPTIONS:--Djdk.virtualThreadScheduler.parallelism=${CARRIERS:-12}}
       # Routing-diagnostic endpoint (/debug/route) for the eval harness — OFF in the image default (B2),
       # enabled here for the demo/eval only. Never enable in a production deployment.
       CONDUIT_DEBUG_ROUTE_DECISION_ENABLED: ${CONDUIT_DEBUG_ROUTE_DECISION_ENABLED:-true}

@@ -51,6 +51,9 @@ services:
       - "8474:8474"          # admin API — scripts/perf-toxic.sh drives this
       - "9113:9000"          # the proxied LLM endpoint, for host-side debugging
       - "9114:9001"          # the proxied embeddings endpoint
+      - "9115:9002"          # the proxied wealth-coverage endpoint (F3 slow-authz/slow-authz-body)
+      - "9116:9003"          # the proxied insurance-coverage endpoint
+      - "9117:9004"          # the proxied Cerbos PDP endpoint
     depends_on:
       aimock:
         condition: service_healthy
@@ -86,6 +89,14 @@ services:
       # `new RestTemplate()` (registry/index/RemoteEmbeddingClient.java:36) whose read timeout
       # defaults to -1 = infinite. This is how we prove that, rather than assert it.
       CONDUIT_EMBEDDING_REMOTE_URL: http://toxiproxy:9001/v1/embeddings
+      # F3: the two request-path legs that are NOT agents — coverage (DISCOVER/CHECK/RESOLVE) and the
+      # Cerbos PDP — routed through the proxy so `slow-authz` (latency 2000–8000ms) and `slow-authz-body`
+      # (bandwidth 4 B/s) can prove the OutboundGate deadline + fail-closed path under load. Coverage
+      # URLs come from the domain manifests via these env vars; Cerbos via CERBOS_HOST/PORT.
+      WEALTH_COVERAGE_URL: http://toxiproxy:9002
+      INSURANCE_COVERAGE_URL: http://toxiproxy:9003
+      CERBOS_HOST: toxiproxy
+      CERBOS_HTTP_PORT: "9004"
       # The gateway Dockerfile's ENTRYPOINT is `java -jar app.jar` with no JAVA_OPTS, so
       # JAVA_TOOL_OPTIONS is the clean lever. The JVM logs "Picked up JAVA_TOOL_OPTIONS" — assert
       # that, and assert the Effective CPU Count, rather than assuming either took effect.
