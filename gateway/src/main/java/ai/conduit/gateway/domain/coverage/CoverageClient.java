@@ -1,47 +1,73 @@
 package ai.conduit.gateway.domain.coverage;
 
 import ai.conduit.gateway.domain.manifest.DomainManifest;
+import ai.conduit.gateway.infrastructure.outbound.OutboundGate;
+import ai.conduit.gateway.infrastructure.outbound.OutboundKeys;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatusCode;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.BodyInserters;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
+import org.springframework.web.client.RestClient;
 
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
 /**
  * HTTP client for the DISCOVER / CHECK / RESOLVE coverage pipeline.
  *
- * <p>All three methods are fail-closed: a 5xx response or a timeout throws
- * {@link CoverageUnavailableException}, which the caller must handle by
- * streaming a degraded response to the end user rather than silently granting
- * access.
+ * <p><b>Fail-closed everywhere.</b> Any non-2xx response — 5xx, 503, and a 404-on-resolve alike —
+ * as well as a connect refusal, a header timeout, or a trickle body that never finishes, all throw
+ * {@link CoverageUnavailableException}. The caller must stream a degraded answer rather than silently
+ * granting access. This is the exact mapping the previous WebClient version produced (its
+ * {@code onStatus(is5xx)} plus the {@code catch(Exception)} fall-through that turned a 404 body-parse
+ * into the same exception); {@code CoverageStatusMappingTest} pins the status→exception table.
+ *
+ * <p><b>VT-pinning discipline (F3).</b> Two independent bounds on every call:
+ * <ul>
+ *   <li>a timed JDK request factory ({@code conduit.coverage.connect-timeout-ms} /
+ *       {@code read-timeout-ms}) — bounds connect and time-to-headers; and</li>
+ *   <li>an {@link OutboundGate} deadline wrap keyed by the coverage service base-URL — bounds the
+ *       BODY phase (defeats the 4 B/s trickle-body toxic that streams under the socket read timeout)
+ *       and bounds per-service concurrency with a leak-proof permit.</li>
+ * </ul>
+ * The 5s timeout budget is preserved (now config); exception types and fail-closed mappings are
+ * unchanged from the WebClient version.
  */
 @Service
 public class CoverageClient {
 
     private static final Logger log = LoggerFactory.getLogger(CoverageClient.class);
-    private static final Duration TIMEOUT = Duration.ofSeconds(5);
 
-    private final WebClient webClient;
+    private final RestClient restClient;
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
+    private final OutboundGate outboundGate;
+    private final long deadlineMs;
 
-    public CoverageClient(WebClient.Builder webClientBuilder, ObjectMapper objectMapper,
-                          MeterRegistry meterRegistry) {
-        this.webClient = webClientBuilder.build();
+    /**
+     * Maps ANY non-2xx response to {@link CoverageUnavailableException}. A custom handler (not the
+     * default {@code RestClient} 4xx/5xx handler) so a 404 on RESOLVE fail-closes identically to a
+     * 500 — the coverage book must never be treated as "granted" on any error status.
+     */
+    private static final RestClient.ResponseSpec.ErrorHandler NON_2XX_FAIL_CLOSED =
+            (request, response) -> {
+                throw new CoverageUnavailableException(
+                        "Coverage service returned HTTP " + response.getStatusCode().value());
+            };
+
+    public CoverageClient(RestClient coverageRestClient, ObjectMapper objectMapper,
+                          MeterRegistry meterRegistry, OutboundGate outboundGate,
+                          @Value("${conduit.coverage.read-timeout-ms:5000}") long deadlineMs) {
+        this.restClient = coverageRestClient;
         this.objectMapper = objectMapper;
         this.meterRegistry = meterRegistry;
+        this.outboundGate = outboundGate;
+        this.deadlineMs = deadlineMs;
     }
 
     // ── DISCOVER ─────────────────────────────────────────────────────────────
@@ -54,23 +80,9 @@ public class CoverageClient {
                                             DomainManifest.Coverage coverage,
                                             String bearerToken) {
         String url = bindPathParams(coverage.discoverUrl(), principalId, null);
+        String body = get("discover", url, tenantId, bearerToken);
         try {
-            String body = webClient.get()
-                .uri(url)
-                .header("X-Tenant-Id", tenantId)
-                .headers(headers -> applyBearer(headers, bearerToken, "coverage discover"))
-                .retrieve()
-                .onStatus(HttpStatusCode::is5xxServerError, response ->
-                    Mono.error(new CoverageUnavailableException(
-                        "Coverage discover returned " + response.statusCode().value())))
-                .bodyToMono(String.class)
-                .timeout(TIMEOUT)
-                .block();
-
             return objectMapper.readValue(body, new TypeReference<List<CoverageResource>>() {});
-        } catch (CoverageUnavailableException e) {
-            emitUnavailable("discover");
-            throw e;
         } catch (Exception e) {
             emitUnavailable("discover");
             throw new CoverageUnavailableException("Coverage discover failed: " + e.getMessage(), e);
@@ -86,23 +98,9 @@ public class CoverageClient {
                                       String resourceId, DomainManifest.Coverage coverage,
                                       String bearerToken) {
         String url = bindPathParams(coverage.checkUrl(), principalId, resourceId);
+        String body = get("check", url, tenantId, bearerToken);
         try {
-            String body = webClient.get()
-                .uri(url)
-                .header("X-Tenant-Id", tenantId)
-                .headers(headers -> applyBearer(headers, bearerToken, "coverage check"))
-                .retrieve()
-                .onStatus(HttpStatusCode::is5xxServerError, response ->
-                    Mono.error(new CoverageUnavailableException(
-                        "Coverage check returned " + response.statusCode().value())))
-                .bodyToMono(String.class)
-                .timeout(TIMEOUT)
-                .block();
-
             return objectMapper.readValue(body, CoverageCheckResult.class);
-        } catch (CoverageUnavailableException e) {
-            emitUnavailable("check");
-            throw e;
         } catch (Exception e) {
             emitUnavailable("check");
             throw new CoverageUnavailableException("Coverage check failed: " + e.getMessage(), e);
@@ -126,26 +124,21 @@ public class CoverageClient {
                                           String tenantId, DomainManifest.Coverage coverage,
                                           String bearerToken) {
         String url = coverage.resolveUrl();
-        Map<String, String> requestBody = Map.of(
-            "reference", reference,
-            "type", entityType
-        );
+        requireBearer(bearerToken, "coverage resolve");
+        Map<String, String> requestBody = Map.of("reference", reference, "type", entityType);
+        String key = OutboundKeys.baseUrl(url);
         try {
             String bodyJson = objectMapper.writeValueAsString(requestBody);
-            String responseBody = webClient.post()
-                .uri(url)
-                .header("X-Tenant-Id", tenantId)
-                .headers(headers -> applyBearer(headers, bearerToken, "coverage resolve"))
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(BodyInserters.fromValue(bodyJson))
-                .retrieve()
-                .onStatus(HttpStatusCode::is5xxServerError, response ->
-                    Mono.error(new CoverageUnavailableException(
-                        "Coverage resolve returned " + response.statusCode().value())))
-                .bodyToMono(String.class)
-                .timeout(TIMEOUT)
-                .block();
-
+            String responseBody = outboundGate.call(key, deadlineMs, () ->
+                    restClient.post()
+                            .uri(url)
+                            .header("X-Tenant-Id", tenantId)
+                            .headers(h -> h.setBearerAuth(bearerToken))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .body(bodyJson)
+                            .retrieve()
+                            .onStatus(status -> !status.is2xxSuccessful(), NON_2XX_FAIL_CLOSED)
+                            .body(String.class));
             return objectMapper.readValue(responseBody, CoverageResolveResult.class);
         } catch (CoverageUnavailableException e) {
             emitUnavailable("resolve");
@@ -153,6 +146,30 @@ public class CoverageClient {
         } catch (Exception e) {
             emitUnavailable("resolve");
             throw new CoverageUnavailableException("Coverage resolve failed: " + e.getMessage(), e);
+        }
+    }
+
+    // ── shared GET (discover/check) ─────────────────────────────────────────────
+
+    private String get(String operation, String url, String tenantId, String bearerToken) {
+        requireBearer(bearerToken, "coverage " + operation);
+        String key = OutboundKeys.baseUrl(url);
+        try {
+            return outboundGate.call(key, deadlineMs, () ->
+                    restClient.get()
+                            .uri(url)
+                            .header("X-Tenant-Id", tenantId)
+                            .headers(h -> h.setBearerAuth(bearerToken))
+                            .retrieve()
+                            .onStatus(status -> !status.is2xxSuccessful(), NON_2XX_FAIL_CLOSED)
+                            .body(String.class));
+        } catch (CoverageUnavailableException e) {
+            emitUnavailable(operation);
+            throw e;
+        } catch (Exception e) {
+            emitUnavailable(operation);
+            throw new CoverageUnavailableException(
+                    "Coverage " + operation + " failed: " + e.getMessage(), e);
         }
     }
 
@@ -179,18 +196,17 @@ public class CoverageClient {
         return result;
     }
 
-    private void applyBearer(HttpHeaders headers, String bearerToken, String operation) {
+    private void requireBearer(String bearerToken, String operation) {
         if (bearerToken == null || bearerToken.isBlank()) {
             throw new CoverageUnavailableException(
-                "No caller identity available for " + operation + " — refusing coverage call");
+                    "No caller identity available for " + operation + " — refusing coverage call");
         }
-        headers.setBearerAuth(bearerToken);
     }
 
     // ── Exception ─────────────────────────────────────────────────────────────
 
     /**
-     * Thrown when the coverage service is unreachable, returns 5xx, or times out.
+     * Thrown when the coverage service is unreachable, returns any non-2xx, or times out.
      * Callers must FAIL CLOSED — deny access, never grant it on error.
      */
     public static class CoverageUnavailableException extends RuntimeException {

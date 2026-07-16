@@ -1,5 +1,7 @@
 package ai.conduit.gateway.domain.auth;
 
+import ai.conduit.gateway.infrastructure.outbound.OutboundGate;
+import ai.conduit.gateway.infrastructure.outbound.OutboundKeys;
 import ai.conduit.gateway.registry.model.AgentManifest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -50,24 +52,35 @@ public class CerbosEntitlementAdapter {
     // Cerbos resource kind for entity-level checks — domain-declared via config,
     // never a hardcoded domain literal (World B).
     private final String       resourceType;
+    // F3 VT-pinning discipline: per-dependency gate + body-phase deadline for the PDP leg.
+    private final OutboundGate outboundGate;
+    private final String       gateKey;      // Cerbos PDP base-URL — infra, not domain (World B)
+    private final long         deadlineMs;   // matches the read timeout (conduit.cerbos.read-timeout-ms)
 
     public CerbosEntitlementAdapter(
-            RestClient.Builder restClientBuilder,
+            RestClient cerbosRestClient,
             ObjectMapper mapper,
+            OutboundGate outboundGate,
             @Value("${conduit.cerbos.host:localhost}") String host,
             @Value("${conduit.cerbos.http-port:3592}") int httpPort,
+            @Value("${conduit.cerbos.read-timeout-ms:3000}") long deadlineMs,
             @Value("${conduit.cerbos.fail-mode:closed}") String failMode,
             @Value("${conduit.authz.resource-type:relationship}") String resourceType) {
 
         this.mapper   = mapper;
         this.failMode = failMode;
         this.resourceType = resourceType;
-        this.restClient = restClientBuilder
-                .baseUrl("http://" + host + ":" + httpPort)
-                .defaultHeader("Content-Type", MediaType.APPLICATION_JSON_VALUE)
-                .build();
-        log.info("CerbosEntitlementAdapter: PDP=http://{}:{} fail-mode={} resource-type={}",
-                host, httpPort, failMode, resourceType);
+        this.outboundGate = outboundGate;
+        this.deadlineMs = deadlineMs;
+        // The RestClient is built in ..config.. over an explicitly timed factory (connect 2s / read 3s
+        // via conduit.cerbos.*) — replacing the previously untimed injected RestClient.Builder, whose
+        // JDK-default factory had NO read timeout, so a slow-but-alive PDP could park the request-path
+        // authz check indefinitely. A >3s batched /api/check/resources now fail-closes deterministically
+        // (see handleFailure / checkAgents). The gate key is the same PDP base-URL (infra, not domain).
+        this.restClient = cerbosRestClient;
+        this.gateKey = OutboundKeys.baseUrl("http://" + host + ":" + httpPort);
+        log.info("CerbosEntitlementAdapter: PDP=http://{}:{} fail-mode={} resource-type={} deadline-ms={}",
+                host, httpPort, failMode, resourceType, deadlineMs);
     }
 
     /**
@@ -188,13 +201,19 @@ public class CerbosEntitlementAdapter {
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
-    private String post(String requestBody) {
-        return restClient.post()
-                .uri("/api/check/resources")
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(requestBody)
-                .retrieve()
-                .body(String.class);
+    private String post(String requestBody) throws Exception {
+        // Body-phase deadline + per-dependency permit. A trickle-body or slow-but-alive PDP is
+        // bounded here (TimeoutException), not just at time-to-headers, and the permit is released
+        // on the cancellation path — so authz can neither hang the request path nor leak permits.
+        // Any exception (timeout, gate-exhausted, transport) propagates to the callers' catch(Exception)
+        // fail-closed path (handleFailure / checkAgents deny-all).
+        return outboundGate.call(gateKey, deadlineMs, () ->
+                restClient.post()
+                        .uri("/api/check/resources")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(requestBody)
+                        .retrieve()
+                        .body(String.class));
     }
 
     /** Generic resource-check builder — used for relationships and domains. */

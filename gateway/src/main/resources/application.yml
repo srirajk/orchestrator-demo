@@ -62,6 +62,11 @@ conduit:
       path-style: ${CONDUIT_AUDIT_S3_PATH_STYLE:true}               # true for MinIO
       access-key: ${CONDUIT_AUDIT_S3_ACCESS_KEY:}
       secret-key: ${CONDUIT_AUDIT_S3_SECRET_KEY:}
+      # F3: bound the S3 PutObject on the audit drain thread — apiCallTimeout covers the whole call
+      # (incl. retries), apiCallAttemptTimeout a single attempt — so a stalled object store cannot
+      # park the drain thread forever.
+      api-call-timeout-ms: ${CONDUIT_AUDIT_S3_API_CALL_TIMEOUT_MS:10000}
+      api-call-attempt-timeout-ms: ${CONDUIT_AUDIT_S3_API_CALL_ATTEMPT_TIMEOUT_MS:5000}
   gateway:
     version: ${CONDUIT_GATEWAY_VERSION:0.1.0}
   # End-to-end deadline for ONE chat turn. The SSE emitter times out here AND the pipeline
@@ -94,6 +99,10 @@ conduit:
   mcp:
     protocol-version: ${CONDUIT_MCP_PROTOCOL_VERSION:2025-11-25}
     legacy-protocol-version: ${CONDUIT_MCP_LEGACY_PROTOCOL_VERSION:2024-11-05}
+    # F3: the whole invoke() (initialize + tools/call) shares ONE end-to-end deadline. default-timeout-ms
+    # is the fallback budget when a manifest declares no SLA; connect-timeout-ms bounds the TCP connect.
+    default-timeout-ms: ${CONDUIT_MCP_DEFAULT_TIMEOUT_MS:10000}
+    connect-timeout-ms: ${CONDUIT_MCP_CONNECT_TIMEOUT_MS:10000}
   registry:
     # Where the agent manifests live. Owned by the registry service; the gateway reads only the
     # domain manifests from here, never the agent ones (those it reads from Redis).
@@ -295,12 +304,34 @@ conduit:
   coverage:
     wealth-management:
       url: ${WEALTH_COVERAGE_URL:http://wealth-coverage:8086}
+    # F3 VT-pinning discipline. connect/read bound the socket; read-timeout-ms is ALSO the
+    # OutboundGate body-phase deadline (defeats a 4 B/s trickle body that streams under the socket
+    # read timeout forever). Preserves the previous 5s coverage timeout, now as config.
+    connect-timeout-ms: ${CONDUIT_COVERAGE_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms: ${CONDUIT_COVERAGE_READ_TIMEOUT_MS:5000}
   cerbos:
     host: ${CERBOS_HOST:localhost}
     http-port: ${CERBOS_HTTP_PORT:3592}
+    # F3: explicit connect/read timeouts for the PDP. read-timeout-ms is the OutboundGate deadline —
+    # a slow-but-alive PDP (>3s batched /api/check/resources) now fail-closes deterministically.
+    connect-timeout-ms: ${CONDUIT_CERBOS_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms: ${CONDUIT_CERBOS_READ_TIMEOUT_MS:3000}
     # closed (default) = Cerbos unreachable → deny all (production safe)
     # local = Cerbos unreachable → fall back to JWT book claim (demo resilience)
     fail-mode: ${CONDUIT_CERBOS_FAIL_MODE:closed}
+  # ── Per-dependency outbound gate (F3) ─────────────────────────────────────────
+  # One bounded semaphore per distinct dependency (coverage base-URL, Cerbos PDP), with a body-phase
+  # deadline wrap. A slow dependency drains only its own permits; a caller that cannot get one within
+  # max-wait-ms is rejected fast (fail-closed) rather than parking. Keys are manifest/config-derived
+  # base-URLs — no domain literal (World B).
+  outbound:
+    gate:
+      permits: ${CONDUIT_OUTBOUND_GATE_PERMITS:16}
+      max-wait-ms: ${CONDUIT_OUTBOUND_GATE_MAX_WAIT_MS:250}
+  # ── Redis socket timeouts (F3) ────────────────────────────────────────────────
+  redis:
+    connect-timeout-ms: ${CONDUIT_REDIS_CONNECT_TIMEOUT_MS:2000}
+    socket-timeout-ms: ${CONDUIT_REDIS_SOCKET_TIMEOUT_MS:2000}
   # ── Conduit Insights (native, admin-gated analytics API) ──────────────────────
   # Aggregates Prometheus (ops) + Langfuse (cost/eval) behind /v1/insights/*.
   # No hardcoded endpoints/keys — everything via env. In docker the gateway reaches

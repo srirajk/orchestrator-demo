@@ -33,6 +33,16 @@ public class RedisConfig {
     @Value("${spring.data.redis.port:6379}")
     private int port;
 
+    // Explicit socket-level timeouts (F3): DefaultJedisClientConfig's defaults are already 2000ms,
+    // but an implicit default is not a discipline. Pinned via config so a Redis that accepts the
+    // connection then stalls the read cannot park a borrowed pool connection — and, with the finite
+    // maxWait below, cannot then starve every other caller of that pool.
+    @Value("${conduit.redis.connect-timeout-ms:2000}")
+    private int connectTimeoutMs;
+
+    @Value("${conduit.redis.socket-timeout-ms:2000}")
+    private int socketTimeoutMs;
+
     /** Request-path pool: routing vector search, revocation, registry. */
     @Bean
     @Primary
@@ -67,7 +77,10 @@ public class RedisConfig {
 
         return new JedisPooled(
                 new HostAndPort(host, port),
-                DefaultJedisClientConfig.builder().build(),
+                DefaultJedisClientConfig.builder()
+                        .connectionTimeoutMillis(connectTimeoutMs)
+                        .socketTimeoutMillis(socketTimeoutMs)
+                        .build(),
                 poolConfig);
     }
 }

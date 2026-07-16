@@ -10,7 +10,6 @@ import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.CompositeArchRule;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import static com.tngtech.archunit.lang.conditions.ArchConditions.callConstructor;
 import static com.tngtech.archunit.lang.conditions.ArchConditions.callMethodWhere;
@@ -82,15 +81,16 @@ public class ArchitectureRulesTest {
                     .because("HttpURLConnection has no first-class timeouts and synchronized internals that "
                             + "pin virtual-thread carriers; use the timed JDK HttpClient-backed clients.");
 
-    // 3c. No WebClient/RestClient static factory (builder/create) outside ..config.. — construction of
+    // 3c. No RestClient static factory (builder/create) outside ..config.. — construction of
     //     HTTP clients is centralized so timeouts/observation are applied in exactly one place.
-    private static final DescribedPredicate<JavaMethodCall> WEBCLIENT_OR_RESTCLIENT_FACTORY =
-            new DescribedPredicate<>("a WebClient/RestClient static factory call") {
+    //     (WebClient dropped from the classpath in F3 — spring-webflux/reactor-netty removed once
+    //     CoverageClient migrated off WebClient to a timed RestClient.)
+    private static final DescribedPredicate<JavaMethodCall> RESTCLIENT_FACTORY =
+            new DescribedPredicate<>("a RestClient static factory call") {
                 @Override
                 public boolean test(JavaMethodCall call) {
                     var owner = call.getTarget().getOwner();
-                    boolean rightOwner = owner.isEquivalentTo(WebClient.class)
-                            || owner.isEquivalentTo(RestClient.class);
+                    boolean rightOwner = owner.isEquivalentTo(RestClient.class);
                     String name = call.getTarget().getName();
                     return rightOwner && (name.equals("builder") || name.equals("create"));
                 }
@@ -99,7 +99,7 @@ public class ArchitectureRulesTest {
     private static final ArchRule NO_OUT_OF_CONFIG_HTTP_CLIENT_FACTORY =
             noClasses()
                     .that().resideOutsideOfPackage("..config..")
-                    .should(callMethodWhere(WEBCLIENT_OR_RESTCLIENT_FACTORY))
+                    .should(callMethodWhere(RESTCLIENT_FACTORY))
                     .because("HTTP clients are constructed only in ..config.. so connect/read timeouts and "
                             + "observation are applied uniformly; inject the built client/builder elsewhere.");
 

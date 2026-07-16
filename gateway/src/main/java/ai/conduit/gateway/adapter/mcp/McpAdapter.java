@@ -80,7 +80,6 @@ import java.util.concurrent.TimeoutException;
 public class McpAdapter implements ProtocolAdapter {
 
     private static final Logger log = LoggerFactory.getLogger(McpAdapter.class);
-    private static final int DEFAULT_TIMEOUT_MS = 10_000;
     private static final TextMapSetter<HttpRequest.Builder> REQUEST_BUILDER_SETTER =
             (carrier, key, value) -> {
                 if (carrier != null && key != null && value != null) {
@@ -98,16 +97,23 @@ public class McpAdapter implements ProtocolAdapter {
     // Force HTTP/1.1: FastMCP/uvicorn returns 421 on HTTP/2 upgrade attempts.
     private final HttpClient httpClient;
 
+    // No SLA declared on a manifest → this default budget for the whole invoke() (both the
+    // initialize and the tools/call share it). Config, not a Java constant (World B / §5).
+    private final int defaultTimeoutMs;
+
     @Autowired
     public McpAdapter(ObjectMapper objectMapper,
                       @Value("${conduit.mcp.protocol-version}") String protocolVersion,
-                      @Value("${conduit.mcp.legacy-protocol-version}") String legacyProtocolVersion) {
+                      @Value("${conduit.mcp.legacy-protocol-version}") String legacyProtocolVersion,
+                      @Value("${conduit.mcp.default-timeout-ms:10000}") int defaultTimeoutMs,
+                      @Value("${conduit.mcp.connect-timeout-ms:10000}") int connectTimeoutMs) {
         this.objectMapper = objectMapper;
         this.protocolVersion = protocolVersion;
         this.legacyProtocolVersion = legacyProtocolVersion;
+        this.defaultTimeoutMs = defaultTimeoutMs;
         this.httpClient = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1)
-                .connectTimeout(Duration.ofSeconds(10))
+                .connectTimeout(Duration.ofMillis(connectTimeoutMs))
                 .build();
     }
 
@@ -116,7 +122,7 @@ public class McpAdapter implements ProtocolAdapter {
      * unit tests that exercise only response parsing ({@link #extractResult}) do not need them.
      */
     McpAdapter(ObjectMapper objectMapper) {
-        this(objectMapper, null, null);
+        this(objectMapper, null, null, 10000, 10000);
     }
 
     @Override
@@ -129,6 +135,12 @@ public class McpAdapter implements ProtocolAdapter {
         String serverUrl = manifest.connection().serverUrl();
         String toolName  = manifest.connection().tool();
         int timeoutMs    = resolveTimeout(manifest);
+        // ONE end-to-end deadline for the whole invoke(). Both sequential legs (initialize, then
+        // tools/call) draw down the SAME budget, so a slow-healthy agent whose initialize eats 80%
+        // leaves tools/call only the remainder and the call fails inside the SLA — instead of each
+        // leg getting the full budget (worst case ≈ 2× SLA). remaining(deadlineNanos) is what every
+        // request timeout and future-wait below uses.
+        long deadlineNanos = System.nanoTime() + timeoutMs * 1_000_000L;
 
         if (serverUrl == null || serverUrl.isBlank()) {
             throw new IllegalArgumentException(
@@ -152,18 +164,25 @@ public class McpAdapter implements ProtocolAdapter {
         if (manifest.connection().isLegacySse()) {
             log.debug("McpAdapter → tool '{}' on {} (legacy SSE) for agent {}",
                     toolName, serverUrl, manifest.agentId());
-            return invokeSse(manifest, input, toolName, serverUrl, bearerToken, timeoutMs);
+            return invokeSse(manifest, input, toolName, serverUrl, bearerToken, deadlineNanos);
         }
 
         log.debug("McpAdapter → tool '{}' on {} (streamable HTTP) for agent {}",
                 toolName, serverUrl, manifest.agentId());
-        return invokeStreamable(manifest, input, toolName, serverUrl, bearerToken, timeoutMs);
+        return invokeStreamable(manifest, input, toolName, serverUrl, bearerToken, deadlineNanos);
+    }
+
+    /** Milliseconds left until {@code deadlineNanos}, floored at 1 so a callee always gets a positive,
+     *  finite budget (never 0/negative, which some HTTP timeouts reject or read as "no timeout"). */
+    private static long remaining(long deadlineNanos) {
+        long ms = (deadlineNanos - System.nanoTime()) / 1_000_000L;
+        return ms < 1 ? 1 : ms;
     }
 
     // ── Streamable HTTP transport (default) ────────────────────────────────────
 
     private JsonNode invokeStreamable(AgentManifest manifest, JsonNode input, String toolName,
-                                      String serverUrl, String bearerToken, int timeoutMs)
+                                      String serverUrl, String bearerToken, long deadlineNanos)
             throws Exception {
 
         String requestedVersion = resolveProtocolVersion(manifest, false);
@@ -180,7 +199,7 @@ public class McpAdapter implements ProtocolAdapter {
                 )
         ));
         HttpResponse<String> initResp =
-                postStreamable(serverUrl, initBody, bearerToken, null, null, timeoutMs);
+                postStreamable(serverUrl, initBody, bearerToken, null, null, deadlineNanos);
         if (initResp.statusCode() >= 400) {
             throw new RuntimeException("MCP initialize on " + serverUrl + " returned HTTP "
                     + initResp.statusCode() + ": " + initResp.body());
@@ -201,7 +220,7 @@ public class McpAdapter implements ProtocolAdapter {
                 "params",  Map.of("name", toolName, "arguments", jsonNodeToMap(input))
         ));
         HttpResponse<String> callResp =
-                postStreamable(serverUrl, callBody, bearerToken, sessionId, negotiatedVersion, timeoutMs);
+                postStreamable(serverUrl, callBody, bearerToken, sessionId, negotiatedVersion, deadlineNanos);
         if (callResp.statusCode() >= 400) {
             throw new RuntimeException("MCP tools/call on " + serverUrl + " returned HTTP "
                     + callResp.statusCode() + ": " + callResp.body());
@@ -222,11 +241,13 @@ public class McpAdapter implements ProtocolAdapter {
      * session id / protocol version when known.
      */
     private HttpResponse<String> postStreamable(String url, String body, String bearerToken,
-                                                String sessionId, String protoVersion, int timeoutMs)
+                                                String sessionId, String protoVersion, long deadlineNanos)
             throws Exception {
+        long remaining = remaining(deadlineNanos);
         HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .version(HttpClient.Version.HTTP_1_1)
+                .timeout(Duration.ofMillis(remaining))
                 .header("Content-Type", "application/json")
                 .header("Accept", "application/json, text/event-stream");
         if (bearerToken != null && !bearerToken.isBlank()) {
@@ -240,7 +261,9 @@ public class McpAdapter implements ProtocolAdapter {
         }
         injectTraceContext(builder);
         HttpRequest request = builder.POST(HttpRequest.BodyPublishers.ofString(body)).build();
-        return sendWithTimeout(request, timeoutMs);
+        // HttpRequest.timeout() bounds time-to-headers; sendWithTimeout(remaining) additionally bounds
+        // the BODY phase and cancels the in-flight exchange on expiry.
+        return sendWithTimeout(request, remaining);
     }
 
     /**
@@ -291,7 +314,7 @@ public class McpAdapter implements ProtocolAdapter {
      * cancelled ({@code future.cancel(true)}) rather than left running against a caller that has
      * already given up.
      */
-    private HttpResponse<String> sendWithTimeout(HttpRequest request, int timeoutMs) throws Exception {
+    private HttpResponse<String> sendWithTimeout(HttpRequest request, long timeoutMs) throws Exception {
         CompletableFuture<HttpResponse<String>> future =
                 httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString());
         try {
@@ -299,13 +322,20 @@ public class McpAdapter implements ProtocolAdapter {
         } catch (TimeoutException te) {
             future.cancel(true);
             throw te;
+        } catch (InterruptedException ie) {
+            // The harness cancelled this call at its SLA (or a shutdown interrupt). Abort the
+            // in-flight exchange rather than leak the socket, then re-assert the interrupt so the
+            // caller's cancellation contract is honoured.
+            future.cancel(true);
+            Thread.currentThread().interrupt();
+            throw ie;
         }
     }
 
     // ── Legacy HTTP+SSE transport (only when transport: "sse") ─────────────────
 
     private JsonNode invokeSse(AgentManifest manifest, JsonNode input, String toolName,
-                               String serverUrl, String bearerToken, int timeoutMs) throws Exception {
+                               String serverUrl, String bearerToken, long deadlineNanos) throws Exception {
 
         String requestedVersion = resolveProtocolVersion(manifest, true);
 
@@ -314,10 +344,20 @@ public class McpAdapter implements ProtocolAdapter {
         CompletableFuture<String> toolResponseFuture = new CompletableFuture<>();
         CompletableFuture<String> verifiedSubFuture = new CompletableFuture<>();
 
-        // SSE request — must be HTTP/1.1; uvicorn rejects HTTP/2 with 421.
+        // The live response body stream, captured by the reader VT once the connection is up.
+        // Needed because once the response has arrived, sseConn.cancel(true) is a no-op — cancelling
+        // an already-completed future does NOT close the socket, so a server that connects then goes
+        // silent would leave the reader VT parked on readLine() and the socket open forever. On
+        // deadline expiry we close THIS stream explicitly, which unblocks the reader.
+        final java.util.concurrent.atomic.AtomicReference<InputStream> liveBody =
+                new java.util.concurrent.atomic.AtomicReference<>();
+
+        // SSE request — must be HTTP/1.1; uvicorn rejects HTTP/2 with 421. .timeout() bounds
+        // time-to-headers (the handshake); the body stream stays open after headers arrive.
         HttpRequest.Builder sseBuilder = HttpRequest.newBuilder()
                 .uri(URI.create(serverUrl))
                 .version(HttpClient.Version.HTTP_1_1)
+                .timeout(Duration.ofMillis(remaining(deadlineNanos)))
                 .header("Accept", "text/event-stream")
                 .header("Cache-Control", "no-cache");
         if (bearerToken != null) {
@@ -335,10 +375,11 @@ public class McpAdapter implements ProtocolAdapter {
         // Start SSE reader virtual thread.
         Thread.startVirtualThread(() -> {
             try {
-                HttpResponse<InputStream> resp = sseConn.get(timeoutMs, TimeUnit.MILLISECONDS);
+                HttpResponse<InputStream> resp = sseConn.get(remaining(deadlineNanos), TimeUnit.MILLISECONDS);
                 if (resp.statusCode() != 200) {
                     throw new RuntimeException("SSE endpoint returned HTTP " + resp.statusCode());
                 }
+                liveBody.set(resp.body());
                 verifiedSubFuture.complete(resp.headers()
                         .firstValue("X-Conduit-Verified-Sub").orElse(null));
                 parseSseStream(resp.body(), endpointFuture, toolResponseFuture);
@@ -352,9 +393,9 @@ public class McpAdapter implements ProtocolAdapter {
         // Wait for the session endpoint path.
         String sessionPath;
         try {
-            sessionPath = endpointFuture.get(timeoutMs, TimeUnit.MILLISECONDS);
+            sessionPath = endpointFuture.get(remaining(deadlineNanos), TimeUnit.MILLISECONDS);
         } catch (TimeoutException te) {
-            sseConn.cancel(true);   // cancel the in-flight SSE exchange
+            abortSse(sseConn, liveBody);
             throw te;
         }
         String sessionUrl = buildSessionUrl(serverUrl, sessionPath);
@@ -371,7 +412,7 @@ public class McpAdapter implements ProtocolAdapter {
                         "clientInfo",     Map.of("name", "conduit-gateway", "version", "1.0")
                 )
         ));
-        postJson(sessionUrl, initBody, bearerToken);
+        postJson(sessionUrl, initBody, bearerToken, deadlineNanos);
 
         // Send tools/call — SSE reader skips the initialize ACK and waits for this result.
         String callBody = objectMapper.writeValueAsString(Map.of(
@@ -380,19 +421,38 @@ public class McpAdapter implements ProtocolAdapter {
                 "method",  "tools/call",
                 "params",  Map.of("name", toolName, "arguments", jsonNodeToMap(input))
         ));
-        postJson(sessionUrl, callBody, bearerToken);
+        postJson(sessionUrl, callBody, bearerToken, deadlineNanos);
 
         // Wait for the tool-call SSE response (second message event).
         String rawResponse;
         try {
-            rawResponse = toolResponseFuture.get(timeoutMs, TimeUnit.MILLISECONDS);
+            rawResponse = toolResponseFuture.get(remaining(deadlineNanos), TimeUnit.MILLISECONDS);
         } catch (TimeoutException te) {
-            sseConn.cancel(true);   // cancel the in-flight SSE exchange
+            abortSse(sseConn, liveBody);
             throw te;
         }
         log.debug("McpAdapter raw response ({}): {}", manifest.agentId(), truncate(rawResponse));
 
         return withVerifiedSub(extractResult(rawResponse), verifiedSubFuture.getNow(null));
+    }
+
+    /**
+     * Aborts an in-flight legacy-SSE exchange on deadline expiry. Cancels the connect future (a
+     * no-op if headers already arrived) AND closes the live body stream — closing the stream is what
+     * unblocks a reader VT parked on {@code readLine()} against a silent server, so no reader thread
+     * or socket is leaked.
+     */
+    private void abortSse(CompletableFuture<HttpResponse<InputStream>> sseConn,
+                          java.util.concurrent.atomic.AtomicReference<InputStream> liveBody) {
+        sseConn.cancel(true);
+        InputStream body = liveBody.get();
+        if (body != null) {
+            try {
+                body.close();
+            } catch (Exception ignored) {
+                // best-effort: the reader VT will still unwind once the stream is closed/errored
+            }
+        }
     }
 
     /**
@@ -467,18 +527,21 @@ public class McpAdapter implements ProtocolAdapter {
 
     // ── HTTP helpers ──────────────────────────────────────────────────────────
 
-    private void postJson(String url, String body, String bearerToken) throws Exception {
+    private void postJson(String url, String body, String bearerToken, long deadlineNanos) throws Exception {
+        long remaining = remaining(deadlineNanos);
         HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .version(HttpClient.Version.HTTP_1_1)
+                .timeout(Duration.ofMillis(remaining))
                 .header("Content-Type", "application/json");
         if (bearerToken != null) {
             builder.header("Authorization", "Bearer " + bearerToken);
         }
         injectTraceContext(builder);
         HttpRequest request = builder.POST(HttpRequest.BodyPublishers.ofString(body)).build();
-        HttpResponse<String> response =
-                httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        // Was httpClient.send() — a blocking, UNTIMED send that could park past the invoke deadline.
+        // Now bounded by the remaining budget AND cancelled on expiry (sendWithTimeout).
+        HttpResponse<String> response = sendWithTimeout(request, remaining);
         if (response.statusCode() >= 400) {
             throw new RuntimeException("POST " + url + " returned HTTP " + response.statusCode()
                     + ": " + response.body());
@@ -642,6 +705,6 @@ public class McpAdapter implements ProtocolAdapter {
         if (manifest.constraints() != null && manifest.constraints().slaTimeoutMs() > 0) {
             return manifest.constraints().slaTimeoutMs();
         }
-        return DEFAULT_TIMEOUT_MS;
+        return defaultTimeoutMs;
     }
 }

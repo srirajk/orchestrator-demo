@@ -224,6 +224,7 @@ public class McpToolIntrospector {
         HttpRequest sseRequest = HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl + "/sse"))
                 .version(HttpClient.Version.HTTP_1_1)
+                .timeout(Duration.ofMillis(TIMEOUT_MS))   // bound the handshake (VT-pinning discipline)
                 .header("Accept", "text/event-stream")
                 .header("Cache-Control", "no-cache")
                 .GET()

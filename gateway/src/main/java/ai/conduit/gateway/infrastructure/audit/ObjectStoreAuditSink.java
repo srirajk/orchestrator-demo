@@ -10,6 +10,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -19,6 +20,7 @@ import software.amazon.awssdk.services.s3.model.ObjectLockMode;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.net.URI;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -54,6 +56,11 @@ public class ObjectStoreAuditSink implements AuditRecordSink {
     private final String secretKey;
     private final int retentionDays;
     private final String objectLockMode;
+    // F3 VT-pinning discipline: an S3 PutObject on the audit drain thread must not park forever if
+    // the object store accepts the connection then stalls. apiCallTimeout bounds the whole call
+    // (incl. retries); apiCallAttemptTimeout bounds a single attempt. Config, never a constant.
+    private final long apiCallTimeoutMs;
+    private final long apiCallAttemptTimeoutMs;
 
     private S3Client s3;
 
@@ -66,7 +73,9 @@ public class ObjectStoreAuditSink implements AuditRecordSink {
             @Value("${conduit.audit.store.access-key:}") String accessKey,
             @Value("${conduit.audit.store.secret-key:}") String secretKey,
             @Value("${conduit.audit.retention-days:2555}") int retentionDays,
-            @Value("${conduit.audit.object-lock-mode:COMPLIANCE}") String objectLockMode) {
+            @Value("${conduit.audit.object-lock-mode:COMPLIANCE}") String objectLockMode,
+            @Value("${conduit.audit.s3.api-call-timeout-ms:10000}") long apiCallTimeoutMs,
+            @Value("${conduit.audit.s3.api-call-attempt-timeout-ms:5000}") long apiCallAttemptTimeoutMs) {
         this.bucket = bucket;
         this.prefix = prefix;
         this.endpoint = endpoint;
@@ -76,12 +85,18 @@ public class ObjectStoreAuditSink implements AuditRecordSink {
         this.secretKey = secretKey;
         this.retentionDays = retentionDays;
         this.objectLockMode = objectLockMode;
+        this.apiCallTimeoutMs = apiCallTimeoutMs;
+        this.apiCallAttemptTimeoutMs = apiCallAttemptTimeoutMs;
     }
 
     @PostConstruct
     void init() {
         var builder = S3Client.builder()
                 .region(Region.of(region))
+                .overrideConfiguration(ClientOverrideConfiguration.builder()
+                        .apiCallTimeout(Duration.ofMillis(apiCallTimeoutMs))
+                        .apiCallAttemptTimeout(Duration.ofMillis(apiCallAttemptTimeoutMs))
+                        .build())
                 .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(pathStyle).build());
         if (endpoint != null && !endpoint.isBlank()) {
             builder.endpointOverride(URI.create(endpoint));   // MinIO / R2 / GCS-interop

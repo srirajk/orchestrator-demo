@@ -66,6 +66,42 @@ public class AppConfig {
                 .build();
     }
 
+    /**
+     * Synchronous client for the coverage DISCOVER / CHECK / RESOLVE legs. Explicit timed factory
+     * (connect 2s, read 5s — preserving the previous 5s coverage timeout, now config). The socket
+     * read timeout bounds time-to-headers; {@code CoverageClient} additionally wraps every exchange in
+     * an {@code OutboundGate} deadline so the BODY phase (trickle-body toxic) is bounded too.
+     */
+    @Bean
+    public RestClient coverageRestClient(
+            @Value("${conduit.coverage.connect-timeout-ms:2000}") long connectTimeoutMs,
+            @Value("${conduit.coverage.read-timeout-ms:5000}") long readTimeoutMs) {
+        return RestClient.builder()
+                .requestFactory(timedFactory(connectTimeoutMs, readTimeoutMs))
+                .build();
+    }
+
+    /**
+     * Synchronous client for the Cerbos PDP, built here in {@code ..config..} (the single place HTTP
+     * clients are constructed — see {@code ArchitectureRulesTest}). Explicitly timed factory (connect
+     * 2s, read 3s) replaces the previously untimed injected {@code RestClient.Builder}, whose
+     * JDK-default factory had NO read timeout — a slow-but-alive PDP could park the request-path authz
+     * check indefinitely. {@code CerbosEntitlementAdapter} additionally wraps every exchange in an
+     * {@code OutboundGate} deadline so the BODY phase is bounded and permits cannot leak.
+     */
+    @Bean
+    public RestClient cerbosRestClient(
+            @Value("${conduit.cerbos.host:localhost}") String host,
+            @Value("${conduit.cerbos.http-port:3592}") int httpPort,
+            @Value("${conduit.cerbos.connect-timeout-ms:2000}") long connectTimeoutMs,
+            @Value("${conduit.cerbos.read-timeout-ms:3000}") long readTimeoutMs) {
+        return RestClient.builder()
+                .requestFactory(timedFactory(connectTimeoutMs, readTimeoutMs))
+                .baseUrl("http://" + host + ":" + httpPort)
+                .defaultHeader("Content-Type", org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+                .build();
+    }
+
     /** JDK HttpClient, HTTP/1.1, with a finite connect AND read timeout. */
     private static ClientHttpRequestFactory timedFactory(long connectTimeoutMs, long readTimeoutMs) {
         HttpClient httpClient = HttpClient.newBuilder()

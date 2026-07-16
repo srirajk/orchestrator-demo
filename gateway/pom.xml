@@ -132,16 +132,9 @@
             <version>2.2.0</version>
         </dependency>
 
-        <!-- WebClient — used by CoverageClient for synchronous coverage service calls -->
-        <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-webflux</artifactId>
-        </dependency>
-        <!-- Reactor Netty — HTTP client backend for WebClient -->
-        <dependency>
-            <groupId>io.projectreactor.netty</groupId>
-            <artifactId>reactor-netty-http</artifactId>
-        </dependency>
+        <!-- WebClient/reactor-netty REMOVED (F3): CoverageClient migrated off WebClient.block() onto a
+             timed RestClient (JDK HttpClient factory) + OutboundGate deadline. No reactive plumbing is
+             on the gateway request path; the two deps were verified unused elsewhere before removal. -->
 
         <!-- Audit: S3-family object store (MinIO / S3 / R2 / GCS-interop) with Object Lock (WORM). -->
         <dependency>
