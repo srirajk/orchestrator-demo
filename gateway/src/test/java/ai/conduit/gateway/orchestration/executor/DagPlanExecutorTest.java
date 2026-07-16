@@ -79,10 +79,10 @@ class DagPlanExecutorTest {
 
     private static AgentManifest.Io mapIo(int maxItems, int maxConcurrency) {
         return new AgentManifest.Io(
-                List.of(new AgentManifest.Consume(null, OUT_TYPE, true, "{items: items}")),
+                List.of(new AgentManifest.Consume(null, OUT_TYPE, true, "{'items': has(input.items) ? input.items : null}")),
                 List.of(new AgentManifest.Produce("mapOut", "typeMap")),
                 null,
-                new AgentManifest.MapSpec("items", "{value: value, fail: fail}", maxItems, maxConcurrency));
+                new AgentManifest.MapSpec("input.items", "{'value': has(item.value) ? item.value : null, 'fail': has(item.fail) ? item.fail : null}", maxItems, maxConcurrency));
     }
 
     private static AgentManifest.Io conditionalConsumerIo(String condition) {
@@ -130,7 +130,7 @@ class DagPlanExecutorTest {
     /** Consumer whose edge maps the WRONG upstream field into 'positions' (a string, not an array). */
     private static Plan producerConsumerPlanWithWrongSelect() {
         AgentManifest.Io badConsumerIo = new AgentManifest.Io(
-                List.of(new AgentManifest.Consume(null, OUT_TYPE, true, "{positions: holdings}")),
+                List.of(new AgentManifest.Consume(null, OUT_TYPE, true, "{'positions': has(input.holdings) ? input.holdings : null}")),
                 List.of(new AgentManifest.Produce("consumerOut", "typeFinal")));
         PlanNode producer = new PlanNode(PRODUCER, agent(PRODUCER, producerIo()), null, List.of());
         PlanNode consumer = new PlanNode(CONSUMER,
@@ -141,7 +141,7 @@ class DagPlanExecutorTest {
     /** Consumer with a correct select, requiring the upstream NOT be marked incomplete. */
     private static Plan producerConsumerPlanRequiringComplete() {
         AgentManifest.Io consumerIoOk = new AgentManifest.Io(
-                List.of(new AgentManifest.Consume(null, OUT_TYPE, true, "{positions: positions}")),
+                List.of(new AgentManifest.Consume(null, OUT_TYPE, true, "{'positions': has(input.positions) ? input.positions : null}")),
                 List.of(new AgentManifest.Produce("consumerOut", "typeFinal")));
         PlanNode producer = new PlanNode(PRODUCER, agent(PRODUCER, producerIo()), null, List.of());
         PlanNode consumer = new PlanNode(CONSUMER,
@@ -421,6 +421,69 @@ class DagPlanExecutorTest {
         assertThat(adapter.order).containsExactly(PRODUCER);
     }
 
+    // ── CEL migration: numeric-variant condition, absent-field taxonomy, missing map.over ────────
+
+    @Test
+    @DisplayName("CEL: a condition over a DECIMAL value still evaluates (2.0 > 0 is true, not CONDITION_ERROR)")
+    void conditionOnDecimalValueStillEvaluates() {
+        JsonNode producerOutput = MAPPER.createObjectNode().put("breach_count", 2.0);
+        RecordingAdapter adapter = new RecordingAdapter(false, producerOutput);
+        DagPlanExecutor exec = executor(harness(adapter));
+        PlanNode producer = new PlanNode(PRODUCER, agent(PRODUCER, producerIo()), null, List.of());
+        PlanNode consumer = new PlanNode(CONSUMER,
+                agent(CONSUMER, conditionalConsumerIo("input.breach_count > 0")), null, List.of(PRODUCER));
+        Blackboard bb = new Blackboard(Set.of("entity"),
+                Map.of(PRODUCER, MAPPER.createObjectNode().put("entity", "E-1")), MAPPER);
+
+        List<NodeResult> results = exec.execute(new Plan(List.of(producer, consumer)), bb);
+
+        assertThat(results.get(0).isOk()).isTrue();
+        // condition true → consumer dispatched (NOT a condition error, NOT a clean skip)
+        assertThat(results.get(1).status()).isNotEqualTo(NodeResult.Status.CONDITION_ERROR);
+        assertThat(results.get(1).status()).isNotEqualTo(NodeResult.Status.SKIPPED_CONDITION_FALSE);
+        assertThat(adapter.order).contains(CONSUMER);
+    }
+
+    @Test
+    @DisplayName("CEL: a condition over an ABSENT field is a CONDITION_ERROR (missing → not boolean)")
+    void conditionOnAbsentFieldIsConditionError() {
+        JsonNode producerOutput = MAPPER.createObjectNode();   // no breach_count
+        RecordingAdapter adapter = new RecordingAdapter(false, producerOutput);
+        DagPlanExecutor exec = executor(harness(adapter));
+        PlanNode producer = new PlanNode(PRODUCER, agent(PRODUCER, producerIo()), null, List.of());
+        PlanNode consumer = new PlanNode(CONSUMER,
+                agent(CONSUMER, conditionalConsumerIo("input.breach_count > 0")), null, List.of(PRODUCER));
+        Blackboard bb = new Blackboard(Set.of("entity"),
+                Map.of(PRODUCER, MAPPER.createObjectNode().put("entity", "E-1")), MAPPER);
+
+        List<NodeResult> results = exec.execute(new Plan(List.of(producer, consumer)), bb);
+
+        assertThat(results.get(1).status()).isEqualTo(NodeResult.Status.CONDITION_ERROR);
+        assertThat(adapter.order).containsExactly(PRODUCER);
+    }
+
+    @Test
+    @DisplayName("CEL: map.over on a MISSING field runs zero items (MissingNode → empty array), still OK")
+    void mapOverMissingFieldRunsZeroItems() {
+        JsonNode producerOutput = MAPPER.createObjectNode();   // no 'items' field at all
+        RecordingAdapter adapter = new RecordingAdapter(false, producerOutput);
+        DagPlanExecutor exec = executor(harness(adapter));
+        PlanNode producer = new PlanNode(PRODUCER, agent(PRODUCER, producerIo()), null, List.of());
+        PlanNode mapper = new PlanNode(MAPPER_AGENT,
+                agentWithSchema(MAPPER_AGENT, mapIo(10, 2), schemaRequiringString("value")),
+                null, List.of(PRODUCER));
+        Blackboard bb = new Blackboard(Set.of("entity"),
+                Map.of(PRODUCER, MAPPER.createObjectNode().put("entity", "E-1")), MAPPER);
+
+        List<NodeResult> results = exec.execute(new Plan(List.of(producer, mapper)), bb);
+
+        NodeResult mapped = results.get(1);
+        assertThat(mapped.isOk()).isTrue();
+        assertThat(mapped.data().path("_items").asInt()).isZero();
+        assertThat(mapped.data().path("_ran").asInt()).isZero();
+        assertThat(adapter.order).containsExactly(PRODUCER);
+    }
+
     @Test
     @DisplayName("T4: blank entity ref is a BIND FAILURE (a gap), never a coverage denial, before dispatch")
     void blankEntityIdIsBindFailureNotCoverageDenial() {
@@ -486,7 +549,7 @@ class DagPlanExecutorTest {
                 .add(MAPPER.createObjectNode().put("id", "E-2").put("value", "denied")));
         RecordingAdapter adapter = new RecordingAdapter(false, producerOutput);
         DagPlanExecutor exec = executor(harness(adapter));
-        PlanNode producer = new PlanNode(PRODUCER, agent(PRODUCER, producerIoWithEntities("items[].id")), null, List.of());
+        PlanNode producer = new PlanNode(PRODUCER, agent(PRODUCER, producerIoWithEntities("output.items.map(x, x.id)")), null, List.of());
         PlanNode consumer = new PlanNode(CONSUMER, agent(CONSUMER, consumerIo()), null, List.of(PRODUCER));
         Blackboard bb = new Blackboard(Set.of("entity"),
                 Map.of(PRODUCER, MAPPER.createObjectNode().put("entity", "E-1")), MAPPER);
@@ -508,9 +571,9 @@ class DagPlanExecutorTest {
                 .add(MAPPER.createObjectNode().put("id", "E-2").put("value", "denied")));
         RecordingAdapter adapter = new RecordingAdapter(false, producerOutput);
         DagPlanExecutor exec = executor(harness(adapter));
-        PlanNode producer = new PlanNode(PRODUCER, agent(PRODUCER, producerIoWithEntities("items[].id")), null, List.of());
+        PlanNode producer = new PlanNode(PRODUCER, agent(PRODUCER, producerIoWithEntities("output.items.map(x, x.id)")), null, List.of());
         PlanNode consumer = new PlanNode(CONSUMER,
-                agent(CONSUMER, conditionalConsumerIo("length(items) > `0`")), null, List.of(PRODUCER));
+                agent(CONSUMER, conditionalConsumerIo("size(input.items) > 0")), null, List.of(PRODUCER));
         Blackboard bb = new Blackboard(Set.of("entity"),
                 Map.of(PRODUCER, MAPPER.createObjectNode().put("entity", "E-1")), MAPPER);
 
@@ -530,7 +593,7 @@ class DagPlanExecutorTest {
                 .add(MAPPER.createObjectNode().put("id", "E-2").put("value", "denied")));
         RecordingAdapter adapter = new RecordingAdapter(false, producerOutput);
         DagPlanExecutor exec = executor(harness(adapter));
-        PlanNode producer = new PlanNode(PRODUCER, agent(PRODUCER, producerIoWithEntities("items[].id")), null, List.of());
+        PlanNode producer = new PlanNode(PRODUCER, agent(PRODUCER, producerIoWithEntities("output.items.map(x, x.id)")), null, List.of());
         PlanNode mapper = new PlanNode(MAPPER_AGENT,
                 agentWithSchema(MAPPER_AGENT, mapIo(10, 2), schemaRequiringString("value")),
                 null, List.of(PRODUCER));

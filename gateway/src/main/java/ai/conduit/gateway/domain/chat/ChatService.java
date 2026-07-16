@@ -143,6 +143,7 @@ public class ChatService {
     private final AgentRegistry     registry;
     private final DagResolver       dagResolver;
     private final DagPlanExecutor   dagExecutor;
+    private final ai.conduit.gateway.infrastructure.expression.EvalEngine evalEngine;
     private final EntityResolver    entityResolver;
     /**
      * When true, a fan-in ("goal") capability whose io consumes another capability's output is
@@ -192,7 +193,9 @@ public class ChatService {
                        AgentRegistry registry,
                        DagResolver dagResolver,
                        DagPlanExecutor dagExecutor,
-                       EntityResolver entityResolver) {
+                       EntityResolver entityResolver,
+                       ai.conduit.gateway.infrastructure.expression.EvalEngine evalEngine) {
+        this.evalEngine          = evalEngine;
         this.mapper              = mapper;
         this.intentClassifier    = intentClassifier;
         this.resolver            = resolver;
@@ -1136,7 +1139,7 @@ public class ChatService {
         plan.nodes().forEach(n -> tracePublisher.publish(TraceEvent.of("agent_start", requestId, conversationId,
                 new AgentStartData(n.nodeId(), n.agent().protocol()))));
 
-        Blackboard blackboard = new Blackboard(availableEntities, preBoundInputs, mapper);
+        Blackboard blackboard = new Blackboard(availableEntities, preBoundInputs, mapper, evalEngine);
         log.info("DAG firing: goal={} nodes={} available={}", goalId,
                 plan.nodes().stream().map(PlanNode::nodeId).collect(Collectors.toList()), availableEntities);
         markGatewayPath("dag");

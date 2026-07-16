@@ -95,12 +95,12 @@
       {
         "from": "insurance.policy_record",
         "required": true,
-        "select": "{policy_id: policy_id, policy_name: policy_name, insured_name: insured_name, line_of_business: line_of_business, premium: premium, premium_currency: premium_currency, coverage_limit: coverage_limit, deductible: deductible, status: status, effective_date: effective_date, expiry_date: expiry_date, as_of_date: as_of_date}"
+        "select": "{'policy_id': has(input.policy_id) ? input.policy_id : null, 'policy_name': has(input.policy_name) ? input.policy_name : null, 'insured_name': has(input.insured_name) ? input.insured_name : null, 'line_of_business': has(input.line_of_business) ? input.line_of_business : null, 'premium': has(input.premium) ? input.premium : null, 'premium_currency': has(input.premium_currency) ? input.premium_currency : null, 'coverage_limit': has(input.coverage_limit) ? input.coverage_limit : null, 'deductible': has(input.deductible) ? input.deductible : null, 'status': has(input.status) ? input.status : null, 'effective_date': has(input.effective_date) ? input.effective_date : null, 'expiry_date': has(input.expiry_date) ? input.expiry_date : null, 'as_of_date': has(input.as_of_date) ? input.as_of_date : null}"
       },
       {
         "from": "insurance.claim_status",
         "required": true,
-        "select": "{policy_id: policy_id, claim_count: claim_count, claims: claims, claim_id: claim_id, amount: amount, status: status}"
+        "select": "{'policy_id': has(input.policy_id) ? input.policy_id : null, 'claim_count': has(input.claim_count) ? input.claim_count : null, 'claims': has(input.claims) ? input.claims : null, 'claim_id': has(input.claim_id) ? input.claim_id : null, 'amount': has(input.amount) ? input.amount : null, 'status': has(input.status) ? input.status : null}"
       }
     ],
     "produces": [
@@ -110,27 +110,27 @@
         "figures": [
           {
             "label": "Claims-based loss ratio",
-            "path": "loss_ratio_pct",
+            "path": "has(output.loss_ratio_pct) ? output.loss_ratio_pct : null",
             "format": "percent1"
           },
           {
             "label": "Firm renewal target",
-            "path": "policy.target_loss_ratio_pct",
+            "path": "has(output.policy) && has(output.policy.target_loss_ratio_pct) ? output.policy.target_loss_ratio_pct : null",
             "format": "percent1"
           },
           {
             "label": "Incurred losses",
-            "path": "incurred_losses",
+            "path": "has(output.incurred_losses) ? output.incurred_losses : null",
             "format": "currency_usd"
           },
           {
             "label": "Renewal breach count",
-            "path": "breach_count",
+            "path": "has(output.breach_count) ? output.breach_count : null",
             "format": "count"
           },
           {
             "label": "Claims-based loss-ratio disclosure",
-            "path": "client_disclosure",
+            "path": "has(output.client_disclosure) ? output.client_disclosure : null",
             "format": "plain"
           }
         ]

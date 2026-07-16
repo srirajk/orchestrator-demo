@@ -1,13 +1,17 @@
 package ai.conduit.gateway.registry.service;
 
+import ai.conduit.gateway.infrastructure.expression.CelEvalEngine;
+import ai.conduit.gateway.infrastructure.expression.CompiledExpr;
+import ai.conduit.gateway.infrastructure.expression.EvalEngine;
+import ai.conduit.gateway.infrastructure.expression.ExpressionCompileException;
+import ai.conduit.gateway.infrastructure.expression.ExpressionEvalException;
+import ai.conduit.gateway.infrastructure.expression.RootVar;
 import ai.conduit.gateway.orchestration.executor.InputContractValidator;
 import ai.conduit.gateway.registry.model.AgentManifest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import io.burt.jmespath.JmesPath;
-import io.burt.jmespath.jackson.JacksonRuntime;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.slf4j.Logger;
@@ -15,44 +19,58 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
- * Boot-time validation for manifest-declared edge projections.
+ * Boot-time validation for manifest-declared edge projections, conditions, maps, produced entities and
+ * figures.
  *
- * <p>The validator reasons only over schemas and manifest-declared symbols: produced type,
- * JMESPath select, JSON Schema keywords, and the consumer's introspected input schema. It does
- * not interpret any business vocabulary.
+ * <p>Every expression is compiled and evaluated through the {@link EvalEngine} seam (CEL). Two guards
+ * come for free from the seam and replace the old regex path-scraper:
+ * <ol>
+ *   <li><b>Checked compile</b> — each expression is compiled against the exact {@link RootVar} its site
+ *       binds ({@code input} for selects/conditions/{@code map.over}, {@code item} for
+ *       {@code item_select} and per-item selectors, {@code output} for figure paths / produced-entity
+ *       selects). A reference to any other root — or a legacy JMESPath-dialect string — is an undeclared
+ *       reference at compile time and is rejected loudly.</li>
+ *   <li><b>Strict evaluation</b> — expressions are evaluated in {@link EvalEngine.Mode#STRICT} against a
+ *       schema-derived sample, so an absent field or a type error surfaces as a thrown error here rather
+ *       than a silent {@code MissingNode} at runtime.</li>
+ * </ol>
+ *
+ * <p>An additional <b>unguarded-optional check</b> evaluates each consume {@code select} in strict mode
+ * against the producer's <i>required-only</i> sample: if it fails there but succeeds on the full sample,
+ * the select reaches an optional field without a {@code has(...)} guard — a runtime footgun — and is
+ * rejected.
+ *
+ * <p>The validator reasons only over schemas and manifest-declared expressions; it interprets no
+ * business vocabulary.
  */
 @Component
 public class SelectContractValidator {
 
     private static final Logger log = LoggerFactory.getLogger(SelectContractValidator.class);
-    private static final JmesPath<JsonNode> JMES_PATH = new JacksonRuntime();
-    private static final Pattern PATH_TOKEN =
-            Pattern.compile("\\b[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*\\b");
-    private static final Set<String> KEYWORDS = Set.of("true", "false", "null", "and", "or", "not");
 
     private final ObjectMapper mapper;
+    private final EvalEngine evalEngine;
     private final int globalMapMaxItems;
     private final int globalMapMaxConcurrency;
 
     public SelectContractValidator(ObjectMapper mapper) {
-        this(mapper, 100, 8);
+        this(mapper, 100, 8, new CelEvalEngine(mapper));
     }
 
     @Autowired
     public SelectContractValidator(
             ObjectMapper mapper,
             @Value("${conduit.orchestration.map.max-items:100}") int globalMapMaxItems,
-            @Value("${conduit.orchestration.map.max-concurrency:8}") int globalMapMaxConcurrency) {
+            @Value("${conduit.orchestration.map.max-concurrency:8}") int globalMapMaxConcurrency,
+            EvalEngine evalEngine) {
         this.mapper = mapper;
         this.globalMapMaxItems = globalMapMaxItems;
         this.globalMapMaxConcurrency = globalMapMaxConcurrency;
+        this.evalEngine = evalEngine;
     }
 
     public Summary validateOne(AgentManifest consumer, List<AgentManifest> manifests) {
@@ -83,20 +101,27 @@ public class SelectContractValidator {
                 continue;
             }
 
-            JsonNode sample = sampleFromSchema(outputSchema);
+            JsonNode sample = sampleFromSchema(outputSchema, false);
             JsonNode projected;
-            try {
-                projected = consume.hasSelect() ? JMES_PATH.compile(consume.select()).search(sample) : sample;
-            } catch (Exception e) {
-                throw new SelectValidationException(consumer.agentId(), consume.from(), consume.select(),
-                        List.of("invalid select expression: " + e.getMessage()));
+            if (consume.hasSelect()) {
+                CompiledExpr compiled = compileOrReject(consume.select(), RootVar.INPUT,
+                        () -> new SelectValidationException(consumer.agentId(), consume.from(), consume.select(),
+                                List.of("invalid select expression")));
+                projected = evalOrReject(compiled, sample,
+                        e -> new SelectValidationException(consumer.agentId(), consume.from(), consume.select(),
+                                List.of("invalid select expression: " + e.getMessage())));
+                // Unguarded-optional check: a select that fails on the required-only sample but not on
+                // the full one reaches an optional field without a has() guard.
+                assertOptionalFieldsGuarded(consumer, consume, compiled, outputSchema);
+            } else {
+                projected = sample;
             }
             projections.add(new EdgeProjection(consume, producerNameFor(producer, consume.from()), projected));
         }
 
         JsonNode merged = !projections.isEmpty()
                 ? composeLikeBlackboard(projections)
-                : sampleFromSchema(consumer.inputSchema());
+                : sampleFromSchema(consumer.inputSchema(), false);
 
         if (hasCondition(consumer)) {
             if (unvalidated > 0) {
@@ -131,6 +156,22 @@ public class SelectContractValidator {
         return new Summary(validated, unvalidated).plus(entitySummary).plus(figureSummary);
     }
 
+    /**
+     * Reject a consume {@code select} that accesses an optional producer field without a {@code has(...)}
+     * guard: it evaluates cleanly on the full sample but throws on the required-only sample. A guarded
+     * select ({@code has(input.f) ? input.f : null}) never throws on either.
+     */
+    private void assertOptionalFieldsGuarded(AgentManifest consumer, AgentManifest.Consume consume,
+                                             CompiledExpr compiled, JsonNode producerSchema) {
+        JsonNode requiredOnly = sampleFromSchema(producerSchema, true);
+        try {
+            evalEngine.eval(compiled, requiredOnly, EvalEngine.Mode.STRICT);
+        } catch (ExpressionEvalException e) {
+            throw new SelectValidationException(consumer.agentId(), consume.from(), consume.select(),
+                    List.of("optional field accessed without has() guard: " + e.getMessage()));
+        }
+    }
+
     private Summary validateProducedEntities(AgentManifest manifest) {
         AgentManifest.Io io = manifest == null ? null : manifest.io();
         List<AgentManifest.Produce> produces =
@@ -147,19 +188,18 @@ public class SelectContractValidator {
                 unvalidated += entities.size();
                 continue;
             }
-            JsonNode sample = sampleFromSchema(manifest.outputSchema());
+            JsonNode sample = sampleFromSchema(manifest.outputSchema(), false);
             for (AgentManifest.ProducedEntity entity : entities) {
                 if (entity == null || entity.select() == null || entity.select().isBlank()) {
                     throw new ProducedEntityValidationException(manifest.agentId(), produce.name(), null,
                             "select is required");
                 }
-                JsonNode selected;
-                try {
-                    selected = JMES_PATH.compile(entity.select()).search(sample);
-                } catch (Exception e) {
-                    throw new ProducedEntityValidationException(manifest.agentId(), produce.name(), entity.select(),
-                            "invalid expression: " + e.getMessage());
-                }
+                CompiledExpr compiled = compileOrReject(entity.select(), RootVar.OUTPUT,
+                        () -> new ProducedEntityValidationException(manifest.agentId(), produce.name(),
+                                entity.select(), "invalid expression"));
+                JsonNode selected = evalOrReject(compiled, sample,
+                        e -> new ProducedEntityValidationException(manifest.agentId(), produce.name(),
+                                entity.select(), "invalid expression: " + e.getMessage()));
                 if (!isStringOrStringArray(selected)) {
                     throw new ProducedEntityValidationException(manifest.agentId(), produce.name(), entity.select(),
                             "must evaluate to a string or array of strings");
@@ -186,7 +226,7 @@ public class SelectContractValidator {
                 unvalidated += figures.size();
                 continue;
             }
-            JsonNode sample = sampleFromSchema(manifest.outputSchema());
+            JsonNode sample = sampleFromSchema(manifest.outputSchema(), false);
             for (AgentManifest.ProducedFigure figure : figures) {
                 if (figure == null || figure.label() == null || figure.label().isBlank()) {
                     throw new ProducedFigureValidationException(manifest.agentId(), produce.name(), null,
@@ -196,13 +236,12 @@ public class SelectContractValidator {
                     throw new ProducedFigureValidationException(manifest.agentId(), produce.name(), figure.label(),
                             "path is required");
                 }
-                JsonNode selected;
-                try {
-                    selected = JMES_PATH.compile(figure.path()).search(sample);
-                } catch (Exception e) {
-                    throw new ProducedFigureValidationException(manifest.agentId(), produce.name(), figure.label(),
-                            "invalid expression: " + e.getMessage());
-                }
+                CompiledExpr compiled = compileOrReject(figure.path(), RootVar.OUTPUT,
+                        () -> new ProducedFigureValidationException(manifest.agentId(), produce.name(),
+                                figure.label(), "invalid expression"));
+                JsonNode selected = evalOrReject(compiled, sample,
+                        e -> new ProducedFigureValidationException(manifest.agentId(), produce.name(),
+                                figure.label(), "invalid expression: " + e.getMessage()));
                 if (selected == null || selected.isMissingNode() || selected.isNull()
                         || !(selected.isNumber() || selected.isTextual() || selected.isBoolean())) {
                     throw new ProducedFigureValidationException(manifest.agentId(), produce.name(), figure.label(),
@@ -236,19 +275,11 @@ public class SelectContractValidator {
 
     private void validateCondition(AgentManifest consumer, JsonNode mergedInput) {
         String expression = consumer.io().condition();
-        for (String path : referencedPaths(expression)) {
-            if (!pathExists(mergedInput, path)) {
-                throw new ConditionValidationException(consumer.agentId(), expression,
-                        "references absent field '" + path + "'");
-            }
-        }
-        JsonNode result;
-        try {
-            result = JMES_PATH.compile(expression).search(mergedInput);
-        } catch (Exception e) {
-            throw new ConditionValidationException(consumer.agentId(), expression,
-                    "invalid expression: " + e.getMessage());
-        }
+        CompiledExpr compiled = compileOrReject(expression, RootVar.INPUT,
+                () -> new ConditionValidationException(consumer.agentId(), expression, "invalid expression"));
+        JsonNode result = evalOrReject(compiled, mergedInput,
+                e -> new ConditionValidationException(consumer.agentId(), expression,
+                        "references absent field or invalid expression: " + e.getMessage()));
         if (result == null || !result.isBoolean()) {
             throw new ConditionValidationException(consumer.agentId(), expression,
                     "expression must evaluate to boolean");
@@ -271,20 +302,11 @@ public class SelectContractValidator {
             throw new MapValidationException(consumer.agentId(), map, "max_concurrency must be positive");
         }
 
-        for (String path : referencedPaths(map.over())) {
-            if (!pathExists(mergedInput, path)) {
-                throw new MapValidationException(consumer.agentId(), map,
-                        "map.over references absent field '" + path + "'");
-            }
-        }
-
-        JsonNode collection;
-        try {
-            collection = JMES_PATH.compile(map.over()).search(mergedInput);
-        } catch (Exception e) {
-            throw new MapValidationException(consumer.agentId(), map,
-                    "invalid map.over expression: " + e.getMessage());
-        }
+        CompiledExpr over = compileOrReject(map.over(), RootVar.INPUT,
+                () -> new MapValidationException(consumer.agentId(), map, "invalid map.over expression"));
+        JsonNode collection = evalOrReject(over, mergedInput,
+                e -> new MapValidationException(consumer.agentId(), map,
+                        "map.over references absent field or is invalid: " + e.getMessage()));
         if (collection == null || !collection.isArray()) {
             throw new MapValidationException(consumer.agentId(), map,
                     "map.over must evaluate to an array");
@@ -293,12 +315,11 @@ public class SelectContractValidator {
         JsonNode itemSample = collection.isEmpty() ? mapper.createObjectNode() : collection.get(0);
         JsonNode projected;
         if (map.hasItemSelect()) {
-            try {
-                projected = JMES_PATH.compile(map.itemSelect()).search(itemSample);
-            } catch (Exception e) {
-                throw new MapValidationException(consumer.agentId(), map,
-                        "invalid item_select expression: " + e.getMessage());
-            }
+            CompiledExpr itemSelect = compileOrReject(map.itemSelect(), RootVar.ITEM,
+                    () -> new MapValidationException(consumer.agentId(), map, "invalid item_select expression"));
+            projected = evalOrReject(itemSelect, itemSample,
+                    e -> new MapValidationException(consumer.agentId(), map,
+                            "invalid item_select expression: " + e.getMessage()));
         } else {
             projected = itemSample;
         }
@@ -310,37 +331,24 @@ public class SelectContractValidator {
         }
     }
 
-    private Set<String> referencedPaths(String expression) {
-        if (expression == null || expression.isBlank()) return Set.of();
-        String scrubbed = expression
-                .replaceAll("`[^`]*`", " ")
-                .replaceAll("'[^']*'", " ")
-                .replaceAll("\"[^\"]*\"", " ");
-        Matcher matcher = PATH_TOKEN.matcher(scrubbed);
-        Set<String> paths = new LinkedHashSet<>();
-        while (matcher.find()) {
-            String token = matcher.group();
-            if (KEYWORDS.contains(token)) continue;
-            int next = matcher.end();
-            while (next < scrubbed.length() && Character.isWhitespace(scrubbed.charAt(next))) next++;
-            if (next < scrubbed.length() && scrubbed.charAt(next) == '(') continue;
-            paths.add(token);
+    // ── seam helpers ─────────────────────────────────────────────────────────────────────────────
+
+    private CompiledExpr compileOrReject(String source, RootVar var,
+                                         java.util.function.Supplier<RuntimeException> onError) {
+        try {
+            return evalEngine.compile(source, var);
+        } catch (ExpressionCompileException e) {
+            throw onError.get();
         }
-        return paths;
     }
 
-    private boolean pathExists(JsonNode root, String path) {
-        if (root == null || path == null || path.isBlank()) return false;
-        JsonNode current = root;
-        for (String rawSegment : path.split("\\.")) {
-            String segment = rawSegment;
-            int arrayStart = segment.indexOf('[');
-            if (arrayStart >= 0) segment = segment.substring(0, arrayStart);
-            if (segment.isBlank()) continue;
-            if (!current.isObject() || !current.has(segment)) return false;
-            current = current.get(segment);
+    private JsonNode evalOrReject(CompiledExpr compiled, JsonNode sample,
+                                  java.util.function.Function<RuntimeException, RuntimeException> onError) {
+        try {
+            return evalEngine.eval(compiled, sample, EvalEngine.Mode.STRICT);
+        } catch (ExpressionEvalException e) {
+            throw onError.apply(e);
         }
-        return true;
     }
 
     private JsonNode composeLikeBlackboard(List<EdgeProjection> projections) {
@@ -394,24 +402,39 @@ public class SelectContractValidator {
         return matches;
     }
 
+    /**
+     * A schema-derived sample. {@code requiredOnly} keeps only effectively-required properties at each
+     * object level — used to prove a select is guarded against absent optional fields.
+     */
     JsonNode sampleFromSchema(JsonNode schema) {
+        return sampleFromSchema(schema, false);
+    }
+
+    JsonNode sampleFromSchema(JsonNode schema, boolean requiredOnly) {
         if (schema == null || schema.isMissingNode() || schema.isNull()) return mapper.nullNode();
 
         JsonNode selected = nonNullBranch(schema);
-        if (selected != schema) return sampleFromSchema(selected);
+        if (selected != schema) return sampleFromSchema(selected, requiredOnly);
 
         String type = schemaType(schema);
         if ("object".equals(type) || schema.path("properties").isObject()) {
             ObjectNode out = mapper.createObjectNode();
             JsonNode props = schema.path("properties");
             if (props.isObject()) {
-                props.fields().forEachRemaining(entry -> out.set(entry.getKey(), sampleFromSchema(entry.getValue())));
+                Set<String> required = requiredOnly
+                        ? InputContractValidator.effectiveRequiredFields(schema)
+                        : null;
+                props.fields().forEachRemaining(entry -> {
+                    if (required == null || required.contains(entry.getKey())) {
+                        out.set(entry.getKey(), sampleFromSchema(entry.getValue(), requiredOnly));
+                    }
+                });
             }
             return out;
         }
         if ("array".equals(type)) {
             ArrayNode out = mapper.createArrayNode();
-            out.add(sampleFromSchema(schema.path("items")));
+            out.add(sampleFromSchema(schema.path("items"), requiredOnly));
             return out;
         }
         if ("number".equals(type) || "integer".equals(type)) return mapper.getNodeFactory().numberNode(1);

@@ -6,16 +6,134 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class SelectContractValidatorTest {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = new ObjectMapper().findAndRegisterModules();
 
     private final SelectContractValidator validator = new SelectContractValidator(MAPPER);
+
+    // ── CEL-migration: unguarded-optional guard check + real production manifests ─────────────────
+
+    @Test
+    @DisplayName("BOOT-REJECT: a select that reads an OPTIONAL producer field without a has() guard")
+    void rejectsUnguardedOptionalField() {
+        // producer output has a required 'present_field' and an OPTIONAL 'opt' (not in required[])
+        AgentManifest producer = manifest(
+                "agent.producer",
+                io(List.of(), List.of(produce("producer_output", "type.produced"))),
+                null,
+                outputSchemaWithOptional());
+        // select reads input.opt WITHOUT has() — fine on the full sample, blows up on required-only
+        AgentManifest consumer = manifest(
+                "agent.consumer",
+                io(List.of(from("type.produced", "{'required_input': input.opt}")), List.of()),
+                inputSchemaRequiring("required_input"),
+                null);
+
+        assertThatThrownBy(() -> validator.validateOne(consumer, List.of(producer, consumer)))
+                .isInstanceOf(SelectContractValidator.SelectValidationException.class)
+                .hasMessageContaining("without has() guard");
+    }
+
+    @Test
+    @DisplayName("a select that guards the optional field with has() is accepted")
+    void acceptsGuardedOptionalField() {
+        AgentManifest producer = manifest(
+                "agent.producer",
+                io(List.of(), List.of(produce("producer_output", "type.produced"))),
+                null,
+                outputSchemaWithOptional());
+        AgentManifest consumer = manifest(
+                "agent.consumer",
+                io(List.of(from("type.produced", "{'required_input': has(input.opt) ? input.opt : null}")), List.of()),
+                inputSchemaRequiring("required_input"),
+                null);
+
+        // guarded select never throws on either sample; the merged input still satisfies the schema
+        // because required_input is present (null is allowed by the loose required schema)
+        assertThatCode(() -> validator.validateOne(consumer, List.of(producer, consumer)))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("AC5: a stale JMESPath-dialect manifest is rejected at ingest (undeclared reference)")
+    void rejectsLegacyJmespathDialectAtIngest() {
+        AgentManifest producer = manifest(
+                "agent.producer",
+                io(List.of(), List.of(produce("producer_output", "type.produced"))),
+                null,
+                outputSchema());
+        // A legacy JMESPath multiselect-hash — a bare identifier is an undeclared reference to the
+        // checked CEL Env, so ingest refuses it (the container would fail startup on this manifest).
+        AgentManifest consumer = manifest(
+                "agent.consumer",
+                io(List.of(from("type.produced", "{present_field: present_field}")), List.of()),
+                inputSchemaRequiring("present_field"),
+                null);
+
+        assertThatThrownBy(() -> validator.validateOne(consumer, List.of(producer, consumer)))
+                .isInstanceOf(SelectContractValidator.SelectValidationException.class)
+                .hasMessageContaining("invalid select expression");
+    }
+
+    @Test
+    @DisplayName("AC3: every current production manifest validates clean under the CEL engine")
+    void acceptsAllFourCurrentProductionManifests() {
+        List<AgentManifest> all = loadAllRealManifests();
+        assertThat(all).as("real manifests must be discoverable").isNotEmpty();
+        // Ingestion validates each consumer against the whole registry snapshot; none may throw.
+        for (AgentManifest consumer : all) {
+            assertThatCode(() -> validator.validateOne(consumer, all))
+                    .as("manifest %s must validate under CEL", consumer.agentId())
+                    .doesNotThrowAnyException();
+        }
+    }
+
+    private static Path registryManifestsDir() {
+        Path dir = Paths.get("").toAbsolutePath();
+        for (int i = 0; i < 6 && dir != null; i++) {
+            Path candidate = dir.resolve("registry").resolve("manifests");
+            if (Files.isDirectory(candidate)) return candidate;
+            dir = dir.getParent();
+        }
+        throw new IllegalStateException("registry/manifests not found");
+    }
+
+    private static List<AgentManifest> loadAllRealManifests() {
+        List<AgentManifest> out = new ArrayList<>();
+        try (var files = Files.walk(registryManifestsDir())) {
+            files.filter(p -> p.getFileName().toString().endsWith(".json"))
+                    .forEach(p -> {
+                        try {
+                            AgentManifest m = MAPPER.readValue(Files.readAllBytes(p), AgentManifest.class);
+                            if (m != null && m.agentId() != null) out.add(m);
+                        } catch (Exception ignored) { /* skip unparseable — mirrors loader tolerance */ }
+                    });
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return out;
+    }
+
+    private static JsonNode outputSchemaWithOptional() {
+        var schema = MAPPER.createObjectNode();
+        schema.put("type", "object");
+        var props = schema.putObject("properties");
+        props.putObject("present_field").put("type", "string");
+        props.putObject("opt").put("type", "string");
+        schema.putArray("required").add("present_field");   // 'opt' is optional
+        return schema;
+    }
 
     @Test
     @DisplayName("BOOT-REJECT: select referencing absent producer field is rejected with precise edge details")
@@ -27,7 +145,7 @@ class SelectContractValidatorTest {
                 outputSchema());
         AgentManifest consumer = manifest(
                 "agent.consumer",
-                io(List.of(from("type.produced", "{required_input: absent_field}")), List.of()),
+                io(List.of(from("type.produced", "{'required_input': has(input.absent_field) ? input.absent_field : null}")), List.of()),
                 inputSchemaRequiring("required_input"),
                 null);
 
@@ -35,7 +153,7 @@ class SelectContractValidatorTest {
                 .isInstanceOf(SelectContractValidator.SelectValidationException.class)
                 .hasMessageContaining("agentId=agent.consumer")
                 .hasMessageContaining("from=type.produced")
-                .hasMessageContaining("select={required_input: absent_field}")
+                .hasMessageContaining("has(input.absent_field)")
                 .hasMessageContaining("required_input");
     }
 
@@ -49,7 +167,7 @@ class SelectContractValidatorTest {
                 outputSchema());
         AgentManifest consumer = manifest(
                 "agent.consumer",
-                io(List.of(from("type.produced", "{required_input: present_field}")), List.of()),
+                io(List.of(from("type.produced", "{'required_input': has(input.present_field) ? input.present_field : null}")), List.of()),
                 inputSchemaRequiring("required_input"),
                 null);
 
@@ -76,8 +194,8 @@ class SelectContractValidatorTest {
         AgentManifest consumer = manifest(
                 "agent.consumer",
                 io(List.of(
-                        from("type.alpha", "{required_input: present_field}"),
-                        from("type.beta", "{required_input: present_field}")
+                        from("type.alpha", "{'required_input': has(input.present_field) ? input.present_field : null}"),
+                        from("type.beta", "{'required_input': has(input.present_field) ? input.present_field : null}")
                 ), List.of()),
                 inputSchemaRequiring("alpha", "beta"),
                 null);
@@ -99,7 +217,7 @@ class SelectContractValidatorTest {
                 null);
         AgentManifest consumer = manifest(
                 "agent.consumer",
-                io(List.of(from("type.produced", "{required_input: present_field}")), List.of()),
+                io(List.of(from("type.produced", "{'required_input': has(input.present_field) ? input.present_field : null}")), List.of()),
                 inputSchemaRequiring("required_input"),
                 null);
 
@@ -120,8 +238,8 @@ class SelectContractValidatorTest {
                 outputSchema());
         AgentManifest consumer = manifest(
                 "agent.consumer",
-                io(List.of(from("type.produced", "{required_input: present_field}")), List.of(),
-                        "required_input == 'x'"),
+                io(List.of(from("type.produced", "{'required_input': has(input.present_field) ? input.present_field : null}")), List.of(),
+                        "input.required_input == 'x'"),
                 inputSchemaRequiring("required_input"),
                 null);
 
@@ -142,15 +260,15 @@ class SelectContractValidatorTest {
                 outputSchema());
         AgentManifest consumer = manifest(
                 "agent.consumer",
-                io(List.of(from("type.produced", "{required_input: present_field}")), List.of(),
-                        "absent_input > `0`"),
+                io(List.of(from("type.produced", "{'required_input': has(input.present_field) ? input.present_field : null}")), List.of(),
+                        "input.absent_input > 0"),
                 inputSchemaRequiring("required_input"),
                 null);
 
         assertThatThrownBy(() -> validator.validateOne(consumer, List.of(producer, consumer)))
                 .isInstanceOf(SelectContractValidator.ConditionValidationException.class)
                 .hasMessageContaining("agentId=agent.consumer")
-                .hasMessageContaining("condition=absent_input > `0`")
+                .hasMessageContaining("input.absent_input")
                 .hasMessageContaining("absent_input");
     }
 
@@ -164,8 +282,8 @@ class SelectContractValidatorTest {
                 outputSchema());
         AgentManifest consumer = manifest(
                 "agent.consumer",
-                io(List.of(from("type.produced", "{required_input: present_field}")), List.of(),
-                        "required_input"),
+                io(List.of(from("type.produced", "{'required_input': has(input.present_field) ? input.present_field : null}")), List.of(),
+                        "input.required_input"),
                 inputSchemaRequiring("required_input"),
                 null);
 
@@ -184,8 +302,8 @@ class SelectContractValidatorTest {
                 outputSchemaWithArray());
         AgentManifest consumer = manifest(
                 "agent.consumer",
-                io(List.of(from("type.produced", "{items: items}")), List.of(),
-                        null, new AgentManifest.MapSpec("items", "{required_input: present_field}", 5, 2)),
+                io(List.of(from("type.produced", "{'items': has(input.items) ? input.items : null}")), List.of(),
+                        null, new AgentManifest.MapSpec("input.items", "{'required_input': has(item.present_field) ? item.present_field : null}", 5, 2)),
                 inputSchemaRequiring("required_input"),
                 null);
 
@@ -206,8 +324,8 @@ class SelectContractValidatorTest {
                 outputSchema());
         AgentManifest consumer = manifest(
                 "agent.consumer",
-                io(List.of(from("type.produced", "{items: present_field}")), List.of(),
-                        null, new AgentManifest.MapSpec("items", "{required_input: present_field}", 5, 2)),
+                io(List.of(from("type.produced", "{'items': has(input.present_field) ? input.present_field : null}")), List.of(),
+                        null, new AgentManifest.MapSpec("input.items", "{'required_input': has(item.present_field) ? item.present_field : null}", 5, 2)),
                 inputSchemaRequiring("required_input"),
                 null);
 
@@ -226,8 +344,8 @@ class SelectContractValidatorTest {
                 outputSchemaWithArray());
         AgentManifest consumer = manifest(
                 "agent.consumer",
-                io(List.of(from("type.produced", "{items: items}")), List.of(),
-                        null, new AgentManifest.MapSpec("items", "{wrong: present_field}", 5, 2)),
+                io(List.of(from("type.produced", "{'items': has(input.items) ? input.items : null}")), List.of(),
+                        null, new AgentManifest.MapSpec("input.items", "{'wrong': has(item.present_field) ? item.present_field : null}", 5, 2)),
                 inputSchemaRequiring("required_input"),
                 null);
 
@@ -247,8 +365,8 @@ class SelectContractValidatorTest {
                 outputSchemaWithArray());
         AgentManifest consumer = manifest(
                 "agent.consumer",
-                io(List.of(from("type.produced", "{items: items}")), List.of(),
-                        null, new AgentManifest.MapSpec("items", "{required_input: present_field}", 0, 2)),
+                io(List.of(from("type.produced", "{'items': has(input.items) ? input.items : null}")), List.of(),
+                        null, new AgentManifest.MapSpec("input.items", "{'required_input': has(item.present_field) ? item.present_field : null}", 0, 2)),
                 inputSchemaRequiring("required_input"),
                 null);
 

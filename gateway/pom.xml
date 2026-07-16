@@ -127,12 +127,13 @@
             <version>0.6.1</version>
         </dependency>
 
-        <!-- ── JMESPath — retained only for EngineParityTest (CEL-vs-JMESPath golden parity proof).
-             Not on the request path; see F2 CEL migration. Moves to test scope once call sites migrate. ── -->
+        <!-- ── JMESPath — TEST SCOPE ONLY. Retained solely for EngineParityTest (the CEL-vs-JMESPath
+             golden parity regression). It is gone from compile/runtime scope: the request path is CEL. ── -->
         <dependency>
             <groupId>io.burt</groupId>
             <artifactId>jmespath-jackson</artifactId>
             <version>0.6.0</version>
+            <scope>test</scope>
         </dependency>
 
         <!-- ── Resilience4j (harness: breaker + timeout + bulkhead + retry) ──  -->

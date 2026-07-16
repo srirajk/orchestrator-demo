@@ -17,7 +17,7 @@ package ai.conduit.gateway.infrastructure.expression;
 public final class ExpressionDialect {
 
     /** The dialect this build's expression engine speaks and the registry stamps at ingest. */
-    public static final String CURRENT = "jmespath";
+    public static final String CURRENT = "cel-v1";
 
     private ExpressionDialect() {}
 }
