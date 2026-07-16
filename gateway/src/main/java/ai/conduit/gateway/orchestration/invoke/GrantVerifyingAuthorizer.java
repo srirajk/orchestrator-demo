@@ -37,18 +37,38 @@ public class GrantVerifyingAuthorizer implements InvocationAuthorizer {
         return AuthorizationDecision.deny("no-fresh-grant", "grant");
     }
 
-    /** True iff a fresh grant covers (principal, agentId, bound resource) — the shared verification core. */
+    /**
+     * True iff a fresh grant authorizes this hop — the shared verification core, with the TOCTOU
+     * closure. A structural grant (no resource scope) authorizes an <em>unbound</em> hop. When the hop
+     * is bound to a coverage resource AND any resource-scoped grant exists for that agent, a matching
+     * resource grant is REQUIRED (a structural grant does not stand in) — so a hop bound to a different
+     * entity than the one the coverage check cleared is denied. When no resource grant exists for the
+     * agent, a structural grant governs (parity with the pre-coverage path).
+     */
     protected boolean freshGrantPresent(InvocationContext ctx, PlanNode node) {
         if (ctx == null || node == null || node.agent() == null) return false;
         String principalId = ctx.principalId();
         String agentId = node.agent().agentId();
         String boundResource = ctx.boundResourceId(node.nodeId());
         long now = System.currentTimeMillis();
+
+        boolean structuralMatch = false;
+        boolean resourceGrantForAgent = false;
+        boolean resourceMatch = false;
         for (AuthorizationGrant g : ctx.grants()) {
-            if (g.isFresh(now, grantTtlMillis) && g.covers(principalId, agentId, boundResource)) {
-                return true;
+            if (!g.isFresh(now, grantTtlMillis)) continue;
+            if (!agentId.equals(g.agentId())
+                    || !java.util.Objects.equals(principalId, g.principalId())) continue;
+            if (g.resourceId() == null) {
+                structuralMatch = true;
+            } else {
+                resourceGrantForAgent = true;
+                if (g.resourceId().equals(boundResource)) resourceMatch = true;
             }
         }
-        return false;
+        if (boundResource != null && resourceGrantForAgent) {
+            return resourceMatch;   // TOCTOU: bound hop must match a resource grant
+        }
+        return structuralMatch || resourceMatch;
     }
 }

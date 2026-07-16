@@ -302,7 +302,7 @@ public class DagPlanExecutor {
                 continue;
             }
             NodeResult coverageResult = evaluateNodeCoverage(candidate, input, coverageContext,
-                    requestId, conversationId);
+                    requestId, conversationId, ctx);
             if (coverageResult != null) {
                 results.put(n.nodeId(), coverageResult);
                 continue;
@@ -633,7 +633,8 @@ public class DagPlanExecutor {
     }
 
     private NodeResult evaluateNodeCoverage(PlanNode node, JsonNode input, CoverageContext ctx,
-                                            String requestId, String conversationId) {
+                                            String requestId, String conversationId,
+                                            InvocationContext invocationCtx) {
         if (ctx == null || node == null || node.agent() == null) return null;
         EffectiveManifest effective = ctx.effectiveManifest(node.agent());
         if (effective == null || !effective.resourceScoped() || effective.coverage() == null) return null;
@@ -670,6 +671,16 @@ public class DagPlanExecutor {
                     publishCoverageDeny(ctx, node, id,
                             check == null ? "coverage-denied" : check.reason(), requestId, conversationId);
                     return coverageDenied(node, "coverage denied: not in coverage");
+                }
+                // Coverage cleared this id for this principal — mint a resource-scoped grant the invoker
+                // verifies, and bind the node to the id so the checkpoint's TOCTOU compare (bound id vs
+                // grant resourceId) closes. Coverage RPC count is unchanged (this is in-memory, on the
+                // caller thread, inside the SAME check loop) — no per-map-item multiplication.
+                if (invocationCtx != null) {
+                    invocationCtx.addGrant(AuthorizationGrant.resourceScoped(
+                            invocationCtx.principalId(), node.agent().agentId(), id, "coverage",
+                            invocationCtx.requestId()));
+                    invocationCtx.bindResource(node.nodeId(), id);
                 }
             }
         }
