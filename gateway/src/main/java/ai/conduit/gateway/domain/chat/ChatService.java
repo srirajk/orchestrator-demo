@@ -476,8 +476,11 @@ public class ChatService {
             // capability asked rather than the entity named, an empty masked residual widens to the full
             // masked window, and relaxation is granted ONLY on a RESOLVED_ALLOWED-and-masked focal (or a
             // deterministic non-coverage-scoped id). A FOLLOW_UP passes its already-prepared memo through.
+            PreparedRoute.MaskDiagnostics maskDiag = prepared.maskDiagnostics();
             tracePublisher.publish(TraceEvent.of("route_prepared", requestId, conversationId,
-                    RoutePreparedData.from(prepared.maskDiagnostics(), prepared.relaxationAllowed())));
+                    RoutePreparedData.of(maskDiag.maskMode(), maskDiag.mentionCount(),
+                            maskDiag.maskedSpanCount(), maskDiag.alignmentMisses(), maskDiag.residualClass(),
+                            prepared.relaxationAllowed(), maskDiag.rawTextHash(), maskDiag.maskedTextHash())));
             long routingStart = System.nanoTime();
             // Piece 4/5 wiring: derive the grounded references' DOMAIN set from the memoized grounded set
             // and pass it so the (config-OFF) conflict trigger is reachable. Gated on the SAME property as
