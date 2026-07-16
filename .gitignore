@@ -116,3 +116,6 @@ output/pdf/
 
 # Private strategy / vision docs — internal only, NEVER check in (name real prospects + GTM)
 vision/
+
+# F5 evidence capture output (machine/run-specific; regenerated via scripts/evidence.sh)
+docs/implementation/evidence/
