@@ -58,6 +58,7 @@ final class ExecutorTestSupport {
     static AgentHarness harness(ProtocolAdapter adapter) {
         return new AgentHarness(List.of(adapter), CircuitBreakerRegistry.ofDefaults(),
                 new SimpleMeterRegistry(),
+                new ai.conduit.gateway.infrastructure.faults.NoopFaultInjector(),
                 5_000,   // default SLA
                 32,      // bulkhead max-concurrent (per agentId)
                 256,     // bulkhead queue-capacity (per agentId)

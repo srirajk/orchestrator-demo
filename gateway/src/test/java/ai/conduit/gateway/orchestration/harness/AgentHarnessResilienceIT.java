@@ -114,6 +114,7 @@ class AgentHarnessResilienceIT {
     private AgentHarness harness(List<ProtocolAdapter> adapters) {
         return new AgentHarness(adapters, cbReg,
                 new SimpleMeterRegistry(), // meterRegistry
+                new ai.conduit.gateway.infrastructure.faults.NoopFaultInjector(),
                 5_000, // defaultSlaMs
                 5,     // bulkheadMaxConcurrent
                 20,    // bulkheadQueueCapacity

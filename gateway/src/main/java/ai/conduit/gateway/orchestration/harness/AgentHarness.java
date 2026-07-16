@@ -1,6 +1,7 @@
 package ai.conduit.gateway.orchestration.harness;
 
 import ai.conduit.gateway.adapter.ProtocolAdapter;
+import ai.conduit.gateway.infrastructure.faults.FaultInjector;
 import ai.conduit.gateway.orchestration.model.NodeResult;
 import ai.conduit.gateway.orchestration.model.PlanNode;
 import ai.conduit.gateway.registry.model.AgentManifest;
@@ -59,6 +60,11 @@ public class AgentHarness {
     private final List<ProtocolAdapter> adapters;
     private final CircuitBreakerRegistry cbRegistry;
     private final MeterRegistry meterRegistry;
+    // Named-point fault seam (F5). NoopFaultInjector in every normal context — no branch, no cost.
+    private final FaultInjector faultInjector;
+
+    /** Pinned insertion point: inside the harness try/catch, immediately before the adapter call. */
+    static final String FP_BEFORE_INVOKE = "harness.before-invoke";
 
     // ── Gauge registration guard: track which agentIds already have gauges ────
     private final Set<String> registeredGauges = ConcurrentHashMap.newKeySet();
@@ -87,6 +93,7 @@ public class AgentHarness {
             List<ProtocolAdapter> adapters,
             CircuitBreakerRegistry cbRegistry,
             MeterRegistry meterRegistry,
+            FaultInjector faultInjector,
             @Value("${conduit.orchestration.harness.default-sla-ms:5000}") int defaultSlaMs,
             @Value("${conduit.orchestration.harness.bulkhead.max-concurrent:5}") int bulkheadMaxConcurrent,
             @Value("${conduit.orchestration.harness.bulkhead.queue-capacity:20}") int bulkheadQueueCapacity,
@@ -100,6 +107,7 @@ public class AgentHarness {
         this.adapters = adapters;
         this.cbRegistry = cbRegistry;
         this.meterRegistry = meterRegistry;
+        this.faultInjector = faultInjector;
         this.defaultSlaMs = defaultSlaMs;
         this.bulkheadMaxConcurrent = bulkheadMaxConcurrent;
         this.bulkheadQueueCapacity = bulkheadQueueCapacity;
@@ -221,7 +229,14 @@ public class AgentHarness {
                 // Phase 2: executing slot is held — run the call and release it on the way out.
                 try {
                     return CircuitBreaker.decorateCallable(cb,
-                            () -> adapter.invoke(node.agent(), node.input(), callerToken)).call();
+                            () -> {
+                                // Pinned fault seam: inside the harness try/catch, immediately before
+                                // the adapter call. A fault here surfaces as a call failure → the
+                                // ExecutionException path below → NodeResult.FAILED. execute() still
+                                // never throws. No-op (and no branch) in every normal context.
+                                faultInjector.at(FP_BEFORE_INVOKE);
+                                return adapter.invoke(node.agent(), node.input(), callerToken);
+                            }).call();
                 } finally {
                     executing.release();
                 }

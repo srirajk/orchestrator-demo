@@ -196,6 +196,7 @@ class DagPlanExecutorTest {
     private AgentHarness harness(ProtocolAdapter adapter) {
         return new AgentHarness(List.of(adapter), CircuitBreakerRegistry.ofDefaults(),
                 new SimpleMeterRegistry(),
+                new ai.conduit.gateway.infrastructure.faults.NoopFaultInjector(),
                 5_000, 5, 20, 50, 80, 10, 30, 10, 3, 2);
     }
 

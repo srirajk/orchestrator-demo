@@ -1,6 +1,8 @@
 package ai.conduit.gateway.testsupport;
 
 import ai.conduit.gateway.adapter.ProtocolAdapter;
+import ai.conduit.gateway.infrastructure.faults.FaultInjector;
+import ai.conduit.gateway.infrastructure.faults.NoopFaultInjector;
 import ai.conduit.gateway.orchestration.harness.AgentHarness;
 import ai.conduit.gateway.orchestration.model.PlanNode;
 import ai.conduit.gateway.registry.model.AgentManifest;
@@ -41,9 +43,15 @@ public final class HarnessTestSupport {
      */
     public static AgentHarness harness(ProtocolAdapter adapter, int defaultSlaMs,
                                        int maxConcurrent, int queueCapacity) {
+        return harness(adapter, new NoopFaultInjector(), defaultSlaMs, maxConcurrent, queueCapacity);
+    }
+
+    /** As above, but with an explicit {@link FaultInjector} (for the fault-seam tests). */
+    public static AgentHarness harness(ProtocolAdapter adapter, FaultInjector faultInjector,
+                                       int defaultSlaMs, int maxConcurrent, int queueCapacity) {
         return new AgentHarness(
                 List.of(adapter), CircuitBreakerRegistry.ofDefaults(), new SimpleMeterRegistry(),
-                defaultSlaMs, maxConcurrent, queueCapacity,
+                faultInjector, defaultSlaMs, maxConcurrent, queueCapacity,
                 50, 80, 10, 30, 1000, 3, 2);
     }
 }
