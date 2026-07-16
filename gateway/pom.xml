@@ -147,10 +147,17 @@
              timed RestClient (JDK HttpClient factory) + OutboundGate deadline. No reactive plumbing is
              on the gateway request path; the two deps were verified unused elsewhere before removal. -->
 
-        <!-- Audit: S3-family object store (MinIO / S3 / R2 / GCS-interop) with Object Lock (WORM). -->
+        <!-- Audit + PayloadStore: S3-family object store (MinIO / S3 / R2 / GCS-interop) with Object Lock (WORM). -->
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>s3</artifactId>
+        </dependency>
+        <!-- Apache sync HTTP client — bounded connection pool + bounded acquisition wait for the
+             PayloadStore materialise path (F3 discipline: a saturated/stalled store must fail within the
+             deadline, never pin a carrier). Version-managed by the AWS SDK BOM. -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>apache-client</artifactId>
         </dependency>
 
         <!-- Test -->

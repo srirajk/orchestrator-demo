@@ -103,6 +103,35 @@ conduit:
     # is the fallback budget when a manifest declares no SLA; connect-timeout-ms bounds the TCP connect.
     default-timeout-ms: ${CONDUIT_MCP_DEFAULT_TIMEOUT_MS:10000}
     connect-timeout-ms: ${CONDUIT_MCP_CONNECT_TIMEOUT_MS:10000}
+  # ── PayloadHandle claim-check (F4) ────────────────────────────────────────────
+  # Agent outputs get a content-addressed sha256 and, when they exceed spill-threshold-bytes AND
+  # the store is enabled, a claim-checked object copy in MinIO. Shipped behaviour is NEVER spill
+  # (threshold -1) — a request answers with zero Refs unless an operator opts in. v1 is provenance +
+  # seam only: the DAG still runs on in-memory trees; materialize() is the tested seam for the
+  # deferred lazy-Ref capability, not on any demo request path.
+  payload:
+    # -1 (default) = never spill = shipped behaviour. Set a positive byte count to claim-check larger payloads.
+    spill-threshold-bytes: ${CONDUIT_PAYLOAD_SPILL_THRESHOLD:-1}
+    # A full materialize of an object over this size with no projecting select is refused (heap guard).
+    max-materialize-bytes: ${CONDUIT_PAYLOAD_MAX_MATERIALIZE_BYTES:8388608}
+    store:
+      enabled: ${CONDUIT_PAYLOAD_STORE_ENABLED:false}
+      bucket: ${CONDUIT_PAYLOAD_BUCKET:conduit-payload}
+      endpoint: ${CONDUIT_PAYLOAD_S3_ENDPOINT:}                      # blank = real AWS
+      region: ${CONDUIT_PAYLOAD_S3_REGION:us-east-1}
+      path-style: ${CONDUIT_PAYLOAD_S3_PATH_STYLE:true}              # true for MinIO
+      access-key: ${CONDUIT_PAYLOAD_S3_ACCESS_KEY:}
+      secret-key: ${CONDUIT_PAYLOAD_S3_SECRET_KEY:}
+      # Bound the S3 calls (whole call incl. retries / single attempt) so a stalled store fails a
+      # spill/materialize within the node SLA rather than parking a carrier (F3 discipline).
+      api-call-timeout-ms: ${CONDUIT_PAYLOAD_S3_API_CALL_TIMEOUT_MS:8000}
+      api-call-attempt-timeout-ms: ${CONDUIT_PAYLOAD_S3_API_CALL_ATTEMPT_TIMEOUT_MS:4000}
+      connect-timeout-ms: ${CONDUIT_PAYLOAD_S3_CONNECT_TIMEOUT_MS:2000}
+      socket-timeout-ms: ${CONDUIT_PAYLOAD_S3_SOCKET_TIMEOUT_MS:4000}
+      # Bounded connection pool + bounded acquisition wait: the N+1th concurrent materialize against a
+      # saturated store rejects within the wait instead of hanging (PayloadStorePoolSaturationIT).
+      max-connections: ${CONDUIT_PAYLOAD_S3_MAX_CONNECTIONS:8}
+      connection-acquisition-timeout-ms: ${CONDUIT_PAYLOAD_S3_CONNECTION_ACQUISITION_TIMEOUT_MS:2000}
   registry:
     # Where the agent manifests live. Owned by the registry service; the gateway reads only the
     # domain manifests from here, never the agent ones (those it reads from Redis).
