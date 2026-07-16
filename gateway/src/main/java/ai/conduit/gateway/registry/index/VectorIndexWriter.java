@@ -18,6 +18,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import ai.conduit.gateway.infrastructure.expression.ExpressionDialect;
+
+import static ai.conduit.gateway.registry.index.VectorIndex.EXPR_DIALECT_STAMP_KEY;
 import static ai.conduit.gateway.registry.index.VectorIndex.INDEX_NAME;
 import static ai.conduit.gateway.registry.index.VectorIndex.KEY_PREFIX;
 import static ai.conduit.gateway.registry.index.VectorIndex.MODEL_STAMP_KEY;
@@ -63,6 +66,11 @@ public class VectorIndexWriter {
                     + currentModel + "' vs '" + queryEmbedder.modelId()
                     + "'. Documents and queries would occupy different vector spaces.");
         }
+
+        // Stamp the expression dialect these manifests were ingested in — independent of the embedding
+        // model rebuild below, and rewritten every ingest so a dialect flip always re-stamps. The
+        // gateway's RegistryReadinessVerifier refuses to start on a mismatch (cross-container skew gate).
+        writeExprDialectStamp();
 
         String stampedModel = readStamp();
         boolean exists;
@@ -144,6 +152,16 @@ public class VectorIndexWriter {
             jedis.set(MODEL_STAMP_KEY, modelId);
         } catch (Exception e) {
             log.warn("Could not stamp the vector index with model '{}': {}", modelId, e.getMessage());
+        }
+    }
+
+    private void writeExprDialectStamp() {
+        try {
+            jedis.set(EXPR_DIALECT_STAMP_KEY, ExpressionDialect.CURRENT);
+            log.info("Stamped routing index with expression dialect '{}'", ExpressionDialect.CURRENT);
+        } catch (Exception e) {
+            log.warn("Could not stamp the vector index with expression dialect '{}': {}",
+                    ExpressionDialect.CURRENT, e.getMessage());
         }
     }
 

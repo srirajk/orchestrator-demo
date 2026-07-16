@@ -158,7 +158,7 @@
               "select": {
                 "type": "string",
                 "minLength": 1,
-                "description": "OPTIONAL, meaningful only alongside 'from': a JMESPath expression that projects/reshapes the producer's output into exactly what this consumer expects (field projection, not a blob pass-through). Absent = identity pass-through (today's behavior) — additive and backward-compatible. Evaluated by the gateway's Blackboard; matched/interpreted generically, never domain-hardcoded."
+                "description": "OPTIONAL, meaningful only alongside 'from': a CEL expression rooted at `input` (the producer's output) that projects/reshapes it into exactly what this consumer expects (field projection, not a blob pass-through). Absent = identity pass-through (today's behavior) — additive and backward-compatible. Evaluated by the gateway's Blackboard; matched/interpreted generically, never domain-hardcoded."
               }
             }
           }
@@ -197,7 +197,7 @@
                     "select": {
                       "type": "string",
                       "minLength": 1,
-                      "description": "JMESPath expression over this producer output that evaluates to a string id or array of string ids."
+                      "description": "CEL expression rooted at `output` (this producer output) that evaluates to a string id or array of string ids, e.g. output.items.map(x, x.id)."
                     }
                   }
                 }
@@ -218,7 +218,7 @@
                     "path": {
                       "type": "string",
                       "minLength": 1,
-                      "description": "JMESPath expression over this producer output that evaluates to the figure's raw scalar value."
+                      "description": "CEL expression rooted at `output` (this producer output) that evaluates to the figure's raw scalar value; guard optional fields with has(...)."
                     },
                     "format": {
                       "type": "string",
@@ -234,7 +234,7 @@
         "condition": {
           "type": "string",
           "minLength": 1,
-          "description": "OPTIONAL node-level JMESPath expression over this node's merged, bound input. It must evaluate to boolean; true dispatches the node, false cleanly skips it as not applicable."
+          "description": "OPTIONAL node-level CEL expression rooted at `input` (this node's merged, bound input). It must evaluate to boolean; true dispatches the node, false cleanly skips it as not applicable."
         },
         "map": {
           "type": "object",
@@ -245,12 +245,12 @@
             "over": {
               "type": "string",
               "minLength": 1,
-              "description": "JMESPath expression over the bound input that must evaluate to an array."
+              "description": "CEL expression rooted at `input` (the bound input) that must evaluate to an array."
             },
             "item_select": {
               "type": "string",
               "minLength": 1,
-              "description": "OPTIONAL JMESPath expression over each array item that produces the per-item wire input."
+              "description": "OPTIONAL CEL expression rooted at `item` (each array element) that produces the per-item wire input."
             },
             "max_items": {
               "type": "integer",

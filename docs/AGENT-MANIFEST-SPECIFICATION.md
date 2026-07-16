@@ -280,7 +280,7 @@ no `io` block is single-node only — it participates in flat fan-out but is nev
 consumer in a DAG. The DAG path lights up per-capability as `io` contracts are declared.
 
 Every string in `io` (`type`, `from`, `entity`, `select`, `path`, `condition`, `over`) is a
-**manifest-declared symbol matched by equality or evaluated as JMESPath** — none is interpreted or
+**manifest-declared symbol matched by equality or evaluated as CEL** — none is interpreted or
 hardcoded in gateway Java.
 
 ### 3.1 `io.consumes` — array, optional
@@ -296,7 +296,7 @@ one** of `entity` or `from` (schema line 142-145).
 - `required` — boolean, optional, **default `true`** (schema line 157; `Consume.isRequired()` returns
   true when null, `AgentManifest.java:189`). A required-but-unsatisfied input skips the node's
   dispatch.
-- `select` — string (JMESPath), optional, **meaningful only alongside `from`** (line 158-161).
+- `select` — string (CEL), optional, **meaningful only alongside `from`** (line 158-161).
   Projects/reshapes the producer's output into exactly what this consumer expects (field projection,
   not a blob pass-through). Absent = identity pass-through (backward-compatible). Evaluated by the
   gateway's `Blackboard.bind` (referenced at `AgentManifest.java:179`); generic, never
@@ -316,13 +316,13 @@ item has `additionalProperties: false` and required keys `name, type`:
   id-looking values. Each item `additionalProperties: false`, required `type, select`:
   - `type` — string. Entity type whose coverage service is declared by the domain/sub-domain
     manifest.
-  - `select` — string (JMESPath) over this producer output evaluating to a string id or array of
+  - `select` — string (CEL) over this producer output evaluating to a string id or array of
     string ids.
 - `figures` — array, optional. Manifest-declared **load-bearing figures** this output emits. The
   gateway renders these deterministically from data and validates answer attribution generically
   (see below). Each item `additionalProperties: false`, required `label, path, format`:
   - `label` — string. Human label the answer must use when attributing this rendered figure.
-  - `path` — string (JMESPath) over this producer output evaluating to the figure's raw scalar
+  - `path` — string (CEL) over this producer output evaluating to the figure's raw scalar
     value.
   - `format` — string enum. The generic formatter id, enumerated to **exactly** the set
     `GroundedFigureRenderer` renders and `GroundedFigureValidator` gates on (schema line 223-227). A
@@ -345,10 +345,10 @@ item has `additionalProperties: false` and required keys `name, type`:
 
 ### 3.3 `io.condition` — string, optional
 
-A node-level JMESPath expression over the node's **merged, bound input** (schema line 234-237). It
+A node-level CEL expression over the node's **merged, bound input** (schema line 234-237). It
 must evaluate to boolean: `true` dispatches the node, `false` cleanly **skips it as not applicable**.
 This is how a downstream node runs only when it is relevant — e.g.
-`meridian.wealth.concentration_review` declares `"condition": "breach_count > \`0\`"` so the review
+`meridian.wealth.concentration_review` declares `"condition": "input.breach_count > \0\"` so the review
 flag node only fires when the upstream concentration analysis found breaches.
 
 **"Not applicable" vs "missing".** A node skipped by a `false` `condition` is *not applicable* — the
@@ -362,8 +362,8 @@ Dynamic map expansion (schema line 239-266, `AgentManifest.MapSpec` at `AgentMan
 `additionalProperties: false`, required key `over`. The gateway evaluates `over` against the node's
 merged, bound input; each selected item is optionally reshaped by `item_select` and dispatched to
 **this same capability**, bounded by the declared caps and the global gateway ceilings.
-- `over` — string (JMESPath), **required**. Must evaluate to an array.
-- `item_select` — string (JMESPath), optional. Produces the per-item wire input from each array
+- `over` — string (CEL), **required**. Must evaluate to an array.
+- `item_select` — string (CEL), optional. Produces the per-item wire input from each array
   item.
 - `max_items` — integer, optional, `minimum: 1`. Per-node item cap; runtime clamps to the gateway
   global maximum.
@@ -372,7 +372,7 @@ merged, bound input; each selected item is optionally reshaped by `item_select` 
 
 Real example — `meridian.servicing.trade_penalty` fans one penalty calculation per failed trade:
 ```json
-"map": { "over": "failed",
+"map": { "over": "input.failed",
          "item_select": "{trade_id: trade_id, security: security, ...}",
          "max_items": 2, "max_concurrency": 2 }
 ```
@@ -945,17 +945,17 @@ Legend: **R** = required, **O** = optional. "Default" is the schema default (bla
 | `io.consumes[].entity` | O (oneOf) | string (≥1) | | Sub-domain entity `key` (leaf, no edge) |
 | `io.consumes[].from` | O (oneOf) | string (≥1) | | Upstream produced `type` (creates edge) |
 | `io.consumes[].required` | O | boolean | `true` | Whether the input is mandatory |
-| `io.consumes[].select` | O | string (JMESPath) | | Reshape producer output (only with `from`) |
+| `io.consumes[].select` | O | string (CEL) | | Reshape producer output (only with `from`) |
 | `io.produces[].name` | R | string (≥1) | | Blackboard key |
 | `io.produces[].type` | R | string (≥1) | | Symbolic output type matched by `from` |
 | `io.produces[].entities[].type` | R | string (≥1) | | Entity type for coverage filtering |
-| `io.produces[].entities[].select` | R | string (JMESPath) | | Selects the id(s) |
+| `io.produces[].entities[].select` | R | string (CEL) | | Selects the id(s) |
 | `io.produces[].figures[].label` | R | string (≥1) | | Label the answer must use |
-| `io.produces[].figures[].path` | R | string (JMESPath) | | Raw scalar selector |
+| `io.produces[].figures[].path` | R | string (CEL) | | Raw scalar selector |
 | `io.produces[].figures[].format` | R | enum (7, §3.2) | | Renderer/validator formatter id |
-| `io.condition` | O | string (JMESPath→bool) | | `false` = skip node as not-applicable |
-| `io.map.over` | R if map | string (JMESPath→array) | | Array to fan over |
-| `io.map.item_select` | O | string (JMESPath) | | Per-item wire input |
+| `io.condition` | O | string (CEL→bool) | | `false` = skip node as not-applicable |
+| `io.map.over` | R if map | string (CEL→array) | | Array to fan over |
+| `io.map.item_select` | O | string (CEL) | | Per-item wire input |
 | `io.map.max_items` | O | int ≥1 | | Per-node item cap (clamped globally) |
 | `io.map.max_concurrency` | O | int ≥1 | | Per-node concurrency cap (clamped globally) |
 | `input_schema` / `output_schema` / `resolved_connection` / `indexed` / `registered_at` | derived | — | | Written by the registry after introspection (not submitted) |

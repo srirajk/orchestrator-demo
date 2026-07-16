@@ -175,7 +175,7 @@ class BlackboardTest {
                  "agent_narrative": "some prose the consumer should never see"}
                 """);
         AgentManifest.Consume edge = fromRef("wealth.holdings", true,
-                "{positions: positions, total_value: total_value}");
+                "{'positions': has(input.positions) ? input.positions : null, 'total_value': has(input.total_value) ? input.total_value : null}");
         PlanNode consumer = node("cons", io(List.of(edge), List.of()), null, "prod");
 
         Blackboard bb = new Blackboard(Set.of(), Map.of(), MAPPER);
@@ -183,7 +183,10 @@ class BlackboardTest {
 
         JsonNode bound = bb.bind(consumer);
         assertThat(bound.has("agent_narrative")).isFalse();
-        assertThat(bound.get("positions")).isEqualTo(raw.get("positions"));
+        // CEL canonicalizes JSON numbers to int64 (LongNode), so compare by value, not node identity
+        // (a JMESPath IntNode and a CEL LongNode both represent 100 — see EngineParityTest's comparator).
+        assertThat(bound.get("positions").get(0).get("ticker").asText()).isEqualTo("AAPL");
+        assertThat(bound.get("positions").get(0).get("value").asInt()).isEqualTo(100);
         assertThat(bound.get("total_value").asInt()).isEqualTo(100);
     }
 
@@ -202,7 +205,7 @@ class BlackboardTest {
     @DisplayName("well-formed select + matching schema → composable, no reason returned")
     void wellFormedInputIsComposable() {
         AgentManifest.Consume edge = fromRef("wealth.holdings", true,
-                "{positions: positions}");
+                "{'positions': has(input.positions) ? input.positions : null}");
         JsonNode schema = schemaRequiring("positions");
         PlanNode consumer = nodeWithSchema("cons", io(List.of(edge), List.of()), schema, null, "prod");
 
@@ -222,7 +225,7 @@ class BlackboardTest {
         // the exact shape of a hand-aligned-then-drifted mapping. The consumer's schema requires
         // 'positions'; the projected input will have it null/absent.
         AgentManifest.Consume wrongEdge = fromRef("wealth.holdings", true,
-                "{positions: positions_typo}");
+                "{'positions': has(input.positions_typo) ? input.positions_typo : null}");
         JsonNode schema = schemaRequiring("positions");
         PlanNode consumer = nodeWithSchema("cons", io(List.of(wrongEdge), List.of()), schema, null, "prod");
 
@@ -238,9 +241,33 @@ class BlackboardTest {
     }
 
     @Test
+    @DisplayName("CEL guard: an ABSENT required field projects key-present-null and is attributed by name")
+    void requiredFieldAbsentStillAttributesField() {
+        // The guarded select unconditionally emits the key (value null) when the source field is absent —
+        // reproducing JMESPath's key-present-value-null shape so one absent field does not collapse the
+        // whole edge to MissingNode, and missingFields still names the exact producer/field.
+        AgentManifest.Consume edge = fromRef("wealth.holdings", true,
+                "{'positions': has(input.positions) ? input.positions : null}");
+        JsonNode schema = schemaRequiring("positions");
+        PlanNode consumer = nodeWithSchema("cons", io(List.of(edge), List.of()), schema, null, "prod");
+
+        Blackboard bb = new Blackboard(Set.of(), Map.of(), MAPPER);
+        JsonNode raw = MAPPER.createObjectNode().put("unrelated", "value");   // no 'positions'
+        bb.project(node("prod", io(List.of(), List.of(produce("holdings", "wealth.holdings"))), null), raw);
+
+        JsonNode bound = bb.bind(consumer);
+        assertThat(bound.has("positions")).as("guarded key is present even when absent upstream").isTrue();
+        assertThat(bound.get("positions").isNull()).isTrue();
+
+        String reason = bb.checkComposable(consumer, bound);
+        assertThat(reason).isNotNull();
+        assertThat(reason).contains("positions");
+    }
+
+    @Test
     @DisplayName("INCOMPLETE INPUT REFUSED: a producer output marked _complete=false fails the consumer")
     void incompleteUpstreamFailsSafe() {
-        AgentManifest.Consume edge = fromRef("wealth.holdings", true, "{positions: positions}");
+        AgentManifest.Consume edge = fromRef("wealth.holdings", true, "{'positions': has(input.positions) ? input.positions : null}");
         JsonNode schema = schemaRequiring("positions");
         PlanNode consumer = nodeWithSchema("cons", io(List.of(edge), List.of()), schema, null, "prod");
 
@@ -259,7 +286,7 @@ class BlackboardTest {
     @Test
     @DisplayName("no schema declared → checkComposable is a no-op (today's behavior for pre-existing agents)")
     void noSchemaIsPassOpen() {
-        AgentManifest.Consume edge = fromRef("wealth.holdings", true, "{positions: positions_typo}");
+        AgentManifest.Consume edge = fromRef("wealth.holdings", true, "{'positions': has(input.positions_typo) ? input.positions_typo : null}");
         PlanNode consumer = node("cons", io(List.of(edge), List.of()), null, "prod");   // no inputSchema
 
         Blackboard bb = new Blackboard(Set.of(), Map.of(), MAPPER);

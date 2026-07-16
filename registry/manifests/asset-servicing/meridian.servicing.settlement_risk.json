@@ -57,24 +57,40 @@
   "output_schema": {
     "type": "object",
     "properties": {
-      "failed_amount_usd": { "type": "number" },
-      "breach_count": { "type": "integer" },
+      "failed_amount_usd": {
+        "type": "number"
+      },
+      "breach_count": {
+        "type": "integer"
+      },
       "aging": {
         "type": "object",
         "properties": {
-          "max_failed_age_days": { "type": "integer" }
+          "max_failed_age_days": {
+            "type": "integer"
+          }
         }
       },
       "cash_context": {
         "type": "object",
         "properties": {
-          "failed_exposure_to_settled_cash_pct": { "type": ["number", "null"] }
+          "failed_exposure_to_settled_cash_pct": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
         }
       },
       "custody_context": {
         "type": "object",
         "properties": {
-          "failed_exposure_to_custody_mv_pct": { "type": ["number", "null"] }
+          "failed_exposure_to_custody_mv_pct": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
         }
       }
     }
@@ -84,17 +100,17 @@
       {
         "from": "servicing.settlement_status",
         "required": true,
-        "select": "{relationship_id: relationship_id, pending: pending, failed: failed, as_of_date: as_of_date}"
+        "select": "{'relationship_id': has(input.relationship_id) ? input.relationship_id : null, 'pending': has(input.pending) ? input.pending : null, 'failed': has(input.failed) ? input.failed : null, 'as_of_date': has(input.as_of_date) ? input.as_of_date : null}"
       },
       {
         "from": "servicing.custody_positions",
         "required": true,
-        "select": "{relationship_id: relationship_id, holdings_by_custodian: holdings_by_custodian, as_of_date: as_of_date}"
+        "select": "{'relationship_id': has(input.relationship_id) ? input.relationship_id : null, 'holdings_by_custodian': has(input.holdings_by_custodian) ? input.holdings_by_custodian : null, 'as_of_date': has(input.as_of_date) ? input.as_of_date : null}"
       },
       {
         "from": "servicing.cash_position",
         "required": true,
-        "select": "{relationship_id: relationship_id, balances: balances, projected_cash_usd: projected_cash_usd, note: note, as_of_date: as_of_date}"
+        "select": "{'relationship_id': has(input.relationship_id) ? input.relationship_id : null, 'balances': has(input.balances) ? input.balances : null, 'projected_cash_usd': has(input.projected_cash_usd) ? input.projected_cash_usd : null, 'note': has(input.note) ? input.note : null, 'as_of_date': has(input.as_of_date) ? input.as_of_date : null}"
       }
     ],
     "produces": [
@@ -102,11 +118,31 @@
         "name": "settlement_analysis",
         "type": "servicing.settlement_analysis",
         "figures": [
-          { "label": "CSDR penalty failed settlement amount", "path": "failed_amount_usd", "format": "currency_usd" },
-          { "label": "Max failed age", "path": "aging.max_failed_age_days", "format": "count" },
-          { "label": "Settlement breach count", "path": "breach_count", "format": "count" },
-          { "label": "Failed exposure to settled cash", "path": "cash_context.failed_exposure_to_settled_cash_pct", "format": "percent1" },
-          { "label": "Failed exposure to custody market value", "path": "custody_context.failed_exposure_to_custody_mv_pct", "format": "percent1" }
+          {
+            "label": "CSDR penalty failed settlement amount",
+            "path": "has(output.failed_amount_usd) ? output.failed_amount_usd : null",
+            "format": "currency_usd"
+          },
+          {
+            "label": "Max failed age",
+            "path": "has(output.aging) && has(output.aging.max_failed_age_days) ? output.aging.max_failed_age_days : null",
+            "format": "count"
+          },
+          {
+            "label": "Settlement breach count",
+            "path": "has(output.breach_count) ? output.breach_count : null",
+            "format": "count"
+          },
+          {
+            "label": "Failed exposure to settled cash",
+            "path": "has(output.cash_context) && has(output.cash_context.failed_exposure_to_settled_cash_pct) ? output.cash_context.failed_exposure_to_settled_cash_pct : null",
+            "format": "percent1"
+          },
+          {
+            "label": "Failed exposure to custody market value",
+            "path": "has(output.custody_context) && has(output.custody_context.failed_exposure_to_custody_mv_pct) ? output.custody_context.failed_exposure_to_custody_mv_pct : null",
+            "format": "percent1"
+          }
         ]
       }
     ]

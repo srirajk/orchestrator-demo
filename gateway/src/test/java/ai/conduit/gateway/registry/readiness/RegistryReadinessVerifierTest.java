@@ -26,6 +26,10 @@ class RegistryReadinessVerifierTest {
         VectorIndex index = mock(VectorIndex.class);
         when(index.exists()).thenReturn(indexExists);
         when(index.stampedModelId()).thenReturn(stamp);
+        // These tests exercise the embedding-model axis; keep the expression-dialect axis satisfied so
+        // it does not shadow them (its own coverage lives in DialectStampTest).
+        when(index.stampedExprDialect())
+                .thenReturn(ai.conduit.gateway.infrastructure.expression.ExpressionDialect.CURRENT);
 
         AgentRegistry registry = mock(AgentRegistry.class);
         when(registry.count()).thenReturn(agents);

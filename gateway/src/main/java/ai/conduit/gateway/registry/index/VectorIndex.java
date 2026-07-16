@@ -37,6 +37,8 @@ public class VectorIndex {
     static final String KEY_PREFIX      = "vec:";
     /** Records which embedding model produced the vectors currently in the index. */
     static final String MODEL_STAMP_KEY = "intent_idx:model";
+    /** Records which manifest expression dialect the registry ingested the manifests in. */
+    static final String EXPR_DIALECT_STAMP_KEY = "intent_idx:expr_dialect";
 
     private static final int TOP_K = 20;  // fetch more, deduplicate later
 
@@ -54,6 +56,15 @@ public class VectorIndex {
     public String stampedModelId() {
         try {
             return jedis.get(MODEL_STAMP_KEY);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** The manifest expression dialect the registry ingested with, or null if it was never stamped. */
+    public String stampedExprDialect() {
+        try {
+            return jedis.get(EXPR_DIALECT_STAMP_KEY);
         } catch (Exception e) {
             return null;
         }

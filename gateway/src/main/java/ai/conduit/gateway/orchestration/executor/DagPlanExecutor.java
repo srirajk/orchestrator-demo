@@ -19,8 +19,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import io.burt.jmespath.JmesPath;
-import io.burt.jmespath.jackson.JacksonRuntime;
+import ai.conduit.gateway.infrastructure.expression.CompiledExpr;
+import ai.conduit.gateway.infrastructure.expression.EvalEngine;
+import ai.conduit.gateway.infrastructure.expression.RootVar;
 import org.springframework.beans.factory.annotation.Autowired;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -47,6 +48,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.regex.Matcher;
 
 /**
  * Executes a dependency-wired {@link Plan} (populated {@code dependsOn} edges, topological order)
@@ -71,13 +73,13 @@ import java.util.function.Function;
 public class DagPlanExecutor {
 
     private static final Logger log = LoggerFactory.getLogger(DagPlanExecutor.class);
-    private static final JmesPath<JsonNode> JMES_PATH = new JacksonRuntime();
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final AgentHarness harness;
     private final Tracer tracer;
     private final MeterRegistry meterRegistry;
     private final TraceEventPublisher tracePublisher;
+    private final EvalEngine evalEngine;
     private final long overallDeadlineMs;
     private final int globalMapMaxItems;
     private final int globalMapMaxConcurrency;
@@ -87,7 +89,8 @@ public class DagPlanExecutor {
             Tracer tracer,
             MeterRegistry meterRegistry,
             @Value("${conduit.orchestration.fan-out-deadline-ms:60000}") long overallDeadlineMs) {
-        this(harness, tracer, meterRegistry, null, overallDeadlineMs, 100, 8);
+        this(harness, tracer, meterRegistry, null, overallDeadlineMs, 100, 8,
+                new ai.conduit.gateway.infrastructure.expression.CelEvalEngine(MAPPER));
     }
 
     @Autowired
@@ -98,11 +101,13 @@ public class DagPlanExecutor {
             TraceEventPublisher tracePublisher,
             @Value("${conduit.orchestration.fan-out-deadline-ms:60000}") long overallDeadlineMs,
             @Value("${conduit.orchestration.map.max-items:100}") int globalMapMaxItems,
-            @Value("${conduit.orchestration.map.max-concurrency:8}") int globalMapMaxConcurrency) {
+            @Value("${conduit.orchestration.map.max-concurrency:8}") int globalMapMaxConcurrency,
+            EvalEngine evalEngine) {
         this.harness = harness;
         this.tracer = tracer;
         this.meterRegistry = meterRegistry;
         this.tracePublisher = tracePublisher;
+        this.evalEngine = evalEngine;
         this.overallDeadlineMs = overallDeadlineMs;
         this.globalMapMaxItems = Math.max(1, globalMapMaxItems);
         this.globalMapMaxConcurrency = Math.max(1, globalMapMaxConcurrency);
@@ -364,8 +369,9 @@ public class DagPlanExecutor {
         AgentManifest.MapSpec map = node.agent().io().map();
         JsonNode collection;
         try {
-            collection = JMES_PATH.compile(map.over()).search(node.input());
-        } catch (Exception e) {
+            CompiledExpr over = evalEngine.compile(map.over(), RootVar.INPUT);
+            collection = evalEngine.eval(over, node.input(), EvalEngine.Mode.LENIENT);
+        } catch (RuntimeException e) {
             return new NodeResult(node.nodeId(), node.agent().agentId(), node.agent().protocol(),
                     NodeResult.Status.FAILED, null, elapsed(start),
                     "map.over evaluation failed: " + e.getMessage());
@@ -462,9 +468,11 @@ public class DagPlanExecutor {
         span.setAttribute("map.node_id", node.nodeId());
         span.setAttribute("map.index", index);
         try (Scope ignored = span.makeCurrent()) {
-            JsonNode itemInput = map.hasItemSelect()
-                    ? JMES_PATH.compile(map.itemSelect()).search(rawItem)
-                    : rawItem;
+            JsonNode itemInput = rawItem;
+            if (map.hasItemSelect()) {
+                CompiledExpr itemSelect = evalEngine.compile(map.itemSelect(), RootVar.ITEM);
+                itemInput = evalEngine.eval(itemSelect, rawItem, EvalEngine.Mode.LENIENT);
+            }
             PlanNode itemNode = new PlanNode(
                     node.nodeId() + "[" + index + "]",
                     node.agent(),
@@ -562,7 +570,8 @@ public class DagPlanExecutor {
         if (!node.hasCondition()) return null;
         String expression = node.condition();
         try {
-            JsonNode result = JMES_PATH.compile(expression).search(input);
+            CompiledExpr compiled = evalEngine.compile(expression, RootVar.INPUT);
+            JsonNode result = evalEngine.eval(compiled, input, EvalEngine.Mode.LENIENT);
             if (result == null || !result.isBoolean()) {
                 String reason = "condition did not evaluate to boolean";
                 publishCondition(node, expression, "error", reason, requestId, conversationId);
@@ -678,8 +687,9 @@ public class DagPlanExecutor {
         }
         JsonNode selected;
         try {
-            selected = JMES_PATH.compile(entity.select()).search(data);
-        } catch (Exception e) {
+            CompiledExpr sel = evalEngine.compile(entity.select(), RootVar.OUTPUT);
+            selected = evalEngine.eval(sel, data, EvalEngine.Mode.LENIENT);
+        } catch (RuntimeException e) {
             publishCoverageDeny(ctx, node, null, "invalid-entity-selector", requestId, conversationId);
             return new FilterOutcome(data, true);
         }
@@ -736,19 +746,29 @@ public class DagPlanExecutor {
         return ids;
     }
 
+    /**
+     * A produced-entity selector, in CEL dialect, has the canonical shape
+     * {@code output.<arrayPath>.map(<var>, <var>.<idField>)} (CEL's projection equivalent of
+     * JMESPath's {@code arrayPath[].idField}). Group 1 is the array path relative to {@code output};
+     * group 3 is the per-item id field. Back-reference {@code \2} pins the lambda variable so only a
+     * well-formed one-hop projection matches; anything else leaves the array un-prunable (fail-safe).
+     */
+    private static final java.util.regex.Pattern ENTITY_MAP_SELECT =
+            java.util.regex.Pattern.compile("^output\\.([\\w.]+)\\.map\\(\\s*(\\w+)\\s*,\\s*\\2\\.([\\w.]+)\\s*\\)$");
+
     private String arrayPathFromSelect(String select) {
-        int marker = select == null ? -1 : select.indexOf("[].");
-        if (marker <= 0) return null;
-        return select.substring(0, marker);
+        if (select == null) return null;
+        Matcher m = ENTITY_MAP_SELECT.matcher(select.trim());
+        return m.matches() ? m.group(1) : null;
     }
 
     private String itemSelectorFrom(String select) {
-        int marker = select == null ? -1 : select.indexOf("[].");
-        if (marker < 0) return null;
-        return select.substring(marker + 3);
+        if (select == null) return null;
+        Matcher m = ENTITY_MAP_SELECT.matcher(select.trim());
+        return m.matches() ? m.group(3) : null;
     }
 
-    private JsonNode pruneArrayByAllowedIds(JsonNode data, String arrayPath, String itemSelector, Set<String> allowed) {
+    private JsonNode pruneArrayByAllowedIds(JsonNode data, String arrayPath, String idField, Set<String> allowed) {
         JsonNode copy = data.deepCopy();
         JsonNode parent = copy;
         String[] segments = arrayPath.split("\\.");
@@ -759,14 +779,21 @@ public class DagPlanExecutor {
         if (!(parent instanceof ObjectNode objectParent)) return copy;
         JsonNode array = objectParent.path(field);
         if (!array.isArray()) return copy;
+        // The per-item id selector is evaluated against RootVar.ITEM (each element bound to `item`).
+        CompiledExpr itemIdSelector;
+        try {
+            itemIdSelector = evalEngine.compile("item." + idField, RootVar.ITEM);
+        } catch (RuntimeException e) {
+            return copy;   // un-prunable selector → fail-safe, leave the array intact
+        }
         ArrayNode filtered = MAPPER.createArrayNode();
         for (JsonNode item : array) {
             try {
-                JsonNode id = JMES_PATH.compile(itemSelector).search(item);
+                JsonNode id = evalEngine.eval(itemIdSelector, item, EvalEngine.Mode.LENIENT);
                 if (id != null && id.isTextual() && allowed.contains(id.asText())) {
                     filtered.add(item);
                 }
-            } catch (Exception ignored) {
+            } catch (RuntimeException ignored) {
                 // Invalid item projection was boot-validated for normal manifests; skip unsafe rows.
             }
         }

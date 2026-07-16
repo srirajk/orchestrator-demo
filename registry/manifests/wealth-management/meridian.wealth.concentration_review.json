@@ -95,10 +95,10 @@
       {
         "from": "wealth.concentration",
         "required": true,
-        "select": "{relationship_id: relationship_id, relationship_name: relationship_name, breach_count: breach_count, flags: flags, policy: policy}"
+        "select": "{'relationship_id': has(input.relationship_id) ? input.relationship_id : null, 'relationship_name': has(input.relationship_name) ? input.relationship_name : null, 'breach_count': has(input.breach_count) ? input.breach_count : null, 'flags': has(input.flags) ? input.flags : null, 'policy': has(input.policy) ? input.policy : null}"
       }
     ],
-    "condition": "breach_count > `0`",
+    "condition": "input.breach_count > 0",
     "produces": [
       {
         "name": "concentration_review",

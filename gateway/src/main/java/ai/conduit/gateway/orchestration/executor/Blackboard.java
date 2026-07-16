@@ -1,12 +1,14 @@
 package ai.conduit.gateway.orchestration.executor;
 
+import ai.conduit.gateway.infrastructure.expression.CelEvalEngine;
+import ai.conduit.gateway.infrastructure.expression.CompiledExpr;
+import ai.conduit.gateway.infrastructure.expression.EvalEngine;
+import ai.conduit.gateway.infrastructure.expression.RootVar;
 import ai.conduit.gateway.orchestration.model.PlanNode;
 import ai.conduit.gateway.registry.model.AgentManifest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import io.burt.jmespath.JmesPath;
-import io.burt.jmespath.jackson.JacksonRuntime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +46,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * </ol>
  *
  * <h2>Per-edge projection ({@code select}) and the pre-dispatch gate</h2>
- * A {@code from} edge may declare an optional {@code select} — a JMESPath expression that reshapes
+ * A {@code from} edge may declare an optional {@code select} — a CEL expression that reshapes
  * the producer's output into exactly what the consumer expects (field projection, not a blob
  * pass-through). No {@code select} = identity, i.e. exactly the behavior above, unchanged. Before a
  * bound node is released to the harness, {@link #checkComposable} runs a fail-safe gate: an upstream
@@ -53,7 +55,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * instead of ever dispatching a malformed request — never a 422 to the user, never a wrong number.
  *
  * <p><b>World B:</b> every symbol reasoned over here — produced type, produced name, entity key,
- * JMESPath expression, schema keyword — comes from the manifests/introspection at runtime and is
+ * CEL expression, schema keyword — comes from the manifests/introspection at runtime and is
  * matched/interpreted generically. This class embeds no domain vocabulary.
  *
  * <p>Thread-safe: {@link #project(PlanNode, JsonNode)} is called from parallel node-completion
@@ -64,8 +66,8 @@ public final class Blackboard {
 
     private static final Logger log = LoggerFactory.getLogger(Blackboard.class);
 
-    /** JMESPath engine over Jackson JsonNode — stateless/thread-safe, one instance for the JVM. */
-    private static final JmesPath<JsonNode> JMES_PATH = new JacksonRuntime();
+    /** Manifest-expression engine (CEL behind the {@link EvalEngine} seam) — stateless/thread-safe. */
+    private final EvalEngine evalEngine;
 
     private final ObjectMapper mapper;
 
@@ -82,9 +84,17 @@ public final class Blackboard {
     public Blackboard(Set<String> availableEntities,
                       Map<String, JsonNode> preBoundInputs,
                       ObjectMapper mapper) {
+        this(availableEntities, preBoundInputs, mapper, new CelEvalEngine(mapper));
+    }
+
+    public Blackboard(Set<String> availableEntities,
+                      Map<String, JsonNode> preBoundInputs,
+                      ObjectMapper mapper,
+                      EvalEngine evalEngine) {
         this.availableEntities = availableEntities == null ? Set.of() : Set.copyOf(availableEntities);
         this.preBoundInputs = preBoundInputs == null ? Map.of() : Map.copyOf(preBoundInputs);
         this.mapper = mapper;
+        this.evalEngine = evalEngine;
     }
 
     /** Entity keys already available (resolved entities). */
@@ -155,18 +165,20 @@ public final class Blackboard {
     }
 
     /**
-     * Apply the edge's declared {@code select} (a JMESPath expression) to reshape {@code raw} into
-     * exactly what the consumer expects. No {@code select} (or a null producer output) → identity
-     * (same reference) — the default, backward-compatible path. A malformed expression is treated
-     * as "could not project" (returns {@code null}, which {@link #checkComposable} then reports as
-     * a missing field) rather than throwing and taking the whole request down.
+     * Apply the edge's declared {@code select} (a CEL expression rooted at {@code input}) to reshape
+     * {@code raw} into exactly what the consumer expects. No {@code select} (or a null producer output)
+     * → identity (same reference) — the default, backward-compatible path. A malformed/failed
+     * projection is treated as "could not project" (returns {@code null}, which {@link #checkComposable}
+     * then reports as a missing field) rather than throwing and taking the whole request down.
      */
     private JsonNode projectEdge(AgentManifest.Consume c, JsonNode raw) {
         if (raw == null || c == null || !c.hasSelect()) return raw;
         try {
-            return JMES_PATH.compile(c.select()).search(raw);
-        } catch (Exception e) {
-            log.warn("JMESPath projection failed for select='{}': {}", c.select(), e.getMessage());
+            CompiledExpr compiled = evalEngine.compile(c.select(), RootVar.INPUT);
+            JsonNode projected = evalEngine.eval(compiled, raw, EvalEngine.Mode.LENIENT);
+            return (projected == null || projected.isMissingNode()) ? null : projected;
+        } catch (RuntimeException e) {
+            log.warn("edge projection failed for select='{}': {}", c.select(), e.getMessage());
             return null;
         }
     }

@@ -1,0 +1,35 @@
+{
+  "id" : "settlement_risk.f1",
+  "root" : "output",
+  "jmespath" : "failed_amount_usd",
+  "cel" : "has(output.failed_amount_usd) ? output.failed_amount_usd : null",
+  "cases" : [ {
+    "fixture" : 0,
+    "root" : {
+      "failed_amount_usd" : 2
+    },
+    "golden" : 2
+  }, {
+    "fixture" : 1,
+    "root" : { },
+    "golden" : null
+  }, {
+    "fixture" : 2,
+    "root" : {
+      "failed_amount_usd" : 2
+    },
+    "golden" : 2
+  }, {
+    "fixture" : 3,
+    "root" : {
+      "failed_amount_usd" : 2.5
+    },
+    "golden" : 2.5
+  }, {
+    "fixture" : 4,
+    "root" : {
+      "failed_amount_usd" : null
+    },
+    "golden" : null
+  } ]
+}

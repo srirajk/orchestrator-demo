@@ -1,11 +1,12 @@
 package ai.conduit.gateway.synthesis.answer;
 
+import ai.conduit.gateway.infrastructure.expression.CompiledExpr;
+import ai.conduit.gateway.infrastructure.expression.EvalEngine;
+import ai.conduit.gateway.infrastructure.expression.RootVar;
 import ai.conduit.gateway.orchestration.model.NodeResult;
 import ai.conduit.gateway.registry.model.AgentManifest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.burt.jmespath.JmesPath;
-import io.burt.jmespath.jackson.JacksonRuntime;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -23,12 +24,17 @@ import java.util.function.Function;
 @Component
 public class GroundedFigureRenderer {
 
-    private static final JmesPath<JsonNode> JMES_PATH = new JacksonRuntime();
-
     private final ObjectMapper mapper;
+    private final EvalEngine evalEngine;
 
     public GroundedFigureRenderer(ObjectMapper mapper) {
+        this(mapper, new ai.conduit.gateway.infrastructure.expression.CelEvalEngine(mapper));
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public GroundedFigureRenderer(ObjectMapper mapper, EvalEngine evalEngine) {
         this.mapper = mapper;
+        this.evalEngine = evalEngine;
     }
 
     public List<GroundedFigure> render(List<NodeResult> results,
@@ -58,7 +64,13 @@ public class GroundedFigureRenderer {
                                     JsonNode data,
                                     int index) {
         if (figure == null || data == null || figure.path() == null || figure.path().isBlank()) return null;
-        JsonNode selected = JMES_PATH.compile(figure.path()).search(data);
+        JsonNode selected;
+        try {
+            CompiledExpr path = evalEngine.compile(figure.path(), RootVar.OUTPUT);
+            selected = evalEngine.eval(path, data, EvalEngine.Mode.LENIENT);
+        } catch (RuntimeException e) {
+            return null;   // a failed/invalid figure path → figure skipped (fail-safe, unchanged behavior)
+        }
         if (selected == null || selected.isMissingNode() || selected.isNull()) return null;
         String rendered = format(selected, figure.format());
         String placeholder = "{{figure_" + index + "_" + slug(figure.label()) + "}}";

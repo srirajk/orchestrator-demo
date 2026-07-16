@@ -1,0 +1,81 @@
+{
+  "id" : "settlement_risk.s3",
+  "root" : "input",
+  "jmespath" : "{relationship_id: relationship_id, balances: balances, projected_cash_usd: projected_cash_usd, note: note, as_of_date: as_of_date}",
+  "cel" : "{'relationship_id': has(input.relationship_id) ? input.relationship_id : null, 'balances': has(input.balances) ? input.balances : null, 'projected_cash_usd': has(input.projected_cash_usd) ? input.projected_cash_usd : null, 'note': has(input.note) ? input.note : null, 'as_of_date': has(input.as_of_date) ? input.as_of_date : null}",
+  "cases" : [ {
+    "fixture" : 0,
+    "root" : {
+      "relationship_id" : 2,
+      "balances" : 2,
+      "projected_cash_usd" : 2,
+      "note" : 2,
+      "as_of_date" : 2
+    },
+    "golden" : {
+      "relationship_id" : 2,
+      "balances" : 2,
+      "projected_cash_usd" : 2,
+      "note" : 2,
+      "as_of_date" : 2
+    }
+  }, {
+    "fixture" : 1,
+    "root" : { },
+    "golden" : {
+      "relationship_id" : null,
+      "balances" : null,
+      "projected_cash_usd" : null,
+      "note" : null,
+      "as_of_date" : null
+    }
+  }, {
+    "fixture" : 2,
+    "root" : {
+      "relationship_id" : 2,
+      "balances" : 2,
+      "projected_cash_usd" : 2,
+      "note" : 2,
+      "as_of_date" : 2
+    },
+    "golden" : {
+      "relationship_id" : 2,
+      "balances" : 2,
+      "projected_cash_usd" : 2,
+      "note" : 2,
+      "as_of_date" : 2
+    }
+  }, {
+    "fixture" : 3,
+    "root" : {
+      "relationship_id" : 2.5,
+      "balances" : 2.5,
+      "projected_cash_usd" : 2.5,
+      "note" : 2.5,
+      "as_of_date" : 2.5
+    },
+    "golden" : {
+      "relationship_id" : 2.5,
+      "balances" : 2.5,
+      "projected_cash_usd" : 2.5,
+      "note" : 2.5,
+      "as_of_date" : 2.5
+    }
+  }, {
+    "fixture" : 4,
+    "root" : {
+      "relationship_id" : null,
+      "balances" : null,
+      "projected_cash_usd" : null,
+      "note" : null,
+      "as_of_date" : null
+    },
+    "golden" : {
+      "relationship_id" : null,
+      "balances" : null,
+      "projected_cash_usd" : null,
+      "note" : null,
+      "as_of_date" : null
+    }
+  } ]
+}

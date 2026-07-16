@@ -59,20 +59,48 @@
   "output_schema": {
     "type": "object",
     "properties": {
-      "trade_id": { "type": "string" },
-      "security": { "type": "string" },
-      "isin": { "type": "string" },
-      "settle_date": { "type": "string" },
-      "as_of_date": { "type": "string" },
-      "amount": { "type": "number" },
-      "side": { "type": "string" },
-      "reason": { "type": "string" },
-      "age_days": { "type": "integer" },
-      "csdr_daily_penalty_bps": { "type": "number" },
-      "estimated_daily_penalty_usd": { "type": "number" },
-      "estimated_accrued_penalty_usd": { "type": "number" },
-      "mandatory_buy_in_active": { "type": "boolean" },
-      "agent_narrative": { "type": "string" }
+      "trade_id": {
+        "type": "string"
+      },
+      "security": {
+        "type": "string"
+      },
+      "isin": {
+        "type": "string"
+      },
+      "settle_date": {
+        "type": "string"
+      },
+      "as_of_date": {
+        "type": "string"
+      },
+      "amount": {
+        "type": "number"
+      },
+      "side": {
+        "type": "string"
+      },
+      "reason": {
+        "type": "string"
+      },
+      "age_days": {
+        "type": "integer"
+      },
+      "csdr_daily_penalty_bps": {
+        "type": "number"
+      },
+      "estimated_daily_penalty_usd": {
+        "type": "number"
+      },
+      "estimated_accrued_penalty_usd": {
+        "type": "number"
+      },
+      "mandatory_buy_in_active": {
+        "type": "boolean"
+      },
+      "agent_narrative": {
+        "type": "string"
+      }
     },
     "required": [
       "trade_id",
@@ -93,17 +121,20 @@
       {
         "from": "servicing.settlement_status",
         "required": true,
-        "select": "{failed: failed}"
+        "select": "{'failed': has(input.failed) ? input.failed : null}"
       }
     ],
     "map": {
-      "over": "failed",
-      "item_select": "{trade_id: trade_id, security: security, isin: isin, settle_date: settle_date, amount: amount, side: side, as_of_date: as_of_date, reason: reason, fail_item: fail_item}",
+      "over": "input.failed",
+      "item_select": "{'trade_id': has(item.trade_id) ? item.trade_id : null, 'security': has(item.security) ? item.security : null, 'isin': has(item.isin) ? item.isin : null, 'settle_date': has(item.settle_date) ? item.settle_date : null, 'amount': has(item.amount) ? item.amount : null, 'side': has(item.side) ? item.side : null, 'as_of_date': has(item.as_of_date) ? item.as_of_date : null, 'reason': has(item.reason) ? item.reason : null, 'fail_item': has(item.fail_item) ? item.fail_item : null}",
       "max_items": 2,
       "max_concurrency": 2
     },
     "produces": [
-      { "name": "trade_penalties", "type": "servicing.trade_penalties" }
+      {
+        "name": "trade_penalties",
+        "type": "servicing.trade_penalties"
+      }
     ]
   }
 }
