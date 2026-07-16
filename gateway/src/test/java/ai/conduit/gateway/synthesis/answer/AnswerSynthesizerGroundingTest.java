@@ -28,7 +28,7 @@ class AnswerSynthesizerGroundingTest {
         return new AnswerSynthesizer(
                 new ObjectMapper(), null, null, null, null, new SimpleMeterRegistry(), prompts(), null,
                 "http://unused", "", "test-model", false, "Meridian", "test context",
-                1, 1, 1, 5, 5);
+                1, 1, 1, "429,502,503,504", 5, 5);
     }
 
     /** Loads the real prompt resources from the test classpath (mirrors production wiring). */
