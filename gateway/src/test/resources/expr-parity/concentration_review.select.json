@@ -1,0 +1,81 @@
+{
+  "id" : "concentration_review.select",
+  "root" : "input",
+  "jmespath" : "{relationship_id: relationship_id, relationship_name: relationship_name, breach_count: breach_count, flags: flags, policy: policy}",
+  "cel" : "{'relationship_id': has(input.relationship_id) ? input.relationship_id : null, 'relationship_name': has(input.relationship_name) ? input.relationship_name : null, 'breach_count': has(input.breach_count) ? input.breach_count : null, 'flags': has(input.flags) ? input.flags : null, 'policy': has(input.policy) ? input.policy : null}",
+  "cases" : [ {
+    "fixture" : 0,
+    "root" : {
+      "relationship_id" : 2,
+      "relationship_name" : 2,
+      "breach_count" : 2,
+      "flags" : 2,
+      "policy" : 2
+    },
+    "golden" : {
+      "relationship_id" : 2,
+      "relationship_name" : 2,
+      "breach_count" : 2,
+      "flags" : 2,
+      "policy" : 2
+    }
+  }, {
+    "fixture" : 1,
+    "root" : { },
+    "golden" : {
+      "relationship_id" : null,
+      "relationship_name" : null,
+      "breach_count" : null,
+      "flags" : null,
+      "policy" : null
+    }
+  }, {
+    "fixture" : 2,
+    "root" : {
+      "relationship_id" : 2,
+      "relationship_name" : 2,
+      "breach_count" : 2,
+      "flags" : 2,
+      "policy" : 2
+    },
+    "golden" : {
+      "relationship_id" : 2,
+      "relationship_name" : 2,
+      "breach_count" : 2,
+      "flags" : 2,
+      "policy" : 2
+    }
+  }, {
+    "fixture" : 3,
+    "root" : {
+      "relationship_id" : 2.5,
+      "relationship_name" : 2.5,
+      "breach_count" : 2.5,
+      "flags" : 2.5,
+      "policy" : 2.5
+    },
+    "golden" : {
+      "relationship_id" : 2.5,
+      "relationship_name" : 2.5,
+      "breach_count" : 2.5,
+      "flags" : 2.5,
+      "policy" : 2.5
+    }
+  }, {
+    "fixture" : 4,
+    "root" : {
+      "relationship_id" : null,
+      "relationship_name" : null,
+      "breach_count" : null,
+      "flags" : null,
+      "policy" : null
+    },
+    "golden" : {
+      "relationship_id" : null,
+      "relationship_name" : null,
+      "breach_count" : null,
+      "flags" : null,
+      "policy" : null
+    }
+  } ]
+}

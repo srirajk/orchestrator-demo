@@ -1,0 +1,39 @@
+{
+  "id" : "concentration.f3",
+  "root" : "output",
+  "jmespath" : "diversification.hhi",
+  "cel" : "has(output.diversification) && has(output.diversification.hhi) ? output.diversification.hhi : null",
+  "cases" : [ {
+    "fixture" : 0,
+    "root" : {
+      "diversification" : {
+        "hhi" : 2
+      }
+    },
+    "golden" : 2
+  }, {
+    "fixture" : 1,
+    "root" : { },
+    "golden" : null
+  }, {
+    "fixture" : 2,
+    "root" : {
+      "diversification" : { }
+    },
+    "golden" : null
+  }, {
+    "fixture" : 3,
+    "root" : {
+      "diversification" : {
+        "hhi" : 2.5
+      }
+    },
+    "golden" : 2.5
+  }, {
+    "fixture" : 4,
+    "root" : {
+      "diversification" : null
+    },
+    "golden" : null
+  } ]
+}

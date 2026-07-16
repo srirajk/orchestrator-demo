@@ -1,0 +1,63 @@
+{
+  "id" : "settlement_risk.s2",
+  "root" : "input",
+  "jmespath" : "{relationship_id: relationship_id, holdings_by_custodian: holdings_by_custodian, as_of_date: as_of_date}",
+  "cel" : "{'relationship_id': has(input.relationship_id) ? input.relationship_id : null, 'holdings_by_custodian': has(input.holdings_by_custodian) ? input.holdings_by_custodian : null, 'as_of_date': has(input.as_of_date) ? input.as_of_date : null}",
+  "cases" : [ {
+    "fixture" : 0,
+    "root" : {
+      "relationship_id" : 2,
+      "holdings_by_custodian" : 2,
+      "as_of_date" : 2
+    },
+    "golden" : {
+      "relationship_id" : 2,
+      "holdings_by_custodian" : 2,
+      "as_of_date" : 2
+    }
+  }, {
+    "fixture" : 1,
+    "root" : { },
+    "golden" : {
+      "relationship_id" : null,
+      "holdings_by_custodian" : null,
+      "as_of_date" : null
+    }
+  }, {
+    "fixture" : 2,
+    "root" : {
+      "relationship_id" : 2,
+      "holdings_by_custodian" : 2,
+      "as_of_date" : 2
+    },
+    "golden" : {
+      "relationship_id" : 2,
+      "holdings_by_custodian" : 2,
+      "as_of_date" : 2
+    }
+  }, {
+    "fixture" : 3,
+    "root" : {
+      "relationship_id" : 2.5,
+      "holdings_by_custodian" : 2.5,
+      "as_of_date" : 2.5
+    },
+    "golden" : {
+      "relationship_id" : 2.5,
+      "holdings_by_custodian" : 2.5,
+      "as_of_date" : 2.5
+    }
+  }, {
+    "fixture" : 4,
+    "root" : {
+      "relationship_id" : null,
+      "holdings_by_custodian" : null,
+      "as_of_date" : null
+    },
+    "golden" : {
+      "relationship_id" : null,
+      "holdings_by_custodian" : null,
+      "as_of_date" : null
+    }
+  } ]
+}

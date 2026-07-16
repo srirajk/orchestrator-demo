@@ -1,0 +1,39 @@
+{
+  "id" : "concentration.f4",
+  "root" : "output",
+  "jmespath" : "policy.single_name_threshold_pct",
+  "cel" : "has(output.policy) && has(output.policy.single_name_threshold_pct) ? output.policy.single_name_threshold_pct : null",
+  "cases" : [ {
+    "fixture" : 0,
+    "root" : {
+      "policy" : {
+        "single_name_threshold_pct" : 2
+      }
+    },
+    "golden" : 2
+  }, {
+    "fixture" : 1,
+    "root" : { },
+    "golden" : null
+  }, {
+    "fixture" : 2,
+    "root" : {
+      "policy" : { }
+    },
+    "golden" : null
+  }, {
+    "fixture" : 3,
+    "root" : {
+      "policy" : {
+        "single_name_threshold_pct" : 2.5
+      }
+    },
+    "golden" : 2.5
+  }, {
+    "fixture" : 4,
+    "root" : {
+      "policy" : null
+    },
+    "golden" : null
+  } ]
+}

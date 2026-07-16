@@ -1,0 +1,35 @@
+{
+  "id" : "settlement_risk.f3",
+  "root" : "output",
+  "jmespath" : "breach_count",
+  "cel" : "has(output.breach_count) ? output.breach_count : null",
+  "cases" : [ {
+    "fixture" : 0,
+    "root" : {
+      "breach_count" : 2
+    },
+    "golden" : 2
+  }, {
+    "fixture" : 1,
+    "root" : { },
+    "golden" : null
+  }, {
+    "fixture" : 2,
+    "root" : {
+      "breach_count" : 2
+    },
+    "golden" : 2
+  }, {
+    "fixture" : 3,
+    "root" : {
+      "breach_count" : 2.5
+    },
+    "golden" : 2.5
+  }, {
+    "fixture" : 4,
+    "root" : {
+      "breach_count" : null
+    },
+    "golden" : null
+  } ]
+}

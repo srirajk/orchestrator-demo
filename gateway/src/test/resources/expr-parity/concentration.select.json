@@ -1,0 +1,108 @@
+{
+  "id" : "concentration.select",
+  "root" : "input",
+  "jmespath" : "{positions: positions, total_value: total_value, allocation_by_class: allocation_by_class, relationship_id: relationship_id, relationship_name: relationship_name, currency: currency, as_of_date: as_of_date, risk_profile: risk_profile}",
+  "cel" : "{'positions': has(input.positions) ? input.positions : null, 'total_value': has(input.total_value) ? input.total_value : null, 'allocation_by_class': has(input.allocation_by_class) ? input.allocation_by_class : null, 'relationship_id': has(input.relationship_id) ? input.relationship_id : null, 'relationship_name': has(input.relationship_name) ? input.relationship_name : null, 'currency': has(input.currency) ? input.currency : null, 'as_of_date': has(input.as_of_date) ? input.as_of_date : null, 'risk_profile': has(input.risk_profile) ? input.risk_profile : null}",
+  "cases" : [ {
+    "fixture" : 0,
+    "root" : {
+      "positions" : 2,
+      "total_value" : 2,
+      "allocation_by_class" : 2,
+      "relationship_id" : 2,
+      "relationship_name" : 2,
+      "currency" : 2,
+      "as_of_date" : 2,
+      "risk_profile" : 2
+    },
+    "golden" : {
+      "positions" : 2,
+      "total_value" : 2,
+      "allocation_by_class" : 2,
+      "relationship_id" : 2,
+      "relationship_name" : 2,
+      "currency" : 2,
+      "as_of_date" : 2,
+      "risk_profile" : 2
+    }
+  }, {
+    "fixture" : 1,
+    "root" : { },
+    "golden" : {
+      "positions" : null,
+      "total_value" : null,
+      "allocation_by_class" : null,
+      "relationship_id" : null,
+      "relationship_name" : null,
+      "currency" : null,
+      "as_of_date" : null,
+      "risk_profile" : null
+    }
+  }, {
+    "fixture" : 2,
+    "root" : {
+      "positions" : 2,
+      "total_value" : 2,
+      "allocation_by_class" : 2,
+      "relationship_id" : 2,
+      "relationship_name" : 2,
+      "currency" : 2,
+      "as_of_date" : 2,
+      "risk_profile" : 2
+    },
+    "golden" : {
+      "positions" : 2,
+      "total_value" : 2,
+      "allocation_by_class" : 2,
+      "relationship_id" : 2,
+      "relationship_name" : 2,
+      "currency" : 2,
+      "as_of_date" : 2,
+      "risk_profile" : 2
+    }
+  }, {
+    "fixture" : 3,
+    "root" : {
+      "positions" : 2.5,
+      "total_value" : 2.5,
+      "allocation_by_class" : 2.5,
+      "relationship_id" : 2.5,
+      "relationship_name" : 2.5,
+      "currency" : 2.5,
+      "as_of_date" : 2.5,
+      "risk_profile" : 2.5
+    },
+    "golden" : {
+      "positions" : 2.5,
+      "total_value" : 2.5,
+      "allocation_by_class" : 2.5,
+      "relationship_id" : 2.5,
+      "relationship_name" : 2.5,
+      "currency" : 2.5,
+      "as_of_date" : 2.5,
+      "risk_profile" : 2.5
+    }
+  }, {
+    "fixture" : 4,
+    "root" : {
+      "positions" : null,
+      "total_value" : null,
+      "allocation_by_class" : null,
+      "relationship_id" : null,
+      "relationship_name" : null,
+      "currency" : null,
+      "as_of_date" : null,
+      "risk_profile" : null
+    },
+    "golden" : {
+      "positions" : null,
+      "total_value" : null,
+      "allocation_by_class" : null,
+      "relationship_id" : null,
+      "relationship_name" : null,
+      "currency" : null,
+      "as_of_date" : null,
+      "risk_profile" : null
+    }
+  } ]
+}

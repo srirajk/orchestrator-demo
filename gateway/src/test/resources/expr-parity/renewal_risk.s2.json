@@ -1,0 +1,90 @@
+{
+  "id" : "renewal_risk.s2",
+  "root" : "input",
+  "jmespath" : "{policy_id: policy_id, claim_count: claim_count, claims: claims, claim_id: claim_id, amount: amount, status: status}",
+  "cel" : "{'policy_id': has(input.policy_id) ? input.policy_id : null, 'claim_count': has(input.claim_count) ? input.claim_count : null, 'claims': has(input.claims) ? input.claims : null, 'claim_id': has(input.claim_id) ? input.claim_id : null, 'amount': has(input.amount) ? input.amount : null, 'status': has(input.status) ? input.status : null}",
+  "cases" : [ {
+    "fixture" : 0,
+    "root" : {
+      "policy_id" : 2,
+      "claim_count" : 2,
+      "claims" : 2,
+      "claim_id" : 2,
+      "amount" : 2,
+      "status" : 2
+    },
+    "golden" : {
+      "policy_id" : 2,
+      "claim_count" : 2,
+      "claims" : 2,
+      "claim_id" : 2,
+      "amount" : 2,
+      "status" : 2
+    }
+  }, {
+    "fixture" : 1,
+    "root" : { },
+    "golden" : {
+      "policy_id" : null,
+      "claim_count" : null,
+      "claims" : null,
+      "claim_id" : null,
+      "amount" : null,
+      "status" : null
+    }
+  }, {
+    "fixture" : 2,
+    "root" : {
+      "policy_id" : 2,
+      "claim_count" : 2,
+      "claims" : 2,
+      "claim_id" : 2,
+      "amount" : 2,
+      "status" : 2
+    },
+    "golden" : {
+      "policy_id" : 2,
+      "claim_count" : 2,
+      "claims" : 2,
+      "claim_id" : 2,
+      "amount" : 2,
+      "status" : 2
+    }
+  }, {
+    "fixture" : 3,
+    "root" : {
+      "policy_id" : 2.5,
+      "claim_count" : 2.5,
+      "claims" : 2.5,
+      "claim_id" : 2.5,
+      "amount" : 2.5,
+      "status" : 2.5
+    },
+    "golden" : {
+      "policy_id" : 2.5,
+      "claim_count" : 2.5,
+      "claims" : 2.5,
+      "claim_id" : 2.5,
+      "amount" : 2.5,
+      "status" : 2.5
+    }
+  }, {
+    "fixture" : 4,
+    "root" : {
+      "policy_id" : null,
+      "claim_count" : null,
+      "claims" : null,
+      "claim_id" : null,
+      "amount" : null,
+      "status" : null
+    },
+    "golden" : {
+      "policy_id" : null,
+      "claim_count" : null,
+      "claims" : null,
+      "claim_id" : null,
+      "amount" : null,
+      "status" : null
+    }
+  } ]
+}

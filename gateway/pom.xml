@@ -118,7 +118,17 @@
             <version>2.1.22</version>
         </dependency>
 
-        <!-- ── JMESPath (per-edge dataflow projection — Blackboard field mapping) ── -->
+        <!-- ── CEL (Common Expression Language) — manifest-expression engine behind EvalEngine.
+             Replaces the archived, Jackson-2-pinned io.burt:jmespath-jackson. cel-tools has NO Jackson
+             dependency: that decoupling is the whole point (it removes the last Boot-4 blocker). ── -->
+        <dependency>
+            <groupId>org.projectnessie.cel</groupId>
+            <artifactId>cel-tools</artifactId>
+            <version>0.6.1</version>
+        </dependency>
+
+        <!-- ── JMESPath — retained only for EngineParityTest (CEL-vs-JMESPath golden parity proof).
+             Not on the request path; see F2 CEL migration. Moves to test scope once call sites migrate. ── -->
         <dependency>
             <groupId>io.burt</groupId>
             <artifactId>jmespath-jackson</artifactId>

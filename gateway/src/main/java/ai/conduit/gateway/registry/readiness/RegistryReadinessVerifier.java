@@ -1,5 +1,6 @@
 package ai.conduit.gateway.registry.readiness;
 
+import ai.conduit.gateway.infrastructure.expression.ExpressionDialect;
 import ai.conduit.gateway.registry.embedding.QueryEmbedder;
 import ai.conduit.gateway.registry.index.VectorIndex;
 import ai.conduit.gateway.registry.service.AgentRegistry;
@@ -83,6 +84,30 @@ public class RegistryReadinessVerifier {
                     + REMEDY);
         }
 
-        log.info("Registry ready — {} agent(s) indexed by model '{}'", agents, stamped);
+        verifyExprDialect();
+
+        log.info("Registry ready — {} agent(s) indexed by model '{}', expression dialect '{}'",
+                agents, stamped, ExpressionDialect.CURRENT);
+    }
+
+    /**
+     * Refuse to start on a manifest-expression dialect skew. Manifest expressions are a language; if
+     * the registry ingested them in one dialect and this gateway evaluates in another, every
+     * expression mis-evaluates. Same failure mode as the embedding-model stamp, different axis.
+     */
+    private void verifyExprDialect() {
+        String stampedDialect = vectorIndex.stampedExprDialect();
+        String currentDialect = ExpressionDialect.CURRENT;
+        if (stampedDialect == null) {
+            throw new IllegalStateException(
+                    "The routing index carries no expression-dialect stamp, so it cannot be shown to have "
+                    + "been ingested in the dialect this gateway evaluates (" + currentDialect + "). " + REMEDY);
+        }
+        if (!stampedDialect.equals(currentDialect)) {
+            throw new IllegalStateException(
+                    "The routing index was ingested in expression dialect '" + stampedDialect
+                    + "' but this gateway evaluates manifest expressions in '" + currentDialect
+                    + "'. Every select/condition/map/figure expression would mis-evaluate. " + REMEDY);
+        }
     }
 }
