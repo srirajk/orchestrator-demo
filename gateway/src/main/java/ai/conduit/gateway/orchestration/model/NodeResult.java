@@ -1,5 +1,6 @@
 package ai.conduit.gateway.orchestration.model;
 
+import ai.conduit.gateway.adapter.PayloadHandle;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -10,6 +11,15 @@ import com.fasterxml.jackson.databind.JsonNode;
  * <p>The status field categorises the outcome; callers should always check
  * {@link #isOk()} before reading {@code data}.  A NodeResult is always produced —
  * the harness never propagates an exception to the executor.
+ *
+ * <p><b>F4 provenance seam.</b> The 8th component {@code payload} is the {@link PayloadHandle} for this
+ * node's output — {@link PayloadHandle.Inline} in the normal case, a content-addressed
+ * {@link PayloadHandle.Ref} when the adapter spilled to the claim-check store. It is {@code @JsonIgnore}:
+ * the sealed handle NEVER flows into the trace/insight serializers (audit gets an explicit flat view,
+ * {@code PayloadAuditView}). {@link #data()} is unchanged — it still returns the identical in-memory
+ * stamped tree, so every existing consumer is bit-for-bit unaffected. The 7-arg compat constructor
+ * wraps {@code data} in an {@code Inline} with ZERO hashing and ZERO copy, so every existing
+ * construction compiles and pays no CPU.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record NodeResult(
@@ -19,8 +29,20 @@ public record NodeResult(
         Status status,
         JsonNode data,        // non-null only when status == OK
         long latencyMs,
-        String errorMessage   // non-null only when status != OK
+        String errorMessage,  // non-null only when status != OK
+        @JsonIgnore PayloadHandle payload   // F4: provenance handle; never serialized
 ) {
+
+    /**
+     * Backward-compatible 7-arg constructor. Wraps {@code data} in an adapter-provenance
+     * {@link PayloadHandle.Inline} (reference wrap — no hashing, no serialization, no copy), so all
+     * existing constructions and tests compile untouched and pay zero request-path CPU.
+     */
+    public NodeResult(String nodeId, String agentId, String protocol, Status status,
+                      JsonNode data, long latencyMs, String errorMessage) {
+        this(nodeId, agentId, protocol, status, data, latencyMs, errorMessage,
+                data == null ? null : new PayloadHandle.Inline(data));
+    }
 
     public enum Status {
         /** Agent call succeeded and returned usable data. */

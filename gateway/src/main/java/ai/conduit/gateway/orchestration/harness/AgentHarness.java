@@ -1,5 +1,6 @@
 package ai.conduit.gateway.orchestration.harness;
 
+import ai.conduit.gateway.adapter.PayloadHandle;
 import ai.conduit.gateway.adapter.ProtocolAdapter;
 import ai.conduit.gateway.infrastructure.faults.FaultInjector;
 import ai.conduit.gateway.orchestration.model.NodeResult;
@@ -214,7 +215,7 @@ public class AgentHarness {
         // Submit to the virtual-thread executor. The virtual thread parks on
         // executing.acquire() — it unmounts from its carrier, freeing the OS thread
         // for other work. This is the correct pattern: no platform thread pool needed.
-        Future<JsonNode> future = vtExecutor.submit(() -> {
+        Future<PayloadHandle> future = vtExecutor.submit(() -> {
             if (mdcContext != null) MDC.setContextMap(mdcContext);
             try {
                 // Phase 1: leave the queue. Whether we successfully acquire an executing
@@ -227,6 +228,9 @@ public class AgentHarness {
                     queued.release();     // free the queue permit deterministically
                 }
                 // Phase 2: executing slot is held — run the call and release it on the way out.
+                // F4: invokeHandle (not invoke) — the adapter returns a provenance PayloadHandle; the
+                // (opt-in) synchronous claim-check spill runs INSIDE this submitted callable, so a slow
+                // put is bounded by the same node SLA (future.get(slaMs)) and bulkhead as every agent touch.
                 try {
                     return CircuitBreaker.decorateCallable(cb,
                             () -> {
@@ -235,7 +239,17 @@ public class AgentHarness {
                                 // ExecutionException path below → NodeResult.FAILED. execute() still
                                 // never throws. No-op (and no branch) in every normal context.
                                 faultInjector.at(FP_BEFORE_INVOKE);
-                                return adapter.invoke(node.agent(), node.input(), callerToken);
+                                PayloadHandle handle =
+                                        adapter.invokeHandle(node.agent(), node.input(), callerToken);
+                                // Fallback for adapters that don't implement claim-check semantics: the SOLE
+                                // ProtocolAdapter.invoke() call lives HERE, inside the harness funnel — so the
+                                // architecture rule (only the harness calls invoke) stays true, and there is
+                                // exactly one outbound call (invokeHandle returned null WITHOUT invoking).
+                                if (handle == null) {
+                                    JsonNode data = adapter.invoke(node.agent(), node.input(), callerToken);
+                                    handle = data == null ? null : new PayloadHandle.Inline(data);
+                                }
+                                return handle;
                             }).call();
                 } finally {
                     executing.release();
@@ -246,11 +260,13 @@ public class AgentHarness {
         });
 
         try {
-            JsonNode data = future.get(slaMs, TimeUnit.MILLISECONDS);
+            PayloadHandle payload = future.get(slaMs, TimeUnit.MILLISECONDS);
+            // v1: the handle always carries the in-memory stamped tree — data() is bit-for-bit as before.
+            JsonNode data = payload == null ? null : payload.tree();
             long latency = System.currentTimeMillis() - start;
             log.debug("Agent {} OK in {}ms", agentId, latency);
             NodeResult okResult = new NodeResult(node.nodeId(), agentId, agent.protocol(),
-                    NodeResult.Status.OK, data, latency, null);
+                    NodeResult.Status.OK, data, latency, null, payload);
             emitCallCounter(agentId, agent.protocol(), okResult.status().name());
             emitLatencyTimer(agentId, agent.protocol(), latency);
             return okResult;

@@ -706,8 +706,23 @@ public class DagPlanExecutor {
                 filtered = outcome.data();
             }
         }
+        // No produced entity was pruned → the tree is untouched; keep the ORIGINAL payload handle
+        // (which may be a spilled Ref) so provenance/audit reflect the adapter output verbatim.
+        if (filtered == result.data()) {
+            return result;
+        }
+        // F4 §3e: a coverage-denied produced entity was filtered out. The NodeResult is rebuilt with a
+        // DERIVED Inline over the FILTERED tree — the audit hash always covers what actually grounded the
+        // answer. Any pre-filter spilled Ref is DROPPED here (never projected downstream); it survives only
+        // as parent_sha256 lineage, so coverage cannot be bypassed via the spill path. No hashing on this
+        // request-path step: the parent sha is taken from the pre-existing Ref when present, else null.
+        String parentSha = (result.payload() instanceof ai.conduit.gateway.adapter.PayloadHandle.Ref ref)
+                ? ref.sha256() : null;
+        ai.conduit.gateway.adapter.PayloadHandle derived =
+                new ai.conduit.gateway.adapter.PayloadHandle.Inline(filtered,
+                        ai.conduit.gateway.adapter.PayloadHandle.Provenance.DERIVED, parentSha);
         return new NodeResult(result.nodeId(), result.agentId(), result.protocol(), result.status(),
-                filtered, result.latencyMs(), result.errorMessage());
+                filtered, result.latencyMs(), result.errorMessage(), derived);
     }
 
     private FilterOutcome filterOneProducedEntity(PlanNode node,

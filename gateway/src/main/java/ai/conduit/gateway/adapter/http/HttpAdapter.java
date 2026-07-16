@@ -1,6 +1,8 @@
 package ai.conduit.gateway.adapter.http;
 
+import ai.conduit.gateway.adapter.PayloadHandle;
 import ai.conduit.gateway.adapter.ProtocolAdapter;
+import ai.conduit.gateway.infrastructure.payload.PayloadSpiller;
 import ai.conduit.gateway.registry.model.AgentManifest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -58,15 +60,31 @@ public class HttpAdapter implements ProtocolAdapter {
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
+    private final PayloadSpiller payloadSpiller;
 
-    public HttpAdapter(RestClient agentRestClient, ObjectMapper objectMapper) {
+    public HttpAdapter(RestClient agentRestClient, ObjectMapper objectMapper, PayloadSpiller payloadSpiller) {
         this.restClient = agentRestClient;
         this.objectMapper = objectMapper;
+        this.payloadSpiller = payloadSpiller;
     }
 
     @Override
     public String protocol() {
         return "http";
+    }
+
+    /**
+     * F4: wrap the stamped response in a {@link PayloadHandle}. The stamped tree is produced by
+     * {@link #invoke} (identical to before); the spill decision (threshold-crossed → content-addressed
+     * {@code Ref}, else {@code Inline}) is delegated to {@link PayloadSpiller}. Runs inside the harness's
+     * submitted callable, so a synchronous store.put is bounded by the node SLA. On spill failure the
+     * spiller keeps {@code Inline} + WARN + counter; {@code data()} always keeps the already-parsed tree.
+     */
+    @Override
+    public PayloadHandle invokeHandle(AgentManifest manifest, JsonNode input, String bearerToken)
+            throws Exception {
+        JsonNode stamped = invoke(manifest, input, bearerToken);
+        return payloadSpiller.handleFor(stamped, PayloadHandle.Provenance.ADAPTER);
     }
 
     @Override

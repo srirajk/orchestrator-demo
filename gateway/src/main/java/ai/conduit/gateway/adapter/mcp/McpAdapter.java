@@ -1,6 +1,8 @@
 package ai.conduit.gateway.adapter.mcp;
 
+import ai.conduit.gateway.adapter.PayloadHandle;
 import ai.conduit.gateway.adapter.ProtocolAdapter;
+import ai.conduit.gateway.infrastructure.payload.PayloadSpiller;
 import ai.conduit.gateway.registry.model.AgentManifest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -101,13 +103,19 @@ public class McpAdapter implements ProtocolAdapter {
     // initialize and the tools/call share it). Config, not a Java constant (World B / §5).
     private final int defaultTimeoutMs;
 
+    // F4: the spill decision for fetched-resource content. Nullable only in the response-parsing
+    // test-only constructor (which never reaches invokeHandle / the fetch path).
+    private final PayloadSpiller payloadSpiller;
+
     @Autowired
     public McpAdapter(ObjectMapper objectMapper,
+                      PayloadSpiller payloadSpiller,
                       @Value("${conduit.mcp.protocol-version}") String protocolVersion,
                       @Value("${conduit.mcp.legacy-protocol-version}") String legacyProtocolVersion,
                       @Value("${conduit.mcp.default-timeout-ms:10000}") int defaultTimeoutMs,
                       @Value("${conduit.mcp.connect-timeout-ms:10000}") int connectTimeoutMs) {
         this.objectMapper = objectMapper;
+        this.payloadSpiller = payloadSpiller;
         this.protocolVersion = protocolVersion;
         this.legacyProtocolVersion = legacyProtocolVersion;
         this.defaultTimeoutMs = defaultTimeoutMs;
@@ -118,11 +126,23 @@ public class McpAdapter implements ProtocolAdapter {
     }
 
     /**
+     * Test/back-compat constructor with explicit versions + timeouts and NO {@link PayloadSpiller}
+     * (spiller is null → only the {@link #invokeHandle} spill path would need it, which these
+     * transport/deadline tests never take; {@link #invoke} is unaffected). Keeps the pre-F4 signature so
+     * the existing MCP deadline/abort tests compile UNMODIFIED.
+     */
+    McpAdapter(ObjectMapper objectMapper, String protocolVersion, String legacyProtocolVersion,
+               int defaultTimeoutMs, int connectTimeoutMs) {
+        this(objectMapper, null, protocolVersion, legacyProtocolVersion, defaultTimeoutMs, connectTimeoutMs);
+    }
+
+    /**
      * Test-only convenience constructor. Protocol versions come from configuration in production;
-     * unit tests that exercise only response parsing ({@link #extractResult}) do not need them.
+     * unit tests that exercise only response parsing ({@link #extractResult}) do not need them, and
+     * never reach the spill/fetch path.
      */
     McpAdapter(ObjectMapper objectMapper) {
-        this(objectMapper, null, null, 10000, 10000);
+        this(objectMapper, null, null, null, 10000, 10000);
     }
 
     @Override
@@ -132,6 +152,25 @@ public class McpAdapter implements ProtocolAdapter {
 
     @Override
     public JsonNode invoke(AgentManifest manifest, JsonNode input, String bearerToken) throws Exception {
+        return invokeStamped(manifest, input, bearerToken).tree();
+    }
+
+    /**
+     * F4: wrap the (possibly resource-fetched) stamped result in a {@link PayloadHandle}. Provenance is
+     * {@link PayloadHandle.Provenance#FETCHED} when the tool result was a {@code resource_link}/{@code resource}
+     * the gateway fetched EAGERLY (TOFU — proves what the gateway fetched, not what the agent claimed to
+     * send), else {@link PayloadHandle.Provenance#ADAPTER}. The spill decision (threshold) is shared with HTTP.
+     */
+    @Override
+    public PayloadHandle invokeHandle(AgentManifest manifest, JsonNode input, String bearerToken)
+            throws Exception {
+        Stamped s = invokeStamped(manifest, input, bearerToken);
+        PayloadHandle.Provenance provenance = s.fetched()
+                ? PayloadHandle.Provenance.FETCHED : PayloadHandle.Provenance.ADAPTER;
+        return payloadSpiller.handleFor(s.tree(), provenance);
+    }
+
+    private Stamped invokeStamped(AgentManifest manifest, JsonNode input, String bearerToken) throws Exception {
         String serverUrl = manifest.connection().serverUrl();
         String toolName  = manifest.connection().tool();
         int timeoutMs    = resolveTimeout(manifest);
@@ -181,8 +220,8 @@ public class McpAdapter implements ProtocolAdapter {
 
     // ── Streamable HTTP transport (default) ────────────────────────────────────
 
-    private JsonNode invokeStreamable(AgentManifest manifest, JsonNode input, String toolName,
-                                      String serverUrl, String bearerToken, long deadlineNanos)
+    private Stamped invokeStreamable(AgentManifest manifest, JsonNode input, String toolName,
+                                     String serverUrl, String bearerToken, long deadlineNanos)
             throws Exception {
 
         String requestedVersion = resolveProtocolVersion(manifest, false);
@@ -232,7 +271,7 @@ public class McpAdapter implements ProtocolAdapter {
         log.debug("McpAdapter streamable raw response ({}): {}", manifest.agentId(),
                 truncate(callRoot.toString()));
 
-        return withVerifiedSub(extractResult(callRoot), verifiedSub);
+        return resolveContent(callRoot, verifiedSub, bearerToken, deadlineNanos);
     }
 
     /**
@@ -334,8 +373,8 @@ public class McpAdapter implements ProtocolAdapter {
 
     // ── Legacy HTTP+SSE transport (only when transport: "sse") ─────────────────
 
-    private JsonNode invokeSse(AgentManifest manifest, JsonNode input, String toolName,
-                               String serverUrl, String bearerToken, long deadlineNanos) throws Exception {
+    private Stamped invokeSse(AgentManifest manifest, JsonNode input, String toolName,
+                              String serverUrl, String bearerToken, long deadlineNanos) throws Exception {
 
         String requestedVersion = resolveProtocolVersion(manifest, true);
 
@@ -433,7 +472,8 @@ public class McpAdapter implements ProtocolAdapter {
         }
         log.debug("McpAdapter raw response ({}): {}", manifest.agentId(), truncate(rawResponse));
 
-        return withVerifiedSub(extractResult(rawResponse), verifiedSubFuture.getNow(null));
+        return resolveContent(objectMapper.readTree(rawResponse), verifiedSubFuture.getNow(null),
+                bearerToken, deadlineNanos);
     }
 
     /**
@@ -642,6 +682,116 @@ public class McpAdapter implements ProtocolAdapter {
                 })
                 .orElse(result);
     }
+
+    /**
+     * F4: resolve the JSON-RPC tool response into the FINAL stamped tree, EAGERLY fetching a
+     * {@code resource_link}/{@code resource} link inside the adapter invoke.
+     *
+     * <p>Provenance policy: a fetched link → {@link Stamped#fetched()} true (TOFU — this proves what the
+     * gateway fetched, not what the agent "sent"); the plain {@code content[0].text} path is unchanged
+     * and returns {@code fetched=false}. A {@code resource_link}/{@code resource} item WITHOUT a usable uri
+     * (and no inline content) THROWS — replacing today's silent {@code .orElse(result)} fall-through — so
+     * the harness records a FAILED node instead of handing an unusable link object to synthesis.
+     */
+    private Stamped resolveContent(JsonNode root, String verifiedSub, String bearerToken, long deadlineNanos)
+            throws Exception {
+        // Protocol error — JSON-RPC "error" member.
+        JsonNode error = root.path("error");
+        if (!error.isMissingNode()) {
+            throw new RuntimeException("MCP JSON-RPC error: "
+                    + error.path("message").asText(root.toString()));
+        }
+        JsonNode result = root.path("result");
+        if (result.isMissingNode()) {
+            return new Stamped(withVerifiedSub(root, verifiedSub), false);
+        }
+        // Tool-execution error — a successful response whose result.isError == true.
+        if (isToolError(result)) {
+            throw new RuntimeException("MCP tool error: "
+                    + firstContentText(result).orElseGet(result::toString));
+        }
+
+        JsonNode content = result.path("content");
+        JsonNode first = (content.isArray() && !content.isEmpty()) ? content.get(0) : null;
+        if (first != null) {
+            String type = first.path("type").asText("");
+            if ("resource_link".equals(type) || "resource".equals(type)) {
+                String uri = resourceUri(first);
+                if (uri != null && !uri.isBlank()) {
+                    JsonNode fetched = fetchResource(uri, bearerToken, deadlineNanos);
+                    return new Stamped(withVerifiedSub(fetched, verifiedSub), true);
+                }
+                // An embedded resource may inline its content (text/blob) — no fetch, not TOFU.
+                JsonNode inline = inlineResourceContent(first);
+                if (inline != null) {
+                    return new Stamped(withVerifiedSub(inline, verifiedSub), false);
+                }
+                throw new RuntimeException("MCP " + type + " item carried no uri and no inline content: " + first);
+            }
+        }
+
+        // Plain text path — unchanged from extractResult.
+        JsonNode tree = firstContentText(result)
+                .map(text -> {
+                    try {
+                        return objectMapper.readTree(text);
+                    } catch (Exception e) {
+                        return (JsonNode) objectMapper.createObjectNode().put("text", text);
+                    }
+                })
+                .orElse(result);
+        return new Stamped(withVerifiedSub(tree, verifiedSub), false);
+    }
+
+    /** The link uri of a {@code resource_link} (top-level {@code uri}) or embedded {@code resource.uri}. */
+    private static String resourceUri(JsonNode item) {
+        String direct = item.path("uri").asText(null);
+        if (direct != null && !direct.isBlank()) return direct;
+        return item.path("resource").path("uri").asText(null);
+    }
+
+    /** Inline content of an embedded {@code resource} (its {@code text}), if present; else null. */
+    private JsonNode inlineResourceContent(JsonNode item) {
+        JsonNode res = item.path("resource");
+        String text = res.path("text").asText(null);
+        if (text == null) return null;
+        try {
+            return objectMapper.readTree(text);
+        } catch (Exception e) {
+            return objectMapper.createObjectNode().put("text", text);
+        }
+    }
+
+    /**
+     * EAGERLY GET a resource link, on the SAME bearer / trace-context / deadline as every agent touch.
+     * A non-2xx or a parse failure is surfaced (parse failure degrades to a {@code {"text":...}} wrap;
+     * a transport/status failure throws → FAILED node).
+     */
+    private JsonNode fetchResource(String uri, String bearerToken, long deadlineNanos) throws Exception {
+        long remaining = remaining(deadlineNanos);
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(uri))
+                .version(HttpClient.Version.HTTP_1_1)
+                .timeout(Duration.ofMillis(remaining))
+                .header("Accept", "application/json, text/plain, */*");
+        if (bearerToken != null && !bearerToken.isBlank()) {
+            builder.header("Authorization", "Bearer " + bearerToken);
+        }
+        injectTraceContext(builder);
+        HttpResponse<String> resp = sendWithTimeout(builder.GET().build(), remaining);
+        if (resp.statusCode() >= 400) {
+            throw new RuntimeException("MCP resource fetch " + uri + " returned HTTP " + resp.statusCode());
+        }
+        String body = resp.body() != null ? resp.body() : "";
+        try {
+            return objectMapper.readTree(body);
+        } catch (Exception e) {
+            return objectMapper.createObjectNode().put("text", body);
+        }
+    }
+
+    /** The final stamped tree plus whether it came from an eager resource fetch (TOFU provenance). */
+    private record Stamped(JsonNode tree, boolean fetched) {}
 
     /** True when the tool ran and reported failure (MCP {@code CallToolResult.isError}). */
     static boolean isToolError(JsonNode result) {
