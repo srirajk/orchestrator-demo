@@ -192,6 +192,17 @@ public class ChatService {
     private boolean conflictTriggerEnabled;
 
     /**
+     * Whether multi-tenant enforcement is ON (Axiom H5). When ON, contextual routing threads the request's
+     * resolved {@link TenantExecutionContext} into the resolver so the query runs against that tenant's own
+     * index; a tenant-less data route then fails closed in the resolver instead of reading the shared legacy
+     * index. When OFF (the single-tenant demo default), routing calls the legacy tenant-free overloads and
+     * behaviour — plus every existing resolver mock — is byte-identical. Bound to the SAME property the
+     * {@link ai.conduit.gateway.infrastructure.redis.TenantKeyspace} reads, so one flag governs both.
+     */
+    @org.springframework.beans.factory.annotation.Value("${conduit.tenancy.multi-tenant.enabled:false}")
+    private boolean multiTenantEnabled;
+
+    /**
      * The preparation/masking contract version stamped onto every {@link RouteDecision} the Piece-6
      * decision endpoint returns, so the goal-pick harness can assert the endpoint exercised the current
      * production preparation (not a stale/forked one). Config, never a constant (CLAUDE.md §5).
@@ -598,10 +609,8 @@ public class ChatService {
             // it only makes the near-tie rerank's error handling stricter on a genuine cross-domain conflict.
             Set<String> groundedDomainIds = conflictTriggerEnabled
                     ? groundedDomainIds(prepared.groundedSet()) : Set.of();
-            ResolverResult resolved = groundedDomainIds.isEmpty()
-                    ? resolver.resolveContextual(prepared.maskedRoutingText(), prepared.relaxationAllowed())
-                    : resolver.resolveContextual(prepared.maskedRoutingText(), prepared.relaxationAllowed(),
-                            groundedDomainIds);
+            ResolverResult resolved = routeContextual(prepared.maskedRoutingText(),
+                    prepared.relaxationAllowed(), groundedDomainIds, tenant);
             recordGatewayStage("routing", System.nanoTime() - routingStart);
             // CAPABILITY-CLARIFY RESUME: a chosen capability biases routing to that exact agent when it is
             // still a plausible candidate for the re-driven query. It never bypasses a gate — the forced
@@ -1432,10 +1441,8 @@ public class ChatService {
         // 3) Context-aware routing over the MASKED text — the identical overload selection production makes.
         Set<String> groundedDomainIds = conflictTriggerEnabled
                 ? groundedDomainIds(prepared.groundedSet()) : Set.of();
-        ResolverResult resolved = groundedDomainIds.isEmpty()
-                ? resolver.resolveContextual(prepared.maskedRoutingText(), prepared.relaxationAllowed())
-                : resolver.resolveContextual(prepared.maskedRoutingText(), prepared.relaxationAllowed(),
-                        groundedDomainIds);
+        ResolverResult resolved = routeContextual(prepared.maskedRoutingText(),
+                prepared.relaxationAllowed(), groundedDomainIds, tenant);
         resolved = withPrimaryCandidate(resolved);
 
         // 4) Requested-capability groups (production partitioner).
@@ -1615,6 +1622,27 @@ public class ChatService {
         if (subDomainId != null) Span.current().setAttribute("conduit.routing.primary_subdomain", subDomainId);
         return resolved.withPrimaryCandidate(
                 new ResolverResult.PrimaryCandidate(leader.agentId(), subDomainId, leader.domain()));
+    }
+
+    /**
+     * The single contextual-routing seam (Axiom H5). With multi-tenancy OFF (the demo default) it calls the
+     * legacy tenant-free {@code resolveContextual} overloads — byte-identical routing, and the exact seam the
+     * resolver mocks in ChatService*Test bind to. With multi-tenancy ON it threads the request's resolved
+     * {@link TenantExecutionContext} so the query runs in that tenant's own index; a tenant-less data route
+     * then fails closed inside the resolver. The two-arg vs three-arg (grounded-domain) selection is
+     * preserved in both regimes.
+     */
+    private ResolverResult routeContextual(String routingText, boolean entityKnown,
+                                            java.util.Set<String> groundedDomainIds,
+                                            TenantExecutionContext tenant) {
+        if (!multiTenantEnabled) {
+            return groundedDomainIds.isEmpty()
+                    ? resolver.resolveContextual(routingText, entityKnown)
+                    : resolver.resolveContextual(routingText, entityKnown, groundedDomainIds);
+        }
+        return groundedDomainIds.isEmpty()
+                ? resolver.resolveContextual(routingText, entityKnown, tenant)
+                : resolver.resolveContextual(routingText, entityKnown, groundedDomainIds, tenant);
     }
 
     /** The grounded references' DOMAIN ids (sub-domain → parent domain) for the Piece-5 conflict trigger. */
@@ -2007,8 +2035,8 @@ public class ChatService {
             String tenantId = tenantIdOrBlank(tenant);
             PreparedRoute prepared = routePreparer.prepare(request, latestPrompt, preExtracted,
                     true, false, principal, tenantId, callerToken);
-            ResolverResult probe = resolver.resolveContextual(
-                    prepared.maskedRoutingText(), prepared.relaxationAllowed());
+            ResolverResult probe = routeContextual(
+                    prepared.maskedRoutingText(), prepared.relaxationAllowed(), Set.of(), tenant);
             if (!probe.fallback() && !probe.selected().isEmpty()) {
                 log.info("FOLLOW_UP → fetch fallthrough (grounded entity + confident route) requestId={}", requestId);
                 handleFetchData(request, emitter, latestPrompt, conversationId, userId, jwtPrincipal, tenant,

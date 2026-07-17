@@ -75,6 +75,18 @@ public class TenantKeyspace {
     }
 
     /**
+     * H5 fail-closed predicate for the data plane. Under multi-tenant enforcement a routing (or other
+     * data-plane) query MUST carry a resolved tenant; a null/absent tenant here would otherwise resolve
+     * to the shared legacy {@code intent_idx} — the fail-open hole the security audit flagged. Returns
+     * {@code true} when such a query must be DENIED rather than served from the legacy index. Always
+     * {@code false} with multi-tenancy OFF (the single-tenant demo) and for the configured default
+     * tenant (which legitimately keeps legacy names), so nothing about the demo path changes.
+     */
+    public boolean deniesTenantlessDataRoute(TenantExecutionContext ctx) {
+        return multiTenantEnabled && rawSegment(ctx) == null;
+    }
+
+    /**
      * The RediSearch index name for this context. Legacy ⇒ {@code legacyIndexName} unchanged; a real
      * tenant ⇒ {@code legacyIndexName__{tenant}} (per-tenant index — stronger than a shared-index
      * prefix filter).

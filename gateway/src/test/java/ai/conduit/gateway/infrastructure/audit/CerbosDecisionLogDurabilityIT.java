@@ -40,8 +40,10 @@ import static org.awaitility.Awaitility.await;
  */
 class CerbosDecisionLogDurabilityIT {
 
+    // Pinned to 0.53.0 — the exact version the runtime Cerbos PDP runs (matches the demo's
+    // conduit-cerbos and the provisioning gate). Overridable via CERBOS_IMAGE.
     private static final DockerImageName CERBOS_IMAGE = DockerImageName.parse(
-            System.getenv().getOrDefault("CERBOS_IMAGE", "ghcr.io/cerbos/cerbos:latest"));
+            System.getenv().getOrDefault("CERBOS_IMAGE", "ghcr.io/cerbos/cerbos:0.53.0"));
 
     private final ObjectMapper mapper = new ObjectMapper();
 
