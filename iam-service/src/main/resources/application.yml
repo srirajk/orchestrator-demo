@@ -3,10 +3,15 @@ server:
 
 conduit:
   iam:
-    # Mandated claim: tenant_id is always included in every issued JWT.
-    # Value comes from principal.tenant_id in the database.
-    # This fallback is used only when a principal record cannot be loaded.
+    # Mandated claim: tenant_id is always included in every issued JWT and comes from
+    # principal.tenant_id in the database. A1: there is NO default fallback for a principal that
+    # cannot be loaded — such a subject is un-mintable unless it is an explicitly-bound service
+    # client below. (Retained only for legacy references; the token paths no longer read it.)
     default-tenant-id: ${CONDUIT_IAM_DEFAULT_TENANT_ID:default}
+    # Explicit tenant binding for non-principal (client_credentials) subjects — config, never
+    # caller-supplied. A service subject absent here is un-mintable.
+    service-tenants:
+      gateway-client: ${CONDUIT_IAM_GATEWAY_CLIENT_TENANT:default}
 
 spring:
   threads:

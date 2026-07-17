@@ -185,6 +185,51 @@ class GatewayClientTransportTest {
     }
 
     /**
+     * A1.5 — the BFF never forwards a caller-supplied identity header to the gateway. The only
+     * identity carrier is the user's OIDC access token (Authorization: Bearer); an {@code X-User-Id}
+     * (or any client-asserted identity header) must never appear on the wire, so the gateway can
+     * only ever act as the verified token subject.
+     */
+    @Test
+    void bffDoesNotForwardClientIdentityHeader() throws Exception {
+        CountDownLatch served = new CountDownLatch(1);
+        executor.submit(() -> {
+            try (Socket socket = server.accept()) {
+                var reader = new BufferedReader(
+                        new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
+                String line;
+                while ((line = reader.readLine()) != null && !line.isEmpty()) {
+                    synchronized (requestLines) {
+                        requestLines.add(line);
+                    }
+                }
+                OutputStream out = socket.getOutputStream();
+                out.write(("HTTP/1.1 200 OK\r\n"
+                        + "Content-Type: text/event-stream\r\n"
+                        + "Content-Length: 0\r\n\r\n").getBytes(StandardCharsets.UTF_8));
+                out.flush();
+                served.countDown();
+            } catch (Exception ignored) {
+            }
+            return null;
+        });
+
+        clientFor(5_000).openChatStream("user-oidc-token", "conv-1", List.of());
+
+        assertThat(served.await(10, TimeUnit.SECONDS)).isTrue();
+        synchronized (requestLines) {
+            // Identity travels ONLY as the bearer token.
+            assertThat(requestLines).anySatisfy(h ->
+                    assertThat(h.toLowerCase()).contains("authorization: bearer user-oidc-token"));
+            // No caller-asserted identity header is ever forwarded.
+            assertThat(requestLines).noneSatisfy(h ->
+                    assertThat(h.toLowerCase()).contains("x-user-id"));
+            assertThat(requestLines).noneSatisfy(h ->
+                    assertThat(h.toLowerCase()).startsWith("x-user"));
+        }
+    }
+
+    /**
      * A peer that accepts the socket and then never writes a status line used to park the caller
      * forever, because {@code HttpClient} without a request timeout waits indefinitely for headers.
      */

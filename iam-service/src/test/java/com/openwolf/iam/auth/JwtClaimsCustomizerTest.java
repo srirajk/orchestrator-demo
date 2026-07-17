@@ -43,7 +43,11 @@ class JwtClaimsCustomizerTest {
         customizer.customize(context);
 
         JwtClaimsSet claims = context.getClaims().build();
-        assertThat(claims.getAudience()).containsExactly("conduit-gateway", "secondary-api");
+        // A1: each base audience is accompanied by its tenant-qualified conduit-gateway@<tenant>
+        // variant so the gateway can bind the token to its tenant_id claim.
+        assertThat(claims.getAudience()).containsExactly(
+                "conduit-gateway", "conduit-gateway@default",
+                "secondary-api", "secondary-api@default");
         assertThat(claims.getClaimAsStringList("roles")).containsExactly("relationship_manager");
         assertThat(claims.getClaimAsStringList("segments")).containsExactly("wealth");
         assertThat(claims.getClaimAsStringList("admin_domains")).isEmpty();
@@ -137,7 +141,7 @@ class JwtClaimsCustomizerTest {
         private String enrichIdTokenSubject;
 
         private CapturingEnricher(Map<String, Object> accessClaims, Map<String, Object> idClaims) {
-            super(null, null, "default");
+            super(null, null, new ServiceTenantProperties());
             this.accessClaims = accessClaims;
             this.idClaims = idClaims;
         }

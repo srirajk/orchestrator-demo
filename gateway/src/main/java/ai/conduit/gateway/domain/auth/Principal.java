@@ -44,6 +44,10 @@ public record Principal(
     public static Principal fromSpringJwt(Jwt jwt) {
         String sub = jwt.getSubject();
 
+        // A1: tenant_id is now mandatory at verify — SecurityConfig#jwtDecoder rejects any token
+        // lacking a canonical tenant_id and a matching tenant-qualified audience, so an
+        // authenticated principal always carries the real tenant here. The null-guard remains only
+        // for the anonymous / non-JWT path (A2 removes the request-path default outright).
         String tenantId = jwt.getClaimAsString("tenant_id");
         if (tenantId == null) tenantId = "default";
 
