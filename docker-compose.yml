@@ -794,7 +794,7 @@ services:
       mc mb --ignore-existing local/langfuse-media &&
       mc mb --ignore-existing --with-lock local/conduit-audit &&
       mc mb --ignore-existing local/cerbos-policies &&
-      mc cp --recursive --exclude 'runtime/*' /seed/cerbos-policies/ local/cerbos-policies/base/ &&
+      mc mirror --overwrite --exclude 'runtime/*' /seed/cerbos-policies/ local/cerbos-policies/base/ &&
       echo 'MinIO buckets ready + Cerbos base seeded to s3://cerbos-policies/base/'
       "
     restart: "no"
