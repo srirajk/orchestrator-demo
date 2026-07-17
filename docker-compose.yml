@@ -506,6 +506,14 @@ services:
       - "3595:3593"   # gRPC
     volumes:
       - ./infra/cerbos:/conf:ro
+      # S1a (lifecycle-spine): the WRITABLE runtime-policies volume, mounted UNDER the watched
+      # /conf/policies dir (config.yaml storage.disk.directory=/conf/policies, watchForChanges=true).
+      # iam-service writes promoted bundles here (each policy stamped version=<bundleId>); Cerbos reads
+      # them read-only and watchForChanges reloads them, so a Policy Studio promotion actually reaches
+      # runtime enforcement. Additive: base default policies under /conf/policies are untouched.
+      # NOTE: applying this needs a `docker compose up -d` recreate of cerbos + iam-service — HELD for
+      # the user; never recreate the running demo containers automatically.
+      - cerbos-runtime-policies:/conf/policies/runtime:ro
       # A6: the Cerbos DECISION LOG (config.yaml audit.file.path=/var/log/cerbos/audit.log) is the
       # immutable authorization chain the examiner joins to via cerbosCallId. It MUST survive a PDP
       # restart — a named volume persists it outside the container's writable layer, so a
@@ -569,6 +577,9 @@ services:
       # model-selection guide; override to a stronger model when one is available.
       IAM_POLICY_GENERATION_MODEL: ${IAM_POLICY_GENERATION_MODEL:-glm-4.6}
       IAM_POLICY_STUDIO_BASE_BUNDLE_DIR: /app/cerbos-policies
+      # S1a: where PromotedBundleLoader writes promoted bundles — the SAME cerbos-runtime-policies volume
+      # Cerbos watches under /conf/policies/runtime. Config-driven (no hardcoded path in Java).
+      IAM_POLICY_STUDIO_RUNTIME_POLICIES_DIR: /var/lib/conduit/runtime-policies
       IAM_POLICY_STUDIO_REGISTRY_ROOT: /app/registry
       IAM_POLICY_STUDIO_CONSEQUENCE_SIGNING_KEY: ${IAM_POLICY_STUDIO_CONSEQUENCE_SIGNING_KEY:-studio-demo-consequence-signing-key-change-me}
       CERBOS_VERSION: "0.53.0"
@@ -591,6 +602,10 @@ services:
       - iam-signing-key:/app/keys
       - ./infra/cerbos/policies:/app/cerbos-policies:ro
       - ./registry:/app/registry:ro
+      # S1a: the writable runtime-policies volume iam-service promotes into; Cerbos reads the SAME volume
+      # (read-only) under its watched /conf/policies/runtime. This is the missing wire that makes a
+      # promotion reach runtime enforcement.
+      - cerbos-runtime-policies:/var/lib/conduit/runtime-policies
     depends_on:
       redis-stack:
         condition: service_healthy
@@ -1036,3 +1051,7 @@ volumes:
   # A6: persists the Cerbos decision log outside the container so the examiner's authorization
   # chain (cerbosCallId ↔ verdict ↔ activePolicyVersion) survives a PDP restart / re-create.
   cerbos-audit:
+  # S1a: the writable runtime-policies volume shared by iam-service (writes promoted bundles) and
+  # cerbos (reads them under its watched /conf/policies/runtime). This is the wire that makes a
+  # Policy Studio promotion reach the serving PDP — without it, promotion only flips a pointer.
+  cerbos-runtime-policies:

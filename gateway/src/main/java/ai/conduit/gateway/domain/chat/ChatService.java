@@ -1337,8 +1337,10 @@ public class ChatService {
         // whose tenant/policy-version is missing before it authorizes or invokes.
         InvocationContext ctx = InvocationContext.of(principal.id(), tenant, conversationId, requestId,
                         callerToken, grants)
+                // S1b: the on-path re-verification evaluates at the request's active bundle version, so a
+                // promoted tenant's fallback structural re-check hits its own bundle (default tenant → base).
                 .withReverifier(node ->
-                        !entitlementService.filterAgents(principal, List.of(node.agent())).isEmpty());
+                        !entitlementService.filterAgents(principal, List.of(node.agent()), tenant).isEmpty());
         return new Plan(nodes, ctx);
     }
 

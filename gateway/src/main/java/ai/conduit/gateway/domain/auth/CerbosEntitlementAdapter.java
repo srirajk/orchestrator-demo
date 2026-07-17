@@ -38,6 +38,9 @@ public class CerbosEntitlementAdapter {
 
     private static final Logger log = LoggerFactory.getLogger(CerbosEntitlementAdapter.class);
 
+    // The base bundle version — the default tenant's policyVersion, and the fail-safe when a request
+    // carries no resolved tenant context. A promoted tenant sends its own active bundle id instead
+    // (S1b): see resolvePolicyVersion(TenantExecutionContext).
     private static final String POLICY_VERSION    = "default";
     private static final String RESOURCE_AGENT    = "agent";
     private static final String ACTION_READ        = "read";
@@ -93,12 +96,22 @@ public class CerbosEntitlementAdapter {
      * Batch-check {@code relationshipIds} against the Cerbos PDP for the {@code read} action.
      */
     public BatchResult checkRelationships(Principal principal, List<String> relationshipIds) {
+        return checkRelationships(principal, relationshipIds, null);
+    }
+
+    /**
+     * Tenant-aware overload (S1b): stamps {@code policyVersion = ctx.activePolicyVersion()} so a promoted
+     * tenant is evaluated against its own active bundle. A {@code null}/unresolved context sends the base
+     * {@code "default"} version — the single-tenant demo is preserved exactly.
+     */
+    public BatchResult checkRelationships(Principal principal, List<String> relationshipIds,
+                                          TenantExecutionContext ctx) {
         if (relationshipIds == null || relationshipIds.isEmpty()) {
             return new BatchResult(Map.of(), "cerbos");
         }
         try {
             String requestBody = buildResourceRequest(principal, resourceType, ACTION_READ,
-                    relationshipIds, Map.of());
+                    relationshipIds, Map.of(), resolvePolicyVersion(ctx));
             String responseBody = post(requestBody);
             Map<String, Boolean> results = parseResponse(responseBody, ACTION_READ, relationshipIds);
             log.debug("Cerbos relationship check: principal={} ids={} results={}",
@@ -124,6 +137,15 @@ public class CerbosEntitlementAdapter {
      * @return map of {@code agentId → allowed}
      */
     public BatchResult checkAgents(Principal principal, List<AgentManifest> manifests) {
+        return checkAgents(principal, manifests, null);
+    }
+
+    /**
+     * Tenant-aware overload (S1b): evaluates the invoke decision at the request's active bundle version
+     * ({@code ctx.activePolicyVersion()}), or the base {@code "default"} when the context is null/unresolved.
+     */
+    public BatchResult checkAgents(Principal principal, List<AgentManifest> manifests,
+                                   TenantExecutionContext ctx) {
         if (manifests == null || manifests.isEmpty()) {
             return new BatchResult(Map.of(), "cerbos");
         }
@@ -131,7 +153,8 @@ public class CerbosEntitlementAdapter {
             List<String> agentIds = manifests.stream()
                     .map(AgentManifest::agentId).toList();
 
-            String requestBody = buildAgentRequest(principal, manifests, ACTION_INVOKE);
+            String requestBody = buildAgentRequest(principal, manifests, ACTION_INVOKE,
+                    resolvePolicyVersion(ctx));
             String responseBody = post(requestBody);
             Map<String, Boolean> results = parseResponse(responseBody, ACTION_INVOKE, agentIds);
             log.debug("Cerbos agent check: principal={} agents={} results={}",
@@ -159,10 +182,17 @@ public class CerbosEntitlementAdapter {
      * @return map of {@code agentId → isMember}; on any error every agent is treated as a non-member.
      */
     public Map<String, Boolean> checkAgentMembership(Principal principal, List<AgentManifest> manifests) {
+        return checkAgentMembership(principal, manifests, null);
+    }
+
+    /** Tenant-aware overload (S1b): membership probe at the request's active bundle version. */
+    public Map<String, Boolean> checkAgentMembership(Principal principal, List<AgentManifest> manifests,
+                                                     TenantExecutionContext ctx) {
         if (manifests == null || manifests.isEmpty()) return Map.of();
         try {
             List<String> agentIds = manifests.stream().map(AgentManifest::agentId).toList();
-            String requestBody = buildAgentRequest(principal, manifests, ACTION_INVOKE_MEMBERSHIP);
+            String requestBody = buildAgentRequest(principal, manifests, ACTION_INVOKE_MEMBERSHIP,
+                    resolvePolicyVersion(ctx));
             String responseBody = post(requestBody);
             return parseResponse(responseBody, ACTION_INVOKE_MEMBERSHIP, agentIds);
         } catch (Exception e) {
@@ -184,8 +214,15 @@ public class CerbosEntitlementAdapter {
      * @return {@code true} iff Cerbos returns {@code EFFECT_ALLOW} for {@code action} on the resource.
      */
     public boolean isAllowed(Principal principal, String kind, String action, String resourceId) {
+        return isAllowed(principal, kind, action, resourceId, null);
+    }
+
+    /** Tenant-aware overload (S1b): single-resource check at the request's active bundle version. */
+    public boolean isAllowed(Principal principal, String kind, String action, String resourceId,
+                             TenantExecutionContext ctx) {
         try {
-            String requestBody = buildResourceRequest(principal, kind, action, List.of(resourceId), Map.of());
+            String requestBody = buildResourceRequest(principal, kind, action, List.of(resourceId), Map.of(),
+                    resolvePolicyVersion(ctx));
             String responseBody = post(requestBody);
             boolean allowed = parseResponse(responseBody, action, List.of(resourceId))
                     .getOrDefault(resourceId, false);
@@ -216,11 +253,25 @@ public class CerbosEntitlementAdapter {
                         .body(String.class));
     }
 
+    /**
+     * The bundle version this request evaluates against (S1b). A resolved tenant sends its captured
+     * {@code activePolicyVersion} — the default tenant's is {@code "default"} (the base bundle), a promoted
+     * tenant's is its {@code b_<sha>} id. A {@code null}/unresolved context falls back to the base
+     * {@code "default"} so the single-tenant demo and the no-tenant callers are byte-identical to before.
+     */
+    private static String resolvePolicyVersion(TenantExecutionContext ctx) {
+        if (ctx != null && ctx.activePolicyVersion() != null && !ctx.activePolicyVersion().isBlank()) {
+            return ctx.activePolicyVersion();
+        }
+        return POLICY_VERSION;
+    }
+
     /** Generic resource-check builder — used for relationships and domains. */
     private String buildResourceRequest(Principal principal, String kind, String action,
-                                         List<String> ids, Map<String, String> extraAttr) throws Exception {
+                                         List<String> ids, Map<String, String> extraAttr,
+                                         String policyVersion) throws Exception {
         ObjectNode root = mapper.createObjectNode();
-        addPrincipal(root, principal);
+        addPrincipal(root, principal, policyVersion);
 
         ArrayNode resources = root.putArray("resources");
         for (String id : ids) {
@@ -228,7 +279,7 @@ public class CerbosEntitlementAdapter {
             entry.putArray("actions").add(action);
             ObjectNode resource = entry.putObject("resource");
             resource.put("kind",          kind);
-            resource.put("policyVersion", POLICY_VERSION);
+            resource.put("policyVersion", policyVersion);
             resource.put("id",            id);
             ObjectNode attr = resource.putObject("attr");
             extraAttr.forEach(attr::put);
@@ -237,9 +288,10 @@ public class CerbosEntitlementAdapter {
     }
 
     /** Agent-specific builder — sends domain, audience, access_mode, data_classification per agent. */
-    private String buildAgentRequest(Principal principal, List<AgentManifest> manifests, String action) throws Exception {
+    private String buildAgentRequest(Principal principal, List<AgentManifest> manifests, String action,
+                                     String policyVersion) throws Exception {
         ObjectNode root = mapper.createObjectNode();
-        addPrincipal(root, principal);
+        addPrincipal(root, principal, policyVersion);
 
         ArrayNode resources = root.putArray("resources");
         for (AgentManifest m : manifests) {
@@ -247,7 +299,7 @@ public class CerbosEntitlementAdapter {
             entry.putArray("actions").add(action);
             ObjectNode resource = entry.putObject("resource");
             resource.put("kind",          RESOURCE_AGENT);
-            resource.put("policyVersion", POLICY_VERSION);
+            resource.put("policyVersion", policyVersion);
             resource.put("id",            m.agentId());
             ObjectNode attr = resource.putObject("attr");
             attr.put("domain",              m.domain() != null ? m.domain() : "");
@@ -261,10 +313,10 @@ public class CerbosEntitlementAdapter {
     }
 
     /** Populates the principal node with id, roles, and all attributes. */
-    private void addPrincipal(ObjectNode root, Principal principal) {
+    private void addPrincipal(ObjectNode root, Principal principal, String policyVersion) {
         ObjectNode p = root.putObject("principal");
         p.put("id",            principal.id());
-        p.put("policyVersion", POLICY_VERSION);
+        p.put("policyVersion", policyVersion);
 
         ArrayNode roles = p.putArray("roles");
         principal.roles().forEach(roles::add);

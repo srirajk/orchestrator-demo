@@ -353,7 +353,8 @@ final class C5LifecycleFixtures {
                                                    PolicyBundleRepository br, ApprovalRepository ar,
                                                    CandidateProbe probe, String gitCommit) {
         return new PolicyPromotionService(dir, approvalService(), pr, br, ar, canon(),
-                gitResolver(gitCommit), probe, validator(), new PolicyYamlParser(), validationProvider());
+                gitResolver(gitCommit), probe, validator(), new PolicyYamlParser(), validationProvider(),
+                new PromotedBundleLoader(""));
     }
 
     static Instant now() {

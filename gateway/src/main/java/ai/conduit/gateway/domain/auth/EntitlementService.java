@@ -108,9 +108,26 @@ public class EntitlementService {
      */
     public List<AgentManifest> filterAgents(Principal principal, List<AgentManifest> manifests) {
         if (manifests == null || manifests.isEmpty()) return List.of();
+        // Calls the no-context adapter method (policyVersion "default") — kept distinct from the
+        // ctx-aware overload so existing callers and their mocks stay byte-identical.
+        return applyAgentVerdict(principal, manifests, cerbos.checkAgents(principal, manifests));
+    }
 
-        CerbosEntitlementAdapter.BatchResult batch = cerbos.checkAgents(principal, manifests);
+    /**
+     * Tenant-aware overload (S1b): evaluates the structural verdict at the request's active bundle version
+     * ({@code ctx.activePolicyVersion()}), so a promoted tenant is filtered against its own promoted bundle
+     * while the default tenant (null/unresolved ctx) stays on the base {@code "default"} bundle — the
+     * single-tenant demo is preserved exactly.
+     */
+    public List<AgentManifest> filterAgents(Principal principal, List<AgentManifest> manifests,
+                                            TenantExecutionContext ctx) {
+        if (manifests == null || manifests.isEmpty()) return List.of();
+        return applyAgentVerdict(principal, manifests, cerbos.checkAgents(principal, manifests, ctx));
+    }
 
+    /** Shared filtering + telemetry over a Cerbos agent-batch verdict (used by both filterAgents overloads). */
+    private List<AgentManifest> applyAgentVerdict(Principal principal, List<AgentManifest> manifests,
+                                                  CerbosEntitlementAdapter.BatchResult batch) {
         List<AgentManifest> allowed = manifests.stream()
                 .filter(m -> batch.isAllowed(m.agentId()))
                 .collect(Collectors.toList());

@@ -51,6 +51,7 @@ public class PolicyPromotionService {
     private final GeneratedPolicyValidator validator;
     private final PolicyYamlParser parser;
     private final PromotionValidationContextProvider contextProvider;
+    private final PromotedBundleLoader runtimeLoader;
 
     public PolicyPromotionService(ActiveTenantDirectory directory,
                                   ConsequenceApprovalService approvals,
@@ -62,7 +63,8 @@ public class PolicyPromotionService {
                                   CandidateProbe probe,
                                   GeneratedPolicyValidator validator,
                                   PolicyYamlParser parser,
-                                  PromotionValidationContextProvider contextProvider) {
+                                  PromotionValidationContextProvider contextProvider,
+                                  PromotedBundleLoader runtimeLoader) {
         this.directory = directory;
         this.approvals = approvals;
         this.promotions = promotions;
@@ -74,6 +76,7 @@ public class PolicyPromotionService {
         this.validator = validator;
         this.parser = parser;
         this.contextProvider = contextProvider;
+        this.runtimeLoader = runtimeLoader;
     }
 
     /**
@@ -155,6 +158,14 @@ public class PolicyPromotionService {
             } catch (IllegalStateException stale) {
                 throw new StalePromotionException(stale.getMessage());
             }
+
+            // ── 5a. (S1a) RUNTIME LOAD — the missing wire. Now that the pointer is flipped, materialise
+            //        the candidate's bundleId-stamped policies into the directory the serving Cerbos
+            //        watches so watchForChanges reloads them and the gateway's policyVersion=<bundleId>
+            //        checks actually resolve to this bundle. Additive: base default policies are untouched.
+            //        A load failure fail-closes the promotion — the @Transactional rolls back the CAS, so a
+            //        tenant is never advanced to a bundle the PDP could not be given. ──
+            runtimeLoader.load(request.candidate());
 
             // ── 6. Persist the immutable bundle record + the signed approval; mark PROMOTED. ──
             if (!bundles.existsById(candidateId)) {
