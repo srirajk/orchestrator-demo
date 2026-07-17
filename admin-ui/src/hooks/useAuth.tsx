@@ -3,8 +3,8 @@ import type { User } from '../api/client'
 import { normalizeSegments } from '../api/client'
 import { AUTH_LOGOUT_EVENT, clearAdminToken, readAdminToken, writeAdminToken } from '../auth/tokenStorage'
 
-/** Roles that may enter the admin console — mirrors the backend /admin/** guard. */
-export const ADMIN_ROLES = ['platform_admin', 'tenant_admin', 'domain_admin']
+/** Roles that may enter the admin console shell. Studio users are still method-gated per endpoint. */
+export const ADMIN_ROLES = ['platform_admin', 'tenant_admin', 'domain_admin', 'policy_author', 'policy_approver']
 export function hasAdminRole(user: User | null): boolean {
   return user?.roles?.some((r) => ADMIN_ROLES.includes(r)) ?? false
 }

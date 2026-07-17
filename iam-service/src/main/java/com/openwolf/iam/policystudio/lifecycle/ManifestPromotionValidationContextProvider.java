@@ -1,40 +1,57 @@
 package com.openwolf.iam.policystudio.lifecycle;
 
+import com.openwolf.iam.policystudio.PolicyIR;
+import com.openwolf.iam.policystudio.PolicyParseException;
+import com.openwolf.iam.policystudio.PolicyYamlParser;
+import com.openwolf.iam.policystudio.StudioGroundingProvider;
+import com.openwolf.iam.policystudio.StudioGroundingSnapshot;
+import com.openwolf.iam.policystudio.TenantScope;
 import org.springframework.stereotype.Component;
 
 /**
- * The production {@link PromotionValidationContextProvider} (Axiom H2). It FAILS CLOSED.
- *
- * <p><b>Honest state of the world:</b> the promotion candidate is a {@link PolicyBundle} — rendered
- * Cerbos YAML + certifying test metadata — and does NOT carry a typed {@link
- * com.openwolf.iam.policystudio.ManifestVocabulary} or {@link com.openwolf.iam.policystudio.BaseCeiling}.
- * There is no per-tenant {@code ManifestVocabularyProvider}/{@code BaseCeilingProvider} bean yet that
- * derives them from the effective manifest (the C2 authoring path still takes them from the request body;
- * see {@code StudioAuthoringController}'s documented grounding gap). The base ceiling also cannot be
- * reconstructed from the bundle's YAML alone: its derived-role modules are not the single
- * {@code resourcePolicy} document the studio parser accepts.
- *
- * <p>Rather than fabricate a vocabulary/ceiling (which would let promote() validate a candidate against an
- * empty or invented ceiling — worse than not validating), this provider throws. That makes promotion
- * FAIL CLOSED on any host until the manifest-derived context source is wired — the correct security
- * posture for the H2 hole, and consistent with "no canned/fallback data". The deterministic gate injects a
- * fixture provider to prove the re-validation itself is unconditional and rejects wildcard / sibling-scope
- * / base-ceiling-omitting candidates.
- *
- * <p>Wiring the real per-tenant provider (manifest → vocabulary + base ceiling) is the follow-up that turns
- * production promotion back on; until then the single-tenant demo does not drive promotion, so it is
- * unaffected.
+ * The production {@link PromotionValidationContextProvider} (Axiom H2). It derives the validator context
+ * from the same manifest-backed source used by the author/review APIs. The base ceiling is never rebuilt
+ * from rendered bundle YAML; the bundle is only inspected to identify the tenant/resource child policy.
  */
 @Component
 public class ManifestPromotionValidationContextProvider implements PromotionValidationContextProvider {
 
+    private final StudioGroundingProvider grounding;
+    private final PolicyYamlParser parser;
+
+    public ManifestPromotionValidationContextProvider(StudioGroundingProvider grounding, PolicyYamlParser parser) {
+        this.grounding = grounding;
+        this.parser = parser;
+    }
+
     @Override
     public PromotionValidationContext contextFor(PolicyBundle candidate) {
-        String id = candidate == null ? "<null>" : candidate.bundleId();
-        throw new IllegalStateException(
-                "no per-tenant manifest vocabulary/base-ceiling source is wired, so the candidate '" + id
-                        + "' cannot be re-validated at promotion — refusing to promote (fail closed). Wire a "
-                        + "PromotionValidationContextProvider that derives the vocabulary + immutable base ceiling "
-                        + "from the effective manifest before enabling promotion in production.");
+        if (candidate == null) {
+            throw new IllegalArgumentException("candidate bundle must be set");
+        }
+        PolicyIR child = firstTenantChild(candidate);
+        StudioGroundingSnapshot snapshot = grounding.snapshot(candidate.tenantId(), child.resource());
+        boolean subscopesEnabled = !candidate.tenantId().equals(child.scope());
+        return new PromotionValidationContext(
+                snapshot.vocabulary(),
+                TenantScope.of(candidate.tenantId()),
+                subscopesEnabled,
+                snapshot.baseCeiling());
+    }
+
+    private PolicyIR firstTenantChild(PolicyBundle candidate) {
+        for (BundleFile file : candidate.renderedFiles()) {
+            try {
+                PolicyIR ir = parser.parse(file.yaml());
+                if (ir.scope() != null && !ir.scope().isBlank()) {
+                    return ir;
+                }
+            } catch (PolicyParseException ignored) {
+                // Non-resource-policy bundle files are allowed in the snapshot; they are not the child
+                // policy that identifies the manifest resource kind.
+            }
+        }
+        throw new IllegalStateException("candidate '" + candidate.bundleId()
+                + "' carries no tenant-child resource policy; cannot choose manifest grounding");
     }
 }

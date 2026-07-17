@@ -569,6 +569,8 @@ services:
       # model-selection guide; override to a stronger model when one is available.
       IAM_POLICY_GENERATION_MODEL: ${IAM_POLICY_GENERATION_MODEL:-glm-4.6}
       IAM_POLICY_STUDIO_BASE_BUNDLE_DIR: /app/cerbos-policies
+      IAM_POLICY_STUDIO_REGISTRY_ROOT: /app/registry
+      IAM_POLICY_STUDIO_CONSEQUENCE_SIGNING_KEY: ${IAM_POLICY_STUDIO_CONSEQUENCE_SIGNING_KEY:-studio-demo-consequence-signing-key-change-me}
       CERBOS_VERSION: "0.53.0"
       # OAuth2 client registration — must match LibreChat's OPENID_CLIENT_ID/SECRET
       IAM_LIBRECHAT_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-meridian-client-secret-dev}
@@ -588,6 +590,7 @@ services:
     volumes:
       - iam-signing-key:/app/keys
       - ./infra/cerbos/policies:/app/cerbos-policies:ro
+      - ./registry:/app/registry:ro
     depends_on:
       redis-stack:
         condition: service_healthy

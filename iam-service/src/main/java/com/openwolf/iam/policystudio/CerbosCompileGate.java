@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
+import com.openwolf.iam.policystudio.lifecycle.BundleFile;
+
 /**
  * Compiles a generated candidate together with the EXACT immutable base bundle it targets, using
  * the SAME pinned Cerbos as the runtime PDP (Axiom Story C2 — "the compile gate is a control").
@@ -77,6 +79,32 @@ public class CerbosCompileGate {
         }
     }
 
+    /**
+     * Assemble {baseBundleDir + full candidate bundle} into an isolated temp dir and compile it as one
+     * policy universe. This is required for scoped resource policies: a tenant child at
+     * {@code scope: default} must compile alongside its same-version root parent.
+     */
+    public CompileOutcome compile(List<BundleFile> candidateFiles, Path baseBundleDir) {
+        Path work = null;
+        try {
+            work = Files.createTempDirectory("policystudio-compile-");
+            copyBundle(baseBundleDir, work);
+            for (BundleFile file : candidateFiles) {
+                Files.writeString(work.resolve(stagedFileName(file.path())), file.yaml(), StandardCharsets.UTF_8);
+            }
+            return runCompile(work);
+        } catch (IOException | InterruptedException e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            return new CompileOutcome(false, "compile gate error: " + e.getMessage());
+        } finally {
+            if (work != null) {
+                deleteRecursively(work);
+            }
+        }
+    }
+
     private CompileOutcome runCompile(Path policiesDir) throws IOException, InterruptedException {
         List<String> cmd = new ArrayList<>();
         if (commandExists("cerbos")) {
@@ -125,6 +153,14 @@ public class CerbosCompileGate {
                 }
             }
         }
+    }
+
+    private static String stagedFileName(String path) {
+        String fileName = "staged_" + path.replace('/', '_').replace('@', '_');
+        if (!fileName.endsWith(".yaml") && !fileName.endsWith(".yml")) {
+            fileName = fileName + ".yaml";
+        }
+        return fileName;
     }
 
     private static boolean commandExists(String cmd) {

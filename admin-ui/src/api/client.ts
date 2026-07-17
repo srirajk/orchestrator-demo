@@ -329,11 +329,21 @@ export interface BaseCeiling {
   reservedIdentities: string[]
 }
 
-export interface DraftRequest {
-  intent: string
-  subscopesEnabled: boolean
+export interface StudioGroundingSnapshot {
+  tenantId: string
   vocabulary: ManifestVocabulary
   baseCeiling: BaseCeiling
+  matrix: { cells: FixtureCell[]; fixtureSetHash: string }
+  current: BundleSnapshot
+  manifestRefs: string[]
+}
+
+export interface DraftRequest {
+  intent: string
+  resourceKind?: string
+  subscopesEnabled: boolean
+  vocabulary?: ManifestVocabulary
+  baseCeiling?: BaseCeiling
 }
 
 export interface ValidationResult {
@@ -480,8 +490,14 @@ export interface BreakGlassGrant {
 export const studioApi = {
   createDraft: (payload: DraftRequest) =>
     req<DraftResponse>('POST', '/admin/studio/drafts', payload),
+  getVocabulary: (resourceKind: string) =>
+    req<StudioGroundingSnapshot>('GET', `/admin/studio/vocabulary/${encodeURIComponent(resourceKind)}`),
   createReview: (payload: ReviewRequest) =>
     req<ConsequenceReview>('POST', '/admin/studio/reviews', payload),
+  createAssembledReview: (resourceKind: string, canonicalYaml: string) =>
+    req<ConsequenceReview>('POST', '/admin/studio/reviews/assembled', { resourceKind, canonicalYaml }),
+  assembleCandidateBundle: (resourceKind: string, canonicalYaml: string, fixtureSetHash: string) =>
+    req<PolicyBundle>('POST', '/admin/studio/bundles/candidates', { resourceKind, canonicalYaml, fixtureSetHash }),
   getReview: (reviewId: string) =>
     req<ConsequenceReview>('GET', `/admin/studio/reviews/${encodeURIComponent(reviewId)}`),
   listBundles: () => req<BundleView[]>('GET', '/admin/studio/bundles'),

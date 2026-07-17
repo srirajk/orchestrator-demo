@@ -5,7 +5,10 @@ import com.openwolf.iam.policystudio.ManifestVocabulary;
 import com.openwolf.iam.policystudio.PolicyAuthoringRequest;
 import com.openwolf.iam.policystudio.PolicyStudioGenerationService;
 import com.openwolf.iam.policystudio.StudioGenerationResult;
+import com.openwolf.iam.policystudio.StudioGroundingProvider;
+import com.openwolf.iam.policystudio.StudioGroundingSnapshot;
 import com.openwolf.iam.policystudio.TenantScope;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -39,13 +42,16 @@ import java.util.UUID;
 public class StudioAuthoringController {
 
     private final PolicyStudioGenerationService generation;
+    private final ObjectProvider<StudioGroundingProvider> grounding;
 
-    public StudioAuthoringController(PolicyStudioGenerationService generation) {
+    public StudioAuthoringController(PolicyStudioGenerationService generation,
+                                     ObjectProvider<StudioGroundingProvider> grounding) {
         this.generation = generation;
+        this.grounding = grounding;
     }
 
     /** The draft request. {@code authorScope} is intentionally absent — it is derived from the principal. */
-    public record DraftPayload(String intent, ManifestVocabulary vocabulary,
+    public record DraftPayload(String intent, String resourceKind, ManifestVocabulary vocabulary,
                                boolean subscopesEnabled, BaseCeiling baseCeiling) {}
 
     /** The deterministic-gate outcome the SPA renders. */
@@ -58,18 +64,30 @@ public class StudioAuthoringController {
     /** {@code POST /admin/studio/drafts} — generate + validate a candidate policy from NL intent. */
     @PostMapping("/drafts")
     public ResponseEntity<DraftResponse> draft(@RequestBody DraftPayload payload, Authentication auth) {
-        if (payload == null || payload.intent() == null || payload.vocabulary() == null
-                || payload.baseCeiling() == null) {
-            throw new IllegalArgumentException("intent, vocabulary and baseCeiling are required");
+        if (payload == null || payload.intent() == null) {
+            throw new IllegalArgumentException("intent is required");
         }
         String author = StudioPrincipal.actor(auth);
         String tenant = StudioPrincipal.tenant(auth);
+        String resourceKind = payload.resourceKind() == null || payload.resourceKind().isBlank()
+                ? (payload.vocabulary() == null ? "agent" : payload.vocabulary().resourceKind())
+                : payload.resourceKind();
+        StudioGroundingSnapshot serverGrounding = null;
+        if (payload.vocabulary() == null || payload.baseCeiling() == null) {
+            StudioGroundingProvider provider = grounding.getIfAvailable();
+            if (provider == null) {
+                throw new IllegalStateException("server manifest grounding is not available");
+            }
+            serverGrounding = provider.snapshot(tenant, resourceKind);
+        }
+        ManifestVocabulary vocabulary = payload.vocabulary() == null ? serverGrounding.vocabulary() : payload.vocabulary();
+        BaseCeiling baseCeiling = payload.baseCeiling() == null ? serverGrounding.baseCeiling() : payload.baseCeiling();
 
         // Author scope is the principal's own tenant — never a body field.
         TenantScope authorScope = TenantScope.of(tenant);
         PolicyAuthoringRequest request = new PolicyAuthoringRequest(
-                payload.intent(), payload.vocabulary(), authorScope,
-                payload.subscopesEnabled(), payload.baseCeiling());
+                payload.intent(), vocabulary, authorScope,
+                payload.subscopesEnabled(), baseCeiling);
 
         StudioGenerationResult result = generation.generate(request);
         DraftResponse response = new DraftResponse(

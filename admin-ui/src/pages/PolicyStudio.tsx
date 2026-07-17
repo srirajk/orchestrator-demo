@@ -6,13 +6,10 @@ import {
 } from 'lucide-react'
 import {
   studioApi,
-  type BaseCeiling,
   type BreakGlassRequest,
   type ConsequenceReview,
   type DraftRequest,
-  type ManifestVocabulary,
   type PolicyBundle,
-  type ReviewRequest,
 } from '../api/client'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
@@ -22,35 +19,6 @@ import { useToast } from '../components/ui/Toast'
 import { useAuth } from '../hooks/useAuth'
 
 type StudioTab = 'author' | 'lifecycle' | 'emergency'
-
-const EMPTY_GROUNDING = JSON.stringify({
-  vocabulary: {
-    resourceKind: 'resource', actions: ['read'], classifications: [], attributes: [],
-    roles: ['operator'], approvedImports: [],
-  },
-  baseCeiling: {
-    resourceKind: 'resource', tuples: [{ action: 'read', role: 'operator' }],
-    carriesTenantEqualityBackstop: true, reservedIdentities: [],
-  },
-}, null, 2)
-
-function reviewTemplate(tenant: string) {
-  return JSON.stringify({
-    current: { bundleId: 'bundle-current', policy: null, ceiling: null, canonicalContent: '<base-only>' },
-    candidate: { bundleId: 'bundle-candidate', policy: null, ceiling: null, canonicalContent: '<candidate>' },
-    matrix: {
-      cells: [{
-        principalRoles: ['operator'], principalTenant: tenant, principalAttrs: {},
-        resourceTenant: tenant, resourceAttrs: {}, action: 'read', label: 'operator-reads-resource',
-      }],
-      fixtureSetHash: 'replace-with-fixture-set-hash',
-    },
-    vocabulary: {
-      resourceKind: 'resource', actions: ['read'], classifications: [], attributes: [],
-      roles: ['operator'], approvedImports: [],
-    },
-  }, null, 2)
-}
 
 const EMPTY_BUNDLE = JSON.stringify({
   bundleId: 'b_replace', tenantId: 'replace', files: [], manifestRefs: [],
@@ -179,25 +147,29 @@ export function PolicyStudio() {
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const tenant = user?.tenantId || 'tenant from verified token'
-  const canDraft = user?.roles.some((role) => role === 'policy_drafter') ?? false
+  const canDraft = user?.roles.some((role) => role === 'policy_author') ?? false
   const canApprove = user?.roles.some((role) => role === 'policy_approver') ?? false
   const [tab, setTab] = useState<StudioTab>('author')
 
   const [intent, setIntent] = useState('')
+  const [resourceKind, setResourceKind] = useState('agent')
   const [subscopesEnabled, setSubscopesEnabled] = useState(false)
-  const [groundingJson, setGroundingJson] = useState(EMPTY_GROUNDING)
   const [draft, setDraft] = useState<Awaited<ReturnType<typeof studioApi.createDraft>> | null>(null)
-  const [reviewJson, setReviewJson] = useState(() => reviewTemplate(user?.tenantId || 'tenant'))
   const [review, setReview] = useState<ConsequenceReview | null>(null)
   const [candidateJson, setCandidateJson] = useState(EMPTY_BUNDLE)
   const [idempotencyKey, setIdempotencyKey] = useState(() => `studio-${Date.now()}`)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [consequencesConfirmed, setConsequencesConfirmed] = useState(false)
+  const grounding = useQuery({
+    queryKey: ['studio-grounding', resourceKind],
+    queryFn: () => studioApi.getVocabulary(resourceKind),
+    enabled: Boolean(user),
+    retry: false,
+  })
 
   const draftMutation = useMutation({
     mutationFn: async () => {
-      const grounding = parseJson<{ vocabulary: ManifestVocabulary; baseCeiling: BaseCeiling }>('Grounding contract', groundingJson)
-      const payload: DraftRequest = { intent, subscopesEnabled, ...grounding }
+      const payload: DraftRequest = { intent, resourceKind, subscopesEnabled }
       return studioApi.createDraft(payload)
     },
     onSuccess: (result) => {
@@ -208,9 +180,15 @@ export function PolicyStudio() {
   })
 
   const reviewMutation = useMutation({
-    mutationFn: () => studioApi.createReview(parseJson<ReviewRequest>('Review request', reviewJson)),
-    onSuccess: (result) => {
+    mutationFn: async () => {
+      if (!draft?.canonicalYaml) throw new Error('Generate an accepted draft first.')
+      const result = await studioApi.createAssembledReview(resourceKind, draft.canonicalYaml)
+      const candidate = await studioApi.assembleCandidateBundle(resourceKind, draft.canonicalYaml, result.fixtureSetHash)
+      return { result, candidate }
+    },
+    onSuccess: ({ result, candidate }) => {
       setReview(result)
+      setCandidateJson(JSON.stringify(candidate, null, 2))
       toast('success', 'Consequences computed by pinned Cerbos')
     },
     onError: (error: Error) => toast('error', error.message),
@@ -291,6 +269,11 @@ export function PolicyStudio() {
                   onChange={(event) => setIntent(event.target.value)}
                   rows={5}
                 />
+                <Input
+                  label="Resource kind"
+                  value={resourceKind}
+                  onChange={(event) => setResourceKind(event.target.value)}
+                />
                 <label className="flex items-start gap-2 text-sm text-ink-700">
                   <input
                     type="checkbox"
@@ -300,12 +283,13 @@ export function PolicyStudio() {
                   />
                   <span>Permit explicitly declared subscopes <span className="block text-xs text-ink-500">Leave off unless this policy intentionally targets a child scope.</span></span>
                 </label>
-                <AdvancedJson
-                  title="Grounding contract"
-                  hint="Temporary contract gap: vocabulary and base ceiling are supplied here until the tenant manifest provider endpoint lands."
-                  value={groundingJson}
-                  onChange={setGroundingJson}
-                />
+                <div className="rounded-md border border-line bg-slate-50 px-3 py-2.5 text-xs leading-5 text-ink-600">
+                  {grounding.isError
+                    ? (grounding.error as Error).message
+                    : grounding.data
+                      ? `${grounding.data.vocabulary.actions.length} actions, ${grounding.data.vocabulary.roles.length} roles, ${grounding.data.matrix.cells.length} sampled cells grounded from manifests.`
+                      : 'Loading manifest grounding...'}
+                </div>
                 <Button
                   onClick={() => draftMutation.mutate()}
                   loading={draftMutation.isPending}
@@ -346,16 +330,17 @@ export function PolicyStudio() {
                 </div>
                 <Badge color="navy">No LLM truth</Badge>
               </div>
-              <AdvancedJson
-                title="Snapshot and fixture input"
-                hint="Temporary contract gap: paste the current/candidate snapshots and sampled fixture matrix assembled by the backend workflow."
-                value={reviewJson}
-                onChange={setReviewJson}
-                rows={18}
-              />
+              <div className="rounded-md border border-line bg-slate-50 p-4">
+                <p className="text-sm font-medium text-ink-900">Server-assembled review input</p>
+                <p className="mt-1 text-xs leading-5 text-ink-500">
+                  The current snapshot, base ceiling, sampled matrix, and fixture hash come from the tenant manifest provider.
+                </p>
+                {draft?.canonicalYaml && <p className="mt-3 break-all font-mono text-[11px] text-ink-500">Candidate: {draft.draftId}</p>}
+              </div>
               <Button
                 onClick={() => reviewMutation.mutate()}
                 loading={reviewMutation.isPending}
+                disabled={!draft?.accepted || !draft.canonicalYaml}
                 className="mt-4 w-full"
               >
                 <GitCompare size={15} /> Run real-Cerbos consequence review
@@ -365,6 +350,17 @@ export function PolicyStudio() {
 
           {review && (
             <>
+              {review.displayProse && (
+                <section className="surface-card p-5">
+                  <div className="flex items-start gap-3">
+                    <FileCheck size={17} className="mt-0.5 text-gold-700" />
+                    <div>
+                      <h2 className="section-heading">Plain-English consequence summary</h2>
+                      <p className="mt-2 text-sm leading-6 text-ink-700">{review.displayProse}</p>
+                    </div>
+                  </div>
+                </section>
+              )}
               <ConsequencePanel review={review} />
               <section className="surface-card p-5">
                 <div className="flex flex-wrap items-start justify-between gap-4">
@@ -510,15 +506,22 @@ function BreakGlassPanel({ canDraft, canApprove, tenant }: { canDraft: boolean; 
   const [role, setRole] = useState('')
   const [ttl, setTtl] = useState(30)
   const [justification, setJustification] = useState('')
-  const [groundingJson, setGroundingJson] = useState(EMPTY_GROUNDING)
   const grants = useQuery({ queryKey: ['studio-break-glass'], queryFn: studioApi.listBreakGlass, retry: false })
+  const grounding = useQuery({
+    queryKey: ['studio-grounding', resourceKind || 'agent'],
+    queryFn: () => studioApi.getVocabulary(resourceKind || 'agent'),
+    enabled: Boolean(tenant && resourceKind),
+    retry: false,
+  })
 
   const requestMutation = useMutation({
     mutationFn: async () => {
-      const grounding = parseJson<{ vocabulary: ManifestVocabulary; baseCeiling: BaseCeiling }>('Break-glass grounding', groundingJson)
+      if (!grounding.data) throw new Error('Manifest grounding is not loaded yet.')
       const payload: BreakGlassRequest = {
         scope: tenant, resourceKind, action, role, ttlMinutes: ttl, justification,
-        ...grounding, allowlist: { resources: [resourceKind], actions: [action] },
+        vocabulary: grounding.data.vocabulary,
+        baseCeiling: grounding.data.baseCeiling,
+        allowlist: { resources: [resourceKind], actions: [action] },
       }
       return studioApi.requestBreakGlass(payload)
     },
@@ -553,8 +556,14 @@ function BreakGlassPanel({ canDraft, canApprove, tenant }: { canDraft: boolean; 
             <Input label="TTL minutes" type="number" min={1} max={60} value={ttl} onChange={(event) => setTtl(Number(event.target.value))} />
           </div>
           <div className="mt-3"><Textarea label="Incident justification" value={justification} onChange={(event) => setJustification(event.target.value)} rows={3} placeholder="Incident or operational reason" /></div>
-          <div className="mt-3"><AdvancedJson title="Emergency grounding" hint="Temporary contract gap: this must match the tenant's trusted manifest and emergency allowlist." value={groundingJson} onChange={setGroundingJson} rows={10} /></div>
-          <Button className="mt-4 w-full" variant="danger" loading={requestMutation.isPending} disabled={!canDraft || !tenant || !resourceKind || !action || !role || !justification.trim() || ttl < 1 || ttl > 60} onClick={() => requestMutation.mutate()}><Siren size={14} /> Request break-glass grant</Button>
+          <div className="mt-3 rounded-md border border-line bg-slate-50 px-3 py-2.5 text-xs leading-5 text-ink-600">
+            {grounding.isError
+              ? (grounding.error as Error).message
+              : grounding.data
+                ? `Emergency grounding loaded from manifests for ${grounding.data.vocabulary.resourceKind}.`
+                : 'Loading emergency grounding...'}
+          </div>
+          <Button className="mt-4 w-full" variant="danger" loading={requestMutation.isPending} disabled={!canDraft || !tenant || !resourceKind || !action || !role || !justification.trim() || ttl < 1 || ttl > 60 || !grounding.data} onClick={() => requestMutation.mutate()}><Siren size={14} /> Request break-glass grant</Button>
         </section>
 
         <section className="surface-panel">

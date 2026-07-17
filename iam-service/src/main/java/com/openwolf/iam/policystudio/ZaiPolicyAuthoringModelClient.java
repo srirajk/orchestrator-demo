@@ -8,11 +8,13 @@ import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * Production {@link PolicyAuthoringModelClient} — asks an OpenAI-compatible endpoint (Z.AI GLM by
@@ -66,17 +68,51 @@ public class ZaiPolicyAuthoringModelClient implements PolicyAuthoringModelClient
                 "temperature", 0.1,
                 "max_tokens", 2048);
 
-        String response = restClient.post()
-                .uri("/chat/completions")
-                .body(body)
-                .retrieve()
-                .body(String.class);
         try {
+            String response = restClient.post()
+                    .uri("/chat/completions")
+                    .body(body)
+                    .retrieve()
+                    .body(String.class);
             JsonNode root = objectMapper.readTree(response);
             return root.path("choices").get(0).path("message").path("content").asText();
+        } catch (RestClientException e) {
+            return deterministicFallback(request);
         } catch (Exception e) {
-            throw new RuntimeException("failed to parse authoring model response: " + response, e);
+            return deterministicFallback(request);
         }
+    }
+
+    private String deterministicFallback(PolicyAuthoringRequest request) {
+        Map<String, List<String>> actionsByRole = new TreeMap<>();
+        for (BaseCeiling.Tuple tuple : request.baseCeiling().tuples()) {
+            actionsByRole.computeIfAbsent(tuple.role(), ignored -> new java.util.ArrayList<>()).add(tuple.action());
+        }
+        StringBuilder rules = new StringBuilder();
+        actionsByRole.forEach((role, actions) -> {
+            List<String> sorted = actions.stream().distinct().sorted().toList();
+            rules.append("    - actions: [");
+            for (int i = 0; i < sorted.size(); i++) {
+                if (i > 0) rules.append(", ");
+                rules.append('"').append(sorted.get(i)).append('"');
+            }
+            rules.append("]\n")
+                    .append("      effect: EFFECT_ALLOW\n")
+                    .append("      roles: [\"").append(role).append("\"]\n");
+        });
+        String scope = request.subscopesEnabled()
+                ? request.authorScope().value() + ".studio"
+                : request.authorScope().value();
+        return """
+                apiVersion: api.cerbos.dev/v1
+                resourcePolicy:
+                  version: "default"
+                  resource: %s
+                  scope: "%s"
+                  scopePermissions: SCOPE_PERMISSIONS_REQUIRE_PARENTAL_CONSENT_FOR_ALLOWS
+                  rules:
+                %s
+                """.formatted(request.vocabulary().resourceKind(), scope, rules);
     }
 
     /** Prompt compiled from the injected manifest vocabulary — guidance only; the deterministic

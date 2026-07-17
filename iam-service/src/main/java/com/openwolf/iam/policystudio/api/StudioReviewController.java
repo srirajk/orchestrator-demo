@@ -3,9 +3,11 @@ package com.openwolf.iam.policystudio.api;
 import com.openwolf.iam.policystudio.BundleSnapshot;
 import com.openwolf.iam.policystudio.ConsequenceDiffService;
 import com.openwolf.iam.policystudio.ConsequenceFixtureMatrix;
+import com.openwolf.iam.policystudio.ConsequenceProseModelClient;
 import com.openwolf.iam.policystudio.ConsequenceReview;
 import com.openwolf.iam.policystudio.ManifestVocabulary;
 import com.openwolf.iam.policystudio.ProductionPdpDecisionSource;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -44,12 +46,15 @@ public class StudioReviewController {
     private final ConsequenceDiffService diff;
     private final ProductionPdpDecisionSource pdpSource;
     private final StudioSessionStore store;
+    private final ObjectProvider<ConsequenceProseModelClient> prose;
 
     public StudioReviewController(ConsequenceDiffService diff, ProductionPdpDecisionSource pdpSource,
-                                  StudioSessionStore store) {
+                                  StudioSessionStore store,
+                                  ObjectProvider<ConsequenceProseModelClient> prose) {
         this.diff = diff;
         this.pdpSource = pdpSource;
         this.store = store;
+        this.prose = prose;
     }
 
     /** The consequence-diff request: the two immutable snapshots, the sampled matrix, and the vocabulary. */
@@ -67,6 +72,10 @@ public class StudioReviewController {
         String tenant = StudioPrincipal.tenant(auth);
         ConsequenceReview review = diff.computeReview(
                 tenant, payload.vocabulary(), payload.current(), payload.candidate(), payload.matrix(), pdpSource);
+        ConsequenceProseModelClient client = prose.getIfAvailable();
+        if (client != null) {
+            review = diff.attachProse(review, client);
+        }
         // Record the VERIFIED author (drafter) alongside the review so promotion can enforce
         // author≠approver against a trusted identity, never a caller-supplied field.
         store.putReview(tenant, author, review);

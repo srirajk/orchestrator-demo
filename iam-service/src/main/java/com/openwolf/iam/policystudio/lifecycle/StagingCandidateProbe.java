@@ -40,7 +40,8 @@ public class StagingCandidateProbe implements CandidateProbe {
     @Override
     public void verify(PolicyBundle candidate) {
         // (1) Deterministic invariant: every policy stamps the candidate id and no sentinel survives.
-        for (BundleFile rendered : candidate.renderedFiles()) {
+        java.util.List<BundleFile> renderedFiles = candidate.renderedFiles();
+        for (BundleFile rendered : renderedFiles) {
             if (rendered.yaml().contains(BundleCanonicalizer.BUNDLE_VERSION_SENTINEL)) {
                 throw new IllegalStateException("candidate '" + candidate.bundleId() + "' file '"
                         + rendered.path() + "' still carries the version sentinel after rendering");
@@ -64,16 +65,10 @@ public class StagingCandidateProbe implements CandidateProbe {
             throw new IllegalStateException("base bundle dir '" + base + "' is missing — cannot stage + "
                     + "cerbos-compile candidate '" + candidate.bundleId() + "'; refusing to promote");
         }
-        for (BundleFile rendered : candidate.renderedFiles()) {
-            String fileName = "staged_" + rendered.path().replace('/', '_').replace('@', '_');
-            if (!fileName.endsWith(".yaml") && !fileName.endsWith(".yml")) {
-                fileName = fileName + ".yaml";
-            }
-            CerbosCompileGate.CompileOutcome outcome = compileGate.compile(rendered.yaml(), base, fileName);
-            if (!outcome.success()) {
-                throw new IllegalStateException("candidate '" + candidate.bundleId() + "' file '"
-                        + rendered.path() + "' failed cerbos compile: " + outcome.output());
-            }
+        CerbosCompileGate.CompileOutcome outcome = compileGate.compile(renderedFiles, base);
+        if (!outcome.success()) {
+            throw new IllegalStateException("candidate '" + candidate.bundleId()
+                    + "' failed cerbos compile: " + outcome.output());
         }
         log.debug("candidate '{}' staged + compiled + version-probed OK", candidate.bundleId());
     }

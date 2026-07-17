@@ -207,6 +207,11 @@ public class SecurityConfig {
                         // carried a @PreAuthorize and every other admin route fell through to
                         // anyRequest().authenticated(). Enforced here rather than per-method so a new
                         // @RequestMapping under /admin cannot silently arrive unguarded.
+                        // Policy Studio has its own two-person method gates. Let the seeded studio
+                        // roles through this coarse /admin shell filter only for the Studio subtree;
+                        // non-studio admin routes remain limited to platform/tenant/domain admins.
+                        .requestMatchers("/admin/studio/**")
+                        .hasAnyRole("platform_admin", "tenant_admin", "domain_admin", "policy_author", "policy_approver")
                         .requestMatchers("/admin/**")
                         .hasAnyRole("platform_admin", "tenant_admin", "domain_admin")
 

@@ -10,7 +10,7 @@
 ## Auth model (read first)
 
 - **Transport**: OIDC Bearer JWT (RS256), `Authorization: Bearer <token>`, minted by Axiom. Verified at every hop.
-- **Roles**: the token's `roles` claim → Spring authorities. Studio roles: `policy_drafter` (author), `policy_approver`
+- **Roles**: the token's `roles` claim → Spring authorities. Studio roles: `policy_author` (author), `policy_approver`
   (approve/promote), plus `platform_admin`. These roles sit under `tenant_admin`/`platform_admin` in the Cerbos meta-authz
   hierarchy — a studio user's token typically carries both an admin role and a studio role.
 - **Two gates, both enforced**:
@@ -51,15 +51,18 @@ Studio errors return: `{ "error": "<code>", "message": "<human text>" }`.
 | 3 | POST | `/admin/tenants` | `platform_admin` | `TenantProvisioningService` | pre-existing |
 | 4 | DELETE | `/admin/tenants/{tenantId}` | `platform_admin` | `TenantProvisioningService` | pre-existing |
 | 5 | GET | `/admin/tenants/directory` | `platform_admin` | `ActiveTenantDirectory` | pre-existing |
-| 6 | POST | `/admin/studio/drafts` | `policy_drafter` | `PolicyStudioGenerationService` | **NEW** |
-| 7 | POST | `/admin/studio/reviews` | drafter/approver/platform_admin | `ConsequenceDiffService` | **NEW** |
+| 6 | GET | `/admin/studio/vocabulary/{resourceKind}` | author/approver/platform_admin | `StudioGroundingProvider` | **NEW** |
+| 7 | POST | `/admin/studio/drafts` | `policy_author` | `PolicyStudioGenerationService` | **NEW** |
+| 8 | POST | `/admin/studio/reviews/assembled` | author/approver/platform_admin | `StudioGroundingProvider` + `ConsequenceDiffService` | **NEW** |
+| 9 | POST | `/admin/studio/bundles/candidates` | author/approver/platform_admin | `BundleCanonicalizer` | **NEW** |
+| 10 | POST | `/admin/studio/reviews` | author/approver/platform_admin | `ConsequenceDiffService` | **NEW** |
 | 8 | GET | `/admin/studio/reviews/{reviewId}` | drafter/approver/platform_admin | (session store) | **NEW** |
 | 9 | GET | `/admin/studio/bundles` | drafter/approver/platform_admin | `PolicyBundleRepository` | **NEW** |
 | 10 | GET | `/admin/studio/bundles/{bundleId}` | drafter/approver/platform_admin | `PolicyBundleRepository` | **NEW** |
 | 11 | GET | `/admin/studio/examiner/{cerbosCallId}` | drafter/approver/platform_admin | `ExaminerChainService` | **NEW** |
 | 12 | POST | `/admin/studio/promotions` | `policy_approver` | `ConsequenceApprovalService` + `PolicyPromotionService` | **NEW** |
 | 13 | POST | `/admin/studio/rollbacks` | `policy_approver` | `PolicyPromotionService#rollback` | **NEW** |
-| 14 | POST | `/admin/studio/break-glass` | `policy_drafter` | `BreakGlassAuthoringService` | **NEW** |
+| 14 | POST | `/admin/studio/break-glass` | `policy_author` | `BreakGlassAuthoringService` | **NEW** |
 | 15 | POST | `/admin/studio/break-glass/{grantId}/approve` | `policy_approver` | `BreakGlassApprovalService` | **NEW** |
 | 16 | GET | `/admin/studio/break-glass` | drafter/approver/platform_admin | (session store) | **NEW** |
 
@@ -105,29 +108,28 @@ Studio errors return: `{ "error": "<code>", "message": "<human text>" }`.
 
 ## C2 — Authoring (draft)
 
-### 6. `POST /admin/studio/drafts` — NL intent → validated canonical policy
-- **Role**: `policy_drafter`.
+### 6. `GET /admin/studio/vocabulary/{resourceKind}` — trusted manifest grounding
+- **Role**: `policy_author` | `policy_approver` | `platform_admin`.
+- **Security preconditions**: tenant comes from the token. The response is assembled from `registry/domains/*.json`
+  (`entity_types`, `domain_context`) plus `registry/manifests/*.json`, and the typed immutable base ceiling. The base
+  ceiling is not reconstructed from rendered bundle YAML.
+- **Response 200** (`StudioGroundingSnapshot`): `{ tenantId, vocabulary, baseCeiling, matrix, current, manifestRefs }`.
+
+### 7. `POST /admin/studio/drafts` — NL intent → validated canonical policy
+- **Role**: `policy_author`.
 - **Security preconditions**: author = verified `sub`; **author scope = `TenantScope.of(<tenant_id claim>)`** (never a body
   field), so a drafter can only target their own tenant subtree. The model only *proposes*; a deterministic gate decides;
   only the IR-derived **canonical** YAML is ever returned (never the model's raw text). A rejected proposal is a normal
   `200` with violations, not an error.
-- **Request** (`StudioAuthoringController.DraftPayload`) — `vocabulary`/`baseCeiling` are the closed manifest grounding
-  (see **Grounding gap** below):
+- **Request** (`StudioAuthoringController.DraftPayload`) — `resourceKind` selects the trusted manifest grounding; if
+  `vocabulary`/`baseCeiling` are omitted, the server supplies them:
 ```json
 {
-  "intent": "allow the desk to read agent decisions",
+  "intent": "allow relationship managers to invoke tenant agents",
+  "resourceKind": "agent",
   "subscopesEnabled": false,
-  "vocabulary": {
-    "resourceKind": "agent",
-    "actions": ["read"], "classifications": [], "attributes": [],
-    "roles": ["desk"], "approvedImports": []
-  },
-  "baseCeiling": {
-    "resourceKind": "agent",
-    "tuples": [ { "action": "read", "role": "desk" } ],
-    "carriesTenantEqualityBackstop": true,
-    "reservedIdentities": []
-  }
+  "vocabulary": null,
+  "baseCeiling": null
 }
 ```
 - **Response 200** (`DraftResponse`):
@@ -150,8 +152,23 @@ Studio errors return: `{ "error": "<code>", "message": "<human text>" }`.
 
 ## C4 — Consequence review
 
-### 7. `POST /admin/studio/reviews` — compute the decision delta (business consequences)
-- **Role**: `policy_drafter` | `policy_approver` | `platform_admin`.
+### 8. `POST /admin/studio/reviews/assembled` — compute the decision delta from server-grounded snapshots
+- **Role**: `policy_author` | `policy_approver` | `platform_admin`.
+- **Security preconditions**: tenant, current base snapshot, base ceiling, vocabulary, sampled fixture matrix and fixture hash
+  are assembled server-side from the trusted manifest provider. The request supplies only `resourceKind` and accepted
+  canonical YAML. Truth is still real Cerbos; optional `displayProse` is LLM display text outside the hash.
+- **Request**: `{ "resourceKind": "agent", "canonicalYaml": "apiVersion: api.cerbos.dev/v1\n..." }`.
+- **Response 200**: same `ConsequenceReview` shape as below.
+
+### 9. `POST /admin/studio/bundles/candidates` — materialize a promotion candidate bundle
+- **Role**: `policy_author` | `policy_approver` | `platform_admin`.
+- **Security preconditions**: tenant is the token claim. The candidate bundle is content-addressed server-side from canonical
+  YAML, trusted manifest refs, and the reviewed fixture set hash.
+- **Request**: `{ "resourceKind": "agent", "canonicalYaml": "...", "fixtureSetHash": "..." }`.
+- **Response 200**: `PolicyBundle`.
+
+### 10. `POST /admin/studio/reviews` — compute the decision delta (business consequences)
+- **Role**: `policy_author` | `policy_approver` | `platform_admin`.
 - **Security preconditions**: tenant = claim; the **verified author (`sub`) is recorded server-side with the review** so the
   later promotion can enforce author≠approver against a trusted identity. Truth is computed by
   **`ProductionPdpDecisionSource` using pinned Cerbos 0.53.0** against both immutable snapshots. If pinned Cerbos or the base
@@ -277,7 +294,7 @@ Studio errors return: `{ "error": "<code>", "message": "<human text>" }`.
 ## C6 — Break-glass (two-person emergency grant)
 
 ### 14. `POST /admin/studio/break-glass` — author (request) a time-bounded grant
-- **Role**: `policy_drafter`.
+- **Role**: `policy_author`.
 - **Security preconditions**: requester = verified `sub`. **`issuedAt` is stamped from the SERVER clock** (any caller value
   is ignored — there is no such field); **TTL is clamped to `(0, 60]` minutes** against the server clock, and `expiresAt =
   server now() + ttlMinutes`. The grant `scope` root must equal the claim tenant ⇒ else `403`. The same two deterministic
@@ -322,14 +339,12 @@ SPA can re-fetch by id and echo ids into later steps instead of reconstructing c
 record (the bundle/promotion/approval repositories + the active directory are). Practical implication: **compute a review on
 the same IAM node you promote against** within a session. A restart-durable / multi-node store is a documented follow-up.
 
-## Grounding gap (for the frontend)
+## Grounding model (for the frontend)
 
-`drafts` (6), `reviews` (7), and `break-glass` (14) currently take the closed manifest **`vocabulary`**, the immutable
-**`baseCeiling`**, the **`allowlist`**, and (for reviews) the two **`BundleSnapshot`s + `matrix`** in the request body. There
-is **no per-tenant provider bean** that derives these from the effective manifest yet (they are test fixtures today). The
-intended follow-up is a `GET /admin/studio/vocabulary/{resourceKind}` (+ a snapshot/matrix assembler keyed by two draft ids)
-so the SPA does not hand-build them. Until then, treat these as World-B config the caller supplies — they are **not** domain
-code and carry no domain literals in Java.
+`GET /admin/studio/vocabulary/{resourceKind}` returns trusted vocabulary, base ceiling, current base snapshot, sampled matrix,
+and manifest refs from the per-tenant `StudioGroundingProvider`. `POST /admin/studio/reviews/assembled` uses the same provider
+to assemble review inputs server-side, and `POST /admin/studio/bundles/candidates` materializes the candidate bundle from the
+accepted canonical YAML plus the reviewed fixture hash. The older raw `POST /reviews` shape remains for deterministic harnesses.
 
 ---
 
