@@ -32,7 +32,10 @@ public class OAuth2AuthorizationStoreConfig {
     public OAuth2AuthorizationService authorizationService(
             RedisTemplate<String, OAuth2Authorization> oauth2AuthorizationRedisTemplate,
             StringRedisTemplate stringRedisTemplate,
-            @Value("${iam.oauth2.authorization-store.redis.key-prefix:iam:oauth2}") String keyPrefix) {
-        return new RedisOAuth2AuthorizationService(oauth2AuthorizationRedisTemplate, stringRedisTemplate, keyPrefix);
+            @Value("${iam.oauth2.authorization-store.redis.key-prefix:iam:oauth2}") String keyPrefix,
+            @Value("${iam.oauth2.authorization-store.tenant-claim:tenant_id}") String tenantClaim,
+            @Value("${iam.oauth2.authorization-store.default-tenant:default}") String defaultTenant) {
+        return new RedisOAuth2AuthorizationService(
+                oauth2AuthorizationRedisTemplate, stringRedisTemplate, keyPrefix, tenantClaim, defaultTenant);
     }
 }

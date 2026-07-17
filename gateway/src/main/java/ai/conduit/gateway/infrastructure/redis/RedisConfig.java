@@ -23,6 +23,13 @@ import java.time.Duration;
  * <p>So: telemetry gets its own pool and can no longer crowd out the request path, and both pools get
  * a finite {@code maxWait} — a caller that cannot get a connection fails fast instead of parking
  * indefinitely. Sizes and timeouts are configuration, never constants.
+ *
+ * <p><b>Tenant-aware key-prefix seam (Axiom A3).</b> The pools are a single host/port with no
+ * namespacing of their own. Per-tenant key/index naming is the job of {@link TenantKeyspace} (the
+ * seam), and per-tenant application commands go through {@link TenantRedisFacade}, produced here by
+ * {@link #tenantRedisFacadeFactory}. Both resolve to the legacy names for the default/single-tenant
+ * case, so the demo (which reads the registry-written {@code intent_idx}) is unaffected until
+ * per-tenant ingestion (A4) exists.
  */
 @Configuration
 public class RedisConfig {
@@ -64,6 +71,24 @@ public class RedisConfig {
             @Value("${conduit.redis.telemetry-pool.max-idle:2}") int maxIdle,
             @Value("${conduit.redis.telemetry-pool.max-wait-ms:250}") long maxWaitMs) {
         return build(maxTotal, maxIdle, maxWaitMs);
+    }
+
+    /**
+     * Factory for the per-request tenant-qualified Redis facade. A request binds it to its
+     * {@link ai.conduit.gateway.domain.auth.TenantExecutionContext} via
+     * {@link TenantRedisFacade#forTenant}; every command it issues is then scoped to that tenant,
+     * with no unqualified {@code SCAN}/{@code FT._LIST} exposed. Kept as a factory (not a request
+     * bean) so the seam is usable off the servlet thread, where the context is passed explicitly.
+     */
+    @Bean
+    public TenantRedisFacadeFactory tenantRedisFacadeFactory(JedisPooled jedisPooled, TenantKeyspace keyspace) {
+        return tenant -> TenantRedisFacade.forTenant(jedisPooled, keyspace, tenant);
+    }
+
+    /** Binds the request-path pool + keyspace seam so callers need only supply the tenant context. */
+    @FunctionalInterface
+    public interface TenantRedisFacadeFactory {
+        TenantRedisFacade forTenant(ai.conduit.gateway.domain.auth.TenantExecutionContext tenant);
     }
 
     private JedisPooled build(int maxTotal, int maxIdle, long maxWaitMs) {
