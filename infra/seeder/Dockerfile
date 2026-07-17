@@ -19,8 +19,9 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # requests → seed-conversations-via-bff.py ; langfuse → langfuse_seed_datasets.py.
+# psycopg[binary] + bcrypt → seed-iam-users.py (IAM Postgres principals, BCrypt passwords).
 # (seed-langfuse-models.py uses only stdlib urllib.)
-RUN pip install --no-cache-dir requests langfuse
+RUN pip install --no-cache-dir requests langfuse "psycopg[binary]" bcrypt
 
 # The compose service mounts ./scripts:/scripts:ro, ./registry:/registry:ro and
 # ./eval:/eval:ro, then invokes bash /scripts/seed-all.sh, so no COPY is required here.

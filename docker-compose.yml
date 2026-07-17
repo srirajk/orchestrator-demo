@@ -955,6 +955,12 @@ services:
       # Internal (in-network) URLs — never localhost.
       REDIS_HOST: redis-stack
       REDIS_PORT: "6379"
+      # IAM Postgres — the OIDC login source of truth seeded by scripts/seed-iam-users.py.
+      IAM_DB_HOST: postgres
+      IAM_DB_PORT: "5432"
+      IAM_DB_NAME: meridian
+      IAM_DB_USER: meridian
+      IAM_DB_PASSWORD: ${POSTGRES_PASSWORD:-meridian_dev}
       GATEWAY_URL: http://gateway:8080
       CHAT_BFF_URL: http://conduit-chat:8095
       IAM_URL: http://iam-service:8084
@@ -971,6 +977,8 @@ services:
       SEED_PASSWORD: ${SEED_PASSWORD:-Meridian@2024}
     depends_on:
       redis-stack:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
       gateway:
         condition: service_healthy
