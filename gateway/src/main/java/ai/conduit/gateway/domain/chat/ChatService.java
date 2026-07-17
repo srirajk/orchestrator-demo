@@ -718,7 +718,10 @@ public class ChatService {
                             new GateData(g.gate(), g.allow() ? GateData.EFFECT_ALLOW : GateData.EFFECT_DENY,
                                     g.reason(), g.agent()))));
 
-            List<AgentManifest> allowedManifests = entitlementService.filterAgents(principal, manifests);
+            // PRIMARY structural-entitlement gate: evaluate at the request's active bundle version
+            // (S1c). A promoted tenant is filtered against its own promoted bundle; the default /
+            // unresolved-ctx tenant stays on the base "default" version — wire-identical to before.
+            List<AgentManifest> allowedManifests = entitlementService.filterAgents(principal, manifests, tenant);
             if (allowedManifests.isEmpty()) {
                 emitRequestOutcome("DENIED");
                 // Glass-box: make the structural (Cerbos agent-invoke) deny explicit in the trace
@@ -1253,7 +1256,7 @@ public class ChatService {
         //    EVERY manifest the plan touches; if it prunes even one, refuse the DAG and fall back to
         //    flat — never invoke a resolver-pulled producer the principal isn't entitled to.
         List<AgentManifest> planManifests = plan.nodes().stream().map(PlanNode::agent).collect(Collectors.toList());
-        List<AgentManifest> allowedPlan = entitlementService.filterAgents(principal, planManifests);
+        List<AgentManifest> allowedPlan = entitlementService.filterAgents(principal, planManifests, tenant);
         if (allowedPlan.size() < planManifests.size()) {
             log.warn("DAG authz re-gate pruned {}→{} plan manifests for principal={} — flat fallback (no producer leak)",
                     planManifests.size(), allowedPlan.size(), principal.id());
@@ -1455,7 +1458,7 @@ public class ChatService {
         int servedGroups = 0;
         int deniedGroups = 0;
         for (RequestedPlan.RequestedGroup group : plan.groups()) {
-            List<AgentManifest> allowed = entitlementService.filterAgents(principal, group.candidates());
+            List<AgentManifest> allowed = entitlementService.filterAgents(principal, group.candidates(), tenant);
             Set<String> allowedIds = allowed.stream().map(AgentManifest::agentId)
                     .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
             List<String> allowedList = new ArrayList<>();
@@ -1713,7 +1716,7 @@ public class ChatService {
                     .forEach(g -> tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
                             new GateData(g.gate(), g.allow() ? GateData.EFFECT_ALLOW : GateData.EFFECT_DENY,
                                     g.reason(), g.agent()))));
-            List<AgentManifest> allowed = entitlementService.filterAgents(principal, group.candidates());
+            List<AgentManifest> allowed = entitlementService.filterAgents(principal, group.candidates(), tenant);
 
             // (2) DAG producer prune → deny this group (never a silent flat-fallback). Closure is derived
             //     intra-group here (ground/bind → closure → authz), not at group formation (spec Piece 4/6).

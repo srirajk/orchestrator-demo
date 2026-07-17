@@ -107,6 +107,13 @@ class RoutePreparedRoutingTest extends RedisContainerTest {
             if (ms != null) ms.forEach(m -> decisions.put(m.agentId(), true));
             return new CerbosEntitlementAdapter.BatchResult(decisions, "cerbos");
         });
+        // S1c: mirror the stub for the ctx-aware overload the PRIMARY filterAgents gate now calls.
+        when(cerbosAdapter.checkAgents(any(), any(), any())).thenAnswer(inv -> {
+            List<ai.conduit.gateway.registry.model.AgentManifest> ms = inv.getArgument(1);
+            Map<String, Boolean> decisions = new HashMap<>();
+            if (ms != null) ms.forEach(m -> decisions.put(m.agentId(), true));
+            return new CerbosEntitlementAdapter.BatchResult(decisions, "cerbos");
+        });
         // Router abstains → the request ends deterministically; we assert the CAPTURED routing text.
         when(resolver.resolveContextual(anyString(), anyBoolean())).thenReturn(
                 new ResolverResult(List.of(), List.of(), true, 0.1, "q", 0.0, false));

@@ -177,6 +177,13 @@ class ChatServiceRequestedGroupTest extends RedisContainerTest {
             if (ms != null) ms.forEach(m -> decisions.put(m.agentId(), allow.contains(m.agentId())));
             return new CerbosEntitlementAdapter.BatchResult(decisions, "cerbos");
         });
+        // S1c: mirror the stub for the ctx-aware overload the PRIMARY filterAgents gate now calls.
+        when(cerbosAdapter.checkAgents(any(), any(), any())).thenAnswer(inv -> {
+            List<AgentManifest> ms = inv.getArgument(1);
+            Map<String, Boolean> decisions = new HashMap<>();
+            if (ms != null) ms.forEach(m -> decisions.put(m.agentId(), allow.contains(m.agentId())));
+            return new CerbosEntitlementAdapter.BatchResult(decisions, "cerbos");
+        });
     }
 
     private ResolverResult twoFacets(AgentManifest a, AgentManifest b) {

@@ -109,6 +109,14 @@ abstract class CapabilityClarifyFixture extends RedisContainerTest {
             if (ms != null) ms.forEach(m -> decisions.put(m.agentId(), true));
             return new CerbosEntitlementAdapter.BatchResult(decisions, "cerbos");
         });
+        // S1c: the PRIMARY filterAgents routing gate now invokes the ctx-aware checkAgents overload.
+        // Same verdict (single-tenant "default" resolves identically); mirror the stub for the new signature.
+        when(cerbosAdapter.checkAgents(any(), any(), any())).thenAnswer(inv -> {
+            List<AgentManifest> ms = inv.getArgument(1);
+            Map<String, Boolean> decisions = new HashMap<>();
+            if (ms != null) ms.forEach(m -> decisions.put(m.agentId(), true));
+            return new CerbosEntitlementAdapter.BatchResult(decisions, "cerbos");
+        });
     }
 
     String mintToken() throws Exception {
