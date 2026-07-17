@@ -1,0 +1,65 @@
+# Throwaway harness proving the Python IAM seeder end-to-end against the REAL iam-service.
+#
+# Distinct project + ports + volumes — never touches the `-p orchestrator-demo` demo.
+#   docker compose -p iam-seeder-proof -f tests/iam-seeder/proof-compose.yml up -d
+#
+# It boots a fresh Postgres + Redis + the prebuilt conduit/iam-service:latest image, but points
+# Flyway at the EDITED migrations on disk (filesystem:/migrations) instead of the ones baked into
+# the image, so the neutralized V4/V5/V7/V8 no-ops are the ones actually applied. Then run:
+#   IAM_DB_HOST=localhost IAM_DB_PORT=15432 python3 scripts/seed-iam-users.py
+#   curl -s localhost:18084/auth/token -H 'content-type: application/json' \
+#        -d '{"username":"ops_analyst_singh","password":"Meridian@2024"}'
+# Teardown:  docker compose -p iam-seeder-proof -f tests/iam-seeder/proof-compose.yml down -v
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: meridian
+      POSTGRES_PASSWORD: meridian_dev
+      POSTGRES_DB: meridian
+    ports:
+      - "15432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U meridian"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "PING"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  iam-service:
+    image: conduit/iam-service:latest
+    ports:
+      - "18084:8084"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/meridian
+      SPRING_DATASOURCE_USERNAME: meridian
+      SPRING_DATASOURCE_PASSWORD: meridian_dev
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      SPRING_DATA_REDIS_DATABASE: "4"
+      # Apply the EDITED migrations from disk, not the image's baked-in copy.
+      SPRING_FLYWAY_LOCATIONS: filesystem:/migrations
+      IAM_ISSUER_URL: http://localhost:18084
+      IAM_ADMIN_PASSWORD: Meridian@2024
+      IAM_SEED_ENABLED: "true"
+      IAM_POLICY_GENERATION_ENABLED: "false"
+      # OAuth2 client secrets — no in-source default (IAM fails fast if unset). Dev values.
+      IAM_LIBRECHAT_CLIENT_SECRET: meridian-client-secret-dev
+      IAM_ADMIN_UI_CLIENT_SECRET: admin-ui-secret
+      IAM_GATEWAY_CLIENT_SECRET: gateway-secret
+      IAM_CONDUIT_CHAT_CLIENT_SECRET: conduit-chat-secret
+    volumes:
+      - ../../iam-service/src/main/resources/db/migration:/migrations:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
