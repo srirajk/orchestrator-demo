@@ -18,6 +18,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Enriches OIDC access tokens with mandated claims ({@code tenant_id}, {@code roles},
@@ -61,12 +62,21 @@ public class JwtClaimsCustomizer {
             }
             String tokenValue = context.getTokenType().getValue();
             if (OAuth2TokenType.ACCESS_TOKEN.getValue().equals(tokenValue)) {
-                // Access token: authorization claims (roles, permissions, segments, …)
-                List<String> audiences = gatewayAudiences();
+                // Access token: authorization claims (roles, permissions, segments, …).
+                // Enrich first so the mandatory tenant_id is known — a subject the enricher cannot
+                // bind to a tenant is un-mintable (requireTenant throws) and no token is emitted.
+                Map<String, Object> enriched = enricher.enrich(subject);
+                enriched.forEach((k, v) -> context.getClaims().claim(k, v));
+
+                // A1: the gateway audience is tenant-qualified. Alongside the bare resource
+                // audience the token carries conduit-gateway@<tenant_id>; the gateway rejects a
+                // token whose @<suffix> disagrees with its tenant_id claim.
+                Object rawTenant = enriched.get("tenant_id");
+                String tenantId = TenantClaims.requireTenant(rawTenant == null ? null : rawTenant.toString());
+                List<String> audiences = TenantClaims.gatewayAudiences(gatewayAudiences(), tenantId);
                 if (!audiences.isEmpty()) {
                     context.getClaims().audience(audiences);
                 }
-                enricher.enrich(subject).forEach((k, v) -> context.getClaims().claim(k, v));
 
                 // AUDIT (additive around auth): record who entered Conduit Chat. We are the OIDC
                 // provider, so a fresh authorization_code exchange for the chat client is the

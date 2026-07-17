@@ -8,7 +8,6 @@ import com.openwolf.iam.entity.Role;
 import com.openwolf.iam.repository.PrincipalRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,15 +39,15 @@ public class OidcClaimEnricher {
 
     private final PrincipalRepository principalRepository;
     private final ObjectMapper objectMapper;
-    private final String defaultTenantId;
+    private final ServiceTenantProperties serviceTenants;
 
     public OidcClaimEnricher(
             PrincipalRepository principalRepository,
             ObjectMapper objectMapper,
-            @Value("${conduit.iam.default-tenant-id:default}") String defaultTenantId) {
+            ServiceTenantProperties serviceTenants) {
         this.principalRepository = principalRepository;
         this.objectMapper = objectMapper;
-        this.defaultTenantId = defaultTenantId;
+        this.serviceTenants = serviceTenants;
     }
 
     /** Returns the claims to add to the access token. Runs in a session so lazy roles load. */
@@ -61,8 +60,13 @@ public class OidcClaimEnricher {
                 .orElse(null);
 
         if (principal == null) {
-            log.warn("JWT enrich: no principal for sub={} — minimal claims", subject);
-            claims.put("tenant_id", defaultTenantId);
+            // A1: NO blanket default-tenant fallback. A subject with no principal is only mintable
+            // if it is an explicitly-bound service (client_credentials) client; otherwise it is
+            // un-mintable (requireTenant throws on the null binding). This closes the side-channel
+            // where a lookup miss silently minted a `default`-tenant token.
+            String serviceTenant = serviceTenants.tenantFor(subject);
+            log.warn("JWT enrich: no principal for sub={} — service-tenant binding={}", subject, serviceTenant);
+            claims.put("tenant_id", TenantClaims.requireTenant(serviceTenant));
             return claims;
         }
 
@@ -90,7 +94,9 @@ public class OidcClaimEnricher {
         claims.put("segments", segments);
         claims.put("admin_domains", adminDomains);
         claims.put("classification", classification);
-        claims.put("tenant_id", principal.getTenantId());
+        // A1: tenant_id is mandatory and non-defaultable — a principal with a null/blank home
+        // tenant is un-mintable (requireTenant throws) rather than silently defaulting.
+        claims.put("tenant_id", TenantClaims.requireTenant(principal.getTenantId()));
         claims.put("permissions", permissions);
 
         log.debug("JWT enriched for sub={} roles={} segments={}", subject, roles, segments);

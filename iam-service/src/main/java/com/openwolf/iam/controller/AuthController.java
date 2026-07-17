@@ -1,5 +1,7 @@
 package com.openwolf.iam.controller;
 
+import com.openwolf.iam.auth.TenantClaims;
+import com.openwolf.iam.dto.DelegationRequest;
 import com.openwolf.iam.dto.LoginResponse;
 import com.openwolf.iam.dto.ImpersonateRequest;
 import com.openwolf.iam.dto.TokenRequest;
@@ -44,6 +46,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * Custom authentication endpoints — issues RS256 JWTs directly.
@@ -69,6 +72,23 @@ public class AuthController {
 
     @Value("${iam.auth.impersonation-ttl-seconds:900}")
     private long impersonationTtlSeconds;
+
+    // Cross-tenant admin delegation (contract #7). Short-lived and hard-capped at 15 minutes;
+    // a configured value above the cap is clamped, never honored.
+    @Value("${iam.auth.delegation-ttl-seconds:900}")
+    private long delegationTtlSeconds;
+
+    // Admin-only base audience for delegation tokens. Deliberately NOT the gateway resource
+    // audience, so ordinary chat/data endpoints reject a delegation token on audience grounds
+    // alone (defence in depth on top of the typ check).
+    @Value("${iam.oauth2.delegation.audience:conduit-admin}")
+    private String delegationAudienceRaw;
+
+    /** Maximum delegation-token lifetime (contract #7: ≤15 minutes). */
+    private static final long DELEGATION_TTL_CAP_SECONDS = 900L;
+
+    /** JOSE {@code typ} that types a cross-tenant delegation token (rejected by data endpoints). */
+    private static final String DELEGATION_TOKEN_TYPE = "tenant-delegation+jwt";
 
     private final AuthenticationManager authenticationManager;
     private final JwtEncoder jwtEncoder;
@@ -135,6 +155,75 @@ public class AuthController {
     }
 
     /**
+     * {@code POST /auth/delegation} — mints a cross-tenant admin <b>delegation token</b>
+     * (contract #7). Admin-only and audited. The token is <em>separately typed</em>
+     * ({@code typ=tenant-delegation+jwt}) and carries an <b>admin-only audience</b>
+     * ({@code conduit-admin@<subject-tenant>}), so ordinary chat/data endpoints reject it — it is
+     * NOT a general bearer and grants no wildcard cross-tenant bypass.
+     *
+     * <p>There is no caller-supplied tenant: the delegation's {@code tenant_id} is derived from the
+     * target subject's home tenant. The actor (admin) identity + home tenant come from the caller's
+     * own verified token. TTL is hard-capped at 15 minutes.
+     */
+    @PostMapping("/auth/delegation")
+    @PreAuthorize("hasRole('platform_admin')")
+    @Transactional
+    public ResponseEntity<LoginResponse> delegate(
+            @Valid @RequestBody DelegationRequest req,
+            HttpServletRequest httpReq) {
+        Principal subject = principalRepository.findById(req.subjectUserId())
+                .or(() -> principalRepository.findByUsername(req.subjectUserId()))
+                .orElseThrow(() -> EntityNotFoundException.forId("User", req.subjectUserId()));
+
+        // Tenant of the subject being administered — mandatory + canonical, no default.
+        String subjectTenant = TenantClaims.requireTenant(subject.getTenantId());
+
+        // Actor = the calling admin, resolved from the verified security context (never the body).
+        String actorSub = auditService.currentActor();
+        Principal actor = principalRepository.findById(actorSub)
+                .or(() -> principalRepository.findByUsername(actorSub))
+                .orElseThrow(() -> EntityNotFoundException.forId("User", actorSub));
+        String actorTenant = TenantClaims.requireTenant(actor.getTenantId());
+
+        long ttl = Math.min(delegationTtlSeconds, DELEGATION_TTL_CAP_SECONDS);
+        Instant now = Instant.now();
+        String delegationId = UUID.randomUUID().toString();
+
+        // Typed header so the token is self-describing on the wire; verifiers reject this typ on
+        // the data path.
+        JwsHeader jwsHeader = JwsHeader.with(SignatureAlgorithm.RS256)
+                .type(DELEGATION_TOKEN_TYPE)
+                .build();
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .issuer(issuerUrl)
+                .subject(subject.getId())
+                .issuedAt(now)
+                .expiresAt(now.plusSeconds(ttl))
+                .audience(TenantClaims.gatewayAudiences(delegationAudiences(), subjectTenant))
+                .claim("typ", DELEGATION_TOKEN_TYPE)
+                .claim("tenant_id", subjectTenant)
+                .claim("actor_tenant_id", actorTenant)
+                .claim("actor_sub", actorSub)
+                .claim("delegation_id", delegationId)
+                .claim("purpose", req.purpose())
+                .build();
+
+        String tokenValue = jwtEncoder.encode(JwtEncoderParameters.from(jwsHeader, claims)).getTokenValue();
+
+        auditService.log(subjectTenant, actorSub,
+                "TENANT_DELEGATION_ISSUED", "tenant", subjectTenant, null,
+                Map.of("delegationId", delegationId, "actorTenant", actorTenant,
+                        "subject", subject.getId(), "purpose", req.purpose(), "expiresIn", ttl),
+                httpReq);
+
+        log.info("Issued tenant-delegation token id={} actor={}@{} subjectTenant={} ttl={}s",
+                delegationId, actorSub, actorTenant, subjectTenant, ttl);
+
+        // No UserResponse body — a delegation token is an admin credential, not a login.
+        return ResponseEntity.ok(new LoginResponse(tokenValue, "Bearer", ttl, null));
+    }
+
+    /**
      * {@code GET /.well-known/jwks.json} — redirect to Spring AS JWKS endpoint.
      * Spring Authorization Server serves the JWKS directly at /oauth2/jwks.
      */
@@ -166,6 +255,12 @@ public class AuthController {
     }
 
     private ResponseEntity<LoginResponse> issueTokenForPrincipal(Principal principal, long ttlSeconds, String purpose) {
+        // A1: tenant_id is mandatory and non-defaultable. Resolve it up front — a principal with a
+        // null/blank home tenant is un-mintable (requireTenant throws → 500), never coerced to a
+        // default. The tenant claim and the tenant-qualified audience both derive from this one
+        // value, so a token can never assert one tenant while being audienced for another.
+        String tenantId = TenantClaims.requireTenant(principal.getTenantId());
+
         // Build JWT claims
         Instant now = Instant.now();
         Instant expiry = now.plusSeconds(ttlSeconds);
@@ -201,7 +296,7 @@ public class AuthController {
                 .subject(principal.getId())
                 .issuedAt(now)
                 .expiresAt(expiry)
-                .audience(gatewayAudiences())
+                .audience(TenantClaims.gatewayAudiences(gatewayAudiences(), tenantId))
                 .claim("username", principal.getUsername())
                 .claim("email", principal.getEmail())
                 .claim("roles", roles)
@@ -209,7 +304,7 @@ public class AuthController {
                 .claim("segments", segments)
                 .claim("classification", classification)
                 .claim("admin_domains", adminDomains)
-                .claim("tenant_id", principal.getTenantId() != null ? principal.getTenantId() : "default")
+                .claim("tenant_id", tenantId)
                 .build();
 
         String tokenValue = jwtEncoder.encode(JwtEncoderParameters.from(jwsHeader, claims)).getTokenValue();
@@ -221,6 +316,13 @@ public class AuthController {
 
     private List<String> gatewayAudiences() {
         return Arrays.stream(gatewayAudienceRaw.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .toList();
+    }
+
+    private List<String> delegationAudiences() {
+        return Arrays.stream(delegationAudienceRaw.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isBlank())
                 .toList();
