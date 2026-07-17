@@ -1,8 +1,7 @@
 package com.openwolf.iam.policystudio.api;
 
-import com.openwolf.iam.policystudio.ConsequenceDiffService;
 import com.openwolf.iam.policystudio.ConsequenceReview;
-import com.openwolf.iam.policystudio.ProductionPdpDecisionSource;
+import com.openwolf.iam.policystudio.GroundedStudioReviewService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -18,6 +17,7 @@ import java.util.Optional;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -25,26 +25,49 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * C4 consequence-diff endpoint. The truth is computed by {@link ConsequenceDiffService} from real PDP
- * decisions; the controller records the VERIFIED author + tenant with the review so promotion can later
- * enforce author≠approver. Tenant is the claim; a cross-tenant re-fetch resolves as 404.
+ * C4 consequence-diff endpoint. The truth is computed by {@link GroundedStudioReviewService} from real
+ * PDP decisions over a manifest-derived fixture matrix; the service records the VERIFIED author + tenant
+ * with the review so promotion can later enforce author≠approver. Tenant is the claim; a cross-tenant
+ * re-fetch resolves as 404.
+ *
+ * <p><b>S2 trusted inputs.</b> Grounding — the two bundle snapshots, the sampled matrix, and the
+ * vocabulary — is NEVER accepted from the caller: the route takes only the authored {@code canonicalYaml}
+ * (+ a {@code resourceKind} selector), and grounding is derived server-side. A caller that smuggles
+ * {@code current}/{@code candidate}/{@code matrix}/{@code vocabulary} into the body is ignored — those
+ * fields no longer exist on the payload and never reach the derivation.
  */
 @WebMvcTest(controllers = StudioReviewController.class)
 @Import(StudioTestSecurityConfig.class)
 class StudioReviewControllerTest {
 
     @Autowired MockMvc mvc;
-    @MockitoBean ConsequenceDiffService diff;
-    @MockitoBean ProductionPdpDecisionSource pdpSource;
+    @MockitoBean GroundedStudioReviewService reviews;
     @MockitoBean StudioSessionStore store;
 
+    private static final String CANONICAL_YAML = "apiVersion: api.cerbos.dev/v1\nresourcePolicy: {}\n";
+
+    /** A clean request: only the authored candidate + the resource-kind selector. */
     private static final String BODY = """
             {
-              "current":{"bundleId":"b0","policy":null,"ceiling":null,"canonicalContent":"x"},
-              "candidate":{"bundleId":"b1","policy":null,"ceiling":null,"canonicalContent":"y"},
-              "matrix":{"cells":[],"fixtureSetHash":"fs-1"},
-              "vocabulary":{"resourceKind":"agent","actions":[],"classifications":[],
-                            "attributes":[],"roles":[],"approvedImports":[]}
+              "resourceKind":"agent",
+              "canonicalYaml":"apiVersion: api.cerbos.dev/v1\\nresourcePolicy: {}\\n"
+            }
+            """;
+
+    /**
+     * A poisoned request: the caller ALSO smuggles the two snapshots, a bogus matrix, and a widened
+     * vocabulary into the body. These fields no longer exist on the payload and must be ignored — only
+     * the authored {@code canonicalYaml} + {@code resourceKind} may cross the boundary.
+     */
+    private static final String POISON_BODY = """
+            {
+              "resourceKind":"agent",
+              "canonicalYaml":"apiVersion: api.cerbos.dev/v1\\nresourcePolicy: {}\\n",
+              "current":{"bundleId":"POISON","policy":null,"ceiling":null,"canonicalContent":"x"},
+              "candidate":{"bundleId":"POISON","policy":null,"ceiling":null,"canonicalContent":"y"},
+              "matrix":{"cells":[],"fixtureSetHash":"POISON"},
+              "vocabulary":{"resourceKind":"agent","actions":["exfiltrate"],"classifications":[],
+                            "attributes":[],"roles":["attacker"],"approvedImports":[]}
             }
             """;
 
@@ -54,8 +77,8 @@ class StudioReviewControllerTest {
     }
 
     @Test
-    void computeReturnsReviewAndRecordsVerifiedAuthor() throws Exception {
-        when(diff.computeReview(eq("meridian"), any(), any(), any(), any(), any())).thenReturn(review());
+    void computeReturnsReviewFromServerDerivedGrounding() throws Exception {
+        when(reviews.assembleAndReview(eq("meridian"), eq("drafter-dan"), any(), any())).thenReturn(review());
 
         mvc.perform(post("/admin/studio/reviews")
                         .with(StudioMvc.principal("drafter-dan", "meridian", "policy_author"))
@@ -65,8 +88,27 @@ class StudioReviewControllerTest {
                 .andExpect(jsonPath("$.overPermissionAlarm").value(true))
                 .andExpect(jsonPath("$.principalsGainingAccess").value(3));
 
-        // the verified author (sub) + tenant are recorded, never a body field.
-        verify(store).putReview(eq("meridian"), eq("drafter-dan"), any());
+        // The VERIFIED tenant (claim) + author (sub) drive the review — grounding is derived server-side
+        // from ONLY the authored candidate + resource kind, never a caller-supplied field.
+        verify(reviews).assembleAndReview("meridian", "drafter-dan", "agent", CANONICAL_YAML);
+    }
+
+    /**
+     * The lockdown proof: caller-supplied snapshots/matrix/vocabulary cannot poison the review. The
+     * service is invoked with ONLY the trusted principal (tenant + author) and the authored candidate;
+     * the poisoned {@code current}/{@code candidate}/{@code matrix}/{@code vocabulary} have nowhere to go.
+     */
+    @Test
+    void callerSuppliedSnapshotsAndMatrixAreIgnored() throws Exception {
+        when(reviews.assembleAndReview(eq("meridian"), eq("drafter-dan"), any(), any())).thenReturn(review());
+
+        mvc.perform(post("/admin/studio/reviews")
+                        .with(StudioMvc.principal("drafter-dan", "meridian", "policy_author"))
+                        .contentType(MediaType.APPLICATION_JSON).content(POISON_BODY))
+                .andExpect(status().isOk());
+
+        // Exactly the trusted inputs reached the server-side derivation — no snapshot/matrix/vocabulary.
+        verify(reviews).assembleAndReview("meridian", "drafter-dan", "agent", CANONICAL_YAML);
     }
 
     @Test
@@ -93,5 +135,6 @@ class StudioReviewControllerTest {
                         .with(StudioMvc.principal("rm", "meridian", "chat_user"))
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isForbidden());
+        verifyNoInteractions(reviews);
     }
 }

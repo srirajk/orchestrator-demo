@@ -1,6 +1,5 @@
 package com.openwolf.iam.policystudio;
 
-import com.openwolf.iam.policystudio.api.StudioReviewController;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
@@ -75,9 +74,12 @@ class LocalPdpParityIT {
                 .as("bug-292 remains documented: the retired local evaluator is not Cerbos truth")
                 .isNotEmpty();
 
-        Class<?>[] controllerDependencies = Arrays.stream(StudioReviewController.class.getConstructors())
+        // The studio review routes (StudioReviewController + StudioGroundingController) both derive
+        // grounding and run consequence diffs through GroundedStudioReviewService — so the production
+        // PDP truth (never the retired local evaluator) must be wired THERE.
+        Class<?>[] reviewServiceDependencies = Arrays.stream(GroundedStudioReviewService.class.getConstructors())
                 .findFirst().orElseThrow().getParameterTypes();
-        assertThat(controllerDependencies)
+        assertThat(reviewServiceDependencies)
                 .contains(ProductionPdpDecisionSource.class)
                 .doesNotContain(LocalPdpDecisionSource.class);
     }
