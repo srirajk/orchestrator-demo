@@ -2,6 +2,18 @@ apiVersion: api.cerbos.dev/v1
 resourcePolicy:
   version: "default"
   resource: relationship
+  # ── Axiom Story B2: base scope + tenant-equality gap closed ───────────────────
+  # BASE scope (root) = ceiling; per-tenant narrowing lives in tenant_default_relationship.yaml.
+  # scopePermissions unset ⇒ Cerbos default OVERRIDE_PARENT (root has no parent — ADR F0;
+  # explicit set on multiple roots false-conflicts on 0.53). Byte-identical to pre-migration.
+  scope: ""
+  importDerivedRoles:
+    - business_derived_roles
+  # B2.5 — GAP CLOSED: the pre-migration policy granted chat_user/relationship_manager read
+  # with NO tenant condition at all (a cross-tenant read bypass once tenants exist). Every
+  # ALLOW below now goes through a business_derived_roles role carrying the tenant-equality
+  # backstop. Parity-neutral today (no tenant_id sent → backstop TRUE → identical decisions);
+  # denies cross-tenant once tenant_id is present on both sides (RelationshipTenantGapClosedTest).
   rules:
     # chat_user (runtime front door) and domain_admin: structural access allowed.
     # Book-of-business check (does this user actually cover this client?) is enforced
@@ -9,12 +21,13 @@ resourcePolicy:
     # relationship_manager kept as an alias during the chat_user migration.
     - actions: ["read"]
       effect: EFFECT_ALLOW
-      roles: ["chat_user", "relationship_manager"]
+      derivedRoles: ["tenant_chat_user"]     # was roles:[chat_user, relationship_manager] with NO tenant gate
 
     - actions: ["read"]
       effect: EFFECT_ALLOW
-      roles: ["domain_admin"]
+      derivedRoles: ["tenant_domain_admin"]  # was roles:[domain_admin] with NO tenant gate
 
+    # CROSS-TENANT SUPERUSER (B2.3 allowlist): platform_admin is intentionally cross-tenant.
     - actions: ["read"]
       effect: EFFECT_ALLOW
       roles: ["platform_admin"]

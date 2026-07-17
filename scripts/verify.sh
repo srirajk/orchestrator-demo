@@ -17,6 +17,19 @@ cd "$ROOT/gateway"
 mvn test -q
 echo "   ✅  Unit tests passed."
 
+# ── Cerbos policy gate: HARD gate on the authz policies (Axiom Story B3) ──────
+# Runs `cerbos compile --test-output=junit` (pinned 0.53.0 — same as the runtime PDP)
+# over the base+tenant policies, the 45 B2 regression tests, and the hand-owned
+# adversarial invariant suite; plus the tenant-totality and tenant-equality lints.
+# Fails the build on a bad policy. The planted-mutant smoke (scripts/cerbos-mutation-
+# smoke.sh) proves this gate has teeth. Placed early so a policy regression fails fast
+# before the compose bring-up.
+echo ""
+echo "▶  [cerbos] policy compile + test + lint gate..."
+cd "$ROOT"
+"$ROOT/scripts/cerbos-policy-gate.sh"
+echo "   ✅  Cerbos policy gate passed."
+
 # ── Phase 1: bring up compose stack ──────────────────────────────────────────
 echo ""
 echo "▶  [2/3] Starting docker-compose stack..."

@@ -1,0 +1,140 @@
+---
+# ═════════════════════════════════════════════════════════════════════════════
+#  HAND-OWNED ADVERSARIAL INVARIANT SUITE  —  NEVER GENERATED
+# ═════════════════════════════════════════════════════════════════════════════
+#  Axiom Story B3 — the invariant suite. Every assertion in this directory is
+#  authored and owned BY HAND. It is NEVER machine-generated, NEVER regenerated
+#  from the policies, and NEVER auto-updated to match a decision. If a policy
+#  change flips one of these assertions, the CHANGE is wrong until proven
+#  otherwise — the assertion is the specification, not the policy. Do not "fix"
+#  a red invariant by editing the expectation; fix the policy or escalate.
+#  (This is the adversary the coverage-theater guard-rail exists to embody:
+#   MutationSmokeTest plants over-permissive mutants that these invariants catch.)
+# ─────────────────────────────────────────────────────────────────────────────
+#  INVARIANT #1 — CROSS-TENANT DENY MATRIX
+#  Every persona homed in tenant A is DENIED on every tenant-B resource, across
+#  all four gateway-facing resource kinds (agent / relationship / domain /
+#  insights). Each cross-tenant DENY is paired with a same-tenant ALLOW control
+#  so the assertion is not vacuously true (a blanket-deny mutant would flip the
+#  control and go red).
+#
+#  MODELED, NOT LIVE (honest scope): today's principals carry NO tenant_id
+#  (CerbosEntitlementAdapter sends none — single-tenant world), so these inputs
+#  STAMP tenant_id explicitly on both principal and resource to exercise the
+#  multi-tenant case that Story A1 will make live on the request path. The gate
+#  under test is B2's business_derived_roles tenant-equality backstop + the
+#  scoped `default` child. Each cross-tenant agent cell is constructed so the
+#  classification ladder PASSES — the ONLY thing denying is tenant inequality —
+#  so a mutant that drops the tenant-equality condition flips these to ALLOW.
+# ═════════════════════════════════════════════════════════════════════════════
+name: CrossTenantDenyMatrix
+description: Every tenant-A persona is denied on every tenant-B resource (paired with same-tenant ALLOW controls).
+
+principals:
+  # ── tenant A ──
+  chat_a:
+    id: chat_a
+    roles: [chat_user]
+    attr:
+      tenant_id: tenantA
+      segments: {wealth: confidential-pii}
+      domains: [wealth-private-banking]
+      admin_domains: []
+  domadmin_a:
+    id: domadmin_a
+    roles: [domain_admin]
+    attr:
+      tenant_id: tenantA
+      segments: {}
+      domains: []
+      admin_domains: [wealth-private-banking]
+  conduit_a:
+    id: conduit_a
+    roles: [conduit_admin]
+    attr:
+      tenant_id: tenantA
+      segments: {}
+      domains: []
+      admin_domains: []
+
+resources:
+  # ── tenant B resources (cross-tenant target) ── scope "default" (a live tenant scope)
+  ag_wealth_B:
+    kind: agent
+    id: ag_wealth_B
+    scope: "default"
+    attr: {tenant_id: tenantB, domain: wealth-management, audience: segment, access_mode: read, data_classification: confidential-pii}
+  rel_B:
+    kind: relationship
+    id: REL-B
+    scope: "default"
+    attr: {tenant_id: tenantB}
+  dom_B:
+    kind: domain
+    id: wealth-private-banking
+    scope: "default"
+    attr: {tenant_id: tenantB}
+  insights_B:
+    kind: insights
+    id: insights
+    scope: "default"
+    attr: {tenant_id: tenantB}
+
+  # ── tenant A resources (same-tenant control — must ALLOW, so the DENYs aren't vacuous) ──
+  ag_wealth_A:
+    kind: agent
+    id: ag_wealth_A
+    scope: "default"
+    attr: {tenant_id: tenantA, domain: wealth-management, audience: segment, access_mode: read, data_classification: confidential-pii}
+  rel_A:
+    kind: relationship
+    id: REL-A
+    scope: "default"
+    attr: {tenant_id: tenantA}
+  dom_A:
+    kind: domain
+    id: wealth-private-banking
+    scope: "default"
+    attr: {tenant_id: tenantA}
+  insights_A:
+    kind: insights
+    id: insights
+    scope: "default"
+    attr: {tenant_id: tenantA}
+
+tests:
+  - name: agentCrossTenantDeniedSameTenantAllowed
+    input:
+      principals: [chat_a]
+      resources: [ag_wealth_B, ag_wealth_A]
+      actions: [invoke]
+    expected:
+      - {principal: chat_a, resource: ag_wealth_B, actions: {invoke: EFFECT_DENY}}   # cross-tenant (only tenant inequality denies — classification passes)
+      - {principal: chat_a, resource: ag_wealth_A, actions: {invoke: EFFECT_ALLOW}}  # same-tenant control
+
+  - name: relationshipCrossTenantDeniedSameTenantAllowed
+    input:
+      principals: [chat_a]
+      resources: [rel_B, rel_A]
+      actions: [read]
+    expected:
+      - {principal: chat_a, resource: rel_B, actions: {read: EFFECT_DENY}}
+      - {principal: chat_a, resource: rel_A, actions: {read: EFFECT_ALLOW}}
+
+  - name: domainCrossTenantDeniedSameTenantAllowed
+    input:
+      principals: [domadmin_a]
+      resources: [dom_B, dom_A]
+      actions: [view]
+    expected:
+      - {principal: domadmin_a, resource: dom_B, actions: {view: EFFECT_DENY}}
+      - {principal: domadmin_a, resource: dom_A, actions: {view: EFFECT_ALLOW}}
+
+  - name: insightsCrossTenantDeniedSameTenantAllowed
+    input:
+      principals: [conduit_a]
+      resources: [insights_B, insights_A]
+      actions: [read]
+    expected:
+      - {principal: conduit_a, resource: insights_B, actions: {read: EFFECT_DENY}}
+      - {principal: conduit_a, resource: insights_A, actions: {read: EFFECT_ALLOW}}

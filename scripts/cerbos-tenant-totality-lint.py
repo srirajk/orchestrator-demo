@@ -29,11 +29,39 @@ def load_docs(path):
                 yield doc["resourcePolicy"], path
 
 
-def rule_tuples(rp):
-    """Yield (action, role, effect) the policy has an explicit opinion on."""
+def load_derived_parents(files):
+    """Map derivedRole name -> set of parentRoles, across all derivedRoles docs.
+
+    Axiom Story B2: the base resource policies gate business roles through
+    business_derived_roles / iam_derived_roles (e.g. tenant_chat_user -> chat_user). A
+    derived-role ALLOW therefore contributes (action, parentRole) tuples to the CEILING.
+    Without expanding these, the ceiling would only contain raw-role ALLOWs and the totality
+    check would have no teeth over the derived-role grants (the majority of the surface).
+    """
+    parents = {}   # derived name -> set(parentRoles)
+    for f in files:
+        if f.endswith("_test.yaml") or f.endswith("_test.yml"):
+            continue
+        with open(f) as fh:
+            for doc in yaml.safe_load_all(fh):
+                if not (isinstance(doc, dict) and "derivedRoles" in doc):
+                    continue
+                for d in doc["derivedRoles"].get("definitions", []) or []:
+                    name = d.get("name")
+                    if name:
+                        parents.setdefault(name, set()).update(d.get("parentRoles", []) or [])
+    return parents
+
+
+def rule_tuples(rp, derived_parents):
+    """Yield (action, role, effect) the policy has an explicit opinion on. A rule's
+    `roles` are taken verbatim; its `derivedRoles` are expanded to their parentRoles
+    (so a derived-role ALLOW contributes the underlying business roles to the ceiling)."""
     for rule in rp.get("rules", []) or []:
         effect = rule.get("effect", "")
-        roles = rule.get("roles", []) or []
+        roles = list(rule.get("roles", []) or [])
+        for dr in rule.get("derivedRoles", []) or []:
+            roles.extend(sorted(derived_parents.get(dr, {dr})))
         actions = rule.get("actions", []) or []
         for a in actions:
             for r in roles:
@@ -67,6 +95,9 @@ def main(argv):
             files += sorted(glob.glob(os.path.join(d, "**", "*.yaml"), recursive=True))
             files += sorted(glob.glob(os.path.join(d, "**", "*.yml"), recursive=True))
 
+    # derivedRole -> parentRoles, so a derived-role ALLOW expands into ceiling tuples.
+    derived_parents = load_derived_parents(files)
+
     # Index policies by (resource, scope).
     by_key = {}   # (resource, scope) -> {"allows": set[(a,r)], "rules": [(a,r,eff)], "sp": str, "path": str}
     for f in files:
@@ -77,7 +108,7 @@ def main(argv):
             scope = rp.get("scope", "") or ""
             entry = by_key.setdefault((resource, scope), {"allows": set(), "rules": [], "sp": None, "path": path})
             entry["sp"] = rp.get("scopePermissions")
-            for a, r, eff in rule_tuples(rp):
+            for a, r, eff in rule_tuples(rp, derived_parents):
                 entry["rules"].append((a, r, eff))
                 if eff == "EFFECT_ALLOW":
                     entry["allows"].add((a, r))

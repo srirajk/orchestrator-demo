@@ -1764,11 +1764,23 @@
 
 ## infra/cerbos/policies/
 
-- `agent_resource.yaml` (~1189 tok)
-- `domain_resource.yaml` (~358 tok)
+- `agent_resource.yaml` — BASE scope; rank-0 trap (variables VERBATIM); chat_user/domain_admin via business_derived_roles; platform_admin superuser (~1189 tok)
+- `business_derived_roles.yaml` — B2 shared tenant-equality backstop (tenant_chat_user/tenant_domain_admin/tenant_conduit_admin); parity-neutral has()-guard (~520 tok)
+- `domain_resource.yaml` — BASE scope; derived-role tenant gate (~380 tok)
 - `iam_derived_roles.yaml` (~542 tok)
-- `iam_resource.yaml` — Declares in (~1247 tok)
-- `relationship_resource.yaml` (~193 tok)
+- `iam_resource.yaml` — BASE scope header added; rules unchanged (already tenant-scoped) (~1290 tok)
+- `insights_resource.yaml` — BASE scope; conduit_admin via tenant_conduit_admin (~250 tok)
+- `relationship_resource.yaml` — BASE scope; B2.5 tenant gap CLOSED via tenant_chat_user/tenant_domain_admin (~230 tok)
+- `tenant_default_{agent,relationship,domain,insights,iam}.yaml` — B2.6 default-tenant TOTAL children (REQUIRE_PARENTAL_CONSENT; grant-all-ceiling → effective=base) (~200 tok ea)
+- `decision_parity_matrix_test.yaml` — B2.1 golden base-scope regression suite (14 cases) (~600 tok)
+- `rank0_trap_preserved_test.yaml` — B2.2 unrecognised-classification-denied (7) (~350 tok)
+- `tenant_equality_backstop_test.yaml` — B2.3 mislabeled-scope cross-tenant deny (3) (~350 tok)
+- `relationship_tenant_gap_closed_test.yaml` — B2.5 relationship tenant-equality (3) (~300 tok)
+- `tenant_policy_totality_test.yaml` — B2.6 default child reproduces base (18) (~300 tok)
+
+## infra/cerbos/tenants/default/
+
+- `domain-segment-map.yaml` — B2.4 tenant deployment config: authoritative domain→segment mapping (relocated from agent_resource comments); NOT loaded as a policy (~260 tok)
 
 ## infra/cerbos/templates/
 
@@ -2086,7 +2098,10 @@
 - `verify.sh` — Full verification script — runs after each phase to confirm acceptance criteria. (~713 tok)
 - `wait-for-healthy.sh` — Wait until all core docker-compose services report healthy, then exit 0. (~323 tok)
 - `world-b-check.sh` — ───────────────────────────────────────────────────────────────────────────── (~1434 tok)
-- `cerbos-tenant-totality-lint.py` — rejects a tenant policy leaving any base-allowed (resource,action,role) tuple unmatched (fall-through hole) (~700 tok)
+- `cerbos-tenant-totality-lint.py` — rejects a tenant policy leaving any base-allowed (resource,action,role) tuple unmatched (fall-through hole); B2: expands derivedRoles→parentRoles for teeth (~820 tok)
+- `cerbos-allow-tenant-equality-lint.py` — B2.3 static lint: every base-ceiling EFFECT_ALLOW must be tenant-scoped (derived-role backstop / inline equality) or platform_admin superuser (~650 tok)
+- `cerbos-parity-matrix.py` — B2.1 persona×resource×action decision matrix prober/differ (PRE vs POST; scope '' vs 'default') (~900 tok)
+- `cerbos-parity-run.sh` — B2.1 gate runner: boots PRE+POST cerbos (distinct 36xx ports) and diffs the 800-cell matrix (~500 tok)
 
 ## scripts/eval-worker/
 

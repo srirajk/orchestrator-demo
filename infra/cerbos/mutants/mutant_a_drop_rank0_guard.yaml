@@ -1,3 +1,18 @@
+# ═════════════════════════════════════════════════════════════════════════════
+#  PLANTED OVER-PERMISSIVE MUTANT — NOT A PRODUCTION POLICY. DO NOT DEPLOY.
+# ═════════════════════════════════════════════════════════════════════════════
+#  Axiom Story B3 mutation smoke. This file lives OUTSIDE the compiled policy root
+#  (infra/cerbos/mutants/, never infra/cerbos/policies/). MutationSmokeTest copies
+#  the real policies to a temp dir, overlays THIS file in place of agent_resource.yaml, runs the
+#  policy gate, and asserts it exits NON-ZERO. If the gate stays green, the invariant
+#  suite missed a real over-grant — the smoke test goes red. The working tree is never
+#  touched.
+#
+#  MUTATION: removed the `V.resourceClassRecognized &&` fail-closed guard from the chat_user invoke rule → an unrecognised/absent data_classification becomes reachable (fail-open).
+#  EXPECTED CATCHER: Rank0TrapPreservedTest + UnknownInputsDeny.unknownClassification + MissingAttributeDeny.absentDataClassification
+#
+#  MUTANT-TARGET: agent_resource.yaml
+# ═════════════════════════════════════════════════════════════════════════════
 apiVersion: api.cerbos.dev/v1
 resourcePolicy:
   version: "default"
@@ -149,9 +164,9 @@ resourcePolicy:
               - expr: V.accessIsRead
               - expr: >
                   V.audienceEnterprise ||
-                  (V.resourceClassRecognized && R.attr.domain == "wealth-management" && V.wealthRank    > 0 && V.wealthRank    >= V.resourceRank) ||
-                  (V.resourceClassRecognized && R.attr.domain == "asset-servicing"   && V.servicingRank > 0 && V.servicingRank >= V.resourceRank) ||
-                  (V.resourceClassRecognized && R.attr.domain == "insurance"         && V.insuranceRank > 0 && V.insuranceRank >= V.resourceRank)
+                  (R.attr.domain == "wealth-management" && V.wealthRank    > 0 && V.wealthRank    >= V.resourceRank) ||
+                  (R.attr.domain == "asset-servicing"   && V.servicingRank > 0 && V.servicingRank >= V.resourceRank) ||
+                  (R.attr.domain == "insurance"         && V.insuranceRank > 0 && V.insuranceRank >= V.resourceRank)
 
     # ── chat_user: membership-only probe (glass-box explanation, NOT enforcement) ──
     #    Same domain->segment mapping as `invoke` but WITHOUT the classification-rank

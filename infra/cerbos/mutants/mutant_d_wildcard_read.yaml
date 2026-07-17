@@ -1,3 +1,18 @@
+# ═════════════════════════════════════════════════════════════════════════════
+#  PLANTED OVER-PERMISSIVE MUTANT — NOT A PRODUCTION POLICY. DO NOT DEPLOY.
+# ═════════════════════════════════════════════════════════════════════════════
+#  Axiom Story B3 mutation smoke. This file lives OUTSIDE the compiled policy root
+#  (infra/cerbos/mutants/, never infra/cerbos/policies/). MutationSmokeTest copies
+#  the real policies to a temp dir, overlays THIS file in place of insights_resource.yaml, runs the
+#  policy gate, and asserts it exits NON-ZERO. If the gate stays green, the invariant
+#  suite missed a real over-grant — the smoke test goes red. The working tree is never
+#  touched.
+#
+#  MUTATION: added an `EFFECT_ALLOW read roles:["*"]` rule to the insights base policy → any authenticated principal (e.g. a chat_user) can read Conduit Insights.
+#  EXPECTED CATCHER: DecisionParityMatrixTest.insightsGatedToAdminsOnly + CrossTenantDenyMatrix.insights
+#
+#  MUTANT-TARGET: insights_resource.yaml
+# ═════════════════════════════════════════════════════════════════════════════
 apiVersion: api.cerbos.dev/v1
 # ── Conduit Insights admin gate ──────────────────────────────────────────────
 # Governs the native analytics API (GET /v1/insights/*). ADDITIVE: a brand-new
@@ -22,6 +37,10 @@ resourcePolicy:
     - business_derived_roles
 
   rules:
+    # MUTANT: wildcard read — grants insights read to EVERY role (over-grant).
+    - actions: ["read"]
+      effect: EFFECT_ALLOW
+      roles: ["*"]
     # Platform administrators: full access (superuser across the platform).
     # CROSS-TENANT SUPERUSER (B2.3 allowlist): intentionally raw / cross-tenant.
     - actions: ["read"]

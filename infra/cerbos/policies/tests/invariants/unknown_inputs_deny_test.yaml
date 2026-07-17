@@ -1,0 +1,81 @@
+---
+# ═════════════════════════════════════════════════════════════════════════════
+#  HAND-OWNED ADVERSARIAL INVARIANT SUITE  —  NEVER GENERATED
+# ═════════════════════════════════════════════════════════════════════════════
+#  Axiom Story B3 — authored and owned BY HAND. NEVER machine-generated, NEVER
+#  regenerated from the policies, NEVER auto-updated to match a decision. A red
+#  invariant means the POLICY changed wrongly — fix the policy, not this file.
+# ─────────────────────────────────────────────────────────────────────────────
+#  INVARIANT #2 — UNKNOWN INPUTS FAIL CLOSED
+#  Anything the policy does not explicitly recognise must DENY:
+#    • unknown data_classification  → resource-side rank-0 guard denies (fail-closed)
+#    • unknown action               → no matching rule → Cerbos default-deny
+#                                      (asserted even for platform_admin, the superuser)
+#    • unknown scope (tenant)       → lenientScopeSearch:false: an absent tenant scope
+#                                      does NOT walk up to the base ceiling → DENY
+#                                      (contract #1 — ADR-axiom-scope-posture)
+#  Each probe is paired with a recognised-input ALLOW control so it is not vacuous.
+# ═════════════════════════════════════════════════════════════════════════════
+name: UnknownInputsDeny
+description: Unknown classification / action / scope all fail closed (paired with recognised-input ALLOW controls).
+
+principals:
+  rm_jane:                      # top-tier wealth member
+    id: rm_jane
+    roles: [chat_user]
+    attr: {segments: {wealth: confidential-pii}, domains: [], admin_domains: []}
+  super_admin:                  # the cross-tenant superuser
+    id: super_admin
+    roles: [platform_admin]
+    attr: {segments: {}, domains: [], admin_domains: []}
+
+resources:
+  # ── unknown data_classification (unrecognised tier → rank 0 → resourceClassRecognized false) ──
+  ag_unknown_class:
+    kind: agent
+    id: ag_unknown_class
+    scope: ""
+    attr: {domain: wealth-management, audience: segment, access_mode: read, data_classification: restricted-xyz}
+  # ── control: recognised classification, same member ⇒ ALLOW ──
+  ag_known_class:
+    kind: agent
+    id: ag_known_class
+    scope: ""
+    attr: {domain: wealth-management, audience: segment, access_mode: read, data_classification: confidential-pii}
+  # ── unknown scope (no policy defines tenant "ghost-tenant") ──
+  ag_unknown_scope:
+    kind: agent
+    id: ag_unknown_scope
+    scope: "ghost-tenant"
+    attr: {domain: wealth-management, audience: segment, access_mode: read, data_classification: confidential-pii}
+
+tests:
+  - name: unknownClassificationDeniedKnownAllowed
+    input:
+      principals: [rm_jane]
+      resources: [ag_unknown_class, ag_known_class]
+      actions: [invoke]
+    expected:
+      - {principal: rm_jane, resource: ag_unknown_class, actions: {invoke: EFFECT_DENY}}
+      - {principal: rm_jane, resource: ag_known_class, actions: {invoke: EFFECT_ALLOW}}   # control
+
+  - name: unknownActionDeniedEvenForSuperuser
+    # "exfiltrate" is granted by NO rule (not even platform_admin's action list) → default-deny.
+    # invoke ALLOW controls prove the principals are otherwise permitted (deny isn't vacuous).
+    input:
+      principals: [super_admin, rm_jane]
+      resources: [ag_known_class]
+      actions: [exfiltrate, invoke]
+    expected:
+      - {principal: super_admin, resource: ag_known_class, actions: {exfiltrate: EFFECT_DENY, invoke: EFFECT_ALLOW}}
+      - {principal: rm_jane, resource: ag_known_class, actions: {exfiltrate: EFFECT_DENY, invoke: EFFECT_ALLOW}}
+
+  - name: unknownScopeDeniedNoLenientWalkUp
+    # Same tuple that ALLOWs at base scope "" must DENY at an undefined tenant scope
+    # (lenientScopeSearch:false → no walk-up to the base ceiling).
+    input:
+      principals: [rm_jane]
+      resources: [ag_unknown_scope]
+      actions: [invoke]
+    expected:
+      - {principal: rm_jane, resource: ag_unknown_scope, actions: {invoke: EFFECT_DENY}}

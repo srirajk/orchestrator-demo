@@ -1,0 +1,132 @@
+---
+# ═════════════════════════════════════════════════════════════════════════════
+# DecisionParityMatrixTest  (Axiom Story B2.1)
+# ═════════════════════════════════════════════════════════════════════════════
+# The GOLDEN regression lock for the base-scope decisions. Every assertion below is the
+# CURRENT (pre-migration) verdict for a seeded persona; the migrated base policy must still
+# produce it. This suite is the executable half of the parity gate; the byte-for-byte
+# BEFORE-vs-AFTER diff over the FULL 800-cell matrix is scripts/cerbos-parity-run.sh
+# (test: byteIdenticalBeforeAfter → 0 flips). Principal attrs mirror what the gateway's
+# CerbosEntitlementAdapter sends: segments map, domains=[], admin_domains=[], NO tenant_id.
+name: DecisionParityMatrixTest
+description: Golden base-scope decisions for seeded personas — must stay byte-identical post-migration.
+
+principals:
+  rm_jane:            # wealth:confidential-pii, servicing:confidential
+    id: rm_jane
+    roles: [chat_user]
+    attr: {segments: {wealth: confidential-pii, servicing: confidential}, domains: [], admin_domains: []}
+  analyst_amy:        # wealth:confidential
+    id: analyst_amy
+    roles: [chat_user]
+    attr: {segments: {wealth: confidential}, domains: [], admin_domains: []}
+  uw_sam:             # insurance:confidential-pii
+    id: uw_sam
+    roles: [chat_user]
+    attr: {segments: {insurance: confidential-pii}, domains: [], admin_domains: []}
+  comm_banker_okoro:  # servicing:confidential
+    id: comm_banker_okoro
+    roles: [chat_user]
+    attr: {segments: {servicing: confidential}, domains: [], admin_domains: []}
+  hr_partner_lund:    # hr:confidential (no wealth/servicing/insurance segment)
+    id: hr_partner_lund
+    roles: [chat_user]
+    attr: {segments: {hr: confidential}, domains: [], admin_domains: []}
+  insights_admin:
+    id: insights_admin
+    roles: [conduit_admin]
+    attr: {segments: {}, domains: [], admin_domains: []}
+
+resources:
+  ag_wealth_pii:
+    kind: agent
+    id: ag_wealth_pii
+    scope: ""
+    attr: {domain: wealth-management, audience: segment, access_mode: read, data_classification: confidential-pii}
+  ag_wealth_conf:
+    kind: agent
+    id: ag_wealth_conf
+    scope: ""
+    attr: {domain: wealth-management, audience: segment, access_mode: read, data_classification: confidential}
+  ag_insurance_pii:
+    kind: agent
+    id: ag_insurance_pii
+    scope: ""
+    attr: {domain: insurance, audience: segment, access_mode: read, data_classification: confidential-pii}
+  ag_enterprise:
+    kind: agent
+    id: ag_enterprise
+    scope: ""
+    attr: {domain: hr, audience: enterprise, access_mode: read, data_classification: internal}
+  ag_write:
+    kind: agent
+    id: ag_write
+    scope: ""
+    attr: {domain: wealth-management, audience: segment, access_mode: write, data_classification: confidential}
+  rel1:
+    kind: relationship
+    id: REL-00042
+    scope: ""
+    attr: {}
+  insights1:
+    kind: insights
+    id: insights
+    scope: ""
+    attr: {}
+
+tests:
+  - name: chatUserInvokesInSegmentAtOrAboveTier
+    input:
+      principals: [rm_jane, uw_sam, comm_banker_okoro]
+      resources: [ag_wealth_pii]
+      actions: [invoke]
+    expected:
+      - {principal: rm_jane, resource: ag_wealth_pii, actions: {invoke: EFFECT_ALLOW}}  # wealth pii >= pii
+      - {principal: uw_sam, resource: ag_wealth_pii, actions: {invoke: EFFECT_DENY}}     # no wealth segment
+      - {principal: comm_banker_okoro, resource: ag_wealth_pii, actions: {invoke: EFFECT_DENY}}  # no wealth segment
+
+  - name: classificationTierGatesInvokeButNotMembership
+    # analyst_amy holds wealth:confidential — below the pii agent. invoke DENY, membership ALLOW
+    # (the glass-box distinction between a segment miss and a classification miss).
+    input:
+      principals: [analyst_amy]
+      resources: [ag_wealth_pii, ag_wealth_conf]
+      actions: [invoke, invoke_membership]
+    expected:
+      - {principal: analyst_amy, resource: ag_wealth_pii, actions: {invoke: EFFECT_DENY, invoke_membership: EFFECT_ALLOW}}
+      - {principal: analyst_amy, resource: ag_wealth_conf, actions: {invoke: EFFECT_ALLOW, invoke_membership: EFFECT_ALLOW}}
+
+  - name: enterpriseAudienceOpenToEveryAuthenticatedUser
+    input:
+      principals: [hr_partner_lund, analyst_amy]
+      resources: [ag_enterprise]
+      actions: [invoke]
+    expected:
+      - {principal: hr_partner_lund, resource: ag_enterprise, actions: {invoke: EFFECT_ALLOW}}
+      - {principal: analyst_amy, resource: ag_enterprise, actions: {invoke: EFFECT_ALLOW}}
+
+  - name: writeAccessModeDeniedPhaseOneReadOnly
+    input:
+      principals: [rm_jane]
+      resources: [ag_write]
+      actions: [invoke]
+    expected:
+      - {principal: rm_jane, resource: ag_write, actions: {invoke: EFFECT_DENY}}
+
+  - name: relationshipStructuralReadAllowedForChatUser
+    input:
+      principals: [rm_jane, insights_admin]
+      resources: [rel1]
+      actions: [read]
+    expected:
+      - {principal: rm_jane, resource: rel1, actions: {read: EFFECT_ALLOW}}
+      - {principal: insights_admin, resource: rel1, actions: {read: EFFECT_DENY}}   # conduit_admin is not chat_user
+
+  - name: insightsGatedToAdminsOnly
+    input:
+      principals: [insights_admin, rm_jane]
+      resources: [insights1]
+      actions: [read]
+    expected:
+      - {principal: insights_admin, resource: insights1, actions: {read: EFFECT_ALLOW}}
+      - {principal: rm_jane, resource: insights1, actions: {read: EFFECT_DENY}}
