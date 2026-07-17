@@ -11,15 +11,23 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 
 /**
  * S1a — the missing runtime-load wire (lifecycle-spine hardening). After a candidate bundle compiles and
  * the activation CAS flips the tenant's active pointer, this loader <b>materialises the promoted bundle's
- * rendered policies — each stamped {@code policyVersion = <bundleId>} — into a directory the serving Cerbos
- * PDP watches</b>. Cerbos' disk driver ({@code watchForChanges: true}) reloads them, so the promotion the
- * control plane performed actually changes runtime enforcement instead of only flipping a pointer the PDP
- * never sees.
+ * rendered policies — each stamped {@code policyVersion = <bundleId>} — into the store the serving Cerbos
+ * PDP reads</b>, so the promotion the control plane performed actually changes runtime enforcement instead
+ * of only flipping a pointer the PDP never sees.
+ *
+ * <p><b>Two backends, one write.</b> Production writes to an <b>S3-family bucket</b> ({@link
+ * S3RuntimePolicySink}) that Cerbos serves with its {@code blob} storage driver and <b>polls</b> on
+ * {@code updatePollInterval} — the reliable path, immune to the macOS-VirtioFS host→container inotify event
+ * loss that the disk + {@code watchForChanges} path suffered. When no bucket is configured the loader falls
+ * back to the legacy <b>watched-directory</b> write (disk driver) — retained so the disk-based enforcement
+ * ITs keep exercising a real reload, and as a one-commit revert path for the live switch. A configured
+ * bucket wins; only if it is unset does the directory apply; unset both ⇒ a logged no-op.
  *
  * <p><b>Additive, never destructive.</b> Every file is namespaced by the content-addressed {@code bundleId}
  * and every policy inside carries {@code version: <bundleId>} (the {@link StagingCandidateProbe} invariant).
@@ -44,9 +52,20 @@ public class PromotedBundleLoader {
     private final long tierSettleMs;
     private final int emitPasses;
 
-    /** Test/convenience constructor: default settle + re-emit passes, no Spring binding. */
+    /** Production blob backend — non-null iff a runtime bucket is configured; then it wins over the dir. */
+    private final S3RuntimePolicySink s3Sink;
+
+    /** Test/convenience constructor: default settle + re-emit passes, disk-only, no Spring binding. */
     public PromotedBundleLoader(String runtimePoliciesDir) {
         this(runtimePoliciesDir, 3000L, 2);
+    }
+
+    /** Test constructor: write to a pre-built blob sink (the Cerbos-on-blob enforcement IT). */
+    public PromotedBundleLoader(S3RuntimePolicySink s3Sink) {
+        this.runtimePoliciesDir = "";
+        this.tierSettleMs = 0L;
+        this.emitPasses = 1;
+        this.s3Sink = s3Sink;
     }
 
     /**
@@ -63,57 +82,106 @@ public class PromotedBundleLoader {
      *                     event for any file whose prior event was dropped, so the promoted bundle
      *                     converges into the index. Byte-identical re-writes ⇒ no spurious churn.
      */
+    public PromotedBundleLoader(String runtimePoliciesDir, long tierSettleMs, int emitPasses) {
+        this.runtimePoliciesDir = runtimePoliciesDir == null ? "" : runtimePoliciesDir.trim();
+        this.tierSettleMs = Math.max(0L, tierSettleMs);
+        this.emitPasses = Math.max(1, emitPasses);
+        this.s3Sink = null;
+    }
+
+    /**
+     * Production constructor. When {@code iam.policy-studio.runtime.s3.bucket} is set the promoted bundle is
+     * written to that bucket (Cerbos {@code blob} driver polls it); otherwise the loader falls back to the
+     * legacy watched-directory write. Every setting is bound (World B / §5: no hardcoded endpoint/bucket).
+     */
     @org.springframework.beans.factory.annotation.Autowired
     public PromotedBundleLoader(
             @Value("${iam.policy-studio.runtime-policies-dir:}") String runtimePoliciesDir,
             @Value("${iam.policy-studio.runtime-load-tier-settle-ms:3000}") long tierSettleMs,
-            @Value("${iam.policy-studio.runtime-load-emit-passes:2}") int emitPasses) {
+            @Value("${iam.policy-studio.runtime-load-emit-passes:2}") int emitPasses,
+            @Value("${iam.policy-studio.runtime.s3.bucket:}") String s3Bucket,
+            @Value("${iam.policy-studio.runtime.s3.prefix:runtime}") String s3Prefix,
+            @Value("${iam.policy-studio.runtime.s3.endpoint:}") String s3Endpoint,
+            @Value("${iam.policy-studio.runtime.s3.region:us-east-1}") String s3Region,
+            @Value("${iam.policy-studio.runtime.s3.path-style:true}") boolean s3PathStyle,
+            @Value("${iam.policy-studio.runtime.s3.access-key:}") String s3AccessKey,
+            @Value("${iam.policy-studio.runtime.s3.secret-key:}") String s3SecretKey) {
         this.runtimePoliciesDir = runtimePoliciesDir == null ? "" : runtimePoliciesDir.trim();
         this.tierSettleMs = Math.max(0L, tierSettleMs);
         this.emitPasses = Math.max(1, emitPasses);
-    }
-
-    /** True iff a runtime-policies directory is configured — otherwise {@link #load} is a no-op. */
-    public boolean isConfigured() {
-        return !runtimePoliciesDir.isBlank();
+        this.s3Sink = (s3Bucket == null || s3Bucket.isBlank())
+                ? null
+                : new S3RuntimePolicySink(s3Bucket, s3Prefix, s3Endpoint, s3Region, s3PathStyle,
+                        s3AccessKey, s3SecretKey);
     }
 
     /**
-     * Write the promoted bundle's rendered (bundleId-stamped) policies into the Cerbos-watched runtime
-     * directory. Returns the files written (empty when no dir is configured).
+     * True iff a runtime backend is configured (a blob bucket OR a watched directory) — otherwise
+     * {@link #load} is a logged no-op.
+     */
+    public boolean isConfigured() {
+        return s3Sink != null || !runtimePoliciesDir.isBlank();
+    }
+
+    /**
+     * Write the promoted bundle's rendered (bundleId-stamped) policies into the runtime store Cerbos serves —
+     * the S3 bucket (blob driver, polled) when a bucket is configured, otherwise the legacy watched
+     * directory (disk driver). Returns the objects/files written (empty when no backend is configured).
      *
-     * @throws PromotedBundleLoadException if the configured directory cannot be written (fail-closed)
+     * @throws PromotedBundleLoadException if the configured backend cannot be written (fail-closed)
      */
     public List<Path> load(PolicyBundle bundle) {
         if (!isConfigured()) {
-            log.info("runtime-policies-dir not configured — skipping runtime load of promoted bundle '{}'. "
-                    + "Set iam.policy-studio.runtime-policies-dir to the Cerbos-watched volume to enforce it.",
-                    bundle.bundleId());
+            log.info("no runtime backend configured — skipping runtime load of promoted bundle '{}'. "
+                    + "Set iam.policy-studio.runtime.s3.bucket (blob) or iam.policy-studio.runtime-policies-dir "
+                    + "(disk) so the promotion reaches the serving PDP.", bundle.bundleId());
             return List.of();
         }
+
+        // Select the version-stamped policies to write, then order them ANCESTOR-FIRST (by scope depth).
+        //
+        // renderedFiles() stamps the concrete bundleId into the version position; the StagingCandidateProbe
+        // already verified every version-keyed rendered file carries it and no sentinel survives, so what
+        // lands in the store is exactly what cerbos compile validated.
+        //
+        // A self-contained bundle also captures GLOBAL, name-keyed modules (derived-roles / variables) for
+        // its own compile identity. Those must NOT be written into the shared runtime store — the base set
+        // already serves them by name, and a second copy of the same module name would be a duplicate-identity
+        // load error that breaks the whole PDP. A version-keyed resource policy stamped version=<bundleId>
+        // coexists additively with the base version=default; a global module does not. Write ONLY the
+        // version-stamped policies (those whose rendered form carries the content-addressed id); imported
+        // global modules resolve from the base set unchanged.
+        List<BundleFile> writable = new ArrayList<>();
+        for (BundleFile file : bundle.renderedFiles()) {
+            if (file.yaml().contains(bundle.bundleId())) {
+                writable.add(file);
+            }
+        }
+
+        // ── Production: write to the blob bucket Cerbos polls. ──
+        // A poll reads the WHOLE bucket snapshot and compiles it as one unit, so the per-file watch-event
+        // ordering the disk path had to defend against does not arise. We still emit ANCESTOR-FIRST (root
+        // scope before scoped children) so that if a poll ever catches a partially-written prefix, the
+        // ancestor is already present rather than a child dangling without its ceiling. No inter-tier settle
+        // and no re-emit passes are needed: an object PUT is atomic and the poll re-reads on the next tick.
+        if (s3Sink != null) {
+            List<BundleFile> ordered = new ArrayList<>(writable);
+            ordered.sort(java.util.Comparator.comparingInt(f -> scopeDepth(f.yaml())));
+            LinkedHashMap<String, String> objects = new LinkedHashMap<>();
+            for (BundleFile file : ordered) {
+                objects.put(stagedFileName(bundle.bundleId(), file.path()), file.yaml());
+            }
+            List<String> keys = s3Sink.write(objects);
+            log.info("Loaded promoted bundle '{}' into runtime blob bucket ({} object(s)) — Cerbos blob "
+                    + "driver will poll and reload; version={} now enforceable, base default unchanged",
+                    bundle.bundleId(), keys.size(), bundle.bundleId());
+            return keys.stream().map(Path::of).collect(java.util.stream.Collectors.toList());
+        }
+
+        // ── Fallback / revert path: write to the Cerbos-watched directory (disk driver). ──
         try {
             Path dir = Path.of(runtimePoliciesDir);
             Files.createDirectories(dir);
-
-            // Select the version-stamped policies to write, then order them ANCESTOR-FIRST (by scope depth).
-            //
-            // renderedFiles() stamps the concrete bundleId into the version position; the
-            // StagingCandidateProbe already verified every version-keyed rendered file carries it and no
-            // sentinel survives, so what lands in the watched dir is exactly what cerbos compile validated.
-            //
-            // S3: a self-contained bundle also captures GLOBAL, name-keyed modules (derived-roles /
-            // variables) for its own compile identity. Those must NOT be written into the shared runtime dir
-            // — the base bundle already serves them by name, and a second copy of the same module name would
-            // be a duplicate-identity load error that breaks the whole PDP. A version-keyed resource policy
-            // stamped version=<bundleId> coexists additively with the base version=default; a global module
-            // does not. Write ONLY the version-stamped policies (those whose rendered form carries the
-            // content-addressed id); imported global modules resolve from the base set unchanged.
-            List<BundleFile> writable = new ArrayList<>();
-            for (BundleFile file : bundle.renderedFiles()) {
-                if (file.yaml().contains(bundle.bundleId())) {
-                    writable.add(file);
-                }
-            }
             // A self-contained bundle carries a whole scope chain at the SAME version — the tenant child
             // (scope: "acme") AND its root ceiling (scope: "") — and the child declares the root as its
             // ancestor. Cerbos' watchForChanges processes each file's storage event as it lands and looks

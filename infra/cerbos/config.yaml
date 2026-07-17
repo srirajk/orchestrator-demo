@@ -10,10 +10,28 @@ engine:
   # docs/adr/ADR-axiom-scope-posture.md and infra/cerbos/proof.
   lenientScopeSearch: false
 storage:
-  driver: disk
-  disk:
-    directory: /conf/policies
-    watchForChanges: true
+  # ── Runtime policy storage: MinIO blob driver (POLL, not file-watch) ──────────
+  # Cerbos has ONE storage driver, so the WHOLE policy set — the base scope-chain (the
+  # cerbos-policy-gate 74-test suite: agent/domain/insights/relationship + tenant scopes +
+  # derived-roles + invariants) AND the Policy Studio runtime bundles — is served from this
+  # one bucket. minio-init seeds the base under s3://cerbos-policies/base/ BEFORE Cerbos
+  # starts (cerbos depends_on it), and PromotedBundleLoader writes promoted bundles under
+  # s3://cerbos-policies/runtime/. Cerbos reads the whole bucket (no prefix) and POLLS it on
+  # updatePollInterval — so a promotion reaches enforcement on the next poll, with none of the
+  # macOS-VirtioFS host→container inotify event loss the old disk + watchForChanges path had.
+  #
+  # MinIO endpoint form: Cerbos 0.53.0 uses the gocloud.dev/blob s3blob driver on AWS SDK v2, so
+  # the S3-compatible URL is `endpoint=http://<host:port>&hostname_immutable=true&region=<r>`
+  # (per the Cerbos 0.53 storage docs) — NOT the older `insecure=/s3ForcePathStyle=` SDK-v1 form.
+  # Credentials come from AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (set in docker-compose to the
+  # MinIO root creds).
+  driver: blob
+  blob:
+    bucket: "s3://cerbos-policies?endpoint=http://minio:9000&hostname_immutable=true&region=us-east-1"
+    workDir: /tmp/cerbos/blob
+    updatePollInterval: 10s
+    downloadTimeout: 30s
+    requestTimeout: 10s
 audit:
   enabled: true
   backend: file

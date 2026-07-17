@@ -20,7 +20,21 @@
 
     <properties>
         <java.version>25</java.version>
+        <!-- Same AWS SDK v2 line the gateway pins (ObjectStorePayloadStore / ObjectStoreAuditSink). -->
+        <aws-sdk.version>2.28.16</aws-sdk.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>${aws-sdk.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <!-- Web (Spring MVC + Tomcat — virtual threads, NOT WebFlux) -->
@@ -101,6 +115,19 @@
         </dependency>
 
         <!-- Cerbos Java SDK (IAM uses Cerbos to authorize its own API operations) -->
+
+        <!-- S3-family object store client (MinIO / S3 / R2 / GCS-interop): PromotedBundleLoader writes
+             promoted runtime bundles to the bucket Cerbos serves with its blob storage driver (polled).
+             Same AWS SDK v2 + bounded Apache sync client the gateway audit/payload path uses; the iam-service
+             did not previously have an S3 SDK, so this dependency is ADDED (version-managed by the AWS BOM). -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>apache-client</artifactId>
+        </dependency>
 
         <!-- Test dependencies -->
         <dependency>
