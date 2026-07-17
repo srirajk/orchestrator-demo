@@ -86,7 +86,7 @@ class StudioBreakGlassControllerTest {
         when(store.putGrant(eq("meridian"), eq("drafter-dan"), any())).thenReturn(pending("drafter-dan", false));
 
         mvc.perform(post("/admin/studio/break-glass")
-                        .with(StudioMvc.principal("drafter-dan", "meridian", "policy_drafter"))
+                        .with(StudioMvc.principal("drafter-dan", "meridian", "policy_author"))
                         .contentType(MediaType.APPLICATION_JSON).content(body("meridian", 30)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.grantId").value("bg-1"))
@@ -97,7 +97,7 @@ class StudioBreakGlassControllerTest {
     @Test
     void ttlBeyondSixtyMinutesIsRejected400() throws Exception {
         mvc.perform(post("/admin/studio/break-glass")
-                        .with(StudioMvc.principal("drafter-dan", "meridian", "policy_drafter"))
+                        .with(StudioMvc.principal("drafter-dan", "meridian", "policy_author"))
                         .contentType(MediaType.APPLICATION_JSON).content(body("meridian", 120)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("bad_request"));
@@ -107,7 +107,7 @@ class StudioBreakGlassControllerTest {
     @Test
     void grantScopeInAnotherTenantIsRejected403() throws Exception {
         mvc.perform(post("/admin/studio/break-glass")
-                        .with(StudioMvc.principal("drafter-dan", "meridian", "policy_drafter"))
+                        .with(StudioMvc.principal("drafter-dan", "meridian", "policy_author"))
                         .contentType(MediaType.APPLICATION_JSON).content(body("acme", 30)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error").value("tenant_scope_violation"));
@@ -152,7 +152,7 @@ class StudioBreakGlassControllerTest {
     @Test
     void approveRequiresApproverRole403() throws Exception {
         mvc.perform(post("/admin/studio/break-glass/bg-1/approve")
-                        .with(StudioMvc.principal("dan", "meridian", "policy_drafter")))
+                        .with(StudioMvc.principal("dan", "meridian", "policy_author")))
                 .andExpect(status().isForbidden());
         verifyNoInteractions(approval);
     }
@@ -161,7 +161,7 @@ class StudioBreakGlassControllerTest {
     void listActiveGrants() throws Exception {
         when(store.activeGrants("meridian")).thenReturn(List.of(pending("drafter-dan", true)));
         mvc.perform(get("/admin/studio/break-glass")
-                        .with(StudioMvc.principal("d", "meridian", "policy_drafter")))
+                        .with(StudioMvc.principal("d", "meridian", "policy_author")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].grantId").value("bg-1"))
                 .andExpect(jsonPath("$[0].issued").value(true));

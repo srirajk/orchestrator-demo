@@ -38,7 +38,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/admin/studio")
-@PreAuthorize("hasAnyRole('policy_drafter','policy_approver','platform_admin')")
+@PreAuthorize("hasAnyRole('policy_author','policy_approver','platform_admin')")
 public class StudioReviewController {
 
     private final ConsequenceDiffService diff;

@@ -58,7 +58,7 @@ class StudioReviewControllerTest {
         when(diff.computeReview(eq("meridian"), any(), any(), any(), any(), any())).thenReturn(review());
 
         mvc.perform(post("/admin/studio/reviews")
-                        .with(StudioMvc.principal("drafter-dan", "meridian", "policy_drafter"))
+                        .with(StudioMvc.principal("drafter-dan", "meridian", "policy_author"))
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.consequenceReviewHash").value("crh-1"))

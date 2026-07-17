@@ -80,7 +80,7 @@ public class StudioBreakGlassController {
 
     /** {@code POST /admin/studio/break-glass} — author (request) a time-bounded grant. Drafter only. */
     @PostMapping
-    @PreAuthorize("hasRole('policy_drafter')")
+    @PreAuthorize("hasRole('policy_author')")
     public ResponseEntity<GrantView> request(@RequestBody RequestPayload payload, Authentication auth) {
         if (payload == null || payload.scope() == null || payload.vocabulary() == null
                 || payload.baseCeiling() == null || payload.allowlist() == null) {
@@ -143,7 +143,7 @@ public class StudioBreakGlassController {
 
     /** {@code GET /admin/studio/break-glass} — the active (issued, unexpired) grants for this tenant. */
     @GetMapping
-    @PreAuthorize("hasAnyRole('policy_drafter','policy_approver','platform_admin')")
+    @PreAuthorize("hasAnyRole('policy_author','policy_approver','platform_admin')")
     public ResponseEntity<List<GrantView>> active(Authentication auth) {
         String tenant = StudioPrincipal.tenant(auth);
         List<GrantView> active = store.activeGrants(tenant).stream().map(GrantView::pending).toList();

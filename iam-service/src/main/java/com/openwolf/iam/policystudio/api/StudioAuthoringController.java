@@ -25,7 +25,7 @@ import java.util.UUID;
  *
  * <p><b>Tenant scope (author scope) is derived from the principal's {@code tenant_id} claim</b>, never a
  * body field: the controller builds {@code authorScope = TenantScope.of(<claim>)}, so a drafter cannot
- * author a policy targeting another tenant's subtree. Requires the {@code policy_drafter} role.
+ * author a policy targeting another tenant's subtree. Requires the {@code policy_author} role.
  *
  * <p><b>Grounding note (documented gap):</b> the closed manifest {@code vocabulary} and the immutable
  * {@code baseCeiling} are supplied in the request body. There is currently no {@code
@@ -35,7 +35,7 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/admin/studio")
-@PreAuthorize("hasRole('policy_drafter')")
+@PreAuthorize("hasRole('policy_author')")
 public class StudioAuthoringController {
 
     private final PolicyStudioGenerationService generation;

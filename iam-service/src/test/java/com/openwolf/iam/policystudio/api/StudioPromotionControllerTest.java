@@ -97,7 +97,7 @@ class StudioPromotionControllerTest {
     @Test
     void drafterRoleIsDenied403() throws Exception {
         mvc.perform(post("/admin/studio/promotions")
-                        .with(StudioMvc.principal("someone", "meridian", "policy_drafter"))
+                        .with(StudioMvc.principal("someone", "meridian", "policy_author"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body("meridian")))
                 .andExpect(status().isForbidden());

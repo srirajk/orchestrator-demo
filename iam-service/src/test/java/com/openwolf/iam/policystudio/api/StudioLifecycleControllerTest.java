@@ -66,7 +66,7 @@ class StudioLifecycleControllerTest {
     void listBundlesReturnsTenantHistory() throws Exception {
         when(bundles.findByTenantIdOrderByCreatedAtDesc("meridian"))
                 .thenReturn(List.of(record("b_9", "meridian")));
-        mvc.perform(get("/admin/studio/bundles").with(StudioMvc.principal("d", "meridian", "policy_drafter")))
+        mvc.perform(get("/admin/studio/bundles").with(StudioMvc.principal("d", "meridian", "policy_author")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].bundleId").value("b_9"))
                 .andExpect(jsonPath("$[0].tenantId").value("meridian"))

@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * C2 authoring endpoint ({@code POST /admin/studio/drafts}). The author scope is derived from the
- * principal's {@code tenant_id} claim (not the body); requires {@code policy_drafter}. A rejected proposal
+ * principal's {@code tenant_id} claim (not the body); requires {@code policy_author}. A rejected proposal
  * is a normal 200 with violations, not an error.
  */
 @WebMvcTest(controllers = StudioAuthoringController.class)
@@ -49,7 +49,7 @@ class StudioAuthoringControllerTest {
                         StudioGenerationResult.Stage.ACCEPTED));
 
         mvc.perform(post("/admin/studio/drafts")
-                        .with(StudioMvc.principal("drafter-dan", "meridian", "policy_drafter"))
+                        .with(StudioMvc.principal("drafter-dan", "meridian", "policy_author"))
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.draftId").exists())
@@ -68,7 +68,7 @@ class StudioAuthoringControllerTest {
                         StudioGenerationResult.Stage.VALIDATE, List.of("rule escapes author scope")));
 
         mvc.perform(post("/admin/studio/drafts")
-                        .with(StudioMvc.principal("drafter-dan", "meridian", "policy_drafter"))
+                        .with(StudioMvc.principal("drafter-dan", "meridian", "policy_author"))
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accepted").value(false))
