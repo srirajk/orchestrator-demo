@@ -111,13 +111,16 @@ class AuthzFromMembershipTest extends RedisContainerTest {
 
     // Mints a JWT with structural claims only — no book claim.
     private String mintToken(String sub) throws Exception {
+        // A1: mirror real Axiom tokens — mandatory tenant_id + tenant-qualified audience so the
+        // decoder's tenant-confusion guard accepts an otherwise-valid token.
         JWTClaimsSet claims = new JWTClaimsSet.Builder()
                 .subject(sub)
                 .issuer("http://iam-service:8084")
-                .audience(List.of("conduit-gateway"))
+                .audience(List.of("conduit-gateway", "conduit-gateway@default"))
                 .expirationTime(new Date(System.currentTimeMillis() + 3_600_000L))
                 .issueTime(new Date())
                 .claim("roles", List.of("relationship_manager"))
+                .claim("tenant_id", "default")
                 .build();
 
         JWSHeader header = new JWSHeader.Builder(JWSAlgorithm.RS256)

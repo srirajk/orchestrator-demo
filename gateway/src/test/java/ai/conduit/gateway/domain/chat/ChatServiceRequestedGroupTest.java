@@ -190,11 +190,12 @@ class ChatServiceRequestedGroupTest extends RedisContainerTest {
         JWTClaimsSet claims = new JWTClaimsSet.Builder()
                 .subject("rm_jane")
                 .issuer("http://iam-service:8084")
-                .audience(List.of("conduit-gateway"))
+                .audience(List.of("conduit-gateway", "conduit-gateway@default"))
                 .expirationTime(new Date(System.currentTimeMillis() + 3_600_000L))
                 .issueTime(new Date())
                 .claim("roles", List.of("relationship_manager"))
                 .claim("segments", Map.of("wealth", "confidential-pii"))
+                .claim("tenant_id", "default")
                 .build();
         SignedJWT jwt = new SignedJWT(
                 new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("k1").build(), claims);

@@ -133,14 +133,23 @@ class SecurityRejectionIT extends RedisContainerTest {
 
     private String mintWith(String sub, String kid, KeyPair kp,
                              Date exp, String iss, List<String> aud, List<String> roles) throws Exception {
+        // A1: real Axiom tokens now carry a mandatory tenant_id and a tenant-qualified audience
+        // conduit-gateway@<tenant>. Mirror that here so an otherwise-valid token passes the
+        // decoder's tenant-confusion guard — additive: the bare `conduit-gateway` audience (used by
+        // the wrong-audience / wrong-issuer negatives) is preserved untouched.
+        List<String> effectiveAud = new java.util.ArrayList<>(aud);
+        if (aud.contains("conduit-gateway")) {
+            effectiveAud.add("conduit-gateway@default");
+        }
         JWTClaimsSet claims = new JWTClaimsSet.Builder()
                 .subject(sub)
                 .issuer(iss)
-                .audience(aud)
+                .audience(effectiveAud)
                 .expirationTime(exp)
                 .issueTime(new Date())
                 .claim("roles", roles)
                 .claim("clearance", 2)
+                .claim("tenant_id", "default")
                 .build();
         JWSHeader header = new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(kid).build();
         SignedJWT jwt = new SignedJWT(header, claims);

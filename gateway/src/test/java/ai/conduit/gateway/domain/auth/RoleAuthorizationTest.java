@@ -93,12 +93,13 @@ class RoleAuthorizationTest extends RedisContainerTest {
         JWTClaimsSet claims = new JWTClaimsSet.Builder()
                 .subject(sub)
                 .issuer("http://iam-service:8084")
-                .audience(List.of("conduit-gateway"))
+                .audience(List.of("conduit-gateway", "conduit-gateway@default"))
                 .expirationTime(new Date(System.currentTimeMillis() + 3_600_000L))
                 .issueTime(new Date())
                 .claim("roles", roles)
                 .claim("admin_domains", adminDomains)
                 .claim("clearance", 2)
+                .claim("tenant_id", "default")
                 .build();
         JWSHeader header = new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("role-test-key").build();
         SignedJWT jwt = new SignedJWT(header, claims);
@@ -265,12 +266,13 @@ class RoleAuthorizationTest extends RedisContainerTest {
         JWTClaimsSet claims = new JWTClaimsSet.Builder()
                 .subject("rm_jane")
                 .issuer("http://iam-service:8084")   // OIDC issuer
-                .audience(List.of("conduit-gateway"))
+                .audience(List.of("conduit-gateway", "conduit-gateway@default"))
                 .expirationTime(new Date(System.currentTimeMillis() + 3_600_000L))
                 .issueTime(new Date())
                 .claim("roles", List.of("relationship_manager"))
                 .claim("admin_domains", List.of())
                 .claim("clearance", 2)
+                .claim("tenant_id", "default")
                 .build();
         JWSHeader header = new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("role-test-key").build();
         SignedJWT jwt = new SignedJWT(header, claims);

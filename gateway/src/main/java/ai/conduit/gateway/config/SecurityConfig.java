@@ -62,6 +62,16 @@ public class SecurityConfig {
     @Value("${conduit.auth.required-audience:conduit-gateway}")
     private String expectedAudience;
 
+    // Canonical tenant-id grammar (Axiom A1): lower alphanumeric start, then alphanumeric/hyphen,
+    // ≤63 chars. The tenant_id claim must match this, and must equal the suffix of the
+    // tenant-qualified audience conduit-gateway@<tenant_id>.
+    private static final java.util.regex.Pattern CANONICAL_TENANT_ID =
+            java.util.regex.Pattern.compile("[a-z0-9][a-z0-9-]{0,62}");
+
+    // JOSE typ (and mirrored claim) that marks a cross-tenant admin delegation token. Such a token
+    // is minted only by the IAM admin-only exchange and is rejected on the ordinary data path.
+    private static final String DELEGATION_TOKEN_TYPE = "tenant-delegation+jwt";
+
     // Browser origins allowed to read the glass-box SSE stream cross-origin (the glass-box
     // page is served from its own host/port). Comma-separated; "*" allows any. Configurable
     // so it can be locked down per environment.
@@ -200,6 +210,47 @@ public class SecurityConfig {
                 List<String> aud = claims.getAudience();
                 if (aud == null || !aud.contains(expectedAudience)) {
                     throw new JwtException("invalid aud: " + aud);
+                }
+
+                // A1: reject a cross-tenant delegation token on the ordinary (chat/data) path.
+                // Delegation tokens are separately typed and carry an admin-only audience; the
+                // audience check above already refuses them, but the typ check is explicit defence
+                // in depth so the boundary can never depend on audience config alone.
+                Object joseType = jwt.getHeader().getType();
+                if (joseType != null && DELEGATION_TOKEN_TYPE.equals(joseType.toString())) {
+                    throw new JwtException("delegation token is not accepted on this endpoint");
+                }
+                Object typClaim = claims.getClaim("typ");
+                if (typClaim != null && DELEGATION_TOKEN_TYPE.equals(typClaim.toString())) {
+                    throw new JwtException("delegation token is not accepted on this endpoint");
+                }
+
+                // A1: tenant confusion guard. tenant_id is mandatory, canonical, and must equal the
+                // suffix of the tenant-qualified audience conduit-gateway@<tenant_id>. A token that
+                // asserts one tenant in its claim but is audienced for another is rejected here even
+                // though it is correctly signed — no unverified side-channel can re-scope it.
+                Object rawTenant = claims.getClaim("tenant_id");
+                String tenantId = rawTenant != null ? rawTenant.toString() : null;
+                if (tenantId == null || tenantId.isBlank()) {
+                    throw new JwtException("missing mandatory tenant_id claim");
+                }
+                if (!CANONICAL_TENANT_ID.matcher(tenantId).matches()) {
+                    throw new JwtException("tenant_id '" + tenantId + "' violates canonical grammar");
+                }
+                String qualifiedPrefix = expectedAudience + "@";
+                boolean sawQualified = false;
+                for (String a : aud) {
+                    if (a == null || !a.startsWith(qualifiedPrefix)) continue;
+                    String suffix = a.substring(qualifiedPrefix.length());
+                    if (!suffix.equals(tenantId)) {
+                        throw new JwtException("tenant-qualified audience '" + a
+                                + "' does not match tenant_id claim '" + tenantId + "'");
+                    }
+                    sawQualified = true;
+                }
+                if (!sawQualified) {
+                    throw new JwtException("missing tenant-qualified audience "
+                            + qualifiedPrefix + "<tenant_id>");
                 }
 
                 return buildSpringJwt(token, jwt.getHeader().getKeyID(), claims);
