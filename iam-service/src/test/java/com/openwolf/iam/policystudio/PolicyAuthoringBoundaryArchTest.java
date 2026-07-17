@@ -92,5 +92,22 @@ class PolicyAuthoringBoundaryArchTest {
                 .should().dependOnClassesThat().areAssignableTo(ConsequenceDiffService.class)
                 .as("the consequence-diff service must never be reachable from enforcement code");
         diffServiceConfined.check(IAM);
+
+        // (7) C5 — the policy-lifecycle promotion machine is authoring-plane only. It stages/compiles/
+        // probes and compare-and-sets the live pointer; no runtime-enforcement code may reach it.
+        ArchRule promotionConfined = noClasses()
+                .that().resideOutsideOfPackage(STUDIO + "..")
+                .should().dependOnClassesThat()
+                .areAssignableTo(com.openwolf.iam.policystudio.lifecycle.PolicyPromotionService.class)
+                .as("the policy-promotion service must never be reachable from enforcement code");
+        promotionConfined.check(IAM);
+
+        // (8) C5 — the examiner chain service is authoring-plane only (audit reconstruction, not enforcement).
+        ArchRule examinerConfined = noClasses()
+                .that().resideOutsideOfPackage(STUDIO + "..")
+                .should().dependOnClassesThat()
+                .areAssignableTo(com.openwolf.iam.policystudio.lifecycle.ExaminerChainService.class)
+                .as("the examiner chain service must never be reachable from enforcement code");
+        examinerConfined.check(IAM);
     }
 }

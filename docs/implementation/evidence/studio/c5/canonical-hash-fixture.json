@@ -1,0 +1,10 @@
+{
+  "bundleId" : "b_4bb6c0d46ba4101403fe81555104475ba54c06a6c80ba3548a5e05e497afa764",
+  "idScheme" : "b_ + sha256(canonicalContent)",
+  "versionSentinel" : "__BUNDLE_VERSION__",
+  "note" : "every policy version in the hash input is the sentinel (no self-reference); the concrete bundleId is stamped back only when rendered for staging/compile",
+  "tenantId" : "acme",
+  "manifestRefs" : [ "manifest:agent@sha-abc123" ],
+  "canonicalContent" : "bundle-v1\ntenant=acme\nFILE:agent@acme.yaml\napiVersion: api.cerbos.dev/v1\nresourcePolicy:\n  version: __BUNDLE_VERSION__\n  resource: agent\n  scope: \"acme\"\n  scopePermissions: SCOPE_PERMISSIONS_REQUIRE_PARENTAL_CONSENT_FOR_ALLOWS\n  rules:\n    - actions: [\"invoke\", \"invoke_membership\", \"register\", \"deregister\"]\n      effect: EFFECT_ALLOW\n      roles: [\"platform_admin\"]\n    - actions: [\"invoke\", \"invoke_membership\"]\n      effect: EFFECT_ALLOW\n      roles: [\"domain_admin\"]\n    - actions: [\"register\", \"deregister\"]\n      effect: EFFECT_DENY\n      roles: [\"domain_admin\"]\n    - actions: [\"invoke\", \"invoke_membership\"]\n      effect: EFFECT_ALLOW\n      roles: [\"chat_user\", \"relationship_manager\"]\nMANIFESTS:\nmanifest:agent@sha-abc123\nTESTS:\nfixtureSetHash=feb25e1df49eb07533d2416c4c644009575b119ad3c08b20cab588a178cd9262;testCount=5;oracle=c3-independent-oracle;pdpSourceId=local-pdp-fidelity-evaluator\n",
+  "recomputedBundleId" : "b_4bb6c0d46ba4101403fe81555104475ba54c06a6c80ba3548a5e05e497afa764"
+}

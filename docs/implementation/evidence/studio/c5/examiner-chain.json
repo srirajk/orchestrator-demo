@@ -1,0 +1,25 @@
+{
+  "reconstructedWith" : "immutable records only; LLM subsystem disabled (no model client on the examiner)",
+  "transactionId" : "txn-9001",
+  "cerbosCallId" : "cerbos-call-7f3a",
+  "activePolicyVersion" : "b_4bb6c0d46ba4101403fe81555104475ba54c06a6c80ba3548a5e05e497afa764",
+  "decision" : "ALLOW",
+  "resourceKind" : "agent",
+  "action" : "invoke",
+  "immutableBundleRecord" : {
+    "bundleId" : "b_4bb6c0d46ba4101403fe81555104475ba54c06a6c80ba3548a5e05e497afa764",
+    "gitCommit" : "commit-c5-headline",
+    "tests" : {
+      "fixtureSetHash" : "feb25e1df49eb07533d2416c4c644009575b119ad3c08b20cab588a178cd9262",
+      "testCount" : 5,
+      "oracle" : "c3-independent-oracle",
+      "pdpSourceId" : "local-pdp-fidelity-evaluator"
+    }
+  },
+  "approval" : {
+    "approverId" : "sec-reviewer-01",
+    "consequenceReviewHash" : "crh-006223d1b6d8afb3fb5a57d720f04eff49966b34c703adc98083f231b307aff1",
+    "signatureValid" : true
+  },
+  "complete" : true
+}
