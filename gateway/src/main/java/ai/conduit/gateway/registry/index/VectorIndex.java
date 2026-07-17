@@ -68,31 +68,67 @@ public class VectorIndex {
         this.keyspace      = keyspace;
     }
 
-    /** The embedding model that produced the vectors in the index, or null if it was never stamped. */
+    /** The embedding model that produced the vectors in the default/legacy index, or null if unstamped. */
     public String stampedModelId() {
+        return stampedModelId(null);
+    }
+
+    /**
+     * The embedding model that produced the vectors in this tenant's index, or null if unstamped.
+     * The stamp key is tenant-qualified through {@link TenantKeyspace}: legacy {@code intent_idx:model}
+     * for the default tenant, {@code t:{tenant}:intent_idx:model} for a real tenant — so one tenant's
+     * model-mismatch verdict is read from that tenant's own stamp and cannot shadow another's.
+     */
+    public String stampedModelId(TenantExecutionContext tenant) {
         try {
-            return jedis.get(MODEL_STAMP_KEY);
+            return jedis.get(keyspace.key(MODEL_STAMP_KEY, tenant));
         } catch (Exception e) {
             return null;
         }
     }
 
-    /** The manifest expression dialect the registry ingested with, or null if it was never stamped. */
+    /** The manifest expression dialect the default/legacy index was ingested with, or null if unstamped. */
     public String stampedExprDialect() {
+        return stampedExprDialect(null);
+    }
+
+    /** The manifest expression dialect this tenant's index was ingested with, or null if unstamped. */
+    public String stampedExprDialect(TenantExecutionContext tenant) {
         try {
-            return jedis.get(EXPR_DIALECT_STAMP_KEY);
+            return jedis.get(keyspace.key(EXPR_DIALECT_STAMP_KEY, tenant));
         } catch (Exception e) {
             return null;
         }
     }
 
-    /** Whether the index itself exists in Redis. */
+    /** Whether the default/legacy index itself exists in Redis. */
     public boolean exists() {
+        return exists(null);
+    }
+
+    /** Whether this tenant's routing index exists in Redis (per-tenant name via {@link TenantKeyspace}). */
+    public boolean exists(TenantExecutionContext tenant) {
         try {
-            jedis.ftInfo(INDEX_NAME);
+            jedis.ftInfo(keyspace.indexName(INDEX_NAME, tenant));
             return true;
         } catch (Exception e) {
             return false;
+        }
+    }
+
+    /**
+     * How many documents this tenant's index holds — the per-tenant "non-empty" signal the readiness
+     * verifier gates on. A tenant whose ingest wrote nothing (broken/empty folder) has a 0 count and is
+     * failed closed without touching any other tenant's index. Returns 0 if the index is absent.
+     */
+    public long documentCount(TenantExecutionContext tenant) {
+        try {
+            var info = jedis.ftInfo(keyspace.indexName(INDEX_NAME, tenant));
+            Object numDocs = info.get("num_docs");
+            if (numDocs == null) return 0L;
+            return Long.parseLong(numDocs.toString());
+        } catch (Exception e) {
+            return 0L;
         }
     }
 

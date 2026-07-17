@@ -1,5 +1,7 @@
 package ai.conduit.gateway.registry.ingest;
 
+import ai.conduit.gateway.domain.auth.TenantExecutionContext;
+import ai.conduit.gateway.infrastructure.redis.TenantKeyspace;
 import ai.conduit.gateway.registry.embedding.TextEmbedder;
 import ai.conduit.gateway.registry.index.VectorIndexWriter;
 import ai.conduit.gateway.registry.model.AgentManifest;
@@ -63,8 +65,26 @@ public class RegistryIngestor {
     private final String registryLocation;
     private final boolean failOnInvalid;
     private final boolean pruneOrphans;
+    private final TenantKeyspace keyspace;
     private final AtomicBoolean ran = new AtomicBoolean(false);
 
+    /**
+     * Single-tenant constructor: no tenant seam. Startup ingest writes the default/legacy index only —
+     * byte-identical to the pre-A4 ingestor. Retained for mock-based unit tests.
+     */
+    public RegistryIngestor(AgentRegistrar registrar,
+                            VectorIndexWriter vectorIndexWriter,
+                            TextEmbedder embedding,
+                            ObjectMapper mapper,
+                            RegistryIngestionHealth health,
+                            String registryLocation,
+                            boolean failOnInvalid,
+                            boolean pruneOrphans) {
+        this(registrar, vectorIndexWriter, embedding, mapper, health, registryLocation,
+                failOnInvalid, pruneOrphans, new TenantKeyspace(false, "default"));
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
     public RegistryIngestor(AgentRegistrar registrar,
                             VectorIndexWriter vectorIndexWriter,
                             TextEmbedder embedding,
@@ -72,7 +92,8 @@ public class RegistryIngestor {
                             RegistryIngestionHealth health,
                             @Value("${conduit.registry.location:classpath:}") String registryLocation,
                             @Value("${conduit.registry.ingest.fail-on-invalid:true}") boolean failOnInvalid,
-                            @Value("${conduit.registry.ingest.prune-orphans:true}") boolean pruneOrphans) {
+                            @Value("${conduit.registry.ingest.prune-orphans:true}") boolean pruneOrphans,
+                            TenantKeyspace keyspace) {
         this.registrar         = registrar;
         this.vectorIndexWriter = vectorIndexWriter;
         this.embedding         = embedding;
@@ -81,6 +102,7 @@ public class RegistryIngestor {
         this.registryLocation  = registryLocation;
         this.failOnInvalid     = failOnInvalid;
         this.pruneOrphans      = pruneOrphans;
+        this.keyspace          = keyspace;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -193,6 +215,60 @@ public class RegistryIngestor {
         for (String agentId : orphans) {
             registrar.deregister(agentId);
             log.warn("  pruned orphan: {}", agentId);
+        }
+    }
+
+    /**
+     * Ingest ONE tenant's routing index from its own manifest folder (Axiom A4), fail-isolated.
+     *
+     * <p>Each tenant has its own manifest folder ({@code {registryLocation}tenants/{tenant}/manifests/})
+     * and its own {@code intent_idx__{tenant}} index. This method builds that tenant's index and nothing
+     * else: a broken or empty tenant folder marks THAT tenant un-ingested (returns {@code false}) and
+     * leaves every other tenant's index untouched — unlike the default-tenant startup path, it never
+     * calls {@link System#exit}. The gateway's per-tenant {@code RegistryReadinessVerifier} then fails
+     * that tenant closed while healthy tenants serve.
+     *
+     * <p><b>Driven by provisioning, not startup.</b> The set of real tenants and their per-tenant
+     * manifest folders arrive with B4 provisioning; this is the seam B4 calls per provisioned tenant.
+     * It builds the routing index (what routing isolation + readiness consume); per-tenant manifest-set
+     * persistence and orphan reconciliation are keyed off the same seam and land with B4.
+     *
+     * @return true if the tenant's index was built with at least one agent; false if the folder was
+     *         missing/empty or every manifest was rejected (that tenant fails closed).
+     */
+    public boolean ingestTenant(TenantExecutionContext tenant) {
+        if (keyspace.isLegacy(tenant)) {
+            throw new IllegalArgumentException(
+                    "ingestTenant is for real (non-default) tenants; the default tenant is ingested at startup");
+        }
+        String segment = keyspace.segment(tenant);
+        String pattern = registryLocation + "tenants/" + segment + "/manifests/**/*.json";
+        try {
+            vectorIndexWriter.ensureIndex(tenant);
+            Resource[] resources = new PathMatchingResourcePatternResolver().getResources(pattern);
+            int loaded = 0;
+            for (Resource resource : resources) {
+                try {
+                    AgentManifest derived = registrar.derive(mapper.readTree(resource.getInputStream()));
+                    vectorIndexWriter.index(derived, tenant);
+                    loaded++;
+                } catch (Exception e) {
+                    log.error("Tenant '{}': invalid manifest '{}': {}",
+                            segment, resource.getFilename(), e.getMessage());
+                }
+            }
+            if (loaded == 0) {
+                log.warn("Tenant '{}': no manifests ingested from {} — tenant fails closed, siblings unaffected",
+                        segment, pattern);
+                return false;
+            }
+            log.info("Tenant '{}': ingested {} agent(s) into its per-tenant routing index", segment, loaded);
+            return true;
+        } catch (Exception e) {
+            // Per-tenant fail-closed: log and report un-ingested; never exit, never touch a sibling.
+            log.error("Tenant '{}': ingestion failed — tenant fails closed, siblings unaffected: {}",
+                    segment, e.getMessage());
+            return false;
         }
     }
 
