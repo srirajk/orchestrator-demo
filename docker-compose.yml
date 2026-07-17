@@ -506,6 +506,16 @@ services:
       - "3595:3593"   # gRPC
     volumes:
       - ./infra/cerbos:/conf:ro
+      # A6: the Cerbos DECISION LOG (config.yaml audit.file.path=/var/log/cerbos/audit.log) is the
+      # immutable authorization chain the examiner joins to via cerbosCallId. It MUST survive a PDP
+      # restart — a named volume persists it outside the container's writable layer, so a
+      # `docker compose restart cerbos` (or a re-create) never erases the chain.
+      # Retention/access/masks: retention is governed at the audit sink / object-store lifecycle
+      # (WORM, conduit.audit.retention-days); this volume is the durable spool for the raw PDP
+      # decision log. Access is operator-only (host-mounted named volume, not exposed); PII masking
+      # of principal/resource attributes is a Cerbos audit.decisionLogFilters concern (config), not a
+      # gateway concern. This change is CONFIG-ONLY and does not alter the running demo's behaviour.
+      - cerbos-audit:/var/log/cerbos
     command: server --config=/conf/config.yaml
     healthcheck:
       test: ["CMD", "/cerbos", "healthcheck", "--insecure"]
@@ -1017,3 +1027,6 @@ volumes:
   loki-data:
   # Persists the iam-service RSA signing key so its kid is stable across restarts.
   iam-signing-key:
+  # A6: persists the Cerbos decision log outside the container so the examiner's authorization
+  # chain (cerbosCallId ↔ verdict ↔ activePolicyVersion) survives a PDP restart / re-create.
+  cerbos-audit:
