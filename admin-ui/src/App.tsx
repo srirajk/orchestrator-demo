@@ -8,7 +8,7 @@ import { Dashboard } from './pages/Dashboard'
 import { Users } from './pages/Users'
 import { Teams } from './pages/Teams'
 import { Roles } from './pages/Roles'
-import { Policies } from './pages/Policies'
+import { PolicyStudio } from './pages/PolicyStudio'
 import { AuditLog } from './pages/AuditLog'
 
 function Protected({ children }: { children: React.ReactNode }) {
@@ -40,7 +40,8 @@ function App() {
               <Route path="users"    element={<PageBoundary><Users /></PageBoundary>} />
               <Route path="teams"    element={<PageBoundary><Teams /></PageBoundary>} />
               <Route path="roles"    element={<PageBoundary><Roles /></PageBoundary>} />
-              <Route path="policies" element={<PageBoundary><Policies /></PageBoundary>} />
+              <Route path="studio"   element={<PageBoundary><PolicyStudio /></PageBoundary>} />
+              <Route path="policies" element={<Navigate to="/studio" replace />} />
               <Route path="audit"    element={<PageBoundary><AuditLog /></PageBoundary>} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

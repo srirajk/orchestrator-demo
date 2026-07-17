@@ -41,13 +41,14 @@ function errorMessage(payload: unknown, fallback: string): string {
   return fallback
 }
 
-async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function req<T>(method: string, path: string, body?: unknown, headers?: Record<string, string>): Promise<T> {
   const authToken = token()
   const res = await fetch(`${BASE}${path}`, {
     method,
     headers: {
       'Content-Type': 'application/json',
       ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      ...headers,
     },
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   })
@@ -82,6 +83,7 @@ export interface User {
   adminDomains: string[]
   isActive?: boolean
   createdAt?: string
+  tenantId?: string
 }
 
 export interface CreateUserInput {
@@ -306,4 +308,195 @@ export const policiesApi = {
     req<{ valid: boolean; errors: string[] }>('POST', '/admin/policies/validate', { yaml }),
   apply: (yaml: string, filename: string) =>
     req<{ applied: boolean; path: string }>('POST', '/admin/policies/apply', { yaml, filename }),
+}
+
+// ── Axiom Policy Studio ──────────────────────────────────────────────────────
+export type JsonRecord = Record<string, unknown>
+
+export interface ManifestVocabulary {
+  resourceKind: string
+  actions: string[]
+  classifications: string[]
+  attributes: string[]
+  roles: string[]
+  approvedImports: string[]
+}
+
+export interface BaseCeiling {
+  resourceKind: string
+  tuples: Array<{ action: string; role: string }>
+  carriesTenantEqualityBackstop: boolean
+  reservedIdentities: string[]
+}
+
+export interface DraftRequest {
+  intent: string
+  subscopesEnabled: boolean
+  vocabulary: ManifestVocabulary
+  baseCeiling: BaseCeiling
+}
+
+export interface ValidationResult {
+  ok: boolean
+  violations: string[]
+  stage: string
+}
+
+export interface DraftResponse {
+  draftId: string
+  tenantId: string
+  authorId: string
+  accepted: boolean
+  canonicalYaml: string | null
+  validation: ValidationResult
+}
+
+export interface FixtureCell {
+  principalRoles: string[]
+  principalTenant: string
+  principalAttrs: JsonRecord
+  resourceTenant: string
+  resourceAttrs: JsonRecord
+  action: string
+  label: string
+}
+
+export interface BundleSnapshot {
+  bundleId: string
+  policy: JsonRecord | null
+  ceiling: BaseCeiling | null
+  canonicalContent: string
+}
+
+export interface ReviewRequest {
+  current: BundleSnapshot
+  candidate: BundleSnapshot
+  matrix: { cells: FixtureCell[]; fixtureSetHash: string }
+  vocabulary: ManifestVocabulary
+}
+
+export interface ConsequenceDelta {
+  cell: FixtureCell
+  from: 'ALLOW' | 'DENY'
+  to: 'ALLOW' | 'DENY'
+  direction: 'WIDENED' | 'NARROWED'
+  overPermission: boolean
+  businessConsequence: string
+}
+
+export interface ConsequenceReview {
+  tenantId: string
+  resourceKind: string
+  currentBundleId: string
+  candidateBundleId: string
+  fixtureSetHash: string
+  deltas: ConsequenceDelta[]
+  overPermissionAlarm: boolean
+  principalsGainingAccess: number
+  canonicalDelta: string
+  consequenceReviewHash: string
+  disclosure: { sampledNotFormal: boolean; sampledCellCount: number; statement: string }
+  provenance: { sourceId: string; currentBatch: JsonRecord; candidateBatch: JsonRecord }
+  generatedAt: string
+  displayProse: string | null
+}
+
+export interface BundleFile { path: string; yaml: string }
+export interface BundleTestMetadata {
+  fixtureSetHash: string
+  testCount: number
+  oracle: string
+  pdpSourceId: string
+}
+export interface PolicyBundle {
+  bundleId: string
+  tenantId: string
+  files: BundleFile[]
+  manifestRefs: string[]
+  testMetadata: BundleTestMetadata
+  canonicalContent: string
+}
+
+export interface BundleView {
+  bundleId: string
+  tenantId: string
+  gitCommit: string
+  fixtureSetHash: string
+  testCount: number
+  testOracle: string
+  pdpSourceId: string
+  createdAt: string
+}
+
+export interface PromotionReceipt {
+  promotionId: string
+  tenantId: string
+  fromBundleId: string
+  toBundleId: string
+  directoryVersion: number
+  kind: 'PROMOTION' | 'ROLLBACK'
+  idempotentReplay: boolean
+}
+
+export interface ExaminerChain {
+  transactionId: string
+  cerbosCallId: string
+  activePolicyVersion: string
+  decision: string
+  resourceKind: string
+  action: string
+  bundleId: string
+  gitCommit: string
+  testMetadata: BundleTestMetadata
+  approverId: string
+  consequenceReviewHash: string
+  approvalSignatureValid: boolean
+  complete: boolean
+}
+
+export interface BreakGlassRequest {
+  scope: string
+  resourceKind: string
+  action: string
+  role: string
+  ttlMinutes: number
+  justification: string
+  vocabulary: ManifestVocabulary
+  baseCeiling: BaseCeiling
+  allowlist: { resources: string[]; actions: string[] }
+}
+
+export interface BreakGlassGrant {
+  grantId: string
+  tenantId: string
+  requestedBy: string
+  admissible: boolean
+  issued: boolean
+  expiresAt: string
+  boundsViolations: string[]
+  c2Violations: string[]
+}
+
+export const studioApi = {
+  createDraft: (payload: DraftRequest) =>
+    req<DraftResponse>('POST', '/admin/studio/drafts', payload),
+  createReview: (payload: ReviewRequest) =>
+    req<ConsequenceReview>('POST', '/admin/studio/reviews', payload),
+  getReview: (reviewId: string) =>
+    req<ConsequenceReview>('GET', `/admin/studio/reviews/${encodeURIComponent(reviewId)}`),
+  listBundles: () => req<BundleView[]>('GET', '/admin/studio/bundles'),
+  getBundle: (bundleId: string) =>
+    req<BundleView>('GET', `/admin/studio/bundles/${encodeURIComponent(bundleId)}`),
+  getExaminerChain: (cerbosCallId: string) =>
+    req<ExaminerChain>('GET', `/admin/studio/examiner/${encodeURIComponent(cerbosCallId)}`),
+  promote: (reviewId: string, candidate: PolicyBundle, idempotencyKey: string) =>
+    req<PromotionReceipt>('POST', '/admin/studio/promotions', { reviewId, candidate, idempotencyKey }),
+  rollback: (reviewId: string, candidate: PolicyBundle, idempotencyKey: string) =>
+    req<PromotionReceipt>('POST', '/admin/studio/rollbacks', { reviewId, candidate, idempotencyKey }),
+  requestBreakGlass: (payload: BreakGlassRequest) =>
+    req<BreakGlassGrant>('POST', '/admin/studio/break-glass', payload),
+  approveBreakGlass: (grantId: string, correlationId?: string) =>
+    req<BreakGlassGrant>('POST', `/admin/studio/break-glass/${encodeURIComponent(grantId)}/approve`, undefined,
+      correlationId ? { 'X-Correlation-Id': correlationId } : undefined),
+  listBreakGlass: () => req<BreakGlassGrant[]>('GET', '/admin/studio/break-glass'),
 }

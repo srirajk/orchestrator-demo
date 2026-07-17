@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Users, Shield, UsersRound, FileText, LogOut, Clock } from 'lucide-react'
+import { LayoutDashboard, Users, Shield, UsersRound, GitCompare, LogOut, Clock } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useAuth } from '../hooks/useAuth'
 
@@ -8,7 +8,7 @@ const nav = [
   { to: '/users',   label: 'Users',     icon: Users },
   { to: '/teams',   label: 'Teams',     icon: UsersRound },
   { to: '/roles',   label: 'Roles',     icon: Shield },
-  { to: '/policies',label: 'Policies',  icon: FileText },
+  { to: '/studio',  label: 'Policy Studio', icon: GitCompare },
   { to: '/audit',   label: 'Audit Log', icon: Clock },
 ]
 

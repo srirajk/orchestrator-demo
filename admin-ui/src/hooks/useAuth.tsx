@@ -46,6 +46,7 @@ export function decodePayload(token: string): User | null {
       classification: p.classification || 'public',
       team: p.team || '',
       adminDomains: p.admin_domains || p.adminDomains || [],
+      tenantId: p.tenant_id || '',
     }
   } catch {
     return null
@@ -61,8 +62,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback((t: string, u: User) => {
     writeAdminToken(t)
+    const verifiedClaims = decodePayload(t)
     setToken(t)
-    setUser(u)
+    setUser(verifiedClaims ? { ...u, ...verifiedClaims } : u)
   }, [])
 
   const logout = useCallback(() => {
