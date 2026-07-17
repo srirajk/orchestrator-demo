@@ -1,0 +1,50 @@
+# Rendered from item WR-01 — intent: WR-01: acme chat_user may invoke internal agents but must NOT probe membership.
+# GENERATED FROM INTENT ONLY — never from candidate policy YAML (Axiom C3 moat).
+name: IndependentIntentOracle
+description: Expected decisions derived from the author's intent + injected negative probes.
+tests:
+  - name: "intent_allow_chat_user_invoke_0"
+    input:
+      principals: [p0]
+      resources: [r0]
+      actions: [invoke]
+    expected:
+      - principal: p0  # roles=[chat_user] tenant=acme
+        resource: r0  # kind=agent tenant=acme attrs={data_classification=internal}
+        actions: {invoke: EFFECT_ALLOW}   # probe=POSITIVE
+  - name: "intent_deny_chat_user_invoke_membership_1"
+    input:
+      principals: [p1]
+      resources: [r1]
+      actions: [invoke_membership]
+    expected:
+      - principal: p1  # roles=[chat_user] tenant=acme
+        resource: r1  # kind=agent tenant=acme attrs={}
+        actions: {invoke_membership: EFFECT_DENY}   # probe=POSITIVE
+  - name: "intent_allow_chat_user_invoke_0::cross_tenant_denied"
+    input:
+      principals: [p2]
+      resources: [r2]
+      actions: [invoke]
+    expected:
+      - principal: p2  # roles=[chat_user] tenant=acme
+        resource: r2  # kind=agent tenant=acme__other attrs={data_classification=internal}
+        actions: {invoke: EFFECT_DENY}   # probe=CROSS_TENANT
+  - name: "intent_allow_chat_user_invoke_0::wrong_segment_denied"
+    input:
+      principals: [p3]
+      resources: [r3]
+      actions: [invoke]
+    expected:
+      - principal: p3  # roles=[chat_user] tenant=acme
+        resource: r3  # kind=agent tenant=acme attrs={data_classification=confidential}
+        actions: {invoke: EFFECT_DENY}   # probe=WRONG_SEGMENT
+  - name: "intent_allow_chat_user_invoke_0::missing_attribute_denied"
+    input:
+      principals: [p4]
+      resources: [r4]
+      actions: [invoke]
+    expected:
+      - principal: p4  # roles=[chat_user] tenant=acme
+        resource: r4  # kind=agent tenant=acme attrs={}
+        actions: {invoke: EFFECT_DENY}   # probe=MISSING_ATTRIBUTE

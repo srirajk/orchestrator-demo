@@ -2236,3 +2236,20 @@
 - gateway/.../test/.../domain/auth/TenantContextFailClosedTest.java — A2.3 filter-level fail-closed (401 missing/403 unknown, chain never entered). ~1.5k
 - gateway/.../test/.../domain/auth/TenantContextPropagationTest.java — A2.2 immutable TEC survives VT hop; invocation/coverage/audit observe exact value. ~1.4k
 - gateway/.../test/.../architecture/TenantContextSeamArchTest.java — A2.1 single claim reader (source scan) + no downstream static getTenant + controllers carry TEC. ~1.6k
+
+## Axiom C3 — independent test-scenario generation (policy studio, iam-service)
+- iam-service/.../policystudio/TestScenarioRequest.java — C3.1 oracle input; ONLY intent+vocab+scope+ceiling, NO YAML/PolicyIR (the moat's type-level fence). fromAuthoring() = lossy projection. ~0.6k
+- iam-service/.../policystudio/TestScenarioModelClient.java — C3 oracle seam (diff process/prompt from PolicyAuthoringModelClient); proposeExpectations(request) only. ~0.4k
+- iam-service/.../policystudio/Expectation.java + Effect.java + ProbeKind.java — one oracle row + ALLOW/DENY + POSITIVE/CROSS_TENANT/WRONG_SEGMENT/MISSING_ATTRIBUTE. ~0.7k
+- iam-service/.../policystudio/TestExpectationSet.java — immutable expectation set; renders Cerbos _test.yaml. ~0.6k
+- iam-service/.../policystudio/ProbeAttributes.java — manifest-grounded tenant/segment attr names (World B: not hardcoded). ~0.3k
+- iam-service/.../policystudio/NegativeProbeInjector.java — C3.3: EVERY allow → 3 DENY probes (cross-tenant/wrong-segment/missing-attr). ~1.2k
+- iam-service/.../policystudio/ConditionEvaluator.java — tight CEL subset (==,!=,in,&&,||,has,parens); fail-closed missing-attr; throws Unsupported rather than guess. ~2k
+- iam-service/.../policystudio/PolicyExpectationEvaluator.java — decides candidate PolicyIR's effect per expectation (rule match, DENY-overrides, fall-through to ceiling, tenant backstop); throws Indeterminate outside subset. ~1.6k
+- iam-service/.../policystudio/IndependentTestGenService.java + CatchLayer.java — C3 draft gate: oracle+probes + C2 validator + optional Cerbos compile(=B3 invariants); TestGenReport(caught/primaryLayer/moatCritical/...). ~2.2k
+- iam-service/.../test/.../policystudio/C3TestGenFixtures.java — seeded deterministic oracle (SeededIntentOracle, NO LLM) + IntentSpec/Grant + bad-policy YAML builders. ~3k
+- iam-service/.../test/.../policystudio/C3Corpus.java — 31 hand-reviewed known-bad (intent,policy) pairs across 7 classes; expectedLayer pins no-regression. ~4k
+- iam-service/.../test/.../policystudio/KnownBadCorpusCatchRateTest.java — C3.2 MEASURED catch-rate; asserts ≥90% agg, 100% cross-tenant/wildcard, no regression; emits catch-rate-table.md + sample-oracle-test.yaml. ~3k
+- iam-service/.../test/.../policystudio/TestGenIsolationArchTest.java — C3.1 arch+reflection: oracle input has no YAML field, seam takes only request. ~2k
+- iam-service/.../test/.../policystudio/NegativeProbeInjectionTest.java — C3.3 probe-per-allow counts (=3). ~1.3k
+- docs/implementation/evidence/studio/c3/{README,arch-isolation-proof,catch-rate-table,sample-oracle-test.yaml} — C3 evidence; catch-rate table is the headline artifact. ~4k
