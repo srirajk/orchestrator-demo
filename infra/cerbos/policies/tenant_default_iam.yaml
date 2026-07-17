@@ -1,0 +1,45 @@
+apiVersion: api.cerbos.dev/v1
+# ═════════════════════════════════════════════════════════════════════════════
+# TENANT "default" — TOTAL child for resource `iam-resource` (Axiom Story B2.6)
+# ═════════════════════════════════════════════════════════════════════════════
+# Reproduces today's IAM decisions; effective = (child ALLOW) ∧ (base ceiling ALLOW).
+# Every base ceiling (action, role) tuple — including those the base grants through the
+# iam_derived_roles (same_tenant→tenant_owner/tenant_admin, domain_scoped_admin→domain_admin,
+# policy_drafter→policy_author/…, policy_approver_role→policy_approver/…, own_resource→*) — is
+# covered UNCONDITIONALLY here, so the base's tenant-equality / owner / resource-type conditions
+# stay the sole gate. See tenant_default_agent.yaml for the posture note. The totality lint
+# expands derivedRoles→parentRoles to enumerate these tuples.
+resourcePolicy:
+  version: "default"
+  resource: iam-resource
+  scope: "default"
+  scopePermissions: SCOPE_PERMISSIONS_REQUIRE_PARENTAL_CONSENT_FOR_ALLOWS
+  rules:
+    # platform_admin (cross-tenant superuser)
+    - actions: ["create", "read", "update", "delete", "list", "export", "approve_policy", "deploy_policy"]
+      effect: EFFECT_ALLOW
+      roles: ["platform_admin"]
+    # same_tenant parents: tenant_owner + tenant_admin (full CRUD/export + policy approve/deploy)
+    - actions: ["create", "read", "update", "delete", "list", "export", "approve_policy", "deploy_policy"]
+      effect: EFFECT_ALLOW
+      roles: ["tenant_owner", "tenant_admin"]
+    # domain_scoped_admin parent: domain_admin
+    - actions: ["create", "read", "update", "list"]
+      effect: EFFECT_ALLOW
+      roles: ["domain_admin"]
+    # policy_drafter parent: policy_author
+    - actions: ["create", "read", "list"]
+      effect: EFFECT_ALLOW
+      roles: ["policy_author"]
+    # policy_approver_role parent: policy_approver
+    - actions: ["approve_policy", "deploy_policy", "read", "list"]
+      effect: EFFECT_ALLOW
+      roles: ["policy_approver"]
+    # auditor (raw role, base gates on tenant + audit_log)
+    - actions: ["read", "list", "export"]
+      effect: EFFECT_ALLOW
+      roles: ["auditor"]
+    # own_resource parent: "*" (base gates on P.id == R.owner_id ∧ same tenant ∧ type=user)
+    - actions: ["read"]
+      effect: EFFECT_ALLOW
+      roles: ["*"]

@@ -1,0 +1,32 @@
+# ═════════════════════════════════════════════════════════════════════════════
+# TENANT DEPLOYMENT CONFIG — domain → segment mapping (tenant: default)
+# ═════════════════════════════════════════════════════════════════════════════
+# Axiom Story B2.4: the authoritative declaration of the domain→segment mapping used by
+# the agent authorization ceiling. This USED to live as free-text in the comments of
+# infra/cerbos/policies/agent_resource.yaml; B2 promotes it to structured per-tenant
+# deployment config so onboarding a domain (or a new tenant with a different mapping)
+# edits config here, not the shared base policy.
+#
+# World B: this is deployment configuration, never gateway Java. The gateway carries zero
+# domain knowledge; the mapping (which business domain gates on which segment membership +
+# classification tier) is a property of how THIS tenant is deployed.
+#
+# NOTE ON ENFORCEMENT (honest boundary): the base agent policy's rule CEL still contains
+# the mapping literals inline (R.attr.domain == "wealth-management" && wealthRank …) — that
+# inline CEL IS the compiled ceiling and must stay for byte-identical single-tenant
+# decisions (B2.1). This manifest is the authoritative SOURCE-OF-TRUTH declaration; wiring
+# the gateway to resolve domain→segment from this manifest before the Cerbos call (so the
+# literals leave the base policy entirely) is a separate request-path story, deferred.
+tenant: default
+domain_segment_map:
+  # business domain (agent R.attr.domain)  →  principal segment key (P.attr.segments[...])
+  wealth-management: wealth
+  asset-servicing:   servicing
+  insurance:         insurance
+# Classification ladder (per-segment tier ceiling): internal < confidential < confidential-pii.
+# A principal may invoke a segment agent iff the tier it holds in the mapped segment ranks
+# >= the agent's data_classification (enforced by the base agent policy's rank ladder).
+classification_ladder:
+  - internal
+  - confidential
+  - confidential-pii

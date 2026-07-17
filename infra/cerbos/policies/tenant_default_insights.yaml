@@ -1,0 +1,16 @@
+apiVersion: api.cerbos.dev/v1
+# TENANT "default" — TOTAL child for resource `insights` (Axiom Story B2.6).
+# Reproduces today's decisions; effective = child ALLOW ∧ base ceiling. See
+# tenant_default_agent.yaml for the full posture note. Fresh tenants use the deny-all template.
+resourcePolicy:
+  version: "default"
+  resource: insights
+  scope: "default"
+  scopePermissions: SCOPE_PERMISSIONS_REQUIRE_PARENTAL_CONSENT_FOR_ALLOWS
+  rules:
+    - actions: ["read"]
+      effect: EFFECT_ALLOW
+      roles: ["platform_admin"]
+    - actions: ["read"]
+      effect: EFFECT_ALLOW
+      roles: ["conduit_admin"]
