@@ -1,5 +1,7 @@
 package ai.conduit.gateway.registry.index;
 
+import ai.conduit.gateway.domain.auth.TenantExecutionContext;
+import ai.conduit.gateway.infrastructure.redis.TenantKeyspace;
 import ai.conduit.gateway.registry.embedding.QueryEmbedder;
 import ai.conduit.gateway.registry.model.AgentManifest;
 import ai.conduit.gateway.registry.model.RoutingCandidate;
@@ -20,8 +22,19 @@ import java.util.Map;
 /**
  * Read-only view of the HNSW vector index over example-prompt embeddings.
  *
- * <p>Index name:  intent_idx<br>
- * Key prefix:  vec:{agent_id}:{example_index}
+ * <p>Index name:  intent_idx (default/single-tenant) — {@code intent_idx__{tenant}} for a real
+ * tenant<br>
+ * Key prefix:  vec:{agent_id}:{example_index} (default) — {@code t:{tenant}:vec:...} for a real
+ * tenant
+ *
+ * <p><b>Tenant isolation (Axiom A3).</b> The index name and key prefix are resolved through the
+ * {@link TenantKeyspace} seam from the request's {@link TenantExecutionContext}. For the default
+ * tenant (or with multi-tenancy off) the seam returns the LEGACY names ({@code intent_idx},
+ * {@code vec:}), so a default-tenant routing query reads exactly the index the registry-service
+ * wrote — the single-tenant demo is unaffected. The per-tenant {@code intent_idx__{tenant}} scheme
+ * activates only for real tenants (whose per-tenant ingestion is A4, not yet built). The
+ * no-tenant-argument {@link #search(String, String, int, java.util.function.Function)} overload
+ * resolves to the legacy names and is what the current request path uses.
  *
  * <p><b>This class cannot write.</b> Building the index — creating it, embedding the agent corpus,
  * and writing the vectors — belongs to {@link VectorIndexWriter}, which exists only in the
@@ -45,11 +58,14 @@ public class VectorIndex {
     private final JedisPooled jedis;
     private final QueryEmbedder queryEmbedder;
     private final MeterRegistry meterRegistry;
+    private final TenantKeyspace keyspace;
 
-    public VectorIndex(JedisPooled jedis, QueryEmbedder queryEmbedder, MeterRegistry meterRegistry) {
+    public VectorIndex(JedisPooled jedis, QueryEmbedder queryEmbedder, MeterRegistry meterRegistry,
+                       TenantKeyspace keyspace) {
         this.jedis         = jedis;
         this.queryEmbedder = queryEmbedder;
         this.meterRegistry = meterRegistry;
+        this.keyspace      = keyspace;
     }
 
     /** The embedding model that produced the vectors in the index, or null if it was never stamped. */
@@ -81,11 +97,29 @@ public class VectorIndex {
     }
 
     /**
-     * KNN search returning top candidates.
+     * KNN search returning top candidates, in the default/single-tenant keyspace.
      * Filters: is_mutating == 0 (read-only agents only).
      * Optionally filters by domain.
+     *
+     * <p>Resolves the index name through the {@link TenantKeyspace} seam with no tenant context,
+     * i.e. the legacy {@code intent_idx} — byte-identical to the pre-A3 behaviour and what the
+     * current request path uses. The tenant-aware overload
+     * {@link #search(String, String, int, TenantExecutionContext, java.util.function.Function)} is
+     * the seam A4 wires once per-tenant ingestion exists.
      */
     public List<RoutingCandidate> search(String queryText, String domain, int topK,
+                                          java.util.function.Function<String, AgentManifest> manifestLoader) {
+        return search(queryText, domain, topK, null, manifestLoader);
+    }
+
+    /**
+     * KNN search against the tenant-qualified routing index. For the default tenant (or with
+     * multi-tenancy off) this is the legacy {@code intent_idx}; for a real tenant it is that
+     * tenant's own {@code intent_idx__{tenant}} — a per-tenant index, so a query issued in one
+     * tenant's context physically cannot return another tenant's documents.
+     */
+    public List<RoutingCandidate> search(String queryText, String domain, int topK,
+                                          TenantExecutionContext tenant,
                                           java.util.function.Function<String, AgentManifest> manifestLoader) {
         Timer.Sample sample = Timer.start(meterRegistry);
         try {
@@ -105,7 +139,7 @@ public class VectorIndex {
                     .dialect(2)
                     .limit(0, TOP_K);
 
-            SearchResult result = jedis.ftSearch(INDEX_NAME, query);
+            SearchResult result = jedis.ftSearch(keyspace.indexName(INDEX_NAME, tenant), query);
 
             // Deduplicate by agent_id, keeping best (lowest distance = highest similarity)
             Map<String, Double> best = new HashMap<>();
