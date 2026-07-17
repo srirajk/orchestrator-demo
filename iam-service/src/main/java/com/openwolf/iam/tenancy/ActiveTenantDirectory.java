@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -98,6 +99,55 @@ public class ActiveTenantDirectory {
         log.info("Deactivated tenant '{}' — directory snapshot v{} ({} tenants); gateway now fails closed",
                 tenantId, published.version(), published.tenantPolicyVersions().size());
         return published.version();
+    }
+
+    /**
+     * The policy-promotion compare-and-set (Axiom Story C5). Atomically advances a tenant's active
+     * policy version from an EXACT expected old id to a new id — the SAME live pointer B4's activation
+     * flips, so a promotion cannot introduce a second source of truth. This is the last step of a
+     * promotion: the candidate bundle has already been staged, compiled, loaded and invariant-probed at
+     * {@code toPolicyVersion}; only now does it become visible.
+     *
+     * <p>Fails (throws) if the tenant's current active version is not {@code expectedFromPolicyVersion} —
+     * i.e. the reviewed baseline was superseded by another promotion after the C4 review. The candidate
+     * then stays inactive and a fresh diff/approval against the new current bundle is required (C5.5).
+     * Retries internally on a benign concurrent snapshot swap, re-checking the precondition each time.
+     *
+     * @param tenantId                  the tenant whose active version advances
+     * @param expectedFromPolicyVersion the reviewed OLD id the CAS must observe ({@code null} ⇒ tenant
+     *                                  currently has no active version)
+     * @param toPolicyVersion           the candidate bundle id to activate
+     * @return the published directory snapshot version
+     * @throws IllegalStateException if the current active version is not the expected old id (stale CAS)
+     */
+    public long compareAndActivate(String tenantId, String expectedFromPolicyVersion, String toPolicyVersion) {
+        if (tenantId == null || tenantId.isBlank()) {
+            throw new IllegalArgumentException("tenantId must be set");
+        }
+        if (toPolicyVersion == null || toPolicyVersion.isBlank()) {
+            throw new IllegalArgumentException("toPolicyVersion must be set");
+        }
+        while (true) {
+            Snapshot prev = current.get();
+            String actual = prev.tenantPolicyVersions().get(tenantId);
+            if (!Objects.equals(actual, expectedFromPolicyVersion)) {
+                throw new IllegalStateException(
+                        "promotion compare-and-set for tenant '" + tenantId + "' failed: expected current "
+                                + "policy version '" + expectedFromPolicyVersion + "' but the active version is now '"
+                                + actual + "' — the reviewed baseline is stale; a fresh diff/approval is required");
+            }
+            long version = nextVersion();
+            Map<String, String> next = new LinkedHashMap<>(prev.tenantPolicyVersions());
+            next.put(tenantId, toPolicyVersion);
+            Snapshot updated = new Snapshot(version, next);
+            if (current.compareAndSet(prev, updated)) {
+                repository.save(new ActiveTenant(tenantId, toPolicyVersion, version));
+                log.info("Promoted tenant '{}' policy version {} → {} — directory snapshot v{}",
+                        tenantId, expectedFromPolicyVersion, toPolicyVersion, version);
+                return version;
+            }
+            // A concurrent snapshot swap won the CAS — re-read and re-check the precondition.
+        }
     }
 
     /** Zero-I/O lookup — reads only the in-memory snapshot. Absent ⇒ unknown ⇒ fail closed. */
