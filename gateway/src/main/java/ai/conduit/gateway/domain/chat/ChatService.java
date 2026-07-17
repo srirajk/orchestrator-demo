@@ -13,6 +13,7 @@ import ai.conduit.gateway.domain.clarify.ClarifyResume;
 import ai.conduit.gateway.domain.auth.EntitlementService;
 import ai.conduit.gateway.domain.auth.EntitlementService.EntitlementResult;
 import ai.conduit.gateway.domain.auth.Principal;
+import ai.conduit.gateway.domain.auth.TenantExecutionContext;
 import ai.conduit.gateway.domain.coverage.CoverageCheckResult;
 import ai.conduit.gateway.domain.coverage.CoverageClient;
 import ai.conduit.gateway.domain.coverage.CoverageResolveResult;
@@ -285,8 +286,9 @@ public class ChatService {
      *                          the pipeline/DAG virtual-thread executors. Null if no JWT.
      */
     public void handleChat(ChatRequest request, SseEmitter emitter, String userId,
-                           Principal jwtPrincipal, String headerConvId, String callerToken) {
-        handleChat(request, emitter, userId, jwtPrincipal, headerConvId, callerToken, null, null);
+                           Principal jwtPrincipal, TenantExecutionContext tenant,
+                           String headerConvId, String callerToken) {
+        handleChat(request, emitter, userId, jwtPrincipal, tenant, headerConvId, callerToken, null, null);
     }
 
     /**
@@ -296,7 +298,8 @@ public class ChatService {
      * answer re-drives the FULL pipeline so entitlement is re-CHECKed on the resumed turn (TOCTOU dissolves).
      */
     public void handleChat(ChatRequest request, SseEmitter emitter, String userId,
-                           Principal jwtPrincipal, String headerConvId, String callerToken,
+                           Principal jwtPrincipal, TenantExecutionContext tenant,
+                           String headerConvId, String callerToken,
                            String clarifyNonce, String clarifySelection) {
         long   requestStart = System.currentTimeMillis();
         GatewaySloMetrics.RequestScope metricScope = gatewaySloMetrics.start();
@@ -399,7 +402,7 @@ public class ChatService {
                 latestPrompt.length() > 120 ? latestPrompt.substring(0, 120) + "..." : latestPrompt);
 
         tracePublisher.publish(TraceEvent.of("request_start", requestId, conversationId,
-                new RequestStartData(userId, latestPrompt)));
+                new RequestStartData(userId, tenant != null ? tenant.tenantId() : null, latestPrompt)));
 
         // streamId is set here and passed to all handlers so that every SSE chunk
         // in this request carries the same completion ID.  The role delta is now emitted
@@ -425,7 +428,7 @@ public class ChatService {
                 EntityBag groundedBag = injectGroundedReference(
                         intentResult.extractedEntities(), resume.idPattern(), resume.groundedId());
                 handleFetchData(pipelineRequest, emitter, latestPrompt,
-                        conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan,
+                        conversationId, userId, jwtPrincipal, tenant, requestId, requestStart, rootSpan,
                         groundedBag, streamId, true, callerToken, null);
             } else if (resume.mode() == ClarifyResume.Mode.CAPABILITY_SELECTION) {
                 // A capability form's pick re-drives the ORIGINAL query as a data fetch, biased to the chosen
@@ -435,15 +438,15 @@ public class ChatService {
                 // injected: the submit token is a capability id, not an entity id.
                 capabilityHintCarry.set(resume.capabilityHint());
                 handleFetchData(pipelineRequest, emitter, latestPrompt,
-                        conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan,
+                        conversationId, userId, jwtPrincipal, tenant, requestId, requestStart, rootSpan,
                         intentResult.extractedEntities(), streamId, true, callerToken, null);
             } else {
             switch (intentResult.intent()) {
                 case FETCH_DATA -> handleFetchData(pipelineRequest, emitter, latestPrompt,
-                        conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan,
+                        conversationId, userId, jwtPrincipal, tenant, requestId, requestStart, rootSpan,
                         intentResult.extractedEntities(), streamId, true, callerToken, null);
                 case FOLLOW_UP  -> handleFollowUp(pipelineRequest, emitter, latestPrompt,
-                        conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan,
+                        conversationId, userId, jwtPrincipal, tenant, requestId, requestStart, rootSpan,
                         intentResult.extractedEntities(), streamId, callerToken);
                 // CLARIFY is routed through the SAME deterministic coverage path as FETCH_DATA
                 // (hard-rule e): the LLM never decides clarification. The coverage
@@ -457,7 +460,7 @@ public class ChatService {
                 // it cannot inherit a confident domain from history and be answered; it stays a
                 // clarification. Enriching it would collapse the FETCH_DATA/CLARIFY distinction.
                 case CLARIFY    -> handleFetchData(pipelineRequest, emitter, latestPrompt,
-                        conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan,
+                        conversationId, userId, jwtPrincipal, tenant, requestId, requestStart, rootSpan,
                         intentResult.extractedEntities(), streamId, false, callerToken, null);
                 case CHITCHAT   -> handleChitchat(pipelineRequest, emitter, conversationId, requestId, requestStart, streamId, rootSpan);
             }
@@ -484,7 +487,7 @@ public class ChatService {
     private void handleFetchData(ChatRequest request, SseEmitter emitter,
                                   String latestPrompt, String conversationId,
                                   String userId,
-                                  Principal jwtPrincipal,
+                                  Principal jwtPrincipal, TenantExecutionContext tenant,
                                   String requestId, long requestStart, Span rootSpan,
                                   EntityBag preExtracted, String streamId,
                                   boolean carryContext, String callerToken,
@@ -508,7 +511,7 @@ public class ChatService {
         // coverage, so every entity check denies. Hoisted above routing because Stage-1 grounding
         // needs it (the coverage CHECK) and the abstain triage re-uses it. (Was computed post-route.)
         Principal principal = (jwtPrincipal != null) ? jwtPrincipal : Principal.anonymous();
-        String tenantId = jwtPrincipal != null ? jwtPrincipal.tenantId() : "default";
+        String tenantId = tenantIdOrBlank(tenant);
         try {
             // ── STAGE 1: SINGLE-PASS REFERENCE GROUNDING via the shared prepared route ─────────
             // A security-relevant disposition (coverage DENY) and its inputs — the extracted entity
@@ -675,7 +678,7 @@ public class ChatService {
             RequestedPlan plan = buildRequestedPlan(resolved);
             if (plan.isMultiGroup()) {
                 disposeGroups(plan, request, emitter, latestPrompt, conversationId, userId, principal,
-                        tenantId, groundedMemo, preExtracted, requestId, requestStart, rootSpan,
+                        tenant, tenantId, groundedMemo, preExtracted, requestId, requestStart, rootSpan,
                         streamId, callerToken, prepared);
                 return;
             }
@@ -1039,7 +1042,7 @@ public class ChatService {
             long fanoutStart = System.currentTimeMillis();
             // Attempt the multi-step DAG (feature-flagged). Any miss returns empty and the flat
             // fan-out below runs VERBATIM — flag OFF is a byte-for-byte no-op for this path.
-            List<NodeResult> results = tryDag(synthesis, finalManifests, effectiveBag, principal,
+            List<NodeResult> results = tryDag(synthesis, finalManifests, effectiveBag, principal, tenant,
                     requestId, conversationId, callerToken).orElseGet(() -> {
                 markGatewayPath("flat");
                 List<PlanNode> nodes = synthesis.inputs().entrySet().stream()
@@ -1053,7 +1056,7 @@ public class ChatService {
                         new AgentStartData(n.nodeId(), n.agent().protocol()))));
 
                 return executor.execute(
-                        governedPlan(nodes, principal, requestId, conversationId, callerToken), callerToken);
+                        governedPlan(nodes, principal, tenant, requestId, conversationId, callerToken), callerToken);
             });
             span.setAttribute("conduit.plan.node_count", results.size());
             rootSpan.setAttribute("conduit.plan.node_count", results.size());
@@ -1186,6 +1189,7 @@ public class ChatService {
                                               List<AgentManifest> finalManifests,
                                               EntityBag effectiveBag,
                                               Principal principal,
+                                              TenantExecutionContext tenant,
                                               String requestId,
                                               String conversationId,
                                               String callerToken) {
@@ -1269,12 +1273,12 @@ public class ChatService {
         emitDagPlan(goal.domain(), goalId, plan.nodes().size());
         DagPlanExecutor.CoverageContext coverageContext = new DagPlanExecutor.CoverageContext(
                 principal.id(),
-                principal.tenantId() == null || principal.tenantId().isBlank() ? "default" : principal.tenantId(),
+                tenantIdOrBlank(tenant),
                 callerToken,
                 m -> manifestStore.getEffective(m.agentId(), m.domain(), m.subDomain()),
                 coverageClient::check);
         List<NodeResult> results = dagExecutor.execute(
-                plan.withContext(governedPlan(plan.nodes(), principal, requestId, conversationId, callerToken).context()),
+                plan.withContext(governedPlan(plan.nodes(), principal, tenant, requestId, conversationId, callerToken).context()),
                 blackboard, requestId, conversationId, callerToken, coverageContext);
         tracePublisher.publish(TraceEvent.of("plan_graph", requestId, conversationId,
                 new PlanGraphData(plan.nodes().stream()
@@ -1291,8 +1295,17 @@ public class ChatService {
      * checkpoint verifies a verdict this request already computed. Nothing else is granted, so an agent
      * that was pruned (and therefore never planned) has no grant and would be denied at the checkpoint.
      */
-    private Plan governedPlan(List<PlanNode> nodes, Principal principal, String requestId,
-                              String conversationId, String callerToken) {
+    /**
+     * The tenant id for a resolved context, or a blank marker when there is none (an anonymous,
+     * unauthenticated caller). Blank is deliberate — an anonymous data attempt must NOT silently
+     * operate as the {@code default} tenant (A2.4); it carries no coverage and is denied at CHECK.
+     */
+    private static String tenantIdOrBlank(TenantExecutionContext tenant) {
+        return (tenant != null && tenant.tenantId() != null) ? tenant.tenantId() : "";
+    }
+
+    private Plan governedPlan(List<PlanNode> nodes, Principal principal, TenantExecutionContext tenant,
+                              String requestId, String conversationId, String callerToken) {
         List<AuthorizationGrant> grants = nodes.stream()
                 .map(n -> n.agent().agentId())
                 .distinct()
@@ -1301,7 +1314,9 @@ public class ChatService {
         // On-path fail-closed fallback for the checkpoint: if a grant is ever missing/stale, re-derive
         // the structural verdict through the SAME Cerbos-backed entitlement bean. Never hit on the green
         // path (a fresh grant is always present), so it adds zero PDP calls to a normal request.
-        InvocationContext ctx = InvocationContext.of(principal.id(), conversationId, requestId,
+        // A2: the immutable tenant context rides the envelope so the GovernedInvoker can refuse any hop
+        // whose tenant/policy-version is missing before it authorizes or invokes.
+        InvocationContext ctx = InvocationContext.of(principal.id(), tenant, conversationId, requestId,
                         callerToken, grants)
                 .withReverifier(node ->
                         !entitlementService.filterAgents(principal, List.of(node.agent())).isEmpty());
@@ -1377,9 +1392,11 @@ public class ChatService {
      *
      * @param request     the client-sent conversation window (same DTO the chat path takes).
      * @param jwtPrincipal the verified caller principal (never {@code null} on the authenticated endpoint).
+     * @param tenant      the immutable tenant context captured on the servlet thread (A2).
      * @param callerToken the caller's own verified bearer token, threaded to the coverage CHECK.
      */
-    public RouteDecision decideRoute(ChatRequest request, Principal jwtPrincipal, String callerToken) {
+    public RouteDecision decideRoute(ChatRequest request, Principal jwtPrincipal,
+                                     TenantExecutionContext tenant, String callerToken) {
         IntentResult intentResult = intentClassifier.classify(request.messages());
         Intent intent = intentResult.intent();
         EntityBag preExtracted = intentResult.extractedEntities();
@@ -1390,7 +1407,7 @@ public class ChatService {
         boolean carryContext = intent != Intent.CLARIFY;
 
         Principal principal = (jwtPrincipal != null) ? jwtPrincipal : Principal.anonymous();
-        String tenantId = jwtPrincipal != null ? jwtPrincipal.tenantId() : "default";
+        String tenantId = tenantIdOrBlank(tenant);
 
         // 1) Shared preparation (masking + relaxation + full grounded set) — the production bean.
         PreparedRoute prepared = routePreparer.prepare(request, latestPrompt, preExtracted, carryContext,
@@ -1635,7 +1652,8 @@ public class ChatService {
      */
     private void disposeGroups(RequestedPlan plan, ChatRequest request, SseEmitter emitter,
                                String latestPrompt, String conversationId, String userId, Principal principal,
-                               String tenantId, GroundingResult groundedMemo, EntityBag preExtracted,
+                               TenantExecutionContext tenant, String tenantId,
+                               GroundingResult groundedMemo, EntityBag preExtracted,
                                String requestId, long requestStart, Span rootSpan, String streamId,
                                String callerToken, PreparedRoute prepared) throws Exception {
         markGatewayPath("groups");
@@ -1701,7 +1719,7 @@ public class ChatService {
                 deniedUserVisible.add(group.candidates().get(0));
                 continue;
             }
-            List<NodeResult> results = tryDag(synthesis, allowed, groupBag, principal, requestId,
+            List<NodeResult> results = tryDag(synthesis, allowed, groupBag, principal, tenant, requestId,
                     conversationId, callerToken).orElseGet(() -> {
                         List<PlanNode> nodes = synthesis.inputs().entrySet().stream()
                                 .map(e -> new PlanNode(e.getKey(), allowed.stream()
@@ -1711,7 +1729,7 @@ public class ChatService {
                         nodes.forEach(n -> tracePublisher.publish(TraceEvent.of("agent_start", requestId,
                                 conversationId, new AgentStartData(n.nodeId(), n.agent().protocol()))));
                         return executor.execute(
-                                governedPlan(nodes, principal, requestId, conversationId, callerToken), callerToken);
+                                governedPlan(nodes, principal, tenant, requestId, conversationId, callerToken), callerToken);
                     });
             results.forEach(r -> {
                 String prev = r.isOk() && r.data() != null
@@ -1963,7 +1981,7 @@ public class ChatService {
     private void handleFollowUp(ChatRequest request, SseEmitter emitter,
                                  String latestPrompt, String conversationId,
                                  String userId,
-                                 Principal jwtPrincipal,
+                                 Principal jwtPrincipal, TenantExecutionContext tenant,
                                  String requestId, long requestStart, Span rootSpan,
                                  EntityBag preExtracted, String streamId, String callerToken) throws Exception {
         // ── BIAS-TO-FETCH FALLTHROUGH (Piece 3: unified prepared route) ───────────
@@ -1976,14 +1994,14 @@ public class ChatService {
         // memo is threaded into handleFetchData so grounding/masking runs exactly once.
         if (preExtracted != null && hasGroundedResolvableReference(preExtracted, latestPrompt)) {
             Principal principal = (jwtPrincipal != null) ? jwtPrincipal : Principal.anonymous();
-            String tenantId = jwtPrincipal != null ? jwtPrincipal.tenantId() : "default";
+            String tenantId = tenantIdOrBlank(tenant);
             PreparedRoute prepared = routePreparer.prepare(request, latestPrompt, preExtracted,
                     true, false, principal, tenantId, callerToken);
             ResolverResult probe = resolver.resolveContextual(
                     prepared.maskedRoutingText(), prepared.relaxationAllowed());
             if (!probe.fallback() && !probe.selected().isEmpty()) {
                 log.info("FOLLOW_UP → fetch fallthrough (grounded entity + confident route) requestId={}", requestId);
-                handleFetchData(request, emitter, latestPrompt, conversationId, userId, jwtPrincipal,
+                handleFetchData(request, emitter, latestPrompt, conversationId, userId, jwtPrincipal, tenant,
                         requestId, requestStart, rootSpan, preExtracted, streamId, true, callerToken, prepared);
                 return;
             }

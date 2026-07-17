@@ -3,6 +3,7 @@ package ai.conduit.gateway.api.v1.admin;
 import ai.conduit.gateway.api.v1.chat.dto.ChatRequest;
 import ai.conduit.gateway.domain.auth.Principal;
 import ai.conduit.gateway.domain.auth.RequestContext;
+import ai.conduit.gateway.domain.auth.TenantExecutionContext;
 import ai.conduit.gateway.domain.chat.ChatService;
 import ai.conduit.gateway.domain.chat.RouteDecision;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -48,13 +49,16 @@ public class RouteDecisionController {
     @PostMapping("/route")
     public ResponseEntity<RouteDecision> route(@RequestBody ChatRequest request) {
         Principal principal = RequestContext.getPrincipal();
+        // A2: the tenant context, captured on the servlet thread and threaded explicitly into the
+        // decision (the filter already validated it fail-closed before this controller ran).
+        TenantExecutionContext tenant = RequestContext.getTenant();
         String callerToken = bearerToken();
         // Defence in depth: the security rule already requires a valid token, but never run the
         // decision for an unauthenticated caller — coverage/entitlement must key on a real principal.
         if (principal == null || callerToken == null) {
             return ResponseEntity.status(401).build();
         }
-        return ResponseEntity.ok(chatService.decideRoute(request, principal, callerToken));
+        return ResponseEntity.ok(chatService.decideRoute(request, principal, tenant, callerToken));
     }
 
     /** The caller's verified bearer token off the servlet-thread {@link SecurityContextHolder}. */

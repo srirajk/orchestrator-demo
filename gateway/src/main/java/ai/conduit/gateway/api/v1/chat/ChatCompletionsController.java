@@ -3,6 +3,7 @@ package ai.conduit.gateway.api.v1.chat;
 import ai.conduit.gateway.api.v1.chat.dto.ChatRequest;
 import ai.conduit.gateway.domain.auth.Principal;
 import ai.conduit.gateway.domain.auth.RequestContext;
+import ai.conduit.gateway.domain.auth.TenantExecutionContext;
 import ai.conduit.gateway.domain.chat.ChatService;
 import ai.conduit.gateway.infrastructure.identity.IdentityExtractor;
 import ai.conduit.gateway.infrastructure.telemetry.MdcPropagation;
@@ -143,6 +144,11 @@ public class ChatCompletionsController {
 
         String userId = identityExtractor.extractUserId(httpRequest);
         Principal principal = RequestContext.getPrincipal(); // null if no JWT
+        // A2: capture the immutable tenant context HERE, on the servlet thread, as request-scoped DATA —
+        // exactly like callerToken/MDC below. The filter resolved + validated it (fail-closed) before this
+        // controller ran; it is threaded explicitly through ChatService and never recovered from a static
+        // holder downstream. Null only for an anonymous (no-JWT) caller, who has no data access.
+        TenantExecutionContext tenant = RequestContext.getTenant();
         // F-IDENTITY: capture the caller's verified bearer token HERE, on the servlet thread,
         // as request-scoped DATA — SecurityContextHolder is thread-local and is NOT propagated
         // to the pipelineExecutor's virtual threads below (nor to DagPlanExecutor's further down
@@ -173,7 +179,7 @@ public class ChatCompletionsController {
                 stream, userId, conversationId);
 
         if (!stream) {
-            return nonStreaming(request, userId, principal, conversationId, callerToken, mdcContext,
+            return nonStreaming(request, userId, principal, tenant, conversationId, callerToken, mdcContext,
                     clarifyNonce, clarifySelection);
         }
 
@@ -199,8 +205,8 @@ public class ChatCompletionsController {
             pipeline = pipelineExecutor.submit(() -> {
                 try (Scope ignored = otelContext.makeCurrent()) {
                     MdcPropagation.run(mdcContext, () ->
-                            chatService.handleChat(request, emitter, userId, principal, conversationId, callerToken,
-                                    clarifyNonce, clarifySelection));
+                            chatService.handleChat(request, emitter, userId, principal, tenant, conversationId,
+                                    callerToken, clarifyNonce, clarifySelection));
                 }
             });
         }
@@ -214,7 +220,8 @@ public class ChatCompletionsController {
      * {@code {object:"chat.completion", choices:[{message:{...}, finish_reason}], usage}}.
      */
     private ResponseEntity<String> nonStreaming(ChatRequest request, String userId,
-                                                Principal principal, String conversationId, String callerToken,
+                                                Principal principal, TenantExecutionContext tenant,
+                                                String conversationId, String callerToken,
                                                 Map<String, String> mdcContext,
                                                 String clarifyNonce, String clarifySelection) {
         BufferingSseEmitter buf = new BufferingSseEmitter();
@@ -229,8 +236,8 @@ public class ChatCompletionsController {
             CompletableFuture.runAsync(() -> {
                 try (Scope ignored = otelContext.makeCurrent()) {
                     MdcPropagation.run(mdcContext, () ->
-                            chatService.handleChat(request, buf, userId, principal, conversationId, callerToken,
-                                    clarifyNonce, clarifySelection));
+                            chatService.handleChat(request, buf, userId, principal, tenant, conversationId,
+                                    callerToken, clarifyNonce, clarifySelection));
                 }
             }, pipelineExecutor);
         }

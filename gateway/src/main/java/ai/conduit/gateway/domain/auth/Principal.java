@@ -10,14 +10,18 @@ import java.util.Map;
 /**
  * A caller's verified identity + structural attributes used for authorization checks.
  *
- * <p>JWT carries identity and structural claims only: {@code sub}, {@code roles},
- * {@code segments}, {@code tenant_id}. No {@code book} claim, no numeric {@code clearance}.
- * Book-of-business is enforced at runtime by the domain coverage service (DISCOVER/CHECK),
- * never embedded in the token or cached in gateway Redis.
+ * <p>JWT carries identity and structural claims only: {@code sub}, {@code roles}, {@code segments}.
+ * No {@code book} claim, no numeric {@code clearance}. Book-of-business is enforced at runtime by the
+ * domain coverage service (DISCOVER/CHECK), never embedded in the token or cached in gateway Redis.
+ *
+ * <p><b>A2 — tenant is not identity.</b> The tenant scope no longer lives on the {@code Principal}.
+ * It is read once from the verified JWT by {@link TenantContextResolver}, validated against the
+ * {@link ProvisionedTenantDirectory}, and carried as an explicit {@link TenantExecutionContext}. The
+ * {@code Principal} therefore never reads the {@code tenant_id} claim (that is the resolver's sole
+ * job) and can no longer silently default a missing tenant to {@code "default"} on the request path.
  *
  * <p>Fields:
  * <ul>
- *   <li>{@code tenantId} — tenant scope for coverage checks (from JWT {@code tenant_id})</li>
  *   <li>{@code roles} — coarse RBAC roles (chat_user, domain_admin, platform_admin)</li>
  *   <li>{@code adminDomains} — org domains this caller may administer (domain_admin only)</li>
  *   <li>{@code segments} — per-segment classification map: business segment → the data
@@ -28,28 +32,23 @@ import java.util.Map;
  */
 public record Principal(
         String              id,
-        String              tenantId,
         List<String>        roles,
         List<String>        adminDomains,
         Map<String, String> segments,
         List<String>        domains
 ) {
-    /** Fallback for unauthenticated / anonymous callers — no data access. */
+    /**
+     * Fallback for unauthenticated / anonymous callers — no data access, and NO tenant. An anonymous
+     * caller never produces a {@link TenantExecutionContext}; every downstream data op therefore fails
+     * closed for it.
+     */
     public static Principal anonymous() {
-        return new Principal("anonymous", "default", List.of("chat_user"),
-                List.of(), Map.of(), List.of());
+        return new Principal("anonymous", List.of("chat_user"), List.of(), Map.of(), List.of());
     }
 
     /** Build a {@link Principal} from a Spring Security {@link Jwt}. Primary factory. */
     public static Principal fromSpringJwt(Jwt jwt) {
         String sub = jwt.getSubject();
-
-        // A1: tenant_id is now mandatory at verify — SecurityConfig#jwtDecoder rejects any token
-        // lacking a canonical tenant_id and a matching tenant-qualified audience, so an
-        // authenticated principal always carries the real tenant here. The null-guard remains only
-        // for the anonymous / non-JWT path (A2 removes the request-path default outright).
-        String tenantId = jwt.getClaimAsString("tenant_id");
-        if (tenantId == null) tenantId = "default";
 
         List<String> roles = jwt.getClaimAsStringList("roles");
         if (roles == null) roles = List.of("chat_user");
@@ -62,16 +61,13 @@ public record Principal(
         List<String> domains = jwt.getClaimAsStringList("domains");
         if (domains == null) domains = List.of();
 
-        return new Principal(sub, tenantId, roles, adminDomains, segments, domains);
+        return new Principal(sub, roles, adminDomains, segments, domains);
     }
 
     /** Build a {@link Principal} from a Nimbus {@link JWTClaimsSet} (unit tests / legacy). */
     @SuppressWarnings("unchecked")
     public static Principal fromJwtClaims(JWTClaimsSet claims) {
         String sub = claims.getSubject();
-
-        Object rawTenantId = claims.getClaim("tenant_id");
-        String tenantId = rawTenantId instanceof String s ? s : "default";
 
         Object rawRoles = claims.getClaim("roles");
         List<String> roles = rawRoles instanceof List<?> l ? (List<String>) l : List.of("chat_user");
@@ -84,7 +80,7 @@ public record Principal(
         Object rawDomains = claims.getClaim("domains");
         List<String> domains = rawDomains instanceof List<?> l ? (List<String>) l : List.of();
 
-        return new Principal(sub, tenantId, roles, adminDomains, segments, domains);
+        return new Principal(sub, roles, adminDomains, segments, domains);
     }
 
     /**

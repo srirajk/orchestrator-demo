@@ -20,6 +20,12 @@ management:
   endpoint:
     health:
       show-details: always
+      # A2: the gateway is not ready until an initial provisioned-tenant snapshot has loaded
+      # (TenantDirectoryReadiness contributes DOWN until then). Gate the readiness group on it. Enable
+      # Spring's probe states in an environment that runs k8s probes to also fold in readinessState.
+      group:
+        readiness:
+          include: tenantDirectory
   # Percentile histograms → so histogram_quantile() latency panels (p50/p95/p99) render.
   # http.* are Spring's server/client request timers; intent.classify.duration is our custom timer.
   metrics:
@@ -69,6 +75,15 @@ conduit:
       api-call-attempt-timeout-ms: ${CONDUIT_AUDIT_S3_API_CALL_ATTEMPT_TIMEOUT_MS:5000}
   gateway:
     version: ${CONDUIT_GATEWAY_VERSION:0.1.0}
+  # A2: tenant provisioning. The request path reads a versioned in-memory snapshot only (no
+  # request-path tenant-directory I/O). For the single-tenant demo the snapshot is CONFIG-BACKED
+  # (ConfigBackedTenantSnapshotSource, active unless the `multi-tenant` profile is on) and MUST
+  # contain `default` — every demo request carries tenant_id=default. In real multi-tenant prod a
+  # `multi-tenant`-profile IAM-HTTP source replaces it. Format: comma-separated tenantId:policyVersion.
+  tenancy:
+    provisioned-tenants: ${CONDUIT_TENANCY_PROVISIONED_TENANTS:default:config-v1}
+    snapshot:
+      refresh-interval-ms: ${CONDUIT_TENANCY_SNAPSHOT_REFRESH_MS:60000}
   # End-to-end deadline for ONE chat turn. The SSE emitter times out here AND the pipeline
   # future is cancelled — so a turn can neither run forever, nor keep running (and keep
   # spending) for a client that has already disconnected. Was a hardcoded 120_000L.
