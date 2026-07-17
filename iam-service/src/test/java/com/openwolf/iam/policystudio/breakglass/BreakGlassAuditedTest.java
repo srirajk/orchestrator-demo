@@ -36,8 +36,8 @@ class BreakGlassAuditedTest {
                 grant, BreakGlassFixtures.allowlist(), BreakGlassFixtures.request("acme"));
         assertThat(art.admissible()).isTrue();
 
-        // 1. Issuance — two-person approved, audited.
-        approvals.approveAndIssue(art, "carol", Set.of("studio_policy_approver"), "corr-grant");
+        // 1. Issuance — two-person approved (author "alice", approver "carol"), audited.
+        approvals.approveAndIssue(art, "alice", "carol", Set.of("studio_policy_approver"), "corr-grant");
 
         // 2. Two uses of the active grant — each audited.
         approvals.recordUse(grant, "admin-p1", "register", "corr-use-1");

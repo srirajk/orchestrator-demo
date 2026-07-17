@@ -33,22 +33,45 @@ public class BreakGlassApprovalService {
      * Approve and issue a break-glass grant. Fails closed on an inadmissible artifact or an SoD
      * violation; audits the issuance on success.
      *
+     * <p><b>Separation of duties over VERIFIED identity (H1).</b> The author is the {@code authorId}
+     * captured from the authenticated {@code sub} at author time and passed by the caller context —
+     * NOT {@code grant.requestedBy()} (a mutable field on the caller-supplied grant record). A missing
+     * ({@code null}/blank) author or approver identity <b>fails closed</b> — it is never allowed to
+     * skip the self-approval check.
+     *
+     * @param artifact     the doubly-gated artifact awaiting issuance
+     * @param authorId     the VERIFIED identity that authored the grant (captured at author time)
+     * @param approverId   the VERIFIED identity approving the grant now
      * @throws IllegalStateException   if the artifact is not admissible (bounds or C2 gate rejected it)
-     * @throws BreakGlassSodException  if the approver is the requester, or lacks the approver role
+     * @throws BreakGlassSodException  if either identity is missing, the approver is the author, or the
+     *                                 approver lacks the approver role
      */
-    public void approveAndIssue(BreakGlassArtifact artifact, String approverId,
+    public void approveAndIssue(BreakGlassArtifact artifact, String authorId, String approverId,
                                 Set<String> approverRoles, String correlationId) {
         if (!artifact.admissible()) {
             throw new IllegalStateException(
                     "refusing to approve an inadmissible break-glass artifact — bounds="
                             + artifact.boundsResult().violations() + " c2=" + artifact.c2Result().violations());
         }
-        String requester = artifact.grant().requestedBy();
 
-        // C6.4 / C1.2 — author≠approver: the requester may never approve their own emergency access.
-        if (approverId != null && approverId.equals(requester)) {
+        // C6.4 / C1.2 — FAIL CLOSED on a missing verified identity: neither side may be absent, or the
+        // author≠approver check could be silently skipped.
+        if (authorId == null || authorId.isBlank()) {
             throw new BreakGlassSodException(
-                    "separation of duties: '" + approverId + "' requested this break-glass grant and "
+                    "separation of duties: the authenticated author identity is required — refusing to "
+                            + "approve a break-glass grant with no verified author (fail-closed)");
+        }
+        if (approverId == null || approverId.isBlank()) {
+            throw new BreakGlassSodException(
+                    "separation of duties: the authenticated approver identity is required — refusing to "
+                            + "approve a break-glass grant with no verified approver (fail-closed)");
+        }
+
+        // C6.4 / C1.2 — author≠approver over VERIFIED identity: the author may never approve their own
+        // emergency access.
+        if (approverId.equals(authorId)) {
+            throw new BreakGlassSodException(
+                    "separation of duties: '" + approverId + "' authored this break-glass grant and "
                             + "may not also approve it (author≠approver)");
         }
         // C6.4 / C1.3 — approval flows only through a studio approver, never an auto-approving superuser.

@@ -35,4 +35,15 @@ public interface PolicyBootstrapAdapter {
     default void retainForEvidence(TenantBootstrapBundle bundle) {
         // intentionally empty: staged bundles are retained, never cleaned up
     }
+
+    /**
+     * Compensation for a FAILED provision (H6): discard the bundle that was staged during a run that
+     * never activated, so a failure-after-N leaves no orphaned staged policy artifact on disk. This is
+     * NOT deprovision retention ({@link #retainForEvidence}) — that retains the bundle of a tenant that
+     * DID go live; a never-activated staging directory is debris, not evidence. Idempotent and
+     * best-effort. Default no-op for adapters that stage nothing durable.
+     */
+    default void discardStaged(TenantBootstrapBundle bundle) {
+        // intentionally empty: nothing durable to clean for a non-disk adapter
+    }
 }

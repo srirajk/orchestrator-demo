@@ -2,6 +2,8 @@ package com.openwolf.iam.policystudio.breakglass;
 
 import com.openwolf.iam.policystudio.TenantScope;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 
 /**
@@ -58,6 +60,29 @@ public record BreakGlassGrant(
         if (requestedBy == null || requestedBy.isBlank()) {
             throw new IllegalArgumentException("requestedBy (the SoD author) must be set");
         }
+    }
+
+    /**
+     * Mint a grant stamped from the SERVER clock (H1): {@code issuedAt = clock.instant()} and
+     * {@code expiresAt = issuedAt + ttl}. This is the ONLY sanctioned way to create a grant on the
+     * request path — there is no way to smuggle a caller-supplied {@code issuedAt} through it, so a
+     * future-dated {@code issuedAt} can never widen the window past the server clock. The bounds gate
+     * ({@link BreakGlassValidator}) additionally re-validates the window against the server clock, and
+     * the compiler bakes {@code now() >= timestamp(issuedAt)} into the PDP rule, so a future-dated
+     * grant is inert in all three planes.
+     */
+    public static BreakGlassGrant issue(Clock clock, TenantScope scope, String resourceKind,
+                                        String action, String role, Duration ttl,
+                                        String justification, String requestedBy) {
+        if (clock == null) {
+            throw new IllegalArgumentException("clock must be set (issuedAt is stamped server-side)");
+        }
+        if (ttl == null || ttl.isZero() || ttl.isNegative()) {
+            throw new IllegalArgumentException("ttl must be a positive duration — was " + ttl);
+        }
+        Instant now = clock.instant();
+        return new BreakGlassGrant(scope, resourceKind, action, role, now, now.plus(ttl),
+                justification, requestedBy);
     }
 
     /** The tenant partition key (A6): the tenant root of the scope. */

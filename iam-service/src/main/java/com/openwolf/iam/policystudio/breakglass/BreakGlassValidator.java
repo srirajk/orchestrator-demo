@@ -1,10 +1,13 @@
 package com.openwolf.iam.policystudio.breakglass;
 
 import com.openwolf.iam.policystudio.ManifestVocabulary;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,6 +23,10 @@ import java.util.List;
  *       or has a malformed/zero window, is rejected).</li>
  *   <li><b>Maximum TTL</b> — the window may not exceed {@code iam.break-glass.max-ttl-minutes}
  *       (default 60m). Emergency access is minutes, not days.</li>
+ *   <li><b>Server-clock window</b> (H1) — {@code issuedAt} may not be in the future and
+ *       {@code expiresAt ∈ (now, now+maxTtl]} against the SERVER clock, not merely a bounded span
+ *       relative to a caller-supplied {@code issuedAt}. A future-dated {@code issuedAt} is rejected
+ *       here even if its relative span is under 60m.</li>
  *   <li><b>No wildcard</b> — neither the action nor the role may be {@code "*"}.</li>
  *   <li><b>Approved allowlists</b> — the resource kind and action must be in the pre-approved
  *       break-glass allowlist ({@link BreakGlassAllowlist}); the role must be in the manifest
@@ -36,13 +43,24 @@ public class BreakGlassValidator {
     private static final String WILDCARD = "*";
 
     private final Duration maxTtl;
+    private final Clock clock;
 
+    @Autowired
     public BreakGlassValidator(
             @Value("${iam.break-glass.max-ttl-minutes:60}") long maxTtlMinutes) {
+        this(maxTtlMinutes, Clock.systemUTC());
+    }
+
+    /** Test/explicit-clock seam: the server clock is the authority for the window bounds (H1). */
+    public BreakGlassValidator(long maxTtlMinutes, Clock clock) {
         if (maxTtlMinutes <= 0) {
             throw new IllegalArgumentException("iam.break-glass.max-ttl-minutes must be positive");
         }
+        if (clock == null) {
+            throw new IllegalArgumentException("clock must be set");
+        }
         this.maxTtl = Duration.ofMinutes(maxTtlMinutes);
+        this.clock = clock;
     }
 
     /** The configured maximum grant window (default 60 minutes). */
@@ -76,6 +94,26 @@ public class BreakGlassValidator {
                 v.add("break-glass TTL " + ttl.toMinutes() + "m exceeds the maximum "
                         + maxTtl.toMinutes() + "m — emergency access must be short-lived");
             }
+        }
+
+        // 2b. Server-clock window (H1) — the AUTHORITATIVE bound. issuedAt is stamped server-side, so a
+        //     future-dated issuedAt is illegitimate, and expiresAt must fall in (now, now+maxTtl] against
+        //     the SERVER clock — not merely a ≤60m span relative to a caller-supplied issuedAt (which a
+        //     future-dated issuedAt could keep hot for weeks).
+        Instant now = clock.instant();
+        if (grant.issuedAt().isAfter(now)) {
+            v.add("issuedAt (" + grant.issuedAt() + ") is in the future relative to the server clock ("
+                    + now + ") — issuedAt is stamped server-side and may not be future-dated");
+        }
+        if (!grant.expiresAt().isAfter(now)) {
+            v.add("expiresAt (" + grant.expiresAt() + ") is not after the server clock (" + now
+                    + ") — the grant is already expired against the server clock");
+        }
+        Instant serverCeiling = now.plus(maxTtl);
+        if (grant.expiresAt().isAfter(serverCeiling)) {
+            v.add("expiresAt (" + grant.expiresAt() + ") is beyond the maximum " + maxTtl.toMinutes()
+                    + "m window from the server clock (ceiling " + serverCeiling + ") — a future-dated "
+                    + "grant cannot stay hot past the server-clock ceiling");
         }
 
         // 3. No wildcard ───────────────────────────────────────────────────────────────────────

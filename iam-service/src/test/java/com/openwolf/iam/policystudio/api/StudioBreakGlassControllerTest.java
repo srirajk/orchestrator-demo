@@ -128,7 +128,7 @@ class StudioBreakGlassControllerTest {
         when(store.getGrant("meridian", "bg-1"))
                 .thenReturn(Optional.of(pending("drafter-dan", false)))
                 .thenReturn(Optional.of(pending("drafter-dan", true)));
-        doNothing().when(approval).approveAndIssue(any(), eq("approver-bob"), any(), anyString());
+        doNothing().when(approval).approveAndIssue(any(), eq("drafter-dan"), eq("approver-bob"), any(), anyString());
 
         mvc.perform(post("/admin/studio/break-glass/bg-1/approve")
                         .with(StudioMvc.principal("approver-bob", "meridian", "policy_approver")))
@@ -141,7 +141,7 @@ class StudioBreakGlassControllerTest {
     void selfApprovalIsRejected409() throws Exception {
         when(store.getGrant("meridian", "bg-1")).thenReturn(Optional.of(pending("drafter-dan", false)));
         doThrow(new BreakGlassSodException("requester may not approve"))
-                .when(approval).approveAndIssue(any(), anyString(), any(), anyString());
+                .when(approval).approveAndIssue(any(), anyString(), anyString(), any(), anyString());
 
         mvc.perform(post("/admin/studio/break-glass/bg-1/approve")
                         .with(StudioMvc.principal("drafter-dan", "meridian", "policy_approver")))

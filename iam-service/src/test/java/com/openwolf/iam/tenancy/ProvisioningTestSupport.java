@@ -59,6 +59,8 @@ final class ProvisioningTestSupport {
             @Override public TenantBootstrapBundle stage(String tenantId) { return real.stage(tenantId); }
             @Override public void probe(TenantBootstrapBundle b) { /* Cerbos probe skipped here */ }
             @Override public boolean isProbeAvailable() { return false; }
+            // Delegate H6 compensation to the real disk-staging adapter so cleanup is genuinely exercised.
+            @Override public void discardStaged(TenantBootstrapBundle b) { real.discardStaged(b); }
         };
     }
 
@@ -115,6 +117,7 @@ final class ProvisioningTestSupport {
         }
         @Override public void probe(TenantBootstrapBundle b) { delegate.probe(b); }
         @Override public boolean isProbeAvailable() { return delegate.isProbeAvailable(); }
+        @Override public void discardStaged(TenantBootstrapBundle b) { delegate.discardStaged(b); }
     }
 
     static final class FailingNamespaceAdapter implements TenantNamespaceAdapter {

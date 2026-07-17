@@ -20,9 +20,12 @@ import java.util.TreeSet;
  * <p><b>The self-limiting idiom (the whole point):</b> the granted {@code (action, role)} tuple is
  * expressed as a COMPLEMENTARY PAIR of time-conditioned rules on the SAME tuple —
  * <pre>
- *   ALLOW  action  role   when  now() &lt; timestamp("&lt;expiresAt&gt;")
- *   DENY   action  role   when  now() &gt;= timestamp("&lt;expiresAt&gt;")
+ *   ALLOW  action  role   when  now() &gt;= timestamp("&lt;issuedAt&gt;") &amp;&amp; now() &lt; timestamp("&lt;expiresAt&gt;")
+ *   DENY   action  role   when  now() &lt;  timestamp("&lt;issuedAt&gt;") || now() &gt;= timestamp("&lt;expiresAt&gt;")
  * </pre>
+ * The ALLOW carries BOTH bounds (H1): the LOWER bound {@code now() >= timestamp(issuedAt)} makes a
+ * future-dated grant inert in the PDP (it cannot fire until {@code issuedAt}), matching the bounds
+ * gate's server-clock rejection.
  * A lone conditional ALLOW would be UNSAFE under {@code REQUIRE_PARENTAL_CONSENT_FOR_ALLOWS}: once
  * its condition lapses the rule becomes silence, and silence inherits the parent ALLOW (the proven
  * fall-through trap — {@code infra/cerbos/templates/tenant-deny-all.yaml}). The complementary DENY
@@ -38,16 +41,40 @@ public class BreakGlassPolicyCompiler {
 
     /** Build the CEL predicate for {@code now() < timestamp(expiresAt)} (seconds precision, RFC3339). */
     static String beforeExpiry(BreakGlassGrant grant) {
-        return "now() < timestamp(\"" + isoSeconds(grant) + "\")";
+        return "now() < timestamp(\"" + isoSeconds(grant.expiresAt()) + "\")";
     }
 
-    /** Build the CEL predicate for {@code now() >= timestamp(expiresAt)} — the self-limit. */
+    /** Build the CEL predicate for {@code now() >= timestamp(expiresAt)} — the upper self-limit. */
     static String afterExpiry(BreakGlassGrant grant) {
-        return "now() >= timestamp(\"" + isoSeconds(grant) + "\")";
+        return "now() >= timestamp(\"" + isoSeconds(grant.expiresAt()) + "\")";
     }
 
-    private static String isoSeconds(BreakGlassGrant grant) {
-        return grant.expiresAt().truncatedTo(ChronoUnit.SECONDS).toString();
+    /** Build the CEL predicate for {@code now() >= timestamp(issuedAt)} — the LOWER bound (H1). */
+    static String afterIssued(BreakGlassGrant grant) {
+        return "now() >= timestamp(\"" + isoSeconds(grant.issuedAt()) + "\")";
+    }
+
+    /** Build the CEL predicate for {@code now() < timestamp(issuedAt)} — before the grant is live. */
+    static String beforeIssued(BreakGlassGrant grant) {
+        return "now() < timestamp(\"" + isoSeconds(grant.issuedAt()) + "\")";
+    }
+
+    /**
+     * The ALLOW window: live ONLY inside {@code [issuedAt, expiresAt)}. Carries BOTH bounds so a
+     * future-dated grant is inert in the PDP (the lower bound fails until {@code issuedAt}) exactly as
+     * it is rejected by the bounds gate (H1).
+     */
+    static String activeWindow(BreakGlassGrant grant) {
+        return afterIssued(grant) + " && " + beforeExpiry(grant);
+    }
+
+    /** The complementary DENY: fires whenever now() is OUTSIDE {@code [issuedAt, expiresAt)}. */
+    static String outsideWindow(BreakGlassGrant grant) {
+        return beforeIssued(grant) + " || " + afterExpiry(grant);
+    }
+
+    private static String isoSeconds(java.time.Instant instant) {
+        return instant.truncatedTo(ChronoUnit.SECONDS).toString();
     }
 
     private static Object matchCondition(String expr) {
@@ -64,10 +91,10 @@ public class BreakGlassPolicyCompiler {
         // ── The break-glass grant: a complementary time-conditioned ALLOW/DENY on the granted tuple ──
         rules.add(new PolicyIR.Rule(
                 List.of(grant.action()), "EFFECT_ALLOW", List.of(grant.role()), List.of(),
-                matchCondition(beforeExpiry(grant))));
+                matchCondition(activeWindow(grant))));
         rules.add(new PolicyIR.Rule(
                 List.of(grant.action()), "EFFECT_DENY", List.of(grant.role()), List.of(),
-                matchCondition(afterExpiry(grant))));
+                matchCondition(outsideWindow(grant))));
 
         // ── Deny-all baseline: explicit DENY for every remaining ceiling (action, role) tuple ──
         // Group by role; exclude the granted (action, role) so the conditional pair alone governs it.
