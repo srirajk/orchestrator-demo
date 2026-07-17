@@ -6,6 +6,7 @@ import ai.conduit.gateway.api.v1.chat.sse.OpenAiSseWriter;
 import ai.conduit.gateway.domain.clarify.ClarificationComposer;
 import ai.conduit.gateway.domain.clarify.ClarificationDescriptor;
 import ai.conduit.gateway.domain.clarify.ClarificationDescriptorFactory;
+import ai.conduit.gateway.domain.clarify.ClarificationOption;
 import ai.conduit.gateway.domain.clarify.ClarificationDualPlane;
 import ai.conduit.gateway.domain.clarify.ClarificationTrigger;
 import ai.conduit.gateway.domain.clarify.ClarifyResume;
@@ -150,6 +151,13 @@ public class ChatService {
      * so the structured-clarification loop is hard-bounded across turns.
      */
     private final ThreadLocal<Integer> clarifyDepthCarry = new ThreadLocal<>();
+    /**
+     * The chosen capability/agent id from a {@code clarify_capability} resume, captured once per turn on the
+     * request virtual thread (mirrors {@link #clarifyDepthCarry}). Set only on a CAPABILITY_SELECTION resume;
+     * read at the routing seam in {@link #handleFetchData} to bias routing to the chosen capability. It is a
+     * ROUTE HINT, never an authorization — the pipeline's structural + coverage CHECK still gates it.
+     */
+    private final ThreadLocal<String> capabilityHintCarry = new ThreadLocal<>();
     private final Counter intentFetchCounter;
     private final Counter intentFollowUpCounter;
     private final Counter intentClarifyCounter;
@@ -325,11 +333,15 @@ public class ChatService {
             clarifyDepthCarry.set(clarificationDualPlane.supersede(conversationId));
         }
 
-        // The effective request/prompt the pipeline runs on: a GROUNDED_SELECTION resume re-drives the
-        // descriptor's original query (the chosen id is injected as a grounded reference below); every
-        // other turn (ordinary, free-text, out-of-set demotion) runs on the folded/original message as-is.
+        // The effective request/prompt the pipeline runs on: a GROUNDED_SELECTION (chosen entity id) or a
+        // CAPABILITY_SELECTION (chosen capability route hint) resume re-drives the descriptor's ORIGINAL
+        // query — the entity id is injected as a grounded reference below, the capability biases routing —
+        // while every other turn (ordinary, free-text, out-of-set demotion) runs on the folded/original
+        // message as-is.
         ChatRequest effectiveRequest = request;
-        if (resume.mode() == ClarifyResume.Mode.GROUNDED_SELECTION && resume.resumedQuery() != null) {
+        if ((resume.mode() == ClarifyResume.Mode.GROUNDED_SELECTION
+                || resume.mode() == ClarifyResume.Mode.CAPABILITY_SELECTION)
+                && resume.resumedQuery() != null) {
             effectiveRequest = withLatestUserContent(request, resume.resumedQuery());
             latestPrompt = resume.resumedQuery();
         }
@@ -415,6 +427,16 @@ public class ChatService {
                 handleFetchData(pipelineRequest, emitter, latestPrompt,
                         conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan,
                         groundedBag, streamId, true, callerToken, null);
+            } else if (resume.mode() == ClarifyResume.Mode.CAPABILITY_SELECTION) {
+                // A capability form's pick re-drives the ORIGINAL query as a data fetch, biased to the chosen
+                // capability via the route hint (read at the routing seam in handleFetchData). The pipeline
+                // re-runs structural + coverage CHECK, so a capability the principal can no longer invoke is
+                // DENIED at resume — the form is a route hint, never authorization. No grounded entity is
+                // injected: the submit token is a capability id, not an entity id.
+                capabilityHintCarry.set(resume.capabilityHint());
+                handleFetchData(pipelineRequest, emitter, latestPrompt,
+                        conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan,
+                        intentResult.extractedEntities(), streamId, true, callerToken, null);
             } else {
             switch (intentResult.intent()) {
                 case FETCH_DATA -> handleFetchData(pipelineRequest, emitter, latestPrompt,
@@ -454,6 +476,7 @@ public class ChatService {
             gatewaySloMetrics.finish(metricScope);
             gatewayMetricScope.remove();
             clarifyDepthCarry.remove();
+            capabilityHintCarry.remove();
             rootSpan.end();
         }
     }
@@ -567,6 +590,15 @@ public class ChatService {
                     : resolver.resolveContextual(prepared.maskedRoutingText(), prepared.relaxationAllowed(),
                             groundedDomainIds);
             recordGatewayStage("routing", System.nanoTime() - routingStart);
+            // CAPABILITY-CLARIFY RESUME: a chosen capability biases routing to that exact agent when it is
+            // still a plausible candidate for the re-driven query. It never bypasses a gate — the forced
+            // pick still transits structural + coverage CHECK below, so a now-denied capability is DENIED at
+            // resume. If the hint is no longer plausible (dropped from the shortlist) the normal abstain
+            // disposition applies unchanged. World-B: an opaque agent id, never a domain literal.
+            String capabilityHint = capabilityHintCarry.get();
+            if (capabilityHint != null && !capabilityHint.isBlank()) {
+                resolved = applyCapabilityHint(resolved, capabilityHint);
+            }
             resolved = withPrimaryCandidate(resolved);
 
             List<AgentsResolvedData.AgentRef> selectedRefs = resolved.selected().stream()
@@ -608,6 +640,16 @@ public class ChatService {
                 }
                 if (attemptRequiredEntityClarify(resolved, preExtracted, principal, tenantId, callerToken,
                         emitter, streamId, requestId, conversationId, requestStart, request)) {
+                    return;
+                }
+                // (2b) CAPABILITY-AMBIGUOUS abstain: routing could not pick among several plausible,
+                // CHECK-passed capabilities (low margin, no confident single route) and it is NOT a
+                // missing-entity case (that was handled above). Offer a clarify_capability form over those
+                // capabilities instead of a bare no-service — the user picks WHICH capability and the resume
+                // re-drives the full pipeline + CHECK. Returns false (→ honest no-service below) when there
+                // is no plausible, entitled capability to disambiguate (the genuinely-unroutable tail).
+                if (attemptCapabilityClarify(resolved, principal, emitter, streamId, requestId,
+                        conversationId, requestStart, request)) {
                     return;
                 }
                 emitRequestOutcome("FAILED");
@@ -2382,6 +2424,125 @@ public class ChatService {
             }
         }
         return false;
+    }
+
+    /**
+     * Stage-3 abstain triage — the DETERMINISTIC capability CLARIFY. Runs AFTER the required-entity clarify
+     * declines, so by construction this is NOT a missing-entity case: routing abstained because it could not
+     * confidently pick among several plausible capabilities (low margin, no single confident route). Instead
+     * of a bare no-service, offer a {@code clarify_capability} form over those capabilities and let the user
+     * pick WHICH one — the resume re-drives the full pipeline + CHECK.
+     *
+     * <p><b>Deterministic trigger</b> (hard-rule 4e, no LLM): abstain AND ≥1 plausible, CHECK-passed
+     * capability candidate — decided by {@link ClarificationTrigger#shouldOfferForm}. "Plausible" reuses the
+     * same {@code conduit.resolver.confidence-floor} the entity triage uses, over the broad (skipped)
+     * candidate set the resolver surfaced on abstain.
+     *
+     * <p><b>Enumeration-oracle discipline</b> (mirrors the entity form): the capability candidates pass
+     * through {@link EntitlementService#filterAgents} (Cerbos) BEFORE they enter the descriptor, so a
+     * capability the principal cannot invoke is never offered and no hidden count is emitted.
+     *
+     * <p><b>World B.</b> Every option's label/secondary is manifest DATA (agent {@code name}/{@code
+     * description}); the only gateway-authored strings are domain-agnostic templates (the question fallback,
+     * the reply invitation). Distinguishes the three abstain dispositions: entity-ambiguous (handled above),
+     * capability-ambiguous (this form), genuinely-nothing (returns false → honest no-service, unchanged).
+     *
+     * @return true if a capability clarification was streamed and the request is complete
+     */
+    private boolean attemptCapabilityClarify(ResolverResult resolved, Principal principal,
+                                             SseEmitter emitter, String streamId, String requestId,
+                                             String conversationId, long requestStart,
+                                             ChatRequest request) throws Exception {
+        if (resolved == null || resolved.skipped() == null || resolved.skipped().isEmpty()) return false;
+
+        // The plausible capability candidates from the abstain set — de-duped by agent id, order preserved
+        // (score-descending). Reuses the entity triage's "plausible" floor so the two triages agree.
+        java.util.LinkedHashMap<String, AgentManifest> byId = new java.util.LinkedHashMap<>();
+        for (RoutingCandidate c : resolved.skipped()) {
+            if (c.score() < confidenceFloor) continue;
+            byId.putIfAbsent(c.manifest().agentId(), c.manifest());
+        }
+        if (byId.isEmpty()) return false;
+
+        // Enumeration-oracle fix: only ever offer capabilities the principal may actually invoke (Cerbos).
+        List<AgentManifest> allowed = entitlementService.filterAgents(principal, new ArrayList<>(byId.values()));
+        if (!ClarificationTrigger.shouldOfferForm(true, allowed.size())) return false;   // nothing to disambiguate
+
+        // Loop bound — a capability clarify advances the shared lineage depth (entity + capability may chain
+        // once, cap 2). Past the cap, degrade to honest no-service rather than loop.
+        int inherited = clarifyDepthCarry.get() == null ? 0 : clarifyDepthCarry.get();
+        int depth = ClarificationTrigger.nextDepth(inherited);
+        if (ClarificationTrigger.overCap(depth, clarificationDescriptorFactory.maxClarifyDepth())) {
+            return false;
+        }
+
+        // Options: value = the agent/capability id (the route hint the resume biases routing on); label +
+        // secondary = manifest copy (name + description). All DATA — no domain literal (World B).
+        List<ClarificationOption> options = allowed.stream()
+                .map(m -> new ClarificationOption(m.agentId(), capabilityLabel(m), capabilitySecondary(m)))
+                .collect(Collectors.toList());
+        String question = msg("which_capability", "Which of these would you like me to use?");
+        String plainText = buildCapabilityClarificationText(question, options);
+
+        ClarificationDescriptor descriptor = clarificationDescriptorFactory.forCapability(
+                conversationId, question, plainText, null, options,
+                extractLatestUserMessage(request), depth);
+        clarificationDualPlane.offer(descriptor, requestId);   // OOB structured form (additive)
+        emitRequestOutcome(clarificationDualPlane.isEnabled() ? "FORM_CLARIFY" : "CLARIFIED");
+        streamTextAndComplete(emitter, descriptor.plainText(), streamId);   // plain-text twin on the SSE
+        tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
+                new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+        return true;
+    }
+
+    /**
+     * Bias a resolver result toward a resume-chosen capability. When {@code agentId} is still a plausible
+     * candidate for the re-driven query (present in selected∪skipped, above the confidence floor), force it
+     * as the SINGLE selected capability so the pipeline routes to it — but it still transits every downstream
+     * gate (structural + coverage CHECK), so a now-denied capability is DENIED at resume, never trusted from
+     * the form. When the hint is no longer plausible the original result is returned unchanged, so the normal
+     * abstain disposition applies. World-B: an opaque agent id, never a domain literal.
+     */
+    private ResolverResult applyCapabilityHint(ResolverResult resolved, String agentId) {
+        List<RoutingCandidate> pool = new ArrayList<>(resolved.selected());
+        pool.addAll(resolved.skipped());
+        RoutingCandidate hit = pool.stream()
+                .filter(c -> agentId.equals(c.manifest().agentId()) && c.score() >= confidenceFloor)
+                .findFirst().orElse(null);
+        if (hit == null) return resolved;
+        List<RoutingCandidate> skipped = pool.stream()
+                .filter(c -> !agentId.equals(c.manifest().agentId()))
+                .collect(Collectors.toList());
+        return new ResolverResult(List.of(hit), skipped, false, hit.score(), resolved.prompt(),
+                resolved.margin(), resolved.rerankFired());
+    }
+
+    /** The manifest-declared display for a capability option — the agent name, else its id. DATA (World B). */
+    private String capabilityLabel(AgentManifest m) {
+        return (m.name() != null && !m.name().isBlank()) ? m.name() : m.agentId();
+    }
+
+    /** The manifest-declared supporting copy for a capability option — its description, else null. DATA. */
+    private String capabilitySecondary(AgentManifest m) {
+        return (m.description() != null && !m.description().isBlank()) ? m.description() : null;
+    }
+
+    /**
+     * The deterministic plain-text twin for a capability clarification: the question, the offered capability
+     * labels (+ their manifest descriptions), and a generic reply invitation. Domain-agnostic templates only;
+     * every capability string is manifest DATA passed in via {@code options} (World B).
+     */
+    private String buildCapabilityClarificationText(String question, List<ClarificationOption> options) {
+        StringBuilder sb = new StringBuilder(question).append("\n");
+        for (ClarificationOption o : options) {
+            sb.append("- ").append(o.label());
+            if (o.secondaryLabel() != null && !o.secondaryLabel().isBlank()) {
+                sb.append(" — ").append(o.secondaryLabel());
+            }
+            sb.append("\n");
+        }
+        sb.append("\nReply with the name of the one you'd like.");
+        return sb.toString();
     }
 
     /**

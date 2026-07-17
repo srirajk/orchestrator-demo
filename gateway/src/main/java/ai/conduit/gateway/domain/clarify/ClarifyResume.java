@@ -46,6 +46,16 @@ public class ClarifyResume {
         NONE,
         /** An offered, entitled candidate was chosen — re-drive the original query with it grounded. */
         GROUNDED_SELECTION,
+        /**
+         * An offered, CHECK-passed capability was chosen from a {@code clarify_capability} form. The chosen
+         * capability is a ROUTE HINT, not an entity ground: the resumed turn re-drives the descriptor's
+         * original query and biases routing to the chosen capability, but the capability still transits the
+         * FULL pipeline + entitlement CHECK — a capability the principal can no longer invoke is DENIED at
+         * resume, never trusted from the form (the form is not authorization). Distinct from
+         * {@link #GROUNDED_SELECTION} because the submit token is an agent/capability id, not an entity id,
+         * so it seeds routing rather than the grounded {@link ai.conduit.gateway.synthesis.input.EntityBag}.
+         */
+        CAPABILITY_SELECTION,
         /** A free-text escape, or an out-of-set (demoted) selection — untrusted DATA, re-drive as a query. */
         FREE_TEXT
     }
@@ -61,11 +71,14 @@ public class ClarifyResume {
      *                        query); null for FREE_TEXT (the folded free-text message content is routed as-is)
      * @param inheritedDepth  the consumed descriptor's lineage depth, so a re-clarification THIS turn
      *                        advances the loop bound instead of resetting it
+     * @param capabilityHint  the chosen capability/agent id to bias routing on ({@link Mode#CAPABILITY_SELECTION}
+     *                        only); null on every other mode. A ROUTE HINT, never an authorization — the
+     *                        pipeline re-CHECKs it, so a now-denied capability is denied at resume.
      */
     public record Decision(boolean consumed, Mode mode, String groundedId, String idPattern,
-                           String resumedQuery, int inheritedDepth) {
+                           String resumedQuery, int inheritedDepth, String capabilityHint) {
         public static Decision none() {
-            return new Decision(false, Mode.NONE, null, null, null, 0);
+            return new Decision(false, Mode.NONE, null, null, null, 0, null);
         }
     }
 
@@ -81,14 +94,28 @@ public class ClarifyResume {
         if (opt.isEmpty()) return Decision.none();   // replay / expired / superseded → ordinary turn
         ClarificationDescriptor d = opt.get();
         int depth = d.clarifyDepth();
-        if (!isBlank(selection)
-                && d.validate(selection) == ClarificationDescriptor.Submission.IN_SET) {
+        boolean inSet = !isBlank(selection)
+                && d.validate(selection) == ClarificationDescriptor.Submission.IN_SET;
+
+        // A capability form's IN_SET pick is a ROUTE HINT, not an entity ground: re-drive the original query
+        // and bias routing to the chosen capability, but let the full pipeline + CHECK decide (never trusted
+        // as authorization). The submit token is an agent/capability id, so it seeds routing, not the bag.
+        if (d.kind() == InteractionKind.CLARIFY_CAPABILITY) {
+            if (inSet) {
+                String query = !isBlank(d.originatingQuery()) ? d.originatingQuery() : selection;
+                return new Decision(true, Mode.CAPABILITY_SELECTION, null, d.idPattern(), query, depth, selection);
+            }
+            // Out-of-set / free-text escape on a capability form: demote to untrusted free text (rule 4c).
+            return new Decision(true, Mode.FREE_TEXT, null, d.idPattern(), null, depth, null);
+        }
+
+        if (inSet) {
             String query = !isBlank(d.originatingQuery()) ? d.originatingQuery() : selection;
-            return new Decision(true, Mode.GROUNDED_SELECTION, selection, d.idPattern(), query, depth);
+            return new Decision(true, Mode.GROUNDED_SELECTION, selection, d.idPattern(), query, depth, null);
         }
         // Free-text escape, or an out-of-set selection: consumed, but NEVER grounded — demote to untrusted
         // free text and let the folded message content re-drive the pipeline as an ordinary query.
-        return new Decision(true, Mode.FREE_TEXT, null, d.idPattern(), null, depth);
+        return new Decision(true, Mode.FREE_TEXT, null, d.idPattern(), null, depth, null);
     }
 
     private static boolean isBlank(String s) {
