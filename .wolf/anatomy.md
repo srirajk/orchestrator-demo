@@ -2243,3 +2243,19 @@
 - gateway/.../infrastructure/redis/DefaultTenantUsesLegacyIndexNameTest.java (test) — demo-preservation guard: default→intent_idx/vec:. ~0.5k
 - gateway/.../infrastructure/redis/RedisTenantIsolationProbeIT.java (test, extends RedisContainerTest) — A3.1/A3.2/A3.3/A3.4 isolation probes + FT.SEARCH transcript. ~1.2k
 - iam-service/.../auth/IamOAuthLocatorIsolationTest.java (test) — A3.5 locator can't leak/cross tenant. ~0.7k
+
+## Axiom A4 — per-tenant registry ingestion + routing index + bulkheads (WRITE side)
+- gateway/.../registry/index/VectorIndexWriter.java — MODIFIED: per-tenant ensureIndex/index/removeAgent(ctx) via TenantKeyspace; per-tenant stamp keys; no-arg = legacy(null); 4-arg @Autowired ctor + legacy 3-arg. ~3.2k
+- gateway/.../registry/index/VectorIndex.java — MODIFIED: tenant-aware exists(ctx)/stampedModelId(ctx)/stampedExprDialect(ctx)/documentCount(ctx); no-arg delegate to legacy. ~2.0k
+- gateway/.../registry/readiness/RegistryReadinessVerifier.java — MODIFIED: immutable per-tenant readiness map; default=process-fatal gate, non-default=fail-closed verdict; isReady/requireReady/evaluate/refreshReadiness. ~2.4k
+- gateway/.../registry/readiness/TenantRegistryNotReadyException.java — per-tenant routing deny (context resolves but registry not ready). ~0.3k
+- gateway/.../registry/ingest/RegistryIngestor.java — MODIFIED: TenantKeyspace ctor + ingestTenant(ctx) per-tenant fail-isolated seam (B4 drives folders); default startup path unchanged. ~3.3k
+- gateway/.../infrastructure/tenancy/TenantBulkheads.java — per-tenant R4j bulkheads + global; bounded max-tenants; deprovision/reconcile removal. ~1.0k
+- gateway/.../registry/embedding/RemoteEmbedder.java — MODIFIED: statelessness declaration (shared across tenants; content-addressed cache tenant-agnostic). ~1.4k
+- gateway/.../registry/tenancy/PerTenantTestSupport.java (test) — A4 fixtures: deterministic embedders, manifest builder, index fingerprint. ~0.8k
+- gateway/.../registry/tenancy/PerTenantRoutingIsolationTest.java (test, RedisContainerTest) — A4.2 query never returns other tenant hits. ~0.7k
+- gateway/.../registry/tenancy/PerTenantReadinessTest.java (test, RedisContainerTest) — A4.1 broken tenant fails closed, B serves, B index byte-hash unchanged. ~0.9k
+- gateway/.../registry/tenancy/PerTenantStampTest.java (test, RedisContainerTest) — A4.3 model-stamp mismatch fails only that tenant. ~0.7k
+- gateway/.../registry/tenancy/DefaultTenantWritesLegacyIndexTest.java (test, RedisContainerTest) — WRITE-side demo-preservation: default→intent_idx/vec:/stamp, no tenant artifacts. ~0.6k
+- gateway/.../registry/tenancy/PerTenantBulkheadTest.java (test) — A4.5 isolation + bounded cardinality + deprovision. ~0.6k
+- gateway/.../registry/tenancy/EmbedderStatelessnessTest.java (test) — A4.4 same text same vector across tenants (real RemoteEmbedder vs stub sidecar). ~0.7k
