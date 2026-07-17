@@ -2236,3 +2236,10 @@
 - gateway/.../test/.../domain/auth/TenantContextFailClosedTest.java — A2.3 filter-level fail-closed (401 missing/403 unknown, chain never entered). ~1.5k
 - gateway/.../test/.../domain/auth/TenantContextPropagationTest.java — A2.2 immutable TEC survives VT hop; invocation/coverage/audit observe exact value. ~1.4k
 - gateway/.../test/.../architecture/TenantContextSeamArchTest.java — A2.1 single claim reader (source scan) + no downstream static getTenant + controllers carry TEC. ~1.6k
+
+## Axiom A3 — per-tenant Redis namespacing
+- gateway/.../infrastructure/redis/TenantKeyspace.java — A3 seam: legacy names for default tenant / multi-tenant off; intent_idx__{tenant} + t:{tenant}: for real tenants; sourced from TenantExecutionContext. ~0.9k
+- gateway/.../infrastructure/redis/TenantRedisFacade.java — tenant-qualified Redis command facade; no unqualified SCAN/FT._LIST; listOwnKeys bounded to tenant prefix. ~0.6k
+- gateway/.../infrastructure/redis/DefaultTenantUsesLegacyIndexNameTest.java (test) — demo-preservation guard: default→intent_idx/vec:. ~0.5k
+- gateway/.../infrastructure/redis/RedisTenantIsolationProbeIT.java (test, extends RedisContainerTest) — A3.1/A3.2/A3.3/A3.4 isolation probes + FT.SEARCH transcript. ~1.2k
+- iam-service/.../auth/IamOAuthLocatorIsolationTest.java (test) — A3.5 locator can't leak/cross tenant. ~0.7k
