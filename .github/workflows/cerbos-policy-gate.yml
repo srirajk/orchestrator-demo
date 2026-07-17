@@ -1,0 +1,68 @@
+name: cerbos-policy-gate
+
+# Axiom Story B3 — HARD CI gate on the authorization policies.
+# Fails the build on a bad Cerbos policy: compile + the 45 B2 regression tests + the
+# hand-owned adversarial invariant suite + the tenant-totality / tenant-equality lints,
+# then proves the gate has teeth with the planted-mutant smoke.
+#
+# Same Cerbos as the runtime PDP: pinned 0.53.0 (cerbos/cerbos-setup-action installs the
+# 0.53.0 binary onto the runner; scripts/cerbos-policy-gate.sh asserts the version).
+
+on:
+  push:
+    paths:
+      - "infra/cerbos/**"
+      - "scripts/cerbos-*.py"
+      - "scripts/cerbos-*.sh"
+      - ".github/workflows/cerbos-policy-gate.yml"
+  pull_request:
+    paths:
+      - "infra/cerbos/**"
+      - "scripts/cerbos-*.py"
+      - "scripts/cerbos-*.sh"
+      - ".github/workflows/cerbos-policy-gate.yml"
+
+jobs:
+  policy-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Pinned to 0.53.0 — the exact version the runtime Cerbos PDP runs.
+      - name: Install pinned Cerbos 0.53.0
+        uses: cerbos/cerbos-setup-action@v1
+        with:
+          version: 0.53.0
+
+      - name: Set up Python (for the totality / equality lints)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install lint deps
+        run: pip install pyyaml
+
+      - name: Assert pinned Cerbos version
+        run: |
+          test "$(cerbos --version)" = "0.53.0"
+
+      # The exact repo command, run as a hard gate (fails the build on non-zero).
+      - name: cerbos compile --test-output=junit (hard gate)
+        run: cerbos compile --test-output=junit infra/cerbos/policies
+
+      # Full composite gate: compile + invariant suite + totality + equality lints.
+      - name: Cerbos policy gate (compile + tests + lints)
+        run: scripts/cerbos-policy-gate.sh
+
+      # THE TEETH TEST: every planted over-permissive mutant must FAIL the gate.
+      - name: Cerbos mutation smoke (planted mutants must fail the gate)
+        run: scripts/cerbos-mutation-smoke.sh
+
+      - name: Upload junit test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cerbos-junit
+          path: .cerbos-junit.xml
+          if-no-files-found: ignore

@@ -1,0 +1,56 @@
+# ═════════════════════════════════════════════════════════════════════════════
+#  PLANTED OVER-PERMISSIVE MUTANT — NOT A PRODUCTION POLICY. DO NOT DEPLOY.
+# ═════════════════════════════════════════════════════════════════════════════
+#  Axiom Story B3 mutation smoke. This file lives OUTSIDE the compiled policy root
+#  (infra/cerbos/mutants/, never infra/cerbos/policies/). MutationSmokeTest copies
+#  the real policies to a temp dir, overlays THIS file in place of insights_resource.yaml, runs the
+#  policy gate, and asserts it exits NON-ZERO. If the gate stays green, the invariant
+#  suite missed a real over-grant — the smoke test goes red. The working tree is never
+#  touched.
+#
+#  MUTATION: added an `EFFECT_ALLOW read roles:["*"]` rule to the insights base policy → any authenticated principal (e.g. a chat_user) can read Conduit Insights.
+#  EXPECTED CATCHER: DecisionParityMatrixTest.insightsGatedToAdminsOnly + CrossTenantDenyMatrix.insights
+#
+#  MUTANT-TARGET: insights_resource.yaml
+# ═════════════════════════════════════════════════════════════════════════════
+apiVersion: api.cerbos.dev/v1
+# ── Conduit Insights admin gate ──────────────────────────────────────────────
+# Governs the native analytics API (GET /v1/insights/*). ADDITIVE: a brand-new
+# resource kind ("insights"); it changes no existing agent/relationship/iam decision.
+#
+# The gateway's InsightsAuthorizer issues a CheckResources call:
+#   principal: the caller (roles from the verified JWT)
+#   resource : kind=insights, id=insights, action=read
+#
+# Allow only administrators. A chat_user carries none of these roles, so the implicit
+# default-deny returns EFFECT_DENY → the gateway responds 403. The role→allow mapping
+# lives HERE in policy, not in gateway Java.
+resourcePolicy:
+  version: "default"
+  resource: insights
+  # ── Axiom Story B2: base scope ────────────────────────────────────────────────
+  # BASE scope (root) = ceiling; per-tenant narrowing lives in tenant_default_insights.yaml.
+  # scopePermissions unset ⇒ Cerbos default OVERRIDE_PARENT (root has no parent — ADR F0;
+  # explicit set on multiple roots false-conflicts on 0.53). Byte-identical to pre-migration.
+  scope: ""
+  importDerivedRoles:
+    - business_derived_roles
+
+  rules:
+    # MUTANT: wildcard read — grants insights read to EVERY role (over-grant).
+    - actions: ["read"]
+      effect: EFFECT_ALLOW
+      roles: ["*"]
+    # Platform administrators: full access (superuser across the platform).
+    # CROSS-TENANT SUPERUSER (B2.3 allowlist): intentionally raw / cross-tenant.
+    - actions: ["read"]
+      effect: EFFECT_ALLOW
+      roles: ["platform_admin"]
+
+    # Dedicated Insights administrators (conduit_admin) — the least-privilege role that
+    # grants analytics access without any other platform_admin capability.
+    - actions: ["read"]
+      effect: EFFECT_ALLOW
+      derivedRoles: ["tenant_conduit_admin"]   # conduit_admin + tenant-equality backstop (B2.3)
+
+    # No explicit deny needed — Cerbos denies by default (a chat_user hits the implicit deny).

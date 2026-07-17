@@ -1,0 +1,38 @@
+# ═════════════════════════════════════════════════════════════════════════════
+#  PLANTED OVER-PERMISSIVE MUTANT — NOT A PRODUCTION POLICY. DO NOT DEPLOY.
+# ═════════════════════════════════════════════════════════════════════════════
+#  Axiom Story B3 mutation smoke. This file lives OUTSIDE the compiled policy root
+#  (infra/cerbos/mutants/, never infra/cerbos/policies/). MutationSmokeTest copies
+#  the real policies to a temp dir, overlays THIS file in place of tenant_default_agent.yaml, runs the
+#  policy gate, and asserts it exits NON-ZERO. If the gate stays green, the invariant
+#  suite missed a real over-grant — the smoke test goes red. The working tree is never
+#  touched.
+#
+#  MUTATION: dropped the chat_user/relationship_manager rule from the `default` tenant child → the tuple is UNMATCHED and falls through to the base ALLOW (fail-open by inheritance).
+#  EXPECTED CATCHER: cerbos-tenant-totality-lint.py (INVISIBLE to cerbos decision tests — fall-through preserves ALLOW; this is exactly why the totality lint exists)
+#
+#  MUTANT-TARGET: tenant_default_agent.yaml
+# ═════════════════════════════════════════════════════════════════════════════
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: default
+  resource: agent
+  scope: default
+  scopePermissions: SCOPE_PERMISSIONS_REQUIRE_PARENTAL_CONSENT_FOR_ALLOWS
+  rules:
+  - actions:
+    - invoke
+    - invoke_membership
+    - register
+    - deregister
+    effect: EFFECT_ALLOW
+    roles:
+    - platform_admin
+  - actions:
+    - invoke
+    - invoke_membership
+    - register
+    - deregister
+    effect: EFFECT_ALLOW
+    roles:
+    - domain_admin

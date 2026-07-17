@@ -1,0 +1,93 @@
+---
+# ═════════════════════════════════════════════════════════════════════════════
+#  HAND-OWNED ADVERSARIAL INVARIANT SUITE  —  NEVER GENERATED
+# ═════════════════════════════════════════════════════════════════════════════
+#  Axiom Story B3 — authored and owned BY HAND. NEVER machine-generated, NEVER
+#  regenerated from the policies, NEVER auto-updated to match a decision. A red
+#  invariant means the POLICY changed wrongly — fix the policy, not this file.
+# ─────────────────────────────────────────────────────────────────────────────
+#  INVARIANT #3 — MISSING ATTRIBUTES FAIL CLOSED
+#  A request that omits an attribute the gate depends on must DENY (a CEL error /
+#  absent-key lookup is a no-match, and no-match is default-deny — never an
+#  accidental allow):
+#    • absent tenant_id (IAM same_tenant) — same_tenant requires BOTH sides'
+#      tenant_id non-empty; a resource with no tenant_id denies the tenant_admin.
+#    • absent segments — a chat_user with no segments map is a member of nothing;
+#      the classification gate can never clear → DENY.
+#    • absent data_classification — an agent with no classification attr ranks 0
+#      and resourceClassRecognized is false → DENY.
+#  Each is paired with a fully-attributed ALLOW control so it is not vacuous.
+# ═════════════════════════════════════════════════════════════════════════════
+name: MissingAttributeDeny
+description: Absent tenant_id / segments / data_classification all fail closed (paired with ALLOW controls).
+
+principals:
+  # IAM: tenant admin homed in tenant t1.
+  ten_admin:
+    id: ten_admin
+    roles: [tenant_admin]
+    attr: {tenant_id: t1, admin_domains: []}
+  # chat_user WITH no segments key at all (absent, not empty).
+  chat_no_segments:
+    id: chat_no_segments
+    roles: [chat_user]
+    attr: {domains: [], admin_domains: []}
+  # chat_user fully attributed — control.
+  chat_full:
+    id: chat_full
+    roles: [chat_user]
+    attr: {segments: {wealth: confidential-pii}, domains: [], admin_domains: []}
+
+resources:
+  # ── IAM user resource with NO tenant_id attr (missing) ──
+  iam_user_no_tenant:
+    kind: iam-resource
+    id: u-999
+    scope: ""
+    attr: {resource_type: user, owner_id: u-999}
+  # ── control: IAM user resource in the admin's tenant ──
+  iam_user_t1:
+    kind: iam-resource
+    id: u-t1
+    scope: ""
+    attr: {resource_type: user, tenant_id: t1, owner_id: u-t1}
+  # ── agent, well-formed, wealth pii (for the absent-segments probe) ──
+  ag_wealth_pii:
+    kind: agent
+    id: ag_wealth_pii
+    scope: ""
+    attr: {domain: wealth-management, audience: segment, access_mode: read, data_classification: confidential-pii}
+  # ── agent with NO data_classification attr (missing) ──
+  ag_no_class:
+    kind: agent
+    id: ag_no_class
+    scope: ""
+    attr: {domain: wealth-management, audience: segment, access_mode: read}
+
+tests:
+  - name: absentTenantIdDeniedIamSameTenant
+    input:
+      principals: [ten_admin]
+      resources: [iam_user_no_tenant, iam_user_t1]
+      actions: [read]
+    expected:
+      - {principal: ten_admin, resource: iam_user_no_tenant, actions: {read: EFFECT_DENY}}   # no tenant_id → same_tenant fails closed
+      - {principal: ten_admin, resource: iam_user_t1, actions: {read: EFFECT_ALLOW}}          # control
+
+  - name: absentSegmentsDeniedControlAllowed
+    input:
+      principals: [chat_no_segments, chat_full]
+      resources: [ag_wealth_pii]
+      actions: [invoke]
+    expected:
+      - {principal: chat_no_segments, resource: ag_wealth_pii, actions: {invoke: EFFECT_DENY}}  # no segments → member of nothing
+      - {principal: chat_full, resource: ag_wealth_pii, actions: {invoke: EFFECT_ALLOW}}         # control
+
+  - name: absentDataClassificationDenied
+    input:
+      principals: [chat_full]
+      resources: [ag_no_class, ag_wealth_pii]
+      actions: [invoke]
+    expected:
+      - {principal: chat_full, resource: ag_no_class, actions: {invoke: EFFECT_DENY}}   # no classification → rank 0, unrecognised
+      - {principal: chat_full, resource: ag_wealth_pii, actions: {invoke: EFFECT_ALLOW}}  # control
