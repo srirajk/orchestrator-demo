@@ -1,13 +1,14 @@
--- Give the asset-servicing operations analyst a concrete relationship for live
--- servicing demos that still pass the relationship coverage pre-check.
-INSERT INTO personal_resources (id, tenant_id, principal_id, resource_type, resource_id, metadata, created_at)
-VALUES (
-  gen_random_uuid(),
-  'default',
-  'ops_analyst_singh',
-  'relationship',
-  'REL-00188',
-  '{"name":"Okafor Family Account","segment":"servicing","purpose":"settlement-risk-demo"}'::jsonb,
-  NOW()
-)
-ON CONFLICT DO NOTHING;
+-- ============================================================================
+-- V9__seed_servicing_ops_coverage.sql — NEUTRALIZED (demo DATA moved to Python seeder)
+--
+-- This migration seeded a personal_resource (relationship REL-00188) for ops_analyst_singh.
+-- ops_analyst_singh is a V8 banker, and V8's demo bankers moved to the Python seeder
+-- (scripts/seed-iam-users.py) — so this FK-dependent row moved with it (ops_analyst_singh
+-- carries `resources=[REL-00188]` in the seeder). Had V9 stayed, it would fail its foreign key
+-- at Flyway time because the principal no longer exists until the Python seeder runs.
+--
+-- Kept as a no-op (not deleted) so Flyway history stays contiguous. See the checksum NOTE in
+-- V4 for existing databases (reseed on a fresh volume or `flyway repair`).
+-- ============================================================================
+
+-- intentionally empty: see scripts/seed-iam-users.py

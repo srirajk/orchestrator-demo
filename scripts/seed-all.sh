@@ -10,6 +10,7 @@
 #
 # Steps, IN ORDER (order matters — see notes inline):
 #   a. Wait for health  — redis-stack, gateway, conduit-chat, iam-service, langfuse, langfuse-db
+#   b0. IAM principals  — Postgres upsert     (scripts/seed-iam-users.py, host postgres)
 #   b. Principals       — Redis HSET           (scripts/seed-users.sh, host redis-stack)
 #   c. Langfuse prices  — seed-langfuse-models.py   (MUST run before traffic — prices at ingestion)
 #   d. BFF conversations— seed-conversations-via-bff.py  (real OIDC via iam-service → conduit-chat)
@@ -34,6 +35,12 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 # ── Config (env-only, in-network defaults) ────────────────────────────────────────
 REDIS_HOST="${REDIS_HOST:-redis-stack}"
 REDIS_PORT="${REDIS_PORT:-6379}"
+# IAM Postgres (login source of truth — principals/roles/teams/segments/tenant).
+IAM_DB_HOST="${IAM_DB_HOST:-postgres}"
+IAM_DB_PORT="${IAM_DB_PORT:-5432}"
+IAM_DB_NAME="${IAM_DB_NAME:-meridian}"
+IAM_DB_USER="${IAM_DB_USER:-meridian}"
+IAM_DB_PASSWORD="${IAM_DB_PASSWORD:-meridian_dev}"
 GATEWAY_URL="${GATEWAY_URL:-http://gateway:8080}"
 CHAT_BFF_URL="${CHAT_BFF_URL:-http://conduit-chat:8095}"
 IAM_URL="${IAM_URL:-http://iam-service:8084}"
@@ -126,6 +133,16 @@ wait_all_health() {
   return 0   # health waits are advisory; never abort the run
 }
 
+# ── (b0) IAM principals → Postgres ────────────────────────────────────────────────
+# The OIDC login source of truth: users, per-segment classification map, roles, teams,
+# tenant. Idempotent upsert; computes BCrypt(SEED_PASSWORD) itself. Runs after iam-service
+# is healthy (Flyway DDL already applied).
+seed_iam_principals() {
+  IAM_DB_HOST="$IAM_DB_HOST" IAM_DB_PORT="$IAM_DB_PORT" IAM_DB_NAME="$IAM_DB_NAME" \
+  IAM_DB_USER="$IAM_DB_USER" IAM_DB_PASSWORD="$IAM_DB_PASSWORD" SEED_PASSWORD="$SEED_PASSWORD" \
+    python3 "${HERE}/seed-iam-users.py"
+}
+
 # ── (b) Principals → Redis ────────────────────────────────────────────────────────
 seed_principals() {
   REDIS_HOST="$REDIS_HOST" REDIS_PORT="$REDIS_PORT" bash "${HERE}/seed-users.sh"
@@ -202,7 +219,8 @@ seed_dashboard() {
 # ── Run ───────────────────────────────────────────────────────────────────────────
 hr
 log "Conduit one-seeder starting — all demo data, one container, over the network."
-log "  redis=${REDIS_HOST}:${REDIS_PORT}  gateway=${GATEWAY_URL}  bff=${CHAT_BFF_URL}"
+log "  redis=${REDIS_HOST}:${REDIS_PORT}  iam-db=${IAM_DB_HOST}:${IAM_DB_PORT}/${IAM_DB_NAME}"
+log "  gateway=${GATEWAY_URL}  bff=${CHAT_BFF_URL}"
 log "  iam=${IAM_URL}  langfuse=${LANGFUSE_URL}  langfuse-db=${LANGFUSE_DB_HOST}:${LANGFUSE_DB_PORT}"
 hr
 echo ""
@@ -211,6 +229,7 @@ echo ""
 wait_all_health
 echo ""
 
+step "b0. IAM principals → Postgres"  seed_iam_principals
 step "b. Principals → Redis"          seed_principals
 step "c. Langfuse model prices"       seed_prices
 step "d. BFF conversations"           seed_conversations
