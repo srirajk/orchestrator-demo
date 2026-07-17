@@ -4984,5 +4984,24 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-07-16T00:00:00Z"
+  },
+  {
+    "id": "bug-286",
+    "timestamp": "2026-07-16",
+    "error_message": "Java char literal written via Write tool corrupted: the character typed between single quotes became a raw NUL (0x00) byte, and in one attempt a raw newline, breaking the char literal and making grep treat the file as binary (grep found no matches).",
+    "file": "gateway/src/main/java/ai/conduit/gateway/registry/embedding/QueryEmbeddingCache.java",
+    "root_cause": "Placing a literal separator character (intended space/NUL) directly inside a Java char literal via the Write tool did not round-trip to the intended byte; od -c revealed a NUL byte, which also makes grep skip the file as binary.",
+    "fix": "Use an escape sequence in source instead of a raw control/space char. Switched KEY_SEP to '\\n' (a clean ASCII escape); newline is a valid separator here because QueryTextNormalizer collapses all whitespace so it can never appear in the normalized text, and no model id contains it. Verify byte integrity with `od -c` after writing non-ASCII/whitespace char literals.",
+    "tags": [
+      "gateway",
+      "embedding",
+      "char-literal",
+      "encoding",
+      "tooling",
+      "query-cache"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-16"
   }
 ]

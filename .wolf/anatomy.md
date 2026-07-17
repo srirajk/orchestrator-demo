@@ -1175,7 +1175,9 @@
 - `EmbeddingModel.java` — The identity of the embedding model in use. (~271 tok)
 - `HashEmbedder.java` — Deterministic 384-dim vectors from SHA-256 hashing of token n-grams. A structural stand-in that (~1062 tok)
 - `ManifestEmbedder.java` — Embeds the agent corpus — the skill example prompts that make up the routing index. (~1855 tok)
-- `QueryEmbedder.java` — Embeds the user's question, once, on the request path. (~448 tok)
+- `QueryEmbedder.java` — Embeds the user's question, once, on the request path; now memoised via QueryEmbeddingCache (constructor takes TextEmbedder + QueryEmbeddingCache). modelId()/dimension() bypass the cache. (~520 tok)
+- `QueryEmbeddingCache.java` — Behaviour-preserving in-JVM bounded-LRU memoisation of the query embed hop (fixes ~70 req/s ceiling). Key = (model-id NL normalize(text)); single-flight via CompletableFuture; hit/miss counters `conduit.embedding.query.cache{result=hit|miss}`; config `conduit.embedding.query.cache.{enabled,max-size}`. (~1150 tok)
+- `QueryTextNormalizer.java` — Query canonicalisation for the cache key + embed input: strip + collapse whitespace, NO casefold (case carries routing meaning). Pure, no domain knowledge. (~330 tok)
 - `RemoteEmbedder.java` — {@link TextEmbedder} backed by an OpenAI-compatible {@code /v1/embeddings} endpoint — (~2080 tok)
 - `TextEmbedder.java` — Turns text into a vector. The single low-level seam over whatever model is configured. (~308 tok)
 
@@ -1519,6 +1521,8 @@
 ## gateway/src/test/java/ai/conduit/gateway/registry/embedding/
 
 - `ManifestEmbedderTest.java` — The corpus embedder's contract: identical text under an identical model is embedded once, ever; (~1613 tok)
+- `QueryEmbeddingCacheTest.java` — 8 pure-unit tests for the query cache: same-text-hits, behaviour-preserving-vs-uncached matrix, whitespace-collapse, case-preserved, model-stamp-invalidates, bounded-eviction, single-flight (concurrent computes once), disabled pass-through, hit/miss counters. (~1500 tok)
+- `QueryEmbedderCacheTest.java` — 2 pure-unit tests for the QueryEmbedder request-path seam: behaviour-preserving vs bare embedder.embed(normalize(text)) + repeat-caching; modelId/dimension bypass the cache. (~500 tok)
 
 ## gateway/src/test/java/ai/conduit/gateway/registry/index/
 

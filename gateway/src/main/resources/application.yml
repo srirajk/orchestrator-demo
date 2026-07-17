@@ -160,10 +160,22 @@ conduit:
     remote:
       url: ${CONDUIT_EMBEDDING_REMOTE_URL:http://localhost:8083/v1/embeddings}
     cache:
-      # Corpus (manifest example) vectors only — content-addressed by model id + text digest.
-      # Never the query path: user questions do not repeat, so caching them buys nothing.
+      # Corpus (manifest example) vectors — content-addressed in Redis by model id + text digest.
+      # Ingestion-side only (ManifestEmbedder), off the request path.
       enabled: ${CONDUIT_EMBEDDING_CACHE_ENABLED:true}
       ttl-seconds: ${CONDUIT_EMBEDDING_CACHE_TTL_SECONDS:2592000}
+    query:
+      cache:
+        # Request-path query-embedding cache (QueryEmbeddingCache): an in-JVM bounded LRU keyed by
+        # (model id, normalised query text). The same question always yields the same vector, so a
+        # repeat skips the CPU-bound sidecar embed that sets the routing throughput ceiling. In-JVM
+        # (not Redis) on purpose: a Redis hop would just replace one network round trip with another.
+        # Behaviour-preserving — a hit returns the identical vector a miss would compute; disable to
+        # A/B against the uncached path.
+        enabled: ${CONDUIT_EMBEDDING_QUERY_CACHE_ENABLED:true}
+        # Bounded so an adversarial stream of unique queries cannot grow it without bound. Each entry
+        # is one 384-float vector (~1.5 KB), so 4096 entries is a few MB.
+        max-size: ${CONDUIT_EMBEDDING_QUERY_CACHE_MAX_SIZE:4096}
   resolver:
     confidence-floor: 0.30       # absolute cosine similarity floor
     relative-floor-factor: 0.65  # dynamic floor = max(absolute, topScore * factor); prunes long-tail matches
