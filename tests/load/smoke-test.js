@@ -55,7 +55,6 @@ export default function () {
     headers: {
       'Content-Type': 'application/json',
       'Accept':       'text/event-stream',
-      'X-User-Id':    'rm_jane',
     },
     timeout: '30s',
     responseType: 'text',

@@ -120,7 +120,9 @@ function chat(prompt, userId, token, conversationId) {
     'Accept':       'text/event-stream',
   };
   if (token)          headers['Authorization']   = `Bearer ${token}`;
-  if (userId)         headers['X-User-Id']        = userId;
+  // Identity comes ONLY from the verified JWT (Axiom A1) — no X-User-Id header path. The `userId`
+  // arg is retained for call-site compatibility but is intentionally not sent.
+  void userId;
   if (conversationId) headers['X-Conversation-Id'] = conversationId;
 
   const start = Date.now();
@@ -182,7 +184,6 @@ export function heroScenario(data) {
   const headers = {
     'Content-Type': 'application/json',
     'Accept':       'text/event-stream',
-    'X-User-Id':    'rm_jane',
   };
   if (data.rmJaneToken) headers['Authorization'] = `Bearer ${data.rmJaneToken}`;
 

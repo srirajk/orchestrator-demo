@@ -137,11 +137,12 @@ def call_gateway(question: str, conversation_id: str) -> str | None:
         "messages": [{"role": "user", "content": question}],
         "stream": True,
     }
+    # Identity comes ONLY from the verified Bearer JWT (Axiom A1); the gateway honors no
+    # X-User-Id header, so it is not sent.
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {get_bearer_token()}",
         "X-Conversation-Id": conversation_id,
-        "X-User-Id": EVAL_USER_ID,
     }
     collected = []
     try:

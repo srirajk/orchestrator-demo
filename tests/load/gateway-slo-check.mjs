@@ -44,9 +44,9 @@ async function gatewayRequest(i) {
     };
     if (AUTH_TOKEN) {
       headers.Authorization = `Bearer ${AUTH_TOKEN}`;
-    } else {
-      headers['X-User-Id'] = 'rm_jane';
     }
+    // No AUTH_TOKEN → anonymous. Identity comes ONLY from the verified JWT; no header identity
+    // path exists (Axiom A1).
     const response = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
       method: 'POST',
       headers,

@@ -124,7 +124,9 @@ def chat(prompt: str, user_id: str, token: str = "",
         "Accept": "text/event-stream",
     }
     if token:           headers["Authorization"]   = f"Bearer {token}"
-    if user_id:         headers["X-User-Id"]        = user_id
+    # Identity comes ONLY from the verified JWT (Axiom A1) — no X-User-Id header path. `user_id`
+    # is kept for call-site compatibility but intentionally not sent.
+    _ = user_id
     if conversation_id: headers["X-Conversation-Id"] = conversation_id
 
     body_messages = messages or [{"role": "user", "content": prompt}]

@@ -96,9 +96,9 @@ export default function () {
   };
   if (AUTH_TOKEN) {
     headers['Authorization'] = `Bearer ${AUTH_TOKEN}`;
-  } else {
-    headers['X-User-Id'] = 'rm_jane';
   }
+  // No AUTH_TOKEN → the request proceeds anonymously. The gateway derives identity ONLY from the
+  // verified JWT; there is no X-User-Id (or any header) identity path (Axiom A1).
 
   const res = http.post(`${GATEWAY_URL}/v1/chat/completions`, payload, {
     headers,

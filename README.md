@@ -125,7 +125,7 @@ Then open the chat and ask the hero question:
 | **Admin UI** (agent/manifest registry) | http://localhost:5180 | admin |
 | **Langfuse** (traces + scores) | http://localhost:3030 | `admin@meridian.bank` / `changeme` |
 | **Grafana** (metrics/logs/traces) | http://localhost:3000 | `admin` / `changeme` |
-| **Gateway** (OpenAI API) | http://localhost:8080/v1 | JWT or `X-User-Id` |
+| **Gateway** (OpenAI API) | http://localhost:8080/v1 | Bearer JWT (Axiom OIDC) — no header-identity path |
 | **Axiom** (identity) | http://localhost:8084 | OIDC issuer |
 
 > **Two host prereqs** (not in the repo): a real LLM key in `.env`, and — for browser SSO — an
