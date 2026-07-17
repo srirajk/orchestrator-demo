@@ -23,10 +23,8 @@
 set -euo pipefail
 
 CERBOS_VERSION="0.53.0"
-# The runtime PDP runs ghcr.io/cerbos/cerbos:latest, which IS 0.53.0 (asserted below).
-# Override with CERBOS_IMAGE=ghcr.io/cerbos/cerbos:0.53.0 in an environment that can pull
-# the immutable tag; the version assertion guarantees parity either way.
-CERBOS_IMAGE="${CERBOS_IMAGE:-ghcr.io/cerbos/cerbos:latest}"
+# Runtime and validation use the same explicit image tag; never let a moving tag alter policy truth.
+CERBOS_IMAGE="${CERBOS_IMAGE:-ghcr.io/cerbos/cerbos:0.53.0}"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 POLICIES_DIR="${1:-$ROOT/infra/cerbos/policies}"

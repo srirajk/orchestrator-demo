@@ -23,7 +23,7 @@ class GeneratedYamlCompilesTest {
     private final PolicyYamlParser parser = new PolicyYamlParser();
     private final GeneratedPolicyValidator validator = new GeneratedPolicyValidator();
     private final CanonicalPolicyWriter writer = new CanonicalPolicyWriter();
-    private final CerbosCompileGate gate = new CerbosCompileGate("ghcr.io/cerbos/cerbos:latest", 90);
+    private final CerbosCompileGate gate = new CerbosCompileGate("ghcr.io/cerbos/cerbos:0.53.0", 90);
 
     @BeforeEach
     void requireCerbos() {

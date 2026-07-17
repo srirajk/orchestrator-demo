@@ -74,6 +74,11 @@ iam:
     base-url: ${ZAI_BASE_URL:https://api.z.ai/api/paas/v4}
     api-key: ${ZAI_API_KEY:}
     model: ${IAM_POLICY_GENERATION_MODEL:glm-5.2}
+  policy-studio:
+    cerbos-image: ${CERBOS_IMAGE:ghcr.io/cerbos/cerbos:0.53.0}
+    cerbos-version: ${CERBOS_VERSION:0.53.0}
+    base-bundle-dir: ${IAM_POLICY_STUDIO_BASE_BUNDLE_DIR:infra/cerbos/policies}
+    compile-timeout-seconds: ${IAM_POLICY_STUDIO_COMPILE_TIMEOUT_SECONDS:60}
   oauth2:
     authorization-store:
       redis:

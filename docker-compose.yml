@@ -499,7 +499,7 @@ services:
 
   # ── Cerbos PDP — policy enforcement point for ABAC entitlements ──────────────
   cerbos:
-    image: ghcr.io/cerbos/cerbos:latest
+    image: ghcr.io/cerbos/cerbos:0.53.0
     container_name: conduit-cerbos
     ports:
       - "3594:3592"   # HTTP API (host 3594 to avoid conflict with other cerbos instances)
@@ -568,6 +568,8 @@ services:
       # model is right. Reconciled to glm-4.6 to match the Java default and the
       # model-selection guide; override to a stronger model when one is available.
       IAM_POLICY_GENERATION_MODEL: ${IAM_POLICY_GENERATION_MODEL:-glm-4.6}
+      IAM_POLICY_STUDIO_BASE_BUNDLE_DIR: /app/cerbos-policies
+      CERBOS_VERSION: "0.53.0"
       # OAuth2 client registration — must match LibreChat's OPENID_CLIENT_ID/SECRET
       IAM_LIBRECHAT_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-meridian-client-secret-dev}
       # Secrets have NO in-source default (IAM fails fast if unset); the demo values live here.
@@ -585,6 +587,7 @@ services:
       IAM_SIGNING_KEY_PATH: /app/keys/signing-key.json
     volumes:
       - iam-signing-key:/app/keys
+      - ./infra/cerbos/policies:/app/cerbos-policies:ro
     depends_on:
       redis-stack:
         condition: service_healthy

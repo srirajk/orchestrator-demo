@@ -10,6 +10,10 @@ RUN mvn dependency:go-offline -q
 COPY src ./src
 RUN mvn package -DskipTests -q
 
+# The consequence-diff authoring path evaluates staged bundles with the exact pinned Cerbos binary.
+# This is copied into the runtime image; it does not talk to or swap the live PDP policy pointer.
+FROM ghcr.io/cerbos/cerbos:0.53.0 AS cerbos-runtime
+
 # Stage 2 — lean runtime (JRE + wget for healthcheck)
 FROM eclipse-temurin:25-jre-alpine
 
@@ -17,6 +21,8 @@ LABEL maintainer="Meridian Platform"
 LABEL description="OpenWolf IAM Service — OIDC provider, user management, entitlements"
 
 RUN apk add --no-cache wget
+
+COPY --from=cerbos-runtime /cerbos /usr/local/bin/cerbos
 
 WORKDIR /app
 COPY --from=build /build/target/iam-service-*.jar app.jar

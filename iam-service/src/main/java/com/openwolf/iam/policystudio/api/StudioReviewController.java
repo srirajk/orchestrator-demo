@@ -4,8 +4,8 @@ import com.openwolf.iam.policystudio.BundleSnapshot;
 import com.openwolf.iam.policystudio.ConsequenceDiffService;
 import com.openwolf.iam.policystudio.ConsequenceFixtureMatrix;
 import com.openwolf.iam.policystudio.ConsequenceReview;
-import com.openwolf.iam.policystudio.LocalPdpDecisionSource;
 import com.openwolf.iam.policystudio.ManifestVocabulary;
+import com.openwolf.iam.policystudio.ProductionPdpDecisionSource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -27,9 +27,9 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>The review is cached (keyed by its {@code consequenceReviewHash}, tagged with the caller's tenant)
  * so the SPA can re-fetch it and later echo it into the promotion request.
  *
- * <p><b>Tenant scope</b> is the principal's {@code tenant_id} claim. The reproducible in-process
- * {@link LocalPdpDecisionSource} is the default truth source (no Docker); the real ephemeral-Cerbos
- * source is the evidence path and is swappable behind the same port. Requires a studio role.
+ * <p><b>Tenant scope</b> is the principal's {@code tenant_id} claim. Production truth comes only from
+ * {@link ProductionPdpDecisionSource}, which evaluates both snapshots with pinned Cerbos and fails
+ * closed when that runtime is unavailable. There is no local-evaluator fallback. Requires a studio role.
  *
  * <p><b>Grounding note (documented gap):</b> the two {@link BundleSnapshot}s, the sampled
  * {@link ConsequenceFixtureMatrix}, and the {@link ManifestVocabulary} are supplied in the request body.
@@ -42,10 +42,10 @@ import org.springframework.web.bind.annotation.RestController;
 public class StudioReviewController {
 
     private final ConsequenceDiffService diff;
-    private final LocalPdpDecisionSource pdpSource;
+    private final ProductionPdpDecisionSource pdpSource;
     private final StudioSessionStore store;
 
-    public StudioReviewController(ConsequenceDiffService diff, LocalPdpDecisionSource pdpSource,
+    public StudioReviewController(ConsequenceDiffService diff, ProductionPdpDecisionSource pdpSource,
                                   StudioSessionStore store) {
         this.diff = diff;
         this.pdpSource = pdpSource;

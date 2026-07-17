@@ -17,7 +17,7 @@
 set -euo pipefail
 
 PRE_DIR="${1:?usage: cerbos-parity-run.sh <PRE_POLICIES_DIR>}"
-IMAGE="${CERBOS_IMAGE:-ghcr.io/cerbos/cerbos:latest}"
+IMAGE="${CERBOS_IMAGE:-ghcr.io/cerbos/cerbos:0.53.0}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 POST_DIR="$HERE/infra/cerbos/policies"
 PRE_NAME=cerbos-b2-pre

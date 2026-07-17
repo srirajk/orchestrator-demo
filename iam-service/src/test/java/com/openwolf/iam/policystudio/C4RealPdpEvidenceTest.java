@@ -68,7 +68,7 @@ class C4RealPdpEvidenceTest {
         CanonicalPolicyWriter writer = new CanonicalPolicyWriter();
         Path baseBundleDir = PolicyStudioFixtures.baseBundleDir();
         CerbosBatchDecisionSource cerbos = new CerbosBatchDecisionSource(
-                "ghcr.io/cerbos/cerbos:latest", 120, "0.53.0", baseBundleDir.toString(), writer);
+                "ghcr.io/cerbos/cerbos:0.53.0", 120, "0.53.0", baseBundleDir.toString(), writer);
 
         Assumptions.assumeTrue(cerbos.isAvailable(),
                 "neither a pinned cerbos binary nor Docker is available — skipping the real-PDP evidence run");

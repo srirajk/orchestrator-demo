@@ -37,7 +37,7 @@ public class CerbosCompileGate {
     private final long timeoutSeconds;
 
     public CerbosCompileGate(
-            @Value("${iam.policy-studio.cerbos-image:ghcr.io/cerbos/cerbos:latest}") String cerbosImage,
+            @Value("${iam.policy-studio.cerbos-image:ghcr.io/cerbos/cerbos:0.53.0}") String cerbosImage,
             @Value("${iam.policy-studio.compile-timeout-seconds:60}") long timeoutSeconds) {
         this.cerbosImage = cerbosImage;
         this.timeoutSeconds = timeoutSeconds;

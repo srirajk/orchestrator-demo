@@ -2,7 +2,7 @@ package com.openwolf.iam.policystudio.api;
 
 import com.openwolf.iam.policystudio.ConsequenceDiffService;
 import com.openwolf.iam.policystudio.ConsequenceReview;
-import com.openwolf.iam.policystudio.LocalPdpDecisionSource;
+import com.openwolf.iam.policystudio.ProductionPdpDecisionSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -35,7 +35,7 @@ class StudioReviewControllerTest {
 
     @Autowired MockMvc mvc;
     @MockitoBean ConsequenceDiffService diff;
-    @MockitoBean LocalPdpDecisionSource pdpSource;
+    @MockitoBean ProductionPdpDecisionSource pdpSource;
     @MockitoBean StudioSessionStore store;
 
     private static final String BODY = """

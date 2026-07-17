@@ -10,6 +10,7 @@ import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -18,6 +19,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
@@ -48,7 +51,7 @@ public class CerbosBatchDecisionSource implements PdpDecisionSource {
     private final CanonicalPolicyWriter writer;
 
     public CerbosBatchDecisionSource(
-            @Value("${iam.policy-studio.cerbos-image:ghcr.io/cerbos/cerbos:latest}") String cerbosImage,
+            @Value("${iam.policy-studio.cerbos-image:ghcr.io/cerbos/cerbos:0.53.0}") String cerbosImage,
             @Value("${iam.policy-studio.compile-timeout-seconds:60}") long timeoutSeconds,
             @Value("${iam.policy-studio.cerbos-version:0.53.0}") String cerbosVersion,
             @Value("${iam.policy-studio.base-bundle-dir:infra/cerbos/policies}") String baseBundleDir,
@@ -67,7 +70,7 @@ public class CerbosBatchDecisionSource implements PdpDecisionSource {
 
     @Override
     public boolean isAvailable() {
-        return commandExists("cerbos") || commandExists("docker");
+        return pinnedCerbosBinaryAvailable() || dockerDaemonAvailable();
     }
 
     @Override
@@ -167,7 +170,7 @@ public class CerbosBatchDecisionSource implements PdpDecisionSource {
 
     private String runCompile(Path policiesDir) throws IOException, InterruptedException {
         List<String> cmd = new ArrayList<>();
-        if (commandExists("cerbos")) {
+        if (pinnedCerbosBinaryAvailable()) {
             cmd.add("cerbos");
             cmd.add("compile");
             cmd.add("-o");
@@ -193,12 +196,26 @@ public class CerbosBatchDecisionSource implements PdpDecisionSource {
         }
         ProcessBuilder pb = new ProcessBuilder(cmd); // NOTE: do NOT merge stderr — JSON must be clean on stdout
         Process proc = pb.start();
-        String stdout = new String(proc.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        String stderr = new String(proc.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
+        // Drain both pipes concurrently so neither can fill and deadlock the child. Crucially, apply
+        // the timeout while the process is running — readAllBytes() before waitFor(timeout) would make
+        // the advertised fail-closed deadline ineffective for a wedged Cerbos process.
+        CompletableFuture<byte[]> stdoutBytes = CompletableFuture.supplyAsync(
+                () -> readAllUnchecked(proc.getInputStream()));
+        CompletableFuture<byte[]> stderrBytes = CompletableFuture.supplyAsync(
+                () -> readAllUnchecked(proc.getErrorStream()));
         boolean finished = proc.waitFor(timeoutSeconds, TimeUnit.SECONDS);
         if (!finished) {
             proc.destroyForcibly();
+            proc.waitFor(5, TimeUnit.SECONDS);
             throw new IOException("cerbos consequence evaluation timed out after " + timeoutSeconds + "s");
+        }
+        String stdout;
+        String stderr;
+        try {
+            stdout = new String(stdoutBytes.join(), StandardCharsets.UTF_8);
+            stderr = new String(stderrBytes.join(), StandardCharsets.UTF_8);
+        } catch (CompletionException e) {
+            throw new IOException("failed reading Cerbos consequence-evaluation output", e.getCause());
         }
         // Exit is non-zero whenever ANY asserted cell was actually DENY (expected ALLOW) — that is normal
         // for a diff. The authoritative signal is the JSON on stdout; only a MISSING suite is an error.
@@ -206,6 +223,14 @@ public class CerbosBatchDecisionSource implements PdpDecisionSource {
             throw new IOException("cerbos produced no JSON output; stderr: " + stderr);
         }
         return stdout;
+    }
+
+    private static byte[] readAllUnchecked(InputStream stream) {
+        try {
+            return stream.readAllBytes();
+        } catch (IOException e) {
+            throw new CompletionException(e);
+        }
     }
 
     private PdpBatchResult parse(String json, String bundleId, List<FixtureCell> cells) throws IOException {
@@ -271,15 +296,34 @@ public class CerbosBatchDecisionSource implements PdpDecisionSource {
         return s == null ? "" : s;
     }
 
-    private static boolean commandExists(String cmd) {
+    private static boolean dockerDaemonAvailable() {
         try {
-            Process p = new ProcessBuilder(cmd, "--version").redirectErrorStream(true).start();
+            Process p = new ProcessBuilder("docker", "info", "--format", "{{.ServerVersion}}")
+                    .redirectErrorStream(true).start();
             boolean done = p.waitFor(10, TimeUnit.SECONDS);
             if (!done) {
                 p.destroyForcibly();
                 return false;
             }
             return p.exitValue() == 0;
+        } catch (IOException | InterruptedException e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            return false;
+        }
+    }
+
+    private boolean pinnedCerbosBinaryAvailable() {
+        try {
+            Process p = new ProcessBuilder("cerbos", "--version").redirectErrorStream(true).start();
+            boolean done = p.waitFor(10, TimeUnit.SECONDS);
+            if (!done) {
+                p.destroyForcibly();
+                return false;
+            }
+            String version = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+            return p.exitValue() == 0 && cerbosVersion.equals(version.lines().findFirst().orElse(""));
         } catch (IOException | InterruptedException e) {
             if (e instanceof InterruptedException) {
                 Thread.currentThread().interrupt();

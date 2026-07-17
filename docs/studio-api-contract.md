@@ -153,9 +153,10 @@ Studio errors return: `{ "error": "<code>", "message": "<human text>" }`.
 ### 7. `POST /admin/studio/reviews` — compute the decision delta (business consequences)
 - **Role**: `policy_drafter` | `policy_approver` | `platform_admin`.
 - **Security preconditions**: tenant = claim; the **verified author (`sub`) is recorded server-side with the review** so the
-  later promotion can enforce author≠approver against a trusted identity. Truth is computed from **real PDP decisions**
-  (`LocalPdpDecisionSource` — reproducible, in-process; the real ephemeral-Cerbos source is swappable). **No LLM touches the
-  truth.** The review is cached (keyed by `consequenceReviewHash`, tenant-tagged) for re-fetch + promotion.
+  later promotion can enforce author≠approver against a trusted identity. Truth is computed by
+  **`ProductionPdpDecisionSource` using pinned Cerbos 0.53.0** against both immutable snapshots. If pinned Cerbos or the base
+  bundle is unavailable, review creation fails closed; there is no Java-evaluator fallback. **No LLM touches the truth.**
+  The review is cached (keyed by `consequenceReviewHash`, tenant-tagged) for re-fetch + promotion.
 - **Request** (`StudioReviewController.ReviewPayload`) — the two immutable snapshots + sampled matrix + vocabulary (see gap):
 ```json
 {
