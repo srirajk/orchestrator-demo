@@ -1,0 +1,148 @@
+package com.openwolf.iam.policystudio.api;
+
+import com.openwolf.iam.policystudio.BaseCeiling;
+import com.openwolf.iam.policystudio.ManifestVocabulary;
+import com.openwolf.iam.policystudio.PolicyAuthoringRequest;
+import com.openwolf.iam.policystudio.TenantScope;
+import com.openwolf.iam.policystudio.breakglass.BreakGlassAllowlist;
+import com.openwolf.iam.policystudio.breakglass.BreakGlassApprovalService;
+import com.openwolf.iam.policystudio.breakglass.BreakGlassArtifact;
+import com.openwolf.iam.policystudio.breakglass.BreakGlassAuthoringService;
+import com.openwolf.iam.policystudio.breakglass.BreakGlassGrant;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
+/**
+ * The C6 break-glass surface — a time-bounded emergency grant that is a normal scoped policy whose ALLOW
+ * carries a {@code now() < timestamp(expiresAt)} CEL condition, so enforcement self-limits inside the PDP.
+ *
+ * <p>Two-person by construction (C6.4 / C1.2):
+ * <ol>
+ *   <li>{@code POST /admin/studio/break-glass} — a <b>drafter</b> authors the grant. The same two
+ *       deterministic gates every studio policy runs (C6 bounds + the C2 policy gate) produce a
+ *       {@link BreakGlassArtifact}; only an admissible one can proceed. The requester is the principal.</li>
+ *   <li>{@code POST /admin/studio/break-glass/{grantId}/approve} — a different <b>approver</b> issues it.
+ *       {@link BreakGlassApprovalService} enforces requester≠approver and the configured approver role
+ *       server-side (a superuser is never an auto-approver).</li>
+ * </ol>
+ *
+ * <p><b>Tenant scope</b> is the principal's {@code tenant_id} claim; the grant's scope root must equal it,
+ * so a grant can never target another tenant. (The compiled artifact is additionally structurally unable
+ * to name another tenant via C2 segment-wise scope containment.)
+ */
+@RestController
+@RequestMapping("/admin/studio/break-glass")
+public class StudioBreakGlassController {
+
+    private final BreakGlassAuthoringService authoring;
+    private final BreakGlassApprovalService approval;
+    private final StudioSessionStore store;
+
+    public StudioBreakGlassController(BreakGlassAuthoringService authoring,
+                                      BreakGlassApprovalService approval,
+                                      StudioSessionStore store) {
+        this.authoring = authoring;
+        this.approval = approval;
+        this.store = store;
+    }
+
+    /** The request to author a break-glass grant. {@code scope} must be within the principal's tenant. */
+    public record RequestPayload(String scope, String resourceKind, String action, String role,
+                                 long ttlMinutes, String justification,
+                                 ManifestVocabulary vocabulary, BaseCeiling baseCeiling,
+                                 BreakGlassAllowlist allowlist) {}
+
+    /** The authoring outcome: the pending grant id, whether it is admissible, and any gate violations. */
+    public record GrantView(String grantId, String tenantId, String requestedBy, boolean admissible,
+                            boolean issued, Instant expiresAt,
+                            List<String> boundsViolations, List<String> c2Violations) {
+        static GrantView pending(StudioSessionStore.PendingGrant g) {
+            BreakGlassArtifact a = g.artifact();
+            return new GrantView(g.grantId(), g.tenantId(), g.requestedBy(), a.admissible(), g.issued(),
+                    a.grant().expiresAt(), a.boundsResult().violations(), a.c2Result().violations());
+        }
+    }
+
+    /** {@code POST /admin/studio/break-glass} — author (request) a time-bounded grant. Drafter only. */
+    @PostMapping
+    @PreAuthorize("hasRole('policy_drafter')")
+    public ResponseEntity<GrantView> request(@RequestBody RequestPayload payload, Authentication auth) {
+        if (payload == null || payload.scope() == null || payload.vocabulary() == null
+                || payload.baseCeiling() == null || payload.allowlist() == null) {
+            throw new IllegalArgumentException("scope, vocabulary, baseCeiling and allowlist are required");
+        }
+        String requester = StudioPrincipal.actor(auth);
+        String tenant = StudioPrincipal.tenant(auth);
+
+        // Server-clock TTL clamp (defence in depth): the grant window is stamped from the SERVER now() and
+        // must be a positive span of at most 60 minutes. issuedAt is ALWAYS server now() — any caller
+        // issuedAt is ignored (there is no such field) — so a future-dated issuedAt cannot widen the
+        // window past the server clock. (The C6 bounds gate also checks the span; this makes it robust.)
+        long ttl = payload.ttlMinutes();
+        if (ttl <= 0 || ttl > 60) {
+            throw new IllegalArgumentException(
+                    "ttlMinutes must be within (0, 60] against the server clock — was " + ttl);
+        }
+        Instant now = Instant.now();
+        BreakGlassGrant grant = new BreakGlassGrant(
+                TenantScope.of(payload.scope()), payload.resourceKind(), payload.action(), payload.role(),
+                now, now.plus(ttl, ChronoUnit.MINUTES), payload.justification(), requester);
+
+        // Cross-tenant guard: the grant's scope root must be the principal's own tenant.
+        StudioPrincipal.assertSameTenant(tenant, grant.tenantId());
+
+        PolicyAuthoringRequest request = new PolicyAuthoringRequest(
+                "break-glass emergency grant", payload.vocabulary(), TenantScope.of(tenant),
+                false, payload.baseCeiling());
+        BreakGlassArtifact artifact = authoring.author(grant, payload.allowlist(), request);
+
+        StudioSessionStore.PendingGrant pending = store.putGrant(tenant, requester, artifact);
+        return ResponseEntity.ok(GrantView.pending(pending));
+    }
+
+    /**
+     * {@code POST /admin/studio/break-glass/{grantId}/approve} — the two-person issue step. Approver only;
+     * the service rejects self-approval (requester≠approver) and a missing approver role.
+     */
+    @PostMapping("/{grantId}/approve")
+    @PreAuthorize("hasRole('policy_approver')")
+    public ResponseEntity<GrantView> approve(@PathVariable String grantId,
+                                             @RequestHeader(value = "X-Correlation-Id", required = false) String correlationId,
+                                             Authentication auth) {
+        String approver = StudioPrincipal.actor(auth);
+        String tenant = StudioPrincipal.tenant(auth);
+        Set<String> approverRoles = StudioPrincipal.roles(auth);
+
+        StudioSessionStore.PendingGrant pending = store.getGrant(tenant, grantId)
+                .orElseThrow(() -> new IllegalArgumentException("no pending break-glass grant '" + grantId + "'"));
+
+        String correlation = correlationId != null ? correlationId : UUID.randomUUID().toString();
+        approval.approveAndIssue(pending.artifact(), approver, approverRoles, correlation);
+        store.markIssued(pending);
+        return store.getGrant(tenant, grantId).map(GrantView::pending).map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /** {@code GET /admin/studio/break-glass} — the active (issued, unexpired) grants for this tenant. */
+    @GetMapping
+    @PreAuthorize("hasAnyRole('policy_drafter','policy_approver','platform_admin')")
+    public ResponseEntity<List<GrantView>> active(Authentication auth) {
+        String tenant = StudioPrincipal.tenant(auth);
+        List<GrantView> active = store.activeGrants(tenant).stream().map(GrantView::pending).toList();
+        return ResponseEntity.ok(active);
+    }
+}
