@@ -1,0 +1,17 @@
+apiVersion: api.cerbos.dev/v1
+# ── BASE SCOPE (root, scope: "") — the CEILING ────────────────────────────────
+# Under REQUIRE_PARENTAL_CONSENT_FOR_ALLOWS every tenant (child) ALLOW must also be
+# allowed here. So the set of ALLOWs in this root policy is the maximum any tenant
+# can ever grant. `delete` is deliberately ABSENT → no tenant can ever grant delete.
+resourcePolicy:
+  version: "default"
+  resource: widget
+  scope: ""
+  # The base (root) has no parent — it IS the ceiling — so it uses OVERRIDE_PARENT.
+  # REQUIRE_PARENTAL_CONSENT is set on the TENANT scopes below; a root that requires
+  # parental consent would deny everything (no parent can ever consent). [EMPIRICAL: proven]
+  scopePermissions: SCOPE_PERMISSIONS_OVERRIDE_PARENT
+  rules:
+    - actions: ["view", "edit"]
+      effect: EFFECT_ALLOW
+      roles: ["user"]

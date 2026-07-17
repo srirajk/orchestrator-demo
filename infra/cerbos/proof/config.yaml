@@ -1,0 +1,21 @@
+# Proof-harness Cerbos config — mirrors the pinned production posture (contract #1).
+# Runs on DISTINCT ports (3600/3601) so it never disturbs the demo's conduit-cerbos.
+server:
+  httpListenAddr: ":3600"
+  grpcListenAddr: ":3601"
+engine:
+  # STRICT scope search — a request for a scope with no policy must NOT silently
+  # walk up to an ancestor. This is the load-bearing key for `missing tenant = hard deny`.
+  lenientScopeSearch: false
+storage:
+  driver: disk
+  disk:
+    directory: /conf/policies
+    watchForChanges: false
+audit:
+  enabled: true
+  backend: local
+  decisionLogsEnabled: true
+  accessLogsEnabled: false
+  local:
+    storagePath: /tmp/cerbos-proof-audit

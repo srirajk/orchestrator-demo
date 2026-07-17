@@ -1,0 +1,19 @@
+apiVersion: api.cerbos.dev/v1
+# ── TENANT "boot2" — same template, ONE grant added ───────────────────────────
+# `view` moved from the withheld (DENY) bucket to the granted (ALLOW) bucket.
+# `edit` stays explicitly withheld. Probe `denyAllTemplateDeniesUntilGranted`
+# (after) expects view = ALLOW, edit = DENY.
+resourcePolicy:
+  version: "default"
+  resource: widget
+  scope: "boot2"
+  scopePermissions: SCOPE_PERMISSIONS_REQUIRE_PARENTAL_CONSENT_FOR_ALLOWS
+  rules:
+    # Granted bucket — explicit ALLOW (parent ceiling also allows → effective ALLOW).
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles: ["user"]
+    # Withheld bucket — remaining ceiling tuples stay explicitly DENIED (no fall-through).
+    - actions: ["edit"]
+      effect: EFFECT_DENY
+      roles: ["user"]
