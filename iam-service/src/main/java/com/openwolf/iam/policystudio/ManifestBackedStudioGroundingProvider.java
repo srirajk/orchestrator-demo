@@ -11,13 +11,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.yaml.snakeyaml.LoaderOptions;
+import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -25,10 +30,12 @@ import java.util.stream.Stream;
 /**
  * Production manifest grounding for Axiom Policy Studio.
  *
- * <p>The base ceiling is typed here because it is the immutable Cerbos resource ceiling, not something
- * recoverable from a rendered tenant bundle. The vocabulary is enriched from registry domain/entity
- * manifests and agent manifests, mirroring the gateway's discipline of compiling prompts from manifest
- * facts instead of Java domain literals.
+ * <p>S5 (lifecycle-spine hardening): the grounding vocabulary — resource kind, actions, roles, approved
+ * imports — and the immutable base ceiling are derived from the <b>tenant-effective Cerbos base policy
+ * bundle</b> via {@link BaseBundleGrounding}, not from Java literals. Data classifications and condition
+ * attributes come from the registry domain/agent manifests (the same facts the gateway compiles prompts
+ * from). Adding an action, role, or ceiling tuple is therefore a policy edit; adding a classification or
+ * entity attribute is a manifest edit — never a code edit.
  */
 @Component
 public class ManifestBackedStudioGroundingProvider implements StudioGroundingProvider {
@@ -41,6 +48,9 @@ public class ManifestBackedStudioGroundingProvider implements StudioGroundingPro
     private final ActiveTenantDirectory directory;
     private final PolicyBundleRepository bundles;
     private final Path registryRoot;
+    private final Path baseBundleDir;
+    private final Path tenantDeploymentRoot;
+    private final String deploymentTenant;
 
     public ManifestBackedStudioGroundingProvider(
             ObjectMapper objectMapper,
@@ -48,14 +58,25 @@ public class ManifestBackedStudioGroundingProvider implements StudioGroundingPro
             PolicyYamlParser parser,
             ActiveTenantDirectory directory,
             PolicyBundleRepository bundles,
-            @Value("${iam.policy-studio.registry-root:registry}") String registryRoot) {
+            @Value("${iam.policy-studio.registry-root:registry}") String registryRoot,
+            @Value("${iam.policy-studio.base-bundle-dir:infra/cerbos/policies}") String baseBundleDir,
+            @Value("${iam.policy-studio.tenant-deployment-root:infra/cerbos/tenants}") String tenantDeploymentRoot,
+            @Value("${iam.policy-studio.deployment-tenant:default}") String deploymentTenant) {
         this.objectMapper = objectMapper;
         this.writer = writer;
         this.parser = parser;
         this.directory = directory;
         this.bundles = bundles;
-        Path configured = Path.of(registryRoot);
-        this.registryRoot = Files.isDirectory(configured) ? configured : Path.of("..").resolve(registryRoot).normalize();
+        this.registryRoot = resolveExisting(registryRoot);
+        this.baseBundleDir = resolveExisting(baseBundleDir);
+        this.tenantDeploymentRoot = resolveExisting(tenantDeploymentRoot);
+        this.deploymentTenant = deploymentTenant;
+    }
+
+    /** Resolve a configured relative path from the process cwd, with a {@code ..} fallback (module-cwd runs). */
+    private static Path resolveExisting(String configured) {
+        Path direct = Path.of(configured);
+        return Files.isDirectory(direct) ? direct : Path.of("..").resolve(configured).normalize();
     }
 
     @Override
@@ -63,19 +84,19 @@ public class ManifestBackedStudioGroundingProvider implements StudioGroundingPro
         if (tenantId == null || tenantId.isBlank()) {
             throw new IllegalArgumentException("tenantId must be set");
         }
-        if (!"agent".equals(resourceKind)) {
-            throw new IllegalArgumentException("no manifest-grounded studio resource is configured for '" + resourceKind + "'");
-        }
+        // Vocabulary + ceiling are derived from the base Cerbos policy bundle for this kind (no Java literals);
+        // a kind with no root policy in the base bundle is not a manifest-grounded studio resource.
+        BaseBundleGrounding.Facts base = BaseBundleGrounding.read(baseBundleDir, resourceKind);
         ManifestFacts facts = loadFacts();
         ManifestVocabulary vocabulary = new ManifestVocabulary(
-                "agent",
-                Set.of("invoke", "invoke_membership", "register", "deregister"),
+                base.resourceKind(),
+                base.actions(),
                 facts.classifications(),
                 facts.attributes(),
-                Set.of("platform_admin", "domain_admin", "chat_user", "relationship_manager", "conduit_admin"),
-                Set.of("business_derived_roles"));
-        BaseCeiling ceiling = agentCeiling();
-        ConsequenceFixtureMatrix matrix = matrixFor(tenantId, ceiling);
+                base.roles(),
+                base.approvedImports());
+        BaseCeiling ceiling = base.ceiling();
+        ConsequenceFixtureMatrix matrix = matrixFor(tenantId, base, facts);
         return new StudioGroundingSnapshot(
                 tenantId,
                 vocabulary,
@@ -129,40 +150,162 @@ public class ManifestBackedStudioGroundingProvider implements StudioGroundingPro
         return new BundleSnapshot(activeVersion, childIr, ceiling, canonicalContent);
     }
 
-    private BaseCeiling agentCeiling() {
-        return new BaseCeiling(
-                "agent",
-                Set.of(
-                        new BaseCeiling.Tuple("invoke", "platform_admin"),
-                        new BaseCeiling.Tuple("invoke_membership", "platform_admin"),
-                        new BaseCeiling.Tuple("register", "platform_admin"),
-                        new BaseCeiling.Tuple("deregister", "platform_admin"),
-                        new BaseCeiling.Tuple("invoke", "domain_admin"),
-                        new BaseCeiling.Tuple("invoke_membership", "domain_admin"),
-                        new BaseCeiling.Tuple("register", "domain_admin"),
-                        new BaseCeiling.Tuple("deregister", "domain_admin"),
-                        new BaseCeiling.Tuple("invoke", "chat_user"),
-                        new BaseCeiling.Tuple("invoke", "relationship_manager"),
-                        new BaseCeiling.Tuple("invoke_membership", "chat_user"),
-                        new BaseCeiling.Tuple("invoke_membership", "relationship_manager")),
-                true,
-                Set.of("agent@"));
-    }
+    // ── consequence fixture matrix ────────────────────────────────────────────────────────────────
 
-    private ConsequenceFixtureMatrix matrixFor(String tenantId, BaseCeiling ceiling) {
-        List<FixtureCell> cells = ceiling.tuples().stream()
+    /**
+     * The consequence-diff evaluation matrix (S5). It is <b>more than same-tenant positives with empty
+     * attributes</b>: for the condition-gated front-door role it also carries, per relevant action, an
+     * <b>attribute-removed</b>, a <b>cross-tenant</b>, a <b>missing-attribute</b>, and a
+     * <b>wrong-segment</b> cell. So the real-PDP consequence diff evaluates those negative classes and the
+     * over-permission alarm can catch a candidate that widens any of them (a base-only current denies them;
+     * a structurally-broken candidate that allowed one would surface as a DENY→ALLOW delta).
+     *
+     * <p>Every attribute value is manifest/config-derived: the domain, audience, access-mode and
+     * data-classification come from an agent manifest that declares them; the segment key and the
+     * classification ladder come from the tenant deployment's domain→segment map. Nothing here is a domain
+     * literal in Java.
+     */
+    private ConsequenceFixtureMatrix matrixFor(String tenantId, BaseBundleGrounding.Facts base, ManifestFacts facts) {
+        List<FixtureCell> cells = new ArrayList<>();
+
+        // (1) same-tenant positives — one per base-allowed (action, role) tuple (unchanged baseline).
+        base.ceiling().tuples().stream()
                 .sorted((a, b) -> (a.role() + ":" + a.action()).compareTo(b.role() + ":" + b.action()))
-                .map(t -> new FixtureCell(
-                        Set.of(t.role()),
-                        tenantId,
-                        java.util.Map.of(),
-                        tenantId,
-                        java.util.Map.of(),
-                        t.action(),
-                        t.role() + "-" + t.action() + "-same-tenant"))
-                .toList();
+                .forEach(t -> cells.add(new FixtureCell(
+                        Set.of(t.role()), tenantId, Map.of(), tenantId, Map.of(), t.action(),
+                        t.role() + "-" + t.action() + "-same-tenant")));
+
+        // (2) attribute negatives for the condition-gated front-door role over a real segment agent.
+        cells.addAll(negativeClassCells(tenantId, base, facts));
+
         return ConsequenceFixtureMatrix.of(cells);
     }
+
+    /**
+     * Build the positive + four negative-class cells (attribute-removed, cross-tenant, missing-attribute,
+     * wrong-segment) for the front-door role, anchored on a real segment-audience agent and the deployment's
+     * domain→segment map. Returns an empty list (never throws) if the deployment map or a suitable manifest
+     * is unavailable — grounding must still produce a matrix (the same-tenant positives stand alone).
+     */
+    private List<FixtureCell> negativeClassCells(String tenantId, BaseBundleGrounding.Facts base, ManifestFacts facts) {
+        Optional<DeploymentSegments> segmentsOpt = loadDeploymentSegments();
+        if (segmentsOpt.isEmpty() || base.frontDoorRoles().isEmpty()) {
+            return List.of();
+        }
+        DeploymentSegments segments = segmentsOpt.get();
+
+        // A segment-audience agent whose domain is in the deployment map — its declared attributes are the
+        // positive; the negatives perturb exactly one dimension each.
+        Optional<AgentProfile> profileOpt = facts.profiles().stream()
+                .filter(p -> segments.domainToSegment().containsKey(p.domain()))
+                .filter(p -> p.audience() != null && !"enterprise".equals(p.audience()))
+                .findFirst();
+        if (profileOpt.isEmpty()) {
+            return List.of();
+        }
+        AgentProfile profile = profileOpt.get();
+        String role = base.frontDoorRoles().iterator().next();          // deterministic (sorted set)
+        String action = firstCeilingAction(base.ceiling(), role);
+        if (action == null) {
+            return List.of();
+        }
+
+        String domain = profile.domain();
+        String segment = segments.domainToSegment().get(domain);
+        String topTier = segments.topTier();                            // holds >= any resource classification
+        String otherSegment = segments.domainToSegment().values().stream()
+                .filter(s -> !s.equals(segment)).sorted().findFirst().orElse(segment);
+        String crossTenant = tenantId + "__other";
+
+        Map<String, Object> resourceAttrs = new LinkedHashMap<>();
+        putIfPresent(resourceAttrs, "domain", domain);
+        putIfPresent(resourceAttrs, "audience", profile.audience());
+        putIfPresent(resourceAttrs, "access_mode", profile.accessMode());
+        putIfPresent(resourceAttrs, "data_classification", profile.classification());
+        Map<String, Object> memberPrincipal = Map.of("segments", Map.of(segment, topTier));
+
+        String label = role + "-" + action + "-" + domain;
+        List<FixtureCell> out = new ArrayList<>();
+        // positive: a member of the mapped segment at the ceiling tier — allowed.
+        out.add(new FixtureCell(Set.of(role), tenantId, memberPrincipal, tenantId, resourceAttrs,
+                action, label + "::segment_positive"));
+        // attribute-removed: the principal's segment membership attribute is removed — must deny.
+        out.add(new FixtureCell(Set.of(role), tenantId, Map.of(), tenantId, resourceAttrs,
+                action, label + "::attribute_removed"));
+        // cross-tenant: the resource is homed in a different tenant — must deny (tenant-equality backstop).
+        out.add(new FixtureCell(Set.of(role), tenantId, memberPrincipal, crossTenant, resourceAttrs,
+                action, label + "::cross_tenant"));
+        // missing-attribute: the resource's data-classification guard attribute is omitted — must deny.
+        out.add(new FixtureCell(Set.of(role), tenantId, memberPrincipal, tenantId,
+                withoutKey(resourceAttrs, "data_classification"), action, label + "::missing_attribute"));
+        // wrong-segment: the principal holds a segment that does not map to the resource domain — must deny.
+        out.add(new FixtureCell(Set.of(role), tenantId, Map.of("segments", Map.of(otherSegment, topTier)),
+                tenantId, resourceAttrs, action, label + "::wrong_segment"));
+        return out;
+    }
+
+    private static String firstCeilingAction(BaseCeiling ceiling, String role) {
+        return ceiling.tuples().stream()
+                .filter(t -> t.role().equals(role))
+                .map(BaseCeiling.Tuple::action)
+                .sorted()
+                .findFirst()
+                .orElse(null);
+    }
+
+    private static void putIfPresent(Map<String, Object> map, String key, String value) {
+        if (value != null && !value.isBlank()) {
+            map.put(key, value);
+        }
+    }
+
+    private static Map<String, Object> withoutKey(Map<String, Object> attrs, String key) {
+        Map<String, Object> copy = new LinkedHashMap<>(attrs);
+        copy.remove(key);
+        return copy;
+    }
+
+    // ── deployment domain→segment map (tenant deployment config) ──────────────────────────────────
+
+    /** The deployment's domain→segment mapping + classification ladder, read from tenant deployment config. */
+    private record DeploymentSegments(Map<String, String> domainToSegment, List<String> ladder) {
+        String topTier() {
+            return ladder.isEmpty() ? "confidential-pii" : ladder.get(ladder.size() - 1);
+        }
+    }
+
+    private Optional<DeploymentSegments> loadDeploymentSegments() {
+        Path mapFile = tenantDeploymentRoot.resolve(deploymentTenant).resolve("domain-segment-map.yaml");
+        if (!Files.isRegularFile(mapFile)) {
+            log.debug("no domain-segment map at '{}' — matrix carries same-tenant positives only", mapFile);
+            return Optional.empty();
+        }
+        try {
+            Object loaded = new Yaml(new SafeConstructor(new LoaderOptions())).load(Files.readString(mapFile));
+            if (!(loaded instanceof Map<?, ?> doc)) {
+                return Optional.empty();
+            }
+            Map<String, String> mapping = new LinkedHashMap<>();
+            Object raw = doc.get("domain_segment_map");
+            if (raw instanceof Map<?, ?> m) {
+                m.forEach((k, v) -> mapping.put(String.valueOf(k), String.valueOf(v)));
+            }
+            List<String> ladder = new ArrayList<>();
+            Object rawLadder = doc.get("classification_ladder");
+            if (rawLadder instanceof List<?> l) {
+                l.forEach(t -> ladder.add(String.valueOf(t)));
+            }
+            if (mapping.isEmpty()) {
+                return Optional.empty();
+            }
+            return Optional.of(new DeploymentSegments(mapping, ladder));
+        } catch (IOException | RuntimeException e) {
+            log.debug("failed to read domain-segment map '{}': {}", mapFile, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    // ── registry manifest facts (classifications, attributes, agent profiles) ─────────────────────
 
     private ManifestFacts loadFacts() {
         LinkedHashSet<String> classifications = new LinkedHashSet<>();
@@ -170,6 +313,7 @@ public class ManifestBackedStudioGroundingProvider implements StudioGroundingPro
                 "domain", "audience", "access_mode", "data_classification",
                 "segments", "admin_domains", "domains", "tenant_id"));
         ArrayList<String> refs = new ArrayList<>();
+        ArrayList<AgentProfile> profiles = new ArrayList<>();
 
         if (!Files.isDirectory(registryRoot)) {
             throw new IllegalStateException("registry root '" + registryRoot + "' is missing");
@@ -190,12 +334,32 @@ public class ManifestBackedStudioGroundingProvider implements StudioGroundingPro
             }
             addIoEntities(node.path("io").path("consumes"), attributes);
             addIoEntities(node.path("io").path("produces"), attributes);
+            if (node.hasNonNull("domain")) {
+                profiles.add(new AgentProfile(
+                        node.path("domain").asText(),
+                        node.path("audience").asText(null),
+                        constraints.path("access_mode").asText(null),
+                        constraints.path("data_classification").asText(null)));
+            }
         });
 
         if (classifications.isEmpty()) {
             throw new IllegalStateException("no data classifications were found under '" + registryRoot.resolve("manifests") + "'");
         }
-        return new ManifestFacts(Set.copyOf(classifications), Set.copyOf(attributes), List.copyOf(refs));
+        // Deterministic profile ordering so the derived matrix is reproducible across machines.
+        profiles.sort((a, b) -> {
+            int d = safe(a.domain()).compareTo(safe(b.domain()));
+            if (d != 0) {
+                return d;
+            }
+            return safe(a.classification()).compareTo(safe(b.classification()));
+        });
+        return new ManifestFacts(Set.copyOf(classifications), Set.copyOf(attributes), List.copyOf(refs),
+                List.copyOf(profiles));
+    }
+
+    private static String safe(String s) {
+        return s == null ? "" : s;
     }
 
     private void readJsonFiles(Path dir, List<String> refs, JsonConsumer consumer) {
@@ -247,7 +411,11 @@ public class ManifestBackedStudioGroundingProvider implements StudioGroundingPro
         }
     }
 
-    private record ManifestFacts(Set<String> classifications, Set<String> attributes, List<String> manifestRefs) {}
+    /** A manifest-declared agent's authorization-relevant attributes (for building attribute-bearing cells). */
+    private record AgentProfile(String domain, String audience, String accessMode, String classification) {}
+
+    private record ManifestFacts(Set<String> classifications, Set<String> attributes, List<String> manifestRefs,
+                                 List<AgentProfile> profiles) {}
 
     @FunctionalInterface
     private interface JsonConsumer {

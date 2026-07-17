@@ -58,7 +58,8 @@ class SecondPromotionReviewsAgainstActiveBundleIT {
         // Grounding derives vocabulary/ceiling/matrix from the real registry manifests, and now loads the
         // tenant's ACTUAL active bundle as `current` from the shared directory + bundle store.
         ManifestBackedStudioGroundingProvider grounding =
-                new ManifestBackedStudioGroundingProvider(mapper, writer, parser, directory, bundleRepo, "registry");
+                new ManifestBackedStudioGroundingProvider(mapper, writer, parser, directory, bundleRepo,
+                        "registry", baseDir, "infra/cerbos/tenants", "default");
 
         StudioSessionStore store = new StudioSessionStore();
         GroundedStudioReviewService reviews = new GroundedStudioReviewService(
