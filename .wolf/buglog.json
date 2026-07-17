@@ -5123,5 +5123,24 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-07-17T21:40:00.000Z"
+  },
+  {
+    "id": "bug-295",
+    "timestamp": "2026-07-17T18:29:35.930366",
+    "error_message": "BreakGlassMergeAndPromoteIT: expected EFFECT_DENY but was EFFECT_ALLOW (past its CEL window the emergency tuple self-limits) \u2014 full-suite run only",
+    "file": "iam-service/src/test/java/com/openwolf/iam/policystudio/lifecycle/BreakGlassMergeAndPromoteIT.java",
+    "root_cause": "Wall-clock CEL time-window break-glass expiry test (~30s wait) races under full-suite Docker/Testcontainers contention; disk-driver watchForChanges reload timing on macOS. NOT related to the blob-storage change (loader disk path byte-identical; break-glass code untouched).",
+    "fix": "Passes 2/2 in isolation; flaky under concurrent Testcontainers load. No code change \u2014 noted as pre-existing time-sensitive flake.",
+    "tags": [
+      "flaky",
+      "break-glass",
+      "testcontainers",
+      "cerbos",
+      "time-window",
+      "cerbos-blob-migration"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-17T18:29:35.930374"
   }
 ]

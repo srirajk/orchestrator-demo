@@ -2259,3 +2259,9 @@
 - gateway/.../registry/tenancy/DefaultTenantWritesLegacyIndexTest.java (test, RedisContainerTest) — WRITE-side demo-preservation: default→intent_idx/vec:/stamp, no tenant artifacts. ~0.6k
 - gateway/.../registry/tenancy/PerTenantBulkheadTest.java (test) — A4.5 isolation + bounded cardinality + deprovision. ~0.6k
 - gateway/.../registry/tenancy/EmbedderStatelessnessTest.java (test) — A4.4 same text same vector across tenants (real RemoteEmbedder vs stub sidecar). ~0.7k
+
+### Cerbos blob runtime storage (spec 12)
+- `iam-service/src/main/java/com/openwolf/iam/policystudio/lifecycle/S3RuntimePolicySink.java` — AWS SDK v2 S3 sink; PromotedBundleLoader writes promoted runtime bundles to the MinIO bucket Cerbos serves via the blob driver (polled). Config-driven (bucket/prefix/endpoint/region/path-style/creds). ~130 lines. (~1.2k tok)
+- `iam-service/src/test/java/com/openwolf/iam/policystudio/lifecycle/PromotionReachesRuntimeEnforcementBlobIT.java` — Testcontainers MinIO + Cerbos-on-blob; proves promote→bucket→poll→enforce (no file-watch) + base-served-from-blob smoke. (~2k tok)
+- `PromotedBundleLoader.java` — now dual-backend: S3 blob (prod) when `iam.policy-studio.runtime.s3.bucket` set, else legacy watched-dir (disk fallback / revert path).
+- `infra/cerbos/config.yaml` — storage.driver: blob (was disk); polls s3://cerbos-policies. `minio-init` seeds the base to base/ prefix before cerbos starts.
