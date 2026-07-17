@@ -112,8 +112,11 @@ public class ObjectStoreAuditSink implements AuditRecordSink {
 
     @Override
     public void write(AuditRecord record) throws Exception {
+        // A6: an un-partitioned record is REJECTED here — it must never enter a shared partition. The
+        // async writer meters the throw (conduit.audit.write.failed) as an incident; the record is
+        // dead-lettered, not silently placed under an "unknown"/"default" bucket.
+        String key = objectKey(record);   // throws UnpartitionedAuditRecordException if partition unresolved
         byte[] body = mapper.writeValueAsBytes(record);
-        String key = objectKey(record);
 
         PutObjectRequest.Builder put = PutObjectRequest.builder()
                 .bucket(bucket)
@@ -131,15 +134,25 @@ public class ObjectStoreAuditSink implements AuditRecordSink {
     }
 
     /**
-     * {@code {prefix}/dt=YYYY-MM-DD/tenant={t}/{transactionId}.json} — Hive/Iceberg-friendly so the
-     * later analytical layer needs no reshuffle. Deterministic from the record, so a re-write of the
-     * same request is idempotent (and, under Object Lock, refused — which is correct).
+     * {@code {prefix}/dt=YYYY-MM-DD/tenant={partition}/{transactionId}[-{view}].json} —
+     * Hive/Iceberg-friendly so the later analytical layer needs no reshuffle. Deterministic from the
+     * record, so a re-write of the same request is idempotent (and, under Object Lock, refused — which
+     * is correct).
+     *
+     * <p>A6: the {@code tenant=} segment is the record's OWN resolved {@code partitionTenantId} — never
+     * the query-time principal guess, and never an {@code unknown}/{@code default} fallback. A record
+     * whose partition is unresolved is <em>rejected</em> ({@link UnpartitionedAuditRecordException}) so
+     * it can never land in a shared partition. For a delegated cross-tenant op the {@code -actor} /
+     * {@code -subject} view suffix keeps the two partition views distinct.
      */
     String objectKey(AuditRecord record) {
+        if (!record.hasResolvedPartition()) {
+            throw new UnpartitionedAuditRecordException(record.transactionId());
+        }
         String dt = OffsetDateTime.ofInstant(Instant.parse(record.occurredAt()), ZoneOffset.UTC)
                 .toLocalDate().toString();
-        String tenant = record.principal() != null && record.principal().tenantId() != null
-                ? record.principal().tenantId() : "unknown";
-        return "%s/dt=%s/tenant=%s/%s.json".formatted(prefix, dt, tenant, record.transactionId());
+        String tenant = record.partitionTenantId();
+        String suffix = record.view() != null && !record.view().isBlank() ? "-" + record.view() : "";
+        return "%s/dt=%s/tenant=%s/%s%s.json".formatted(prefix, dt, tenant, record.transactionId(), suffix);
     }
 }

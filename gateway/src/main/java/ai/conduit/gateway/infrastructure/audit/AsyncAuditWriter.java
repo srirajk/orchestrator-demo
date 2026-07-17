@@ -141,9 +141,20 @@ public class AsyncAuditWriter {
             try {
                 Job job = queue.poll(200, TimeUnit.MILLISECONDS);
                 if (job == null) continue;
-                AuditRecord record = assembler.assemble(job.events(), job.occurredAt());
-                sink.write(record);
-                written.increment();
+                // A6: one request may yield >1 record — a delegated cross-tenant op writes a redacted
+                // actor-view AND subject-view, each to its own tenant partition. A per-record failure
+                // (e.g. an un-partitioned record rejected by the sink) is metered and must not abort the
+                // sibling records or the drain loop.
+                for (AuditRecord record : assembler.assembleAll(job.events(), job.occurredAt())) {
+                    try {
+                        sink.write(record);
+                        written.increment();
+                    } catch (Exception e) {
+                        failed.increment();
+                        log.error("AsyncAuditWriter: audit write failed (txn={}, view={}): {}",
+                                record.transactionId(), record.view(), e.getMessage(), e);
+                    }
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return;
