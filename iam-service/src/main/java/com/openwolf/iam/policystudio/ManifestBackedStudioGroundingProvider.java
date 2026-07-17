@@ -2,6 +2,13 @@ package com.openwolf.iam.policystudio;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.openwolf.iam.policystudio.lifecycle.BundleCanonicalizer;
+import com.openwolf.iam.policystudio.lifecycle.BundleContentReader;
+import com.openwolf.iam.policystudio.lifecycle.PolicyBundleRecord;
+import com.openwolf.iam.policystudio.lifecycle.PolicyBundleRepository;
+import com.openwolf.iam.tenancy.ActiveTenantDirectory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -11,6 +18,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -25,16 +33,27 @@ import java.util.stream.Stream;
 @Component
 public class ManifestBackedStudioGroundingProvider implements StudioGroundingProvider {
 
+    private static final Logger log = LoggerFactory.getLogger(ManifestBackedStudioGroundingProvider.class);
+
     private final ObjectMapper objectMapper;
     private final CanonicalPolicyWriter writer;
+    private final PolicyYamlParser parser;
+    private final ActiveTenantDirectory directory;
+    private final PolicyBundleRepository bundles;
     private final Path registryRoot;
 
     public ManifestBackedStudioGroundingProvider(
             ObjectMapper objectMapper,
             CanonicalPolicyWriter writer,
+            PolicyYamlParser parser,
+            ActiveTenantDirectory directory,
+            PolicyBundleRepository bundles,
             @Value("${iam.policy-studio.registry-root:registry}") String registryRoot) {
         this.objectMapper = objectMapper;
         this.writer = writer;
+        this.parser = parser;
+        this.directory = directory;
+        this.bundles = bundles;
         Path configured = Path.of(registryRoot);
         this.registryRoot = Files.isDirectory(configured) ? configured : Path.of("..").resolve(registryRoot).normalize();
     }
@@ -62,8 +81,52 @@ public class ManifestBackedStudioGroundingProvider implements StudioGroundingPro
                 vocabulary,
                 ceiling,
                 matrix,
-                BundleSnapshot.of(null, ceiling, writer),
+                currentBundle(tenantId, ceiling),
                 facts.manifestRefs());
+    }
+
+    /**
+     * The tenant's <b>actual current bundle</b> as the review baseline (S3, Bug A). Once a tenant has a
+     * promoted active version, a second promotion must review against that live bundle — not a synthetic
+     * base-only snapshot — or the consequence diff is wrong and the CAS from the real active id fails.
+     *
+     * <p>Resolution: read the live pointer from the {@link ActiveTenantDirectory}; if it names a promoted
+     * bundle in the immutable {@link PolicyBundleRepository store}, materialise that record's tenant
+     * restriction child as {@code current} (its {@code bundleId} is exactly the live pointer, so the
+     * promotion CAS aligns). A tenant still on the inherited base — no pointer, or a pointer that is the
+     * base baseline registered by {@code StudioBaselineActivationService} (no bundle record) — falls back
+     * to the deterministic base-only snapshot, whose id reproduces that baseline exactly.
+     */
+    private BundleSnapshot currentBundle(String tenantId, BaseCeiling ceiling) {
+        Optional<String> activeVersion = directory.find(tenantId);
+        if (activeVersion.isPresent()) {
+            Optional<PolicyBundleRecord> record = bundles.findById(activeVersion.get());
+            if (record.isPresent()) {
+                return materializeCurrent(activeVersion.get(), record.get(), ceiling);
+            }
+            log.debug("Tenant '{}' active version '{}' has no bundle record — treating as inherited base baseline",
+                    tenantId, activeVersion.get());
+        }
+        // Base-only, deterministic: reproduces any base baseline id already registered for the tenant.
+        return BundleSnapshot.of(null, ceiling, writer);
+    }
+
+    /**
+     * Materialise the {@code current} snapshot from a promoted bundle's immutable record. The recovered
+     * tenant child is stored in version-sentinel form; it is lowered back to the {@code default} version the
+     * consequence-diff PDP probe evaluates at, then parsed into the typed IR. The snapshot id is pinned to
+     * the live active version so the promotion compare-and-set observes an exact match.
+     */
+    private BundleSnapshot materializeCurrent(String activeVersion, PolicyBundleRecord record, BaseCeiling ceiling) {
+        String canonicalContent = record.getCanonicalContent();
+        Optional<String> childYaml = BundleContentReader.tenantChildYaml(canonicalContent);
+        if (childYaml.isEmpty()) {
+            // A promoted bundle with no tenant restriction child inherits the base ceiling directly.
+            return new BundleSnapshot(activeVersion, null, ceiling, canonicalContent);
+        }
+        String evaluable = childYaml.get().replace(BundleCanonicalizer.BUNDLE_VERSION_SENTINEL, "default");
+        PolicyIR childIr = parser.parse(evaluable);
+        return new BundleSnapshot(activeVersion, childIr, ceiling, canonicalContent);
     }
 
     private BaseCeiling agentCeiling() {

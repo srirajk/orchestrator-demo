@@ -5,16 +5,13 @@ import com.openwolf.iam.policystudio.lifecycle.BundleCanonicalizer;
 import com.openwolf.iam.policystudio.lifecycle.BundleFile;
 import com.openwolf.iam.policystudio.lifecycle.BundleTestMetadata;
 import com.openwolf.iam.policystudio.lifecycle.PolicyBundle;
+import com.openwolf.iam.policystudio.lifecycle.SelfContainedBundleAssembler;
 import com.openwolf.iam.policystudio.lifecycle.StudioBaselineActivationService;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Matcher;
 
 /**
  * The single server-side path that turns an <em>authored candidate policy</em> (canonical YAML) into a
@@ -40,7 +37,7 @@ public class GroundedStudioReviewService {
     private final BundleCanonicalizer canonicalizer;
     private final StudioSessionStore store;
     private final StudioBaselineActivationService baselineActivation;
-    private final Path baseBundleDir;
+    private final SelfContainedBundleAssembler assembler;
 
     public GroundedStudioReviewService(StudioGroundingProvider grounding,
                                        PolicyYamlParser parser,
@@ -51,7 +48,7 @@ public class GroundedStudioReviewService {
                                        BundleCanonicalizer canonicalizer,
                                        StudioSessionStore store,
                                        StudioBaselineActivationService baselineActivation,
-                                       @Value("${iam.policy-studio.base-bundle-dir:infra/cerbos/policies}") String baseBundleDir) {
+                                       SelfContainedBundleAssembler assembler) {
         this.grounding = grounding;
         this.parser = parser;
         this.writer = writer;
@@ -61,8 +58,7 @@ public class GroundedStudioReviewService {
         this.canonicalizer = canonicalizer;
         this.store = store;
         this.baselineActivation = baselineActivation;
-        Path configured = Path.of(baseBundleDir);
-        this.baseBundleDir = Files.isDirectory(configured) ? configured : Path.of("..").resolve(baseBundleDir).normalize();
+        this.assembler = assembler;
     }
 
     private static String resolveKind(String resourceKind) {
@@ -124,30 +120,17 @@ public class GroundedStudioReviewService {
                 grounded.matrix().cells().size(),
                 "manifest-grounded-sampled-matrix",
                 "cerbos-0.53.0");
+        // S3 (Bug B): capture the WHOLE self-contained set — base ceiling + every scope-chain policy for
+        // the kind + imported derived-roles / variables — plus the authored tenant child, so the bundleId
+        // hashes a complete policy universe and the candidate compiles from its own captured contents
+        // (never the mutable external base dir). The manifest refs used for validation are captured too.
+        List<BundleFile> files = new ArrayList<>(assembler.captureScopeChain(parsed.resource()));
+        files.add(new BundleFile("policies/" + parsed.resource() + "@" + tenant + ".yaml", yaml));
         return PolicyBundle.materialize(
                 tenant,
-                List.of(
-                        new BundleFile("policies/" + parsed.resource() + "_resource.yaml",
-                                versionStampedBaseRoot(parsed.resource())),
-                        new BundleFile("policies/" + parsed.resource() + "@" + tenant + ".yaml", yaml)),
+                files,
                 grounded.manifestRefs(),
                 metadata,
                 canonicalizer);
-    }
-
-    private String versionStampedBaseRoot(String resourceKind) {
-        Path path = baseBundleDir.resolve(resourceKind + "_resource.yaml");
-        try {
-            String yaml = Files.readString(path);
-            String stamped = yaml.replaceFirst(
-                    "(?m)^(\\s*version:\\s*)(\"default\"|'default'|default)\\s*$",
-                    "$1" + Matcher.quoteReplacement("\"" + BundleCanonicalizer.BUNDLE_VERSION_SENTINEL + "\""));
-            if (stamped.equals(yaml)) {
-                throw new IllegalStateException("base policy '" + path + "' does not declare version default");
-            }
-            return stamped;
-        } catch (IOException e) {
-            throw new IllegalStateException("failed to read base policy '" + path + "'", e);
-        }
     }
 }

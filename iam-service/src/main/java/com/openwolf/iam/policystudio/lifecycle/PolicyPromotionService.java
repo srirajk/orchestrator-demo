@@ -201,6 +201,14 @@ public class PolicyPromotionService {
         List<String> violations = new ArrayList<>();
         int childrenValidated = 0;
         for (BundleFile file : candidate.renderedFiles()) {
+            // S3: a self-contained bundle also captures the immutable base scope-chain (e.g. the tenant
+            // `default` scope policy) verbatim — those are the CEILING, not the authored tenant restriction
+            // child, and must not be re-validated against the author's subtree. The authored child is the
+            // only file carrying the `resource@tenant` marker (see materializeCandidate); base ceiling /
+            // derived-role / variable files never do. Re-validate ONLY the authored child(ren).
+            if (!file.path().contains("@" + candidate.tenantId())) {
+                continue;
+            }
             PolicyIR ir;
             try {
                 ir = parser.parse(file.yaml());

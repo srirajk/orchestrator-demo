@@ -80,6 +80,33 @@ public class CerbosCompileGate {
     }
 
     /**
+     * Compile a SELF-CONTAINED candidate bundle from ONLY its own captured files — no external base
+     * directory is read (S3, Bug B). The bundle must already carry its whole policy universe (base ceiling
+     * + scope-chain + imported derived-roles / variables + tenant child); this stages exactly those files
+     * into an isolated temp dir and compiles them. Used by the promotion probe so a candidate's compile
+     * depends only on its content-addressed contents, never on a mutable external base dir.
+     */
+    public CompileOutcome compile(List<BundleFile> candidateFiles) {
+        Path work = null;
+        try {
+            work = Files.createTempDirectory("policystudio-compile-selfcontained-");
+            for (BundleFile file : candidateFiles) {
+                Files.writeString(work.resolve(stagedFileName(file.path())), file.yaml(), StandardCharsets.UTF_8);
+            }
+            return runCompile(work);
+        } catch (IOException | InterruptedException e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            return new CompileOutcome(false, "compile gate error: " + e.getMessage());
+        } finally {
+            if (work != null) {
+                deleteRecursively(work);
+            }
+        }
+    }
+
+    /**
      * Assemble {baseBundleDir + full candidate bundle} into an isolated temp dir and compile it as one
      * policy universe. This is required for scoped resource policies: a tenant child at
      * {@code scope: default} must compile alongside its same-version root parent.

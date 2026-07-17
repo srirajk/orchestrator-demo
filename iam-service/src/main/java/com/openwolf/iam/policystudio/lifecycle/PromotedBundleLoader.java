@@ -71,8 +71,21 @@ public class PromotedBundleLoader {
             List<Path> written = new ArrayList<>();
             for (BundleFile file : bundle.renderedFiles()) {
                 // renderedFiles() stamps the concrete bundleId into the version position; the
-                // StagingCandidateProbe already verified every rendered file carries it and no sentinel
-                // survives, so what lands in the watched dir is exactly what cerbos compile validated.
+                // StagingCandidateProbe already verified every version-keyed rendered file carries it and
+                // no sentinel survives, so what lands in the watched dir is exactly what cerbos compile
+                // validated.
+                //
+                // S3: a self-contained bundle also captures GLOBAL, name-keyed modules (derived-roles /
+                // variables) for its own compile identity. Those must NOT be written into the shared
+                // runtime dir — the base bundle already serves them by name, and a second copy of the same
+                // module name would be a duplicate-identity load error that breaks the whole PDP. A
+                // version-keyed resource policy stamped version=<bundleId> coexists additively with the
+                // base version=default; a global module does not. Load ONLY the version-stamped policies
+                // (those whose rendered form carries the content-addressed id); imported global modules
+                // resolve from the base set unchanged.
+                if (!file.yaml().contains(bundle.bundleId())) {
+                    continue;
+                }
                 Path target = dir.resolve(stagedFileName(bundle.bundleId(), file.path()));
                 Files.writeString(target, file.yaml(), StandardCharsets.UTF_8,
                         StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
