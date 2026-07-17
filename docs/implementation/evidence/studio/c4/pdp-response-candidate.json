@@ -1,0 +1,15 @@
+{
+  "bundleId" : "bundle-597093abcbe5c3a3",
+  "sourceId" : "cerbos:0.53.0",
+  "decisions" : [ {
+    "cell" : "platformAdmin_register",
+    "effect" : "EFFECT_ALLOW",
+    "callId" : "ConsequenceProbe/cell_0",
+    "rawResponse" : "{\"name\":\"register\",\"details\":{\"result\":\"RESULT_PASSED\",\"success\":{\"effect\":\"EFFECT_ALLOW\"}}}"
+  }, {
+    "cell" : "platformAdmin_invoke",
+    "effect" : "EFFECT_ALLOW",
+    "callId" : "ConsequenceProbe/cell_1",
+    "rawResponse" : "{\"name\":\"invoke\",\"details\":{\"result\":\"RESULT_PASSED\",\"success\":{\"effect\":\"EFFECT_ALLOW\"}}}"
+  } ]
+}
