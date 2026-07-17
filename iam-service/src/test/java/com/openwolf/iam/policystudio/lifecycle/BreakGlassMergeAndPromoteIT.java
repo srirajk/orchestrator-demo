@@ -204,10 +204,11 @@ class BreakGlassMergeAndPromoteIT {
                     bundleA, reviewA, approvalA, "key-A", PromotionRecord.Kind.PROMOTION));
             assertThat(directory.find(TENANT)).as("A is now the active bundle").hasValue(bundleA.bundleId());
 
-            // Sanity at version=A: invoke ALLOWs (normal), register DENYs (A withholds it).
-            assertThat(awaitDecision(base, bundleA.bundleId(), ROLE, NORMAL_ACTION, "EFFECT_ALLOW"))
-                    .as("A grants the normal tuple").isEqualTo("EFFECT_ALLOW");
-            assertThat(decide(base, bundleA.bundleId(), ROLE, EMERGENCY_ACTION))
+            // Sanity at version=A (await both tuples together): invoke ALLOWs (normal), register DENYs.
+            java.util.Map<String, String> atA = awaitDecisions(base, bundleA.bundleId(), ROLE,
+                    java.util.Map.of(NORMAL_ACTION, "EFFECT_ALLOW", EMERGENCY_ACTION, "EFFECT_DENY"));
+            assertThat(atA.get(NORMAL_ACTION)).as("A grants the normal tuple").isEqualTo("EFFECT_ALLOW");
+            assertThat(atA.get(EMERGENCY_ACTION))
                     .as("A withholds register — the emergency the break-glass grant will add")
                     .isEqualTo("EFFECT_DENY");
 
@@ -228,11 +229,13 @@ class BreakGlassMergeAndPromoteIT {
             assertThat(directory.find(TENANT)).as("B (A + emergency) is now active").hasValue(bundleB);
             assertThat(bundleB).isNotEqualTo(bundleA.bundleId());
 
-            // ── 3. At version=B: the emergency tuple ALLOWs AND the normal tuple STILL ALLOWs (MERGE). ──
-            assertThat(awaitDecision(base, bundleB, ROLE, EMERGENCY_ACTION, "EFFECT_ALLOW"))
+            // ── 3. At version=B (await both together): emergency ALLOWs AND normal STILL ALLOWs (MERGE). ──
+            java.util.Map<String, String> atB = awaitDecisions(base, bundleB, ROLE,
+                    java.util.Map.of(EMERGENCY_ACTION, "EFFECT_ALLOW", NORMAL_ACTION, "EFFECT_ALLOW"));
+            assertThat(atB.get(EMERGENCY_ACTION))
                     .as("after break-glass approval the emergency tuple (register) ALLOWs in the serving PDP")
                     .isEqualTo("EFFECT_ALLOW");
-            assertThat(decide(base, bundleB, ROLE, NORMAL_ACTION))
+            assertThat(atB.get(NORMAL_ACTION))
                     .as("MERGE, not replace: the tenant's normal grant (invoke) STILL ALLOWs — a deny-all-else "
                             + "compiler would DENY this")
                     .isEqualTo("EFFECT_ALLOW");
@@ -246,10 +249,16 @@ class BreakGlassMergeAndPromoteIT {
             loader.load(expiredBundle);
             String bundleExpired = expiredBundle.bundleId();
 
-            assertThat(awaitDecision(base, bundleExpired, ROLE, NORMAL_ACTION, "EFFECT_ALLOW"))
+            // Await BOTH tuples together: the expired bundle is fully converged only when the normal grant
+            // ALLOWs (bundle loaded) AND the emergency tuple has self-limited to DENY. Reading the emergency
+            // tuple with a single shot the instant the normal grant flips races the reload; requiring both to
+            // hold together waits out that window without weakening the "expires to DENY" assertion.
+            java.util.Map<String, String> atExpired = awaitDecisions(base, bundleExpired, ROLE,
+                    java.util.Map.of(NORMAL_ACTION, "EFFECT_ALLOW", EMERGENCY_ACTION, "EFFECT_DENY"));
+            assertThat(atExpired.get(NORMAL_ACTION))
                     .as("the normal grant survives inside the expired bundle — the rest of the bundle is intact")
                     .isEqualTo("EFFECT_ALLOW");
-            assertThat(decide(base, bundleExpired, ROLE, EMERGENCY_ACTION))
+            assertThat(atExpired.get(EMERGENCY_ACTION))
                     .as("past its CEL window the emergency tuple self-limits to DENY inside the PDP")
                     .isEqualTo("EFFECT_DENY");
         }
@@ -362,14 +371,33 @@ class BreakGlassMergeAndPromoteIT {
         return actions.path(action).asText();
     }
 
-    /** Poll until the PDP's decision reaches {@code want} (watch reload), or time out. */
-    private String awaitDecision(String baseUrl, String policyVersion, String role, String action, String want)
+    /**
+     * Poll until EVERY {@code (action → wantEffect)} for {@code role} holds TOGETHER at {@code policyVersion}
+     * (the whole bundle has converged), or time out; returns the final snapshot either way.
+     *
+     * <p>Contention-robust by construction. A promotion reaches this ephemeral PDP through a reload the test
+     * does not control the timing of (disk {@code watchForChanges}, or — on the blob path — a poll interval),
+     * and under full-verify Docker contention on macOS that reload can lag and can be observed mid-flight: one
+     * tuple of a version flips before another. Asserting a paired tuple with a single-shot read races that
+     * window; requiring ALL tuples to hold together before asserting waits for genuine convergence WITHOUT
+     * weakening any assertion (an unknown/partially-loaded version answers DENY, so an ALLOW expectation can
+     * never pass early). The timeout is generous — 60s — to absorb the poll interval + contention margin.
+     */
+    private java.util.Map<String, String> awaitDecisions(
+            String baseUrl, String policyVersion, String role, java.util.Map<String, String> wants)
             throws Exception {
-        String last = "";
-        long deadline = System.currentTimeMillis() + Duration.ofSeconds(40).toMillis();
+        java.util.Map<String, String> last = new java.util.LinkedHashMap<>();
+        long deadline = System.currentTimeMillis() + Duration.ofSeconds(60).toMillis();
         while (System.currentTimeMillis() < deadline) {
-            last = decide(baseUrl, policyVersion, role, action);
-            if (want.equals(last)) {
+            boolean all = true;
+            for (var want : wants.entrySet()) {
+                String got = decide(baseUrl, policyVersion, role, want.getKey());
+                last.put(want.getKey(), got);
+                if (!want.getValue().equals(got)) {
+                    all = false;
+                }
+            }
+            if (all) {
                 return last;
             }
             Thread.sleep(500);
