@@ -70,5 +70,27 @@ class PolicyAuthoringBoundaryArchTest {
                 .should().resideInAPackage(STUDIO + "..")
                 .as("all PolicyAuthoringModelClient implementations must live in the authoring plane");
         implsInStudio.check(IAM);
+
+        // (5) C4 — the consequence-diff LLM PROSE seam is authoring-plane only. It phrases an already
+        // PDP-computed delta into display text; it must never be reachable from enforcement, exactly
+        // like the C2 authoring client. (Same fencing style, extended to the new seam.)
+        ArchRule proseClientConfined = noClasses()
+                .that().resideOutsideOfPackage(STUDIO + "..")
+                .should().dependOnClassesThat().areAssignableTo(ConsequenceProseModelClient.class)
+                .as("ConsequenceProseModelClient must never be injected outside the authoring plane");
+        proseClientConfined.check(IAM);
+
+        ArchRule proseImplsInStudio = classes()
+                .that().areAssignableTo(ConsequenceProseModelClient.class)
+                .should().resideInAPackage(STUDIO + "..")
+                .as("all ConsequenceProseModelClient implementations must live in the authoring plane");
+        proseImplsInStudio.check(IAM);
+
+        // (6) C4 — the consequence-diff service itself is authoring-plane confined.
+        ArchRule diffServiceConfined = noClasses()
+                .that().resideOutsideOfPackage(STUDIO + "..")
+                .should().dependOnClassesThat().areAssignableTo(ConsequenceDiffService.class)
+                .as("the consequence-diff service must never be reachable from enforcement code");
+        diffServiceConfined.check(IAM);
     }
 }

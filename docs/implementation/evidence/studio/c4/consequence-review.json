@@ -1,0 +1,33 @@
+{
+  "tenantId" : "acme",
+  "resourceKind" : "agent",
+  "currentBundleId" : "bundle-945d0077e148d713",
+  "candidateBundleId" : "bundle-597093abcbe5c3a3",
+  "fixtureSetHash" : "3fe688bf96fe63784705785ece80962f1aa6076cb50a94ac7e788bbe064888dd",
+  "sampledCellCount" : 2,
+  "overPermissionAlarm" : true,
+  "principalsGainingAccess" : 2,
+  "consequenceReviewHash" : "crh-192d36b1bcae41895d6ae4ffc0de48ce0a2eddf6d57cf8871a44f2a7653ea9e7",
+  "pdpSourceId" : "cerbos:0.53.0",
+  "sampledNotFormalDisclosure" : {
+    "sampledNotFormal" : true,
+    "sampledCellCount" : 2,
+    "statement" : "This consequence diff is computed over a sampled fixture matrix of 2 principal×resource×action cells evaluated against the real policy decision point. It is an empirical measurement of the decision delta on those cells, NOT a formal proof that no other decision differs. Widen the matrix to raise assurance; it can never be exhaustive."
+  },
+  "deltas" : [ {
+    "direction" : "WIDENED",
+    "overPermission" : true,
+    "from" : "EFFECT_DENY",
+    "to" : "EFFECT_ALLOW",
+    "businessConsequence" : "Principals holding role(s) [platform_admin] GAIN 'register' access to agent — currently denied, would be allowed.",
+    "canonicalRow" : "roles=[platform_admin];pTenant=acme;rTenant=acme;action=register;rAttrs={}|EFFECT_DENY->EFFECT_ALLOW"
+  }, {
+    "direction" : "WIDENED",
+    "overPermission" : true,
+    "from" : "EFFECT_DENY",
+    "to" : "EFFECT_ALLOW",
+    "businessConsequence" : "Principals holding role(s) [platform_admin] GAIN 'invoke' access to agent — currently denied, would be allowed.",
+    "canonicalRow" : "roles=[platform_admin];pTenant=acme;rTenant=acme;action=invoke;rAttrs={}|EFFECT_DENY->EFFECT_ALLOW"
+  } ],
+  "canonicalDelta" : "roles=[platform_admin];pTenant=acme;rTenant=acme;action=invoke;rAttrs={}|EFFECT_DENY->EFFECT_ALLOW\nroles=[platform_admin];pTenant=acme;rTenant=acme;action=register;rAttrs={}|EFFECT_DENY->EFFECT_ALLOW"
+}
