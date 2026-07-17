@@ -1090,6 +1090,7 @@
 ## gateway/src/main/java/ai/conduit/gateway/api/v1/chat/
 
 - `ChatCompletionsController.java` — Non-streaming ({@code stream:false}) — runs the same pipeline into a buffering emitter, (~2296 tok)
+- `sse/OpenAiSseWriter.java` — Byte-exact OpenAI chat-SSE chunk builder (role/content/stop/[DONE], finish_reason:stop). Single source shared by ChatService + clarify dual-plane so bytes can't drift (~700 tok)
 
 ## gateway/src/main/java/ai/conduit/gateway/config/
 
@@ -1110,6 +1111,14 @@
 ## gateway/src/main/java/ai/conduit/gateway/domain/clarify/
 
 - `ClarificationComposer.java` — The 4th grounded LLM call site (alongside {@code IntentClassifier}, {@code EntityExtractor}, (~4850 tok)
+- `InteractionKind.java` — Extensible HITL discriminator enum: CLARIFY_ENTITY | CLARIFY_CAPABILITY (consent reserved, unimplemented); String-backed wire, lenient parse (~450 tok)
+- `ClarificationOption.java` — One offered choice {value(submit token),label,secondaryLabel}; all manifest/coverage data, World-B clean (~350 tok)
+- `StructuredInteraction.java` — OOB structured-form envelope (rides `structured_interaction` TraceEvent, not the SSE); options + FreeTextEscape(inputContract=data, rule 4c); no hidden-count (~900 tok)
+- `ClarificationDescriptor.java` — THE single source object; renders twice (plainText→SSE, toStructuredInteraction()→OOB); offeredValues()+validate()=Phase-2 resume contract; withers; atCap() (~1100 tok)
+- `ClarificationDescriptorFactory.java` — @Component; composes descriptor; enumeration-oracle fix (offered = entitledBook ∩ restrictToIds); cap+free-text; World-B (no domain literal) (~900 tok)
+- `ClarificationDescriptorStore.java` — @Component; Redis (gateway ns, primary JedisPooled) key clarify:desc:{convId}; store(setex TTL)/peek/consume(single-use nonce)/invalidate(latest-turn-wins)/inheritedDepth (~800 tok)
+- `ClarificationTrigger.java` — Pure deterministic decisions: shouldOfferForm(abstain&&candidates≥1), decide()=partial-answer split, nextDepth/overCap loop bound; no LLM (~700 tok)
+- `ClarificationDualPlane.java` — @Component; OOB seam: offer()=store+publish structured_interaction; supersede()=invalidate+inherit depth; additive, never touches SSE bytes (~650 tok)
 
 ## gateway/src/main/java/ai/conduit/gateway/domain/coverage/
 

@@ -34,4 +34,14 @@ public abstract class RedisContainerTest {
         registry.add("spring.data.redis.host", REDIS::getHost);
         registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
     }
+
+    /** Host of the shared throwaway Redis — for tests that build a client directly (no Spring context). */
+    protected static String redisHost() {
+        return REDIS.getHost();
+    }
+
+    /** Mapped port of the shared throwaway Redis — for tests that build a client directly. */
+    protected static int redisPort() {
+        return REDIS.getMappedPort(6379);
+    }
 }

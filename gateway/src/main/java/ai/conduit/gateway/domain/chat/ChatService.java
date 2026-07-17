@@ -2,7 +2,12 @@ package ai.conduit.gateway.domain.chat;
 
 import ai.conduit.gateway.api.v1.chat.dto.ChatRequest;
 import ai.conduit.gateway.api.v1.chat.dto.Message;
+import ai.conduit.gateway.api.v1.chat.sse.OpenAiSseWriter;
 import ai.conduit.gateway.domain.clarify.ClarificationComposer;
+import ai.conduit.gateway.domain.clarify.ClarificationDescriptor;
+import ai.conduit.gateway.domain.clarify.ClarificationDescriptorFactory;
+import ai.conduit.gateway.domain.clarify.ClarificationDualPlane;
+import ai.conduit.gateway.domain.clarify.ClarificationTrigger;
 import ai.conduit.gateway.domain.auth.EntitlementService;
 import ai.conduit.gateway.domain.auth.EntitlementService.EntitlementResult;
 import ai.conduit.gateway.domain.auth.Principal;
@@ -62,8 +67,6 @@ import ai.conduit.gateway.synthesis.input.InputSynthesizer;
 import ai.conduit.gateway.synthesis.input.InputSynthesizer.SynthesisResult;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -132,10 +135,19 @@ public class ChatService {
     private final RoutePreparer            routePreparer;
     private final DomainManifestStore      manifestStore;
     private final ai.conduit.gateway.domain.clarify.ClarificationComposer clarificationComposer;
+    private final ClarificationDescriptorFactory clarificationDescriptorFactory;
+    private final ClarificationDualPlane   clarificationDualPlane;
     private final Tracer                   tracer;
     private final MeterRegistry meterRegistry;
     private final GatewaySloMetrics gatewaySloMetrics;
     private final ThreadLocal<GatewaySloMetrics.RequestScope> gatewayMetricScope = new ThreadLocal<>();
+    /**
+     * The depth INHERITED from any outstanding clarification descriptor for the conversation, captured
+     * once per turn on the request virtual thread (mirrors {@link #gatewayMetricScope}). A new free-text
+     * turn supersedes the outstanding form; if THIS turn clarifies again it advances the lineage depth,
+     * so the structured-clarification loop is hard-bounded across turns.
+     */
+    private final ThreadLocal<Integer> clarifyDepthCarry = new ThreadLocal<>();
     private final Counter intentFetchCounter;
     private final Counter intentFollowUpCounter;
     private final Counter intentClarifyCounter;
@@ -189,6 +201,8 @@ public class ChatService {
                        RoutePreparer routePreparer,
                        DomainManifestStore manifestStore,
                        ai.conduit.gateway.domain.clarify.ClarificationComposer clarificationComposer,
+                       ClarificationDescriptorFactory clarificationDescriptorFactory,
+                       ClarificationDualPlane clarificationDualPlane,
                        Tracer tracer,
                        MeterRegistry meterRegistry,
                        GatewaySloMetrics gatewaySloMetrics,
@@ -212,6 +226,8 @@ public class ChatService {
         this.routePreparer       = routePreparer;
         this.manifestStore       = manifestStore;
         this.clarificationComposer = clarificationComposer;
+        this.clarificationDescriptorFactory = clarificationDescriptorFactory;
+        this.clarificationDualPlane = clarificationDualPlane;
         this.tracer              = tracer;
         this.meterRegistry         = meterRegistry;
         this.gatewaySloMetrics     = gatewaySloMetrics;
@@ -274,6 +290,11 @@ public class ChatService {
         String conversationId = (headerConvId != null && !headerConvId.isBlank())
                 ? headerConvId
                 : deriveConversationId(userId, request);
+
+        // Latest-turn-wins: a new user turn supersedes any outstanding structured clarification form.
+        // Capture the superseded lineage depth so a re-clarification THIS turn advances the loop bound,
+        // hard-bounding the structured-clarification loop across turns (brief (d)+(g)).
+        clarifyDepthCarry.set(clarificationDualPlane.supersede(conversationId));
 
         // ── Span attributes: visible on this span in Phoenix / Tempo ────────────
         rootSpan.setAttribute("session.id", conversationId);
@@ -381,6 +402,7 @@ public class ChatService {
             baggageScope.close();
             gatewaySloMetrics.finish(metricScope);
             gatewayMetricScope.remove();
+            clarifyDepthCarry.remove();
             rootSpan.end();
         }
     }
@@ -753,10 +775,12 @@ public class ChatService {
                                             .anyMatch(d -> d.id().equals(c.id())))
                                         .collect(Collectors.toList());
                                 String question = buildClarificationQuestion(em, filtered, discovered, request);
-                                emitRequestOutcome("CLARIFIED");
-                                streamTextAndComplete(emitter, question, streamId);
-                                tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
-                                    new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                                // Dual-plane: the SAME options that narrow the plain-text question narrow the
+                                // structured form. restrictToIds = filtered (candidates ∩ book), so only entitled
+                                // candidates are offered — the enumeration-oracle fix (no out-of-book id leaks).
+                                emitEntityClarification(em, discovered,
+                                    filtered.stream().map(CoverageResolveResult.ResolveCandidate::id).toList(),
+                                    question, latestPrompt, emitter, streamId, requestId, conversationId, requestStart);
                                 return;
 
                             } else {
@@ -833,10 +857,9 @@ public class ChatService {
                             }
 
                             String question = buildClarificationQuestion(em, List.of(), discovered, request);
-                            emitRequestOutcome("CLARIFIED");
-                            streamTextAndComplete(emitter, question, streamId);
-                            tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
-                                new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                            // Dual-plane over the whole entitled book (no ambiguous subset to narrow to).
+                            emitEntityClarification(em, discovered, List.of(),
+                                question, latestPrompt, emitter, streamId, requestId, conversationId, requestStart);
                             return;
                             }
                         }
@@ -2009,6 +2032,55 @@ public class ChatService {
     }
 
     /**
+     * DUAL-PLANE entity clarification (the Structured Clarification Surface, Phase 1). One
+     * {@link ClarificationDescriptor} is built from the ENTITLED book and the already-authored plain-text
+     * question, then rendered twice from that single object: the structured form on the out-of-band
+     * glass-box lane ({@link ClarificationDualPlane}, additive — never touches the SSE bytes) and the
+     * plain-text twin on the OpenAI chat SSE (today's byte-correct path). Both come from {@code descriptor}
+     * so they cannot drift.
+     *
+     * <p><b>Security.</b> {@code entitledBook} is the principal's CHECK-passed {@code discover} result;
+     * {@code restrictToIds} (the ambiguous candidate ids, or empty) only NARROWS it. The factory offers
+     * {@code book ∩ restrictToIds}, so an id resolved outside the caller's book never appears and no
+     * hidden count is emitted (the enumeration-oracle fix).
+     *
+     * <p><b>Loop bound.</b> The lineage depth is inherited from any superseded descriptor and advanced by
+     * one; past the cap this degrades to honest no-service text with NO further structured form.
+     */
+    private void emitEntityClarification(EffectiveManifest em, List<CoverageResource> entitledBook,
+                                         java.util.Collection<String> restrictToIds, String plainText,
+                                         String originatingQuery, SseEmitter emitter, String streamId,
+                                         String requestId, String conversationId, long requestStart) throws Exception {
+        int inherited = clarifyDepthCarry.get() == null ? 0 : clarifyDepthCarry.get();
+        int depth = ClarificationTrigger.nextDepth(inherited);
+        if (ClarificationTrigger.overCap(depth, clarificationDescriptorFactory.maxClarifyDepth())) {
+            // Loop bound reached across turns — degrade to honest no-service text, no further form.
+            emitRequestOutcome("FAILED");
+            streamTextAndComplete(emitter, msg("needs_more_detail",
+                    "Sorry — I still couldn't narrow that down. Please add a little more detail about what you need."),
+                    streamId);
+            tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
+                    new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+            return;
+        }
+        ai.conduit.gateway.domain.manifest.ClarificationSchema cs = em.clarificationFor(em.primaryRequiredKey());
+        String question = (cs != null && cs.question() != null && !cs.question().isBlank())
+                ? cs.question()
+                : msg("missing_entity_question", "Which resource are you asking about?");
+        EntityType primary = primaryResolvableEntity(em);
+        ClarificationDescriptor descriptor = clarificationDescriptorFactory.forEntity(
+                conversationId, question, plainText,
+                primary != null ? primary.display() : null,
+                primary != null ? primary.idPattern() : null,
+                entitledBook, restrictToIds, originatingQuery, depth);
+        clarificationDualPlane.offer(descriptor, requestId);   // OOB structured form (additive)
+        emitRequestOutcome("CLARIFIED");
+        streamTextAndComplete(emitter, descriptor.plainText(), streamId);   // plain-text twin on the SSE
+        tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
+                new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+    }
+
+    /**
      * The deterministic clarification string — the default style and the composed fallback. Candidates
      * are listed by NAME (+ identifier), never numbered, and the invitation asks for the name or
      * identifier — matching what the resolve path can actually honour (there is no positional-number
@@ -2202,10 +2274,9 @@ public class ChatService {
                     return true;
                 }
                 String question = buildClarificationQuestion(em, List.of(), discovered, request);
-                emitRequestOutcome("CLARIFIED");
-                streamTextAndComplete(emitter, question, streamId);
-                tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
-                        new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
+                // Dual-plane over the entitled book (abstain triage — the whole in-book set is offerable).
+                emitEntityClarification(em, discovered, List.of(), question,
+                        extractLatestUserMessage(request), emitter, streamId, requestId, conversationId, requestStart);
                 return true;
             } catch (CoverageClient.CoverageUnavailableException e) {
                 // Fail closed: cannot build a grounded clarify → let the caller emit clean no-service.
@@ -2318,46 +2389,31 @@ public class ChatService {
         streamTextAndComplete(emitter, text, null);
     }
 
-    /** Sends text tokens using the request's completion id when one is already allocated. */
+    /**
+     * Sends text tokens using the request's completion id when one is already allocated. Byte shape is
+     * owned by {@link OpenAiSseWriter} — the single source shared with the structured-clarification
+     * dual-plane so the two emitters cannot drift. A clarification streamed here is byte-identical to
+     * today's path (role delta, content deltas, {@code stop}, {@code [DONE]}).
+     */
     private void streamTextAndComplete(SseEmitter emitter, String text, String streamId) throws Exception {
         String id = (streamId != null && !streamId.isBlank()) ? streamId : newId();
         long ts = epochSeconds();
-        emitter.send(SseEmitter.event().data(roleDelta(id, ts)));
-        for (String word : text.split("(?<=\\s)|(?=\\s)")) {
-            emitter.send(SseEmitter.event().data(contentDelta(id, ts, word)));
+        for (String frame : OpenAiSseWriter.textFrames(mapper, MODEL_ID, id, ts, text)) {
+            emitter.send(SseEmitter.event().data(frame));
         }
-        emitter.send(SseEmitter.event().data(stopDelta(id, ts)));
-        emitter.send(SseEmitter.event().data(" [DONE]"));
         emitter.complete();
     }
 
-    private String roleDelta(String id, long ts) throws Exception {
-        return chunk(id, ts, delta -> delta.put("role", "assistant"), null);
+    private String roleDelta(String id, long ts) {
+        return OpenAiSseWriter.roleDelta(mapper, MODEL_ID, id, ts);
     }
 
-    private String contentDelta(String id, long ts, String content) throws Exception {
-        return chunk(id, ts, delta -> delta.put("content", content), null);
+    private String contentDelta(String id, long ts, String content) {
+        return OpenAiSseWriter.contentDelta(mapper, MODEL_ID, id, ts, content);
     }
 
-    private String stopDelta(String id, long ts) throws Exception {
-        return chunk(id, ts, delta -> {}, "stop");
-    }
-
-    @FunctionalInterface
-    private interface DeltaWriter { void write(ObjectNode delta) throws Exception; }
-
-    private String chunk(String id, long ts, DeltaWriter w, String finishReason) throws Exception {
-        ObjectNode root = mapper.createObjectNode();
-        root.put("id", id); root.put("object", "chat.completion.chunk");
-        root.put("created", ts); root.put("model", MODEL_ID);
-        ArrayNode choices = root.putArray("choices");
-        ObjectNode choice = choices.addObject();
-        choice.put("index", 0);
-        ObjectNode delta = choice.putObject("delta");
-        w.write(delta);
-        if (finishReason != null) choice.put("finish_reason", finishReason);
-        else choice.putNull("finish_reason");
-        return " " + mapper.writeValueAsString(root);  // leading space → OpenAI-exact "data: {json}" (Spring omits it)
+    private String stopDelta(String id, long ts) {
+        return OpenAiSseWriter.stopDelta(mapper, MODEL_ID, id, ts);
     }
 
     /** Increments the request outcome counter. Micrometer caches the Counter by key. */
