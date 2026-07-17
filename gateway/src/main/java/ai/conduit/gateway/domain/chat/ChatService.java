@@ -43,6 +43,7 @@ import ai.conduit.gateway.infrastructure.telemetry.event.GroundedFiguresData;
 import ai.conduit.gateway.infrastructure.telemetry.event.IntentClassifiedData;
 import ai.conduit.gateway.infrastructure.telemetry.event.RequestCompleteData;
 import ai.conduit.gateway.infrastructure.telemetry.event.RequestStartData;
+import ai.conduit.gateway.infrastructure.telemetry.event.TenantContextData;
 import ai.conduit.gateway.infrastructure.telemetry.event.SynthesisStartData;
 import ai.conduit.gateway.infrastructure.telemetry.event.PlanGraphData;
 import ai.conduit.gateway.orchestration.executor.Blackboard;
@@ -403,6 +404,15 @@ public class ChatService {
 
         tracePublisher.publish(TraceEvent.of("request_start", requestId, conversationId,
                 new RequestStartData(userId, tenant != null ? tenant.tenantId() : null, latestPrompt)));
+
+        // A6: stamp the resolved tenant scope (A2) into the trace so the audit record — assembled purely
+        // from the trace, off the request path — partitions on the EXACT execution tenant and carries the
+        // active policy/bundle version, never a write-time guess. Only opaque tenant/version ids (World B).
+        if (tenant != null && tenant.tenantId() != null) {
+            tracePublisher.publish(TraceEvent.of("tenant_context", requestId, conversationId,
+                    new TenantContextData(tenant.tenantId(), tenant.actorTenantId(),
+                            tenant.activePolicyVersion(), null)));
+        }
 
         // streamId is set here and passed to all handlers so that every SSE chunk
         // in this request carries the same completion ID.  The role delta is now emitted

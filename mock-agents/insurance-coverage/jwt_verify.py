@@ -161,3 +161,59 @@ def verify_bearer_token(authorization: str | None) -> tuple[bool, str | None, di
 
     log.debug("JWT verified: sub=%s iss=%s", claims.get("sub"), issuer)
     return True, None, claims
+
+
+def verify_tenant_binding(
+    claims: dict | None,
+    header_tenant: str | None,
+    book_owner_tenant: str | None,
+) -> tuple[bool, str | None]:
+    """Second, data-layer tenant gate (Axiom Story A5).
+
+    The coverage service does NOT trust the ``X-Tenant-Id`` header the gateway sends. It
+    independently binds three tenant facts and requires them to agree:
+
+      1. ``tenant_id`` from the *verified* JWT (already signature/issuer/expiry/audience
+         checked by :func:`verify_bearer_token`),
+      2. the ``X-Tenant-Id`` request header, and
+      3. the tenant that OWNS the requested book (``book_owner_tenant``).
+
+    Any disagreement ⇒ deny. This makes coverage a genuine second gate: even a
+    compromised or buggy gateway that sends tenant A's book request under tenant B's
+    header — or replays a valid tenant A token against a tenant B book — is rejected
+    HERE, at the data-authz layer, not merely by gateway discipline.
+
+    ``book_owner_tenant`` is ``None`` for principal-agnostic operations (RESOLVE), where
+    there is no book owner to bind; only the token<->header agreement is enforced there.
+
+    Returns ``(ok, error_msg)`` — ``(True, None)`` when the binding holds, otherwise
+    ``(False, reason)`` and the caller must return HTTP 403.
+    """
+    if not claims:
+        return False, "No verified claims available for tenant binding"
+
+    token_tenant = claims.get("tenant_id")
+    if not token_tenant:
+        # A verified token with no tenant_id cannot be tenant-bound → fail closed.
+        return False, "Token carries no tenant_id claim"
+
+    if not header_tenant:
+        # A data request that omits the tenant header cannot be bound → fail closed.
+        return False, "Missing X-Tenant-Id header"
+
+    if header_tenant != token_tenant:
+        # Forged / mismatched header: the gateway (or an attacker past it) asserted a
+        # tenant the token does not carry.
+        return False, (
+            f"Tenant header '{header_tenant}' does not match token tenant '{token_tenant}'"
+        )
+
+    if book_owner_tenant is not None and header_tenant != book_owner_tenant:
+        # Cross-tenant book request: an internally-consistent token for one tenant is
+        # asking for a book owned by another tenant.
+        return False, (
+            f"Cross-tenant book request: tenant '{header_tenant}' may not access a "
+            f"book owned by tenant '{book_owner_tenant}'"
+        )
+
+    return True, None

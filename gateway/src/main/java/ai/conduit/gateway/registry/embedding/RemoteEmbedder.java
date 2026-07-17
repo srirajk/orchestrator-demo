@@ -28,6 +28,19 @@ import java.util.List;
  * by default the local sentence-transformers sidecar (all-MiniLM-L6-v2, 384-dim).
  *
  * <p>Active when {@code conduit.embedding.provider=remote}.
+ *
+ * <h2>Stateless — safe to share across tenants (Axiom A4, CLAUDE.md §3)</h2>
+ * This embedder holds no per-tenant, per-caller, or per-request state: {@link #embed} and
+ * {@link #embedBatch} are pure functions of {@code (text, model, dimension)} — the same text always
+ * yields the same vector, whichever tenant asks. There is no tenant-specific preprocessing (no
+ * per-tenant tokenizer, vocabulary, normalisation, or prompt prefix); the only mutable field is the
+ * {@link RestTemplate} built once in {@link #probe()} and never mutated per call. The one Python
+ * service the request path calls (the intended in-JVM move) is therefore a single shared sidecar for
+ * all tenants, not one per tenant. Because the vector is a pure function of the text, the corpus
+ * cache in {@link ManifestEmbedder} — keyed on {@code (model-id, sha256(text))} — is tenant-agnostic
+ * by construction: two tenants ingesting the identical example text share the cached vector without
+ * cross-tenant leakage, because the vector carries no tenant identity to leak. Proven by
+ * {@code EmbedderStatelessnessTest} (same text under two tenant contexts ⇒ byte-identical vectors).
  */
 @Service
 @ConditionalOnProperty(name = "conduit.embedding.provider", havingValue = "remote")

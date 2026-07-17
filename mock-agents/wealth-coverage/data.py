@@ -84,6 +84,23 @@ BOOKS: dict[str, set[str]] = {
 }
 
 
+# Tenant that OWNS each principal's book (Axiom Story A5). Every current demo principal
+# lives in the single pre-Axiom "default" tenant; the coverage service uses this map to
+# reject a request whose (token-and-header) tenant does not match the book's owning tenant
+# — a genuine cross-tenant data boundary enforced at the data layer, not just the gateway.
+DEFAULT_TENANT = "default"
+PRINCIPAL_TENANTS: dict[str, str] = {principal_id: DEFAULT_TENANT for principal_id in BOOKS}
+
+
+def owner_tenant(principal_id: str) -> str:
+    """Return the tenant that owns principal_id's book.
+
+    Unknown principals fall back to the default tenant: their book is empty, but the
+    request is still tenant-scoped so a mismatched tenant is rejected before any lookup.
+    """
+    return PRINCIPAL_TENANTS.get(principal_id, DEFAULT_TENANT)
+
+
 def discover(principal_id: str) -> list[dict]:
     """Return all resources in principal's book."""
     ids = BOOKS.get(principal_id, set())

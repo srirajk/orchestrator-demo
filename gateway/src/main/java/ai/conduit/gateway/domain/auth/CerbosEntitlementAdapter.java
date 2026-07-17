@@ -103,7 +103,7 @@ public class CerbosEntitlementAdapter {
             Map<String, Boolean> results = parseResponse(responseBody, ACTION_READ, relationshipIds);
             log.debug("Cerbos relationship check: principal={} ids={} results={}",
                     principal.id(), relationshipIds, results);
-            return new BatchResult(results, "cerbos");
+            return new BatchResult(results, "cerbos", parseCallId(responseBody));
 
         } catch (Exception e) {
             return handleFailure(e, principal, relationshipIds, resourceType);
@@ -136,7 +136,7 @@ public class CerbosEntitlementAdapter {
             Map<String, Boolean> results = parseResponse(responseBody, ACTION_INVOKE, agentIds);
             log.debug("Cerbos agent check: principal={} agents={} results={}",
                     principal.id(), agentIds, results);
-            return new BatchResult(results, "cerbos");
+            return new BatchResult(results, "cerbos", parseCallId(responseBody));
 
         } catch (Exception e) {
             // fail-CLOSED for agent checks — Cerbos outage is a security event, not graceful degradation.
@@ -303,6 +303,20 @@ public class CerbosEntitlementAdapter {
         return new BatchResult(denied, "local-fallback-closed");
     }
 
+    /**
+     * The {@code cerbosCallId} the PDP stamps on every {@code /api/check/resources} response — the join
+     * key back to the durable Cerbos decision log (Axiom A6 / C5). Best-effort: a body without it (or a
+     * parse error) yields {@code null}, never a failure of the authz check itself.
+     */
+    private String parseCallId(String body) {
+        try {
+            String id = mapper.readTree(body).path("cerbosCallId").asText(null);
+            return id != null && !id.isBlank() ? id : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private Map<String, Boolean> parseResponse(String body, String action, List<String> requestedIds) throws Exception {
         JsonNode root    = mapper.readTree(body);
         JsonNode results = root.path("results");
@@ -322,8 +336,17 @@ public class CerbosEntitlementAdapter {
         return out;
     }
 
-    /** Result of a batch check — holds per-resource verdicts and the decision source. */
-    public record BatchResult(Map<String, Boolean> decisions, String source) {
+    /**
+     * Result of a batch check — holds per-resource verdicts, the decision source, and the Cerbos
+     * {@code cerbosCallId} (the durable decision-log join key; {@code null} on the fail-closed paths
+     * that never reached the PDP).
+     */
+    public record BatchResult(Map<String, Boolean> decisions, String source, String cerbosCallId) {
+        /** Back-compat constructor for fail paths / callers that carry no decision-log id. */
+        public BatchResult(Map<String, Boolean> decisions, String source) {
+            this(decisions, source, null);
+        }
+
         public boolean isAllowed(String resourceId) {
             return decisions.getOrDefault(resourceId, false);
         }

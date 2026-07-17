@@ -18,6 +18,9 @@ audit:
   enabled: true
   backend: file
   file:
+    # A6: this path is bind-mounted to a durable named volume (docker-compose `cerbos-audit`) so the
+    # decision log — the examiner's authorization chain, joined via cerbosCallId — survives a PDP
+    # restart / re-create. Config (B1) unchanged; the durability guarantee is the volume.
     path: /var/log/cerbos/audit.log
   accessLogsEnabled: true
   # Decision logs are the audit trail for every authorization verdict (contract #1).

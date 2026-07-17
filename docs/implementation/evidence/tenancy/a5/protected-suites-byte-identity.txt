@@ -1,0 +1,10 @@
+# A5 — protected suites byte-identity proof (vs conduit-platform-next @ 7f42f69)
+# Branch: feature/axiom-A5-coverage-tenancy @ 06d79f8 (+ working tree)
+# Method: git hash-object every existing gateway test file in the working tree, compare to the
+#         same path in conduit-platform-next. A match on ALL existing files + only the new IT added
+#         proves no protected suite was touched (superset of the 7).
+
+
+existing gateway test files checked : 135
+files that DIFFER from base          : 0   (MUST be 0)
+new gateway test file added (A5)     : gateway/src/test/java/ai/conduit/gateway/domain/coverage/CoverageClientTenantHeaderIT.java

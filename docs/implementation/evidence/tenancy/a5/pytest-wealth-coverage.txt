@@ -1,0 +1,40 @@
+/private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/covtest-venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:208: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the fixture caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to function scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+============================= test session starts ==============================
+platform darwin -- Python 3.12.7, pytest-8.3.3, pluggy-1.6.0 -- /private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/ed1064b3-910e-402b-8a61-3b4abe474725/scratchpad/covtest-venv/bin/python
+rootdir: /Users/srirajkadimisetty/projects/orchestrator-demo/.claude/worktrees/agent-a711b93b3c7ece569/mock-agents/wealth-coverage
+plugins: asyncio-0.24.0, anyio-4.14.2
+asyncio: mode=Mode.STRICT, default_loop_scope=None
+collecting ... collected 27 items
+
+tests/test_coverage.py::TestDiscover::test_rm_jane_sees_her_relationships PASSED [  3%]
+tests/test_coverage.py::TestDiscover::test_rm_ken_sees_okafor PASSED     [  7%]
+tests/test_coverage.py::TestDiscover::test_ops_analyst_singh_sees_okafor PASSED [ 11%]
+tests/test_coverage.py::TestDiscover::test_unknown_principal_gets_empty_list PASSED [ 14%]
+tests/test_coverage.py::TestDiscover::test_admin_sees_all PASSED         [ 18%]
+tests/test_coverage.py::TestCheck::test_rm_jane_allowed_whitman PASSED   [ 22%]
+tests/test_coverage.py::TestCheck::test_rm_jane_denied_okafor PASSED     [ 25%]
+tests/test_coverage.py::TestCheck::test_ops_analyst_singh_allowed_okafor PASSED [ 29%]
+tests/test_coverage.py::TestCheck::test_unknown_resource_denied PASSED   [ 33%]
+tests/test_coverage.py::TestCheck::test_unknown_principal_denied PASSED  [ 37%]
+tests/test_coverage.py::TestResolve::test_resolve_whitman_by_alias PASSED [ 40%]
+tests/test_coverage.py::TestResolve::test_resolve_exact_id PASSED        [ 44%]
+tests/test_coverage.py::TestResolve::test_resolve_not_found_returns_empty_candidates PASSED [ 48%]
+tests/test_coverage.py::TestResolve::test_okafor_resolves_for_anyone_but_check_denies_rm_jane PASSED [ 51%]
+tests/test_coverage.py::TestDiscoverEndpoint::test_discover_rm_jane PASSED [ 55%]
+tests/test_coverage.py::TestDiscoverEndpoint::test_discover_unknown_principal_returns_empty_list PASSED [ 59%]
+tests/test_coverage.py::TestCheckEndpoint::test_check_allowed PASSED     [ 62%]
+tests/test_coverage.py::TestCheckEndpoint::test_check_denied PASSED      [ 66%]
+tests/test_coverage.py::TestResolveEndpoint::test_resolve_whitman PASSED [ 70%]
+tests/test_coverage.py::TestResolveEndpoint::test_resolve_not_found PASSED [ 74%]
+tests/test_coverage.py::TestHealthEndpoint::test_health PASSED           [ 77%]
+tests/test_coverage_tenant_enforcement.py::TestCoverageTenantEnforcement::test_forged_header_rejected_by_coverage PASSED [ 81%]
+tests/test_coverage_tenant_enforcement.py::TestCoverageTenantEnforcement::test_cross_tenant_book_request_rejected PASSED [ 85%]
+tests/test_coverage_tenant_enforcement.py::TestCoverageTenantEnforcement::test_consistent_tenant_allowed PASSED [ 88%]
+tests/test_coverage_tenant_enforcement.py::TestCoverageTenantEnforcement::test_check_forged_header_rejected PASSED [ 92%]
+tests/test_coverage_tenant_enforcement.py::TestCoverageTenantEnforcement::test_resolve_forged_header_rejected PASSED [ 96%]
+tests/test_coverage_tenant_enforcement.py::TestCoverageTenantEnforcement::test_missing_tenant_header_rejected PASSED [100%]
+
+============================== 27 passed in 0.18s ==============================

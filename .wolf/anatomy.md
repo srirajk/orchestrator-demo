@@ -2244,17 +2244,18 @@
 - gateway/.../infrastructure/redis/RedisTenantIsolationProbeIT.java (test, extends RedisContainerTest) — A3.1/A3.2/A3.3/A3.4 isolation probes + FT.SEARCH transcript. ~1.2k
 - iam-service/.../auth/IamOAuthLocatorIsolationTest.java (test) — A3.5 locator can't leak/cross tenant. ~0.7k
 
-## Axiom C4 — Consequence-diff review surface (iam-service policystudio)
-- `iam-service/.../policystudio/ConsequenceDiffService.java` — computes the decision delta (current vs candidate bundle) from real PDP decisions; renders consequences over manifest vocab; computes consequenceReviewHash; NO LLM in truth path. ~180 tok
-- `ConsequenceReview.java` — the typed data contract the SPA renders (deltas, alarm, disclosure, hash, provenance, optional displayProse via withProse). ~120 tok
-- `ConsequenceDelta.java` / `DeltaDirection.java` — one changed cell (WIDENED=DENY→ALLOW alarm / NARROWED); business consequence + canonicalRow. ~90 tok
-- `PdpDecisionSource.java` (port) + `LocalPdpDecisionSource.java` (in-process C3 fidelity evaluator, reproducible) + `CerbosBatchDecisionSource.java` (real pinned Cerbos via ephemeral docker run --rm; assert-ALLOW-for-all suite, parse failure.actual). ~200 tok
-- `PdpDecision.java` / `PdpBatchResult.java` / `PdpProvenance.java` — per-cell decision + batch + both-snapshot provenance. ~90 tok
-- `BundleSnapshot.java` — immutable content-addressed bundle (bundleId=sha256 of canonical child + ceiling fingerprint). ~80 tok
-- `FixtureCell.java` / `ConsequenceFixtureMatrix.java` — principal×resource×action cell (no expected effect) + fixtureSetHash; built from C3 TestExpectationSet. ~110 tok
-- `ConsequenceProseModelClient.java` — authoring-plane LLM prose seam (phrases finished delta; never truth). ~60 tok
-- `ConsequenceApprovalService.java` / `ConsequenceApprovalRecord.java` / `ConsequenceReviewSigner.java` (HMAC, no committed default) — sign the review hash; staleness gate; authorizesPromotion exact-tuple check. ~180 tok
-- `TenantActiveBundleRegistry.java` + `InMemoryTenantActiveBundleRegistry.java` — active bundle pointer for the staleness gate. ~60 tok
-- `ApprovalDecision.java` / `StaleReviewException.java` / `SampledDisclosure.java` / `StudioHashing.java` — small value types + sha256 helper. ~70 tok
-- tests: `C4ConsequenceFixtures.java`, `ConsequenceDiffFromRealPdpTest` (C4.1 headline), `OverPermissionAlarmTest` (C4.2), `ConsequenceVocabularyTest` (C4.3), `SampledNotFormalDisclosureTest` (C4.4), `ReviewStalenessTest` (C4.5), `ApprovalBindingTest` (C4.6), `C4RealPdpEvidenceTest` (real Cerbos + writes evidence). Arch fence extended in `PolicyAuthoringBoundaryArchTest`.
-- `docs/implementation/evidence/studio/c4/` — README + real current-vs-candidate diff run (bundles, raw PDP batches, review JSON, signed record).
+## Axiom A4 — per-tenant registry ingestion + routing index + bulkheads (WRITE side)
+- gateway/.../registry/index/VectorIndexWriter.java — MODIFIED: per-tenant ensureIndex/index/removeAgent(ctx) via TenantKeyspace; per-tenant stamp keys; no-arg = legacy(null); 4-arg @Autowired ctor + legacy 3-arg. ~3.2k
+- gateway/.../registry/index/VectorIndex.java — MODIFIED: tenant-aware exists(ctx)/stampedModelId(ctx)/stampedExprDialect(ctx)/documentCount(ctx); no-arg delegate to legacy. ~2.0k
+- gateway/.../registry/readiness/RegistryReadinessVerifier.java — MODIFIED: immutable per-tenant readiness map; default=process-fatal gate, non-default=fail-closed verdict; isReady/requireReady/evaluate/refreshReadiness. ~2.4k
+- gateway/.../registry/readiness/TenantRegistryNotReadyException.java — per-tenant routing deny (context resolves but registry not ready). ~0.3k
+- gateway/.../registry/ingest/RegistryIngestor.java — MODIFIED: TenantKeyspace ctor + ingestTenant(ctx) per-tenant fail-isolated seam (B4 drives folders); default startup path unchanged. ~3.3k
+- gateway/.../infrastructure/tenancy/TenantBulkheads.java — per-tenant R4j bulkheads + global; bounded max-tenants; deprovision/reconcile removal. ~1.0k
+- gateway/.../registry/embedding/RemoteEmbedder.java — MODIFIED: statelessness declaration (shared across tenants; content-addressed cache tenant-agnostic). ~1.4k
+- gateway/.../registry/tenancy/PerTenantTestSupport.java (test) — A4 fixtures: deterministic embedders, manifest builder, index fingerprint. ~0.8k
+- gateway/.../registry/tenancy/PerTenantRoutingIsolationTest.java (test, RedisContainerTest) — A4.2 query never returns other tenant hits. ~0.7k
+- gateway/.../registry/tenancy/PerTenantReadinessTest.java (test, RedisContainerTest) — A4.1 broken tenant fails closed, B serves, B index byte-hash unchanged. ~0.9k
+- gateway/.../registry/tenancy/PerTenantStampTest.java (test, RedisContainerTest) — A4.3 model-stamp mismatch fails only that tenant. ~0.7k
+- gateway/.../registry/tenancy/DefaultTenantWritesLegacyIndexTest.java (test, RedisContainerTest) — WRITE-side demo-preservation: default→intent_idx/vec:/stamp, no tenant artifacts. ~0.6k
+- gateway/.../registry/tenancy/PerTenantBulkheadTest.java (test) — A4.5 isolation + bounded cardinality + deprovision. ~0.6k
+- gateway/.../registry/tenancy/EmbedderStatelessnessTest.java (test) — A4.4 same text same vector across tenants (real RemoteEmbedder vs stub sidecar). ~0.7k
