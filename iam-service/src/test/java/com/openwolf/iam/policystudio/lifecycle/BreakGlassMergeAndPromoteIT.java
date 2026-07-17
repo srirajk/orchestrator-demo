@@ -162,7 +162,7 @@ class BreakGlassMergeAndPromoteIT {
         ProductionPdpDecisionSource pdp = new ProductionPdpDecisionSource(cerbos);
 
         ManifestBackedStudioGroundingProvider grounding =
-                new ManifestBackedStudioGroundingProvider(mapper, writer, parser, directory, bundleRepo, "registry");
+                new ManifestBackedStudioGroundingProvider(mapper, writer, parser, directory, bundleRepo, "registry", baseDir, "infra/cerbos/tenants", "default");
         StudioSessionStore store = new StudioSessionStore();
         SelfContainedBundleAssembler assembler = new SelfContainedBundleAssembler(baseDir);
         GroundedStudioReviewService reviews = new GroundedStudioReviewService(
