@@ -127,6 +127,27 @@ public class AuditService {
         }
     }
 
+    /**
+     * Resolves the current execution tenant from the verified JWT ({@code tenant_id} claim) in the
+     * Spring Security context (Axiom A6). This is the tenant the caller is authenticated into — the
+     * audit read/export scopes to it, so an examiner never sees another tenant's records. Falls back to
+     * {@link #TENANT_ID} only when there is genuinely no authenticated tenant claim (system context).
+     */
+    public String currentTenant() {
+        try {
+            var authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication != null && authentication.getPrincipal() instanceof Jwt jwt) {
+                Object claim = jwt.getClaims().get("tenant_id");
+                if (claim != null && !claim.toString().isBlank()) {
+                    return claim.toString();
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("Could not resolve current tenant from security context: {}", ex.getMessage());
+        }
+        return TENANT_ID;
+    }
+
     private String toJson(Object value) {
         if (value == null) return null;
         try {
