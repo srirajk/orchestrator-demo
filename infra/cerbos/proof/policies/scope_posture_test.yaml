@@ -1,0 +1,106 @@
+---
+# ── Cerbos test suite — the scope-posture empirical proof, reproducible via ─────
+#   cerbos compile --test-output=junit infra/cerbos/proof/policies
+#
+# The compile test runner uses the engine default lenientScopeSearch=false (strict),
+# matching the pinned production posture. Each test below is the assertion form of a
+# probe captured live against cerbos 0.53.0 (see docs/adr/ADR-axiom-scope-posture.md).
+name: ScopePostureSuite
+description: >-
+  Proves the base=ceiling / tenant=grants posture under
+  SCOPE_PERMISSIONS_REQUIRE_PARENTAL_CONSENT_FOR_ALLOWS with strict scope search.
+
+principals:
+  user_u1:
+    id: u1
+    roles:
+      - user
+
+resources:
+  widget_root:
+    kind: widget
+    id: w1
+    scope: ""
+  widget_acme:
+    kind: widget
+    id: w1
+    scope: "acme"
+  widget_exceed:
+    kind: widget
+    id: w1
+    scope: "exceed"
+  widget_boot:
+    kind: widget
+    id: w1
+    scope: "boot"
+  widget_boot2:
+    kind: widget
+    id: w1
+    scope: "boot2"
+
+tests:
+  - name: baseCeilingAllowsViewEditDeniesDelete
+    input:
+      principals: [user_u1]
+      resources: [widget_root]
+      actions: [view, edit, delete]
+    expected:
+      - principal: user_u1
+        resource: widget_root
+        actions:
+          view: EFFECT_ALLOW
+          edit: EFFECT_ALLOW
+          delete: EFFECT_DENY
+
+  - name: emptyChildFallsThroughToParent
+    # acme grants ONLY view; it is silent on edit. edit therefore INHERITS the base
+    # ALLOW (fail-open) — proving an unmentioned tuple is NOT denied by a child.
+    input:
+      principals: [user_u1]
+      resources: [widget_acme]
+      actions: [view, edit]
+    expected:
+      - principal: user_u1
+        resource: widget_acme
+        actions:
+          view: EFFECT_ALLOW
+          edit: EFFECT_ALLOW
+
+  - name: tenantOverrideCannotExceedBaseCeiling
+    # exceed tries to grant delete; base ceiling withholds it → DENY (parental consent).
+    input:
+      principals: [user_u1]
+      resources: [widget_exceed]
+      actions: [view, delete]
+    expected:
+      - principal: user_u1
+        resource: widget_exceed
+        actions:
+          view: EFFECT_ALLOW
+          delete: EFFECT_DENY
+
+  - name: denyAllTemplateDeniesBeforeGrant
+    # boot applies the deny-all template with no grants: every ceiling tuple DENIED.
+    input:
+      principals: [user_u1]
+      resources: [widget_boot]
+      actions: [view, edit]
+    expected:
+      - principal: user_u1
+        resource: widget_boot
+        actions:
+          view: EFFECT_DENY
+          edit: EFFECT_DENY
+
+  - name: denyAllTemplateAllowsAfterGrant
+    # boot2 moves view into the granted bucket; edit stays explicitly withheld.
+    input:
+      principals: [user_u1]
+      resources: [widget_boot2]
+      actions: [view, edit]
+    expected:
+      - principal: user_u1
+        resource: widget_boot2
+        actions:
+          view: EFFECT_ALLOW
+          edit: EFFECT_DENY

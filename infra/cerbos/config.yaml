@@ -1,6 +1,14 @@
 server:
   httpListenAddr: ":3592"
   grpcListenAddr: ":3593"
+engine:
+  # ── Axiom scope-posture (contract #1), empirically pinned against cerbos 0.53.0 ──
+  # STRICT scope search: a request for a tenant scope that has NO policy must NOT walk
+  # up to an ancestor. Proven load-bearing — with lenientScopeSearch:true an absent
+  # tenant scope inherits the base ceiling's ALLOWs (fail-open on an unregistered
+  # tenant); with it false, an absent tenant scope hard-DENYs. See
+  # docs/adr/ADR-axiom-scope-posture.md and infra/cerbos/proof.
+  lenientScopeSearch: false
 storage:
   driver: disk
   disk:
@@ -12,6 +20,8 @@ audit:
   file:
     path: /var/log/cerbos/audit.log
   accessLogsEnabled: true
+  # Decision logs are the audit trail for every authorization verdict (contract #1).
+  decisionLogsEnabled: true
   decisionLogFilters:
     checkResources:
       ignoreAllowAll: false

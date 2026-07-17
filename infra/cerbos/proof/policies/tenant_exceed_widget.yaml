@@ -1,0 +1,14 @@
+apiVersion: api.cerbos.dev/v1
+# ── TENANT "exceed" — attempts to EXCEED the ceiling ──────────────────────────
+# Tries to ALLOW `delete`, which the base ceiling does NOT allow. Probe
+# `tenantOverrideCannotExceedBaseCeiling` asserts the effective decision is DENY:
+# a child cannot out-grant its parent under REQUIRE_PARENTAL_CONSENT_FOR_ALLOWS.
+resourcePolicy:
+  version: "default"
+  resource: widget
+  scope: "exceed"
+  scopePermissions: SCOPE_PERMISSIONS_REQUIRE_PARENTAL_CONSENT_FOR_ALLOWS
+  rules:
+    - actions: ["view", "delete"]
+      effect: EFFECT_ALLOW
+      roles: ["user"]

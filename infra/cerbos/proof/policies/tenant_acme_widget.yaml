@@ -1,0 +1,14 @@
+apiVersion: api.cerbos.dev/v1
+# ── TENANT "acme" — grants a SUBSET of the ceiling ────────────────────────────
+# Explicitly grants `view`. Says NOTHING about `edit` (which the base ceiling allows).
+# Probe `emptyChildFallsThroughToParent` uses `edit` here to observe what a base-allowed
+# but tenant-unmentioned tuple resolves to.
+resourcePolicy:
+  version: "default"
+  resource: widget
+  scope: "acme"
+  scopePermissions: SCOPE_PERMISSIONS_REQUIRE_PARENTAL_CONSENT_FOR_ALLOWS
+  rules:
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles: ["user"]

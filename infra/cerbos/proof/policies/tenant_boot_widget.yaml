@@ -1,0 +1,16 @@
+apiVersion: api.cerbos.dev/v1
+# ── TENANT "boot" — deny-all bootstrap, NO grants yet ─────────────────────────
+# Applies the tenant-deny-all template: every base-ceiling action for the role is
+# EXPLICITLY denied so NOTHING falls through to the parent's ALLOW. Probe
+# `denyAllTemplateDeniesUntilGranted` (before) expects view AND edit = DENY here,
+# even though the base ceiling allows both.
+resourcePolicy:
+  version: "default"
+  resource: widget
+  scope: "boot"
+  scopePermissions: SCOPE_PERMISSIONS_REQUIRE_PARENTAL_CONSENT_FOR_ALLOWS
+  rules:
+    # Withheld bucket = every base-ceiling (action, role) tuple. Explicit DENY, not silence.
+    - actions: ["view", "edit"]
+      effect: EFFECT_DENY
+      roles: ["user"]
