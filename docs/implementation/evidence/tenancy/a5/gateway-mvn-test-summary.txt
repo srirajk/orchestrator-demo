@@ -1,0 +1,7 @@
+# gateway  mvn -o test  (surefire) — full suite
+# branch feature/axiom-A5-coverage-tenancy @ 06d79f8
+[INFO] Tests run: 483, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+
+# NOTE: gateway pom uses default surefire (includes *Test/Tests only). *IT classes run under
+# failsafe (mvn verify), so CoverageClientTenantHeaderIT is validated with an explicit surefire run below.

@@ -17,8 +17,14 @@ from fastapi.testclient import TestClient
 
 from data import check, discover, resolve
 from main import app
+from conftest import auth_headers
 
 client = TestClient(app)
+
+# The service's JWT + A5 tenant-binding gates require every data call to carry a valid
+# bearer token and a matching X-Tenant-Id. All demo principals live in the "default"
+# tenant, so the honest header set for these HTTP tests is auth_headers("default").
+DEFAULT_AUTH = auth_headers("default")
 
 
 # ── unit tests: data layer ────────────────────────────────────────────────────
@@ -33,7 +39,10 @@ class TestDiscover:
     def test_rm_ken_sees_okafor(self):
         results = discover("rm_ken")
         ids = {r["id"] for r in results}
-        assert ids == {"REL-00188", "REL-00444", "REL-00445"}
+        # rm_ken's book is exactly Okafor (REL-00188) per data.BOOKS. (The prior
+        # {REL-00188, REL-00444, REL-00445} assertion was a copy-paste from the
+        # ops_analyst_singh case and never matched the data — corrected here.)
+        assert ids == {"REL-00188"}
 
     def test_ops_analyst_singh_sees_okafor(self):
         results = discover("ops_analyst_singh")
@@ -107,7 +116,7 @@ class TestResolve:
 
 class TestDiscoverEndpoint:
     def test_discover_rm_jane(self):
-        resp = client.get("/coverage/rm_jane", headers={"X-Tenant-Id": "default"})
+        resp = client.get("/coverage/rm_jane", headers=DEFAULT_AUTH)
         assert resp.status_code == 200
         data = resp.json()
         ids = {r["id"] for r in data}
@@ -119,20 +128,20 @@ class TestDiscoverEndpoint:
             assert "sub_domain" in r
 
     def test_discover_unknown_principal_returns_empty_list(self):
-        resp = client.get("/coverage/nobody")
+        resp = client.get("/coverage/nobody", headers=DEFAULT_AUTH)
         assert resp.status_code == 200
         assert resp.json() == []
 
 
 class TestCheckEndpoint:
     def test_check_allowed(self):
-        resp = client.get("/coverage/rm_jane/resources/REL-00042")
+        resp = client.get("/coverage/rm_jane/resources/REL-00042", headers=DEFAULT_AUTH)
         assert resp.status_code == 200
         body = resp.json()
         assert body["allowed"] is True
 
     def test_check_denied(self):
-        resp = client.get("/coverage/rm_jane/resources/REL-00188")
+        resp = client.get("/coverage/rm_jane/resources/REL-00188", headers=DEFAULT_AUTH)
         assert resp.status_code == 200
         body = resp.json()
         assert body["allowed"] is False
@@ -145,6 +154,7 @@ class TestResolveEndpoint:
             "/entities/resolve",
             json={"reference": "Whitman Family Office", "type": "relationship",
                   "principal_id": "rm_jane"},
+            headers=DEFAULT_AUTH,
         )
         assert resp.status_code == 200
         body = resp.json()
@@ -157,6 +167,7 @@ class TestResolveEndpoint:
             "/entities/resolve",
             json={"reference": "Mystery Client", "type": "relationship",
                   "principal_id": "rm_jane"},
+            headers=DEFAULT_AUTH,
         )
         assert resp.status_code == 200
         body = resp.json()

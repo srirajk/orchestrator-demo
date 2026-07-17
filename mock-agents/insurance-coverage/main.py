@@ -19,12 +19,12 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from data import check, discover, resolve
-from jwt_verify import verify_bearer_token
+from data import check, discover, owner_tenant, resolve
+from jwt_verify import verify_bearer_token, verify_tenant_binding
 
 log = logging.getLogger("insurance-coverage")
 logging.basicConfig(level=logging.INFO)
@@ -44,10 +44,25 @@ async def jwt_auth_middleware(request: Request, call_next):
     if not allowed:
         log.warning("insurance-coverage: rejected request — %s (path=%s)", error, request.url.path)
         return JSONResponse(status_code=401, content={"detail": error})
+    # Stash the verified claims so the data endpoints can run the A5 tenant-binding gate
+    # (token tenant_id ⇔ X-Tenant-Id header ⇔ book-owner tenant).
+    request.state.claims = claims
     response = await call_next(request)
     if claims and claims.get("sub"):
         response.headers["X-Conduit-Verified-Sub"] = claims["sub"]
     return response
+
+
+def _enforce_tenant(request: Request, book_owner_tenant: Optional[str]) -> None:
+    """A5 second gate. Rejects with HTTP 403 (from THIS service) when the verified token
+    tenant, the X-Tenant-Id header, and the requested book's owning tenant do not all
+    agree. ``book_owner_tenant=None`` for principal-agnostic RESOLVE."""
+    claims = getattr(request.state, "claims", None)
+    header_tenant = request.headers.get("X-Tenant-Id")
+    ok, reason = verify_tenant_binding(claims, header_tenant, book_owner_tenant)
+    if not ok:
+        log.warning("insurance-coverage: tenant binding rejected — %s (path=%s)", reason, request.url.path)
+        raise HTTPException(status_code=403, detail=reason)
 
 
 # ── response models ──────────────────────────────────────────────────────────
@@ -102,6 +117,7 @@ def health() -> dict:
     summary="DISCOVER — list all policies in the principal's book",
 )
 def discover_resources(principal_id: str, request: Request) -> list[CoverageResource]:
+    _enforce_tenant(request, owner_tenant(principal_id))
     tenant_id = request.headers.get("X-Tenant-Id", "default")
     log.info("DISCOVER principal=%s tenant=%s", principal_id, tenant_id)
     resources = discover(principal_id)
@@ -114,6 +130,7 @@ def discover_resources(principal_id: str, request: Request) -> list[CoverageReso
     summary="CHECK — verify a principal may access a specific policy",
 )
 def check_resource(principal_id: str, resource_id: str, request: Request) -> CoverageCheckResult:
+    _enforce_tenant(request, owner_tenant(principal_id))
     tenant_id = request.headers.get("X-Tenant-Id", "default")
     log.info("CHECK principal=%s resource=%s tenant=%s", principal_id, resource_id, tenant_id)
     result = check(principal_id, resource_id)
@@ -126,6 +143,9 @@ def check_resource(principal_id: str, resource_id: str, request: Request) -> Cov
     summary="RESOLVE — map free-text reference to canonical policy ID",
 )
 def resolve_entity(body: ResolveRequest, request: Request) -> CoverageResolveResult:
+    # RESOLVE is principal-agnostic (World-B invariant 5): there is no book owner to bind,
+    # so only the token⇔header tenant agreement is enforced (book_owner_tenant=None).
+    _enforce_tenant(request, None)
     tenant_id = request.headers.get("X-Tenant-Id", "default")
     log.info(
         "RESOLVE reference=%r type=%s tenant=%s principal=%s (audit-only)",

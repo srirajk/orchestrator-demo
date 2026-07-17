@@ -1,0 +1,76 @@
+"""Axiom Story A5 — the coverage service enforces tenant binding at the DATA layer.
+
+Spec harness (doc 07 A5) → pytest mapping:
+  CoverageTenantEnforcementTest.forgedHeaderRejectedByCoverage
+      → TestCoverageTenantEnforcement.test_forged_header_rejected_by_coverage
+  CoverageTenantEnforcementTest.crossTenantBookRequestRejected
+      → TestCoverageTenantEnforcement.test_cross_tenant_book_request_rejected
+
+The service does NOT trust the X-Tenant-Id header: it re-derives the tenant from the
+verified JWT and from the requested book's owner and requires all three to agree, so a
+compromised/buggy gateway is stopped HERE, not merely by gateway discipline.
+"""
+
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
+from fastapi.testclient import TestClient
+
+from main import app
+from conftest import auth_headers, mint_token
+
+client = TestClient(app)
+
+
+class TestCoverageTenantEnforcement:
+    def test_forged_header_rejected_by_coverage(self):
+        """X-Tenant-Id disagrees with the verified JWT tenant_id ⇒ 403 from coverage."""
+        token = mint_token("default", sub="uw_sam")
+        resp = client.get(
+            "/coverage/uw_sam",
+            headers={"Authorization": f"Bearer {token}", "X-Tenant-Id": "tenant-evil"},
+        )
+        assert resp.status_code == 403, resp.text
+        assert "does not match token tenant" in resp.json()["detail"]
+
+    def test_cross_tenant_book_request_rejected(self):
+        """Valid tenant-A token (token==header) requesting a tenant-B book ⇒ 403."""
+        resp = client.get("/coverage/uw_sam", headers=auth_headers("tenant-a", sub="user_a"))
+        assert resp.status_code == 403, resp.text
+        assert "Cross-tenant book request" in resp.json()["detail"]
+
+    # ── guards: the gate must not over-deny the honest, tenant-consistent path ──────
+
+    def test_consistent_tenant_allowed(self):
+        """Token tenant == header == book-owner tenant ⇒ 200 (no over-blocking)."""
+        resp = client.get("/coverage/uw_sam", headers=auth_headers("default"))
+        assert resp.status_code == 200, resp.text
+        ids = {r["id"] for r in resp.json()}
+        assert ids == {"POL-77001", "POL-77002"}
+
+    def test_check_forged_header_rejected(self):
+        """The forged-header gate applies to CHECK too, not just DISCOVER."""
+        token = mint_token("default", sub="uw_sam")
+        resp = client.get(
+            "/coverage/uw_sam/resources/POL-77001",
+            headers={"Authorization": f"Bearer {token}", "X-Tenant-Id": "tenant-evil"},
+        )
+        assert resp.status_code == 403, resp.text
+
+    def test_resolve_forged_header_rejected(self):
+        """RESOLVE is principal-agnostic but still binds token⇔header tenant."""
+        token = mint_token("default", sub="uw_sam")
+        resp = client.post(
+            "/entities/resolve",
+            json={"reference": "continental", "type": "policy"},
+            headers={"Authorization": f"Bearer {token}", "X-Tenant-Id": "tenant-evil"},
+        )
+        assert resp.status_code == 403, resp.text
+
+    def test_missing_tenant_header_rejected(self):
+        """A data request with a valid token but no X-Tenant-Id cannot be bound ⇒ 403."""
+        token = mint_token("default", sub="uw_sam")
+        resp = client.get("/coverage/uw_sam", headers={"Authorization": f"Bearer {token}"})
+        assert resp.status_code == 403, resp.text

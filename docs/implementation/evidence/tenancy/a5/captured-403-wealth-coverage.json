@@ -1,0 +1,19 @@
+{
+  "service": "wealth-coverage",
+  "A5.1_forged_header": {
+    "status": 403,
+    "body": {
+      "detail": "Tenant header 'tenant-evil' does not match token tenant 'default'"
+    }
+  },
+  "A5.2_cross_tenant_book": {
+    "status": 403,
+    "body": {
+      "detail": "Cross-tenant book request: tenant 'tenant-a' may not access a book owned by tenant 'default'"
+    }
+  },
+  "control_consistent_tenant": {
+    "status": 200,
+    "count": 3
+  }
+}

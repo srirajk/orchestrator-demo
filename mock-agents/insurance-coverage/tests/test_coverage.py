@@ -17,8 +17,14 @@ from fastapi.testclient import TestClient
 
 from data import check, discover, resolve
 from main import app
+from conftest import auth_headers
 
 client = TestClient(app)
+
+# The service's JWT + A5 tenant-binding gates require every data call to carry a valid
+# bearer token and a matching X-Tenant-Id. All demo principals live in the "default"
+# tenant, so the honest header set for these HTTP tests is auth_headers("default").
+DEFAULT_AUTH = auth_headers("default")
 
 
 # ── unit tests: data layer ────────────────────────────────────────────────────
@@ -102,7 +108,7 @@ class TestResolve:
 
 class TestDiscoverEndpoint:
     def test_discover_uw_sam(self):
-        resp = client.get("/coverage/uw_sam", headers={"X-Tenant-Id": "default"})
+        resp = client.get("/coverage/uw_sam", headers=DEFAULT_AUTH)
         assert resp.status_code == 200
         data = resp.json()
         ids = {r["id"] for r in data}
@@ -113,20 +119,20 @@ class TestDiscoverEndpoint:
             assert "sub_domain" in r
 
     def test_discover_unknown_principal_returns_empty_list(self):
-        resp = client.get("/coverage/nobody")
+        resp = client.get("/coverage/nobody", headers=DEFAULT_AUTH)
         assert resp.status_code == 200
         assert resp.json() == []
 
 
 class TestCheckEndpoint:
     def test_check_allowed(self):
-        resp = client.get("/coverage/uw_sam/resources/POL-77001")
+        resp = client.get("/coverage/uw_sam/resources/POL-77001", headers=DEFAULT_AUTH)
         assert resp.status_code == 200
         body = resp.json()
         assert body["allowed"] is True
 
     def test_check_denied(self):
-        resp = client.get("/coverage/uw_sam/resources/POL-88003")
+        resp = client.get("/coverage/uw_sam/resources/POL-88003", headers=DEFAULT_AUTH)
         assert resp.status_code == 200
         body = resp.json()
         assert body["allowed"] is False
@@ -139,6 +145,7 @@ class TestResolveEndpoint:
             "/entities/resolve",
             json={"reference": "Continental Freight Liability", "type": "policy",
                   "principal_id": "uw_sam"},
+            headers=DEFAULT_AUTH,
         )
         assert resp.status_code == 200
         body = resp.json()
@@ -151,6 +158,7 @@ class TestResolveEndpoint:
             "/entities/resolve",
             json={"reference": "Mystery Policy", "type": "policy",
                   "principal_id": "uw_sam"},
+            headers=DEFAULT_AUTH,
         )
         assert resp.status_code == 200
         body = resp.json()

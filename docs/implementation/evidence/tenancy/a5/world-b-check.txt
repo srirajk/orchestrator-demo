@@ -1,0 +1,35 @@
+═══════════════════════════════════════════════════════════════════════
+ World B check — gateway must carry zero domain knowledge
+ target: gateway/src/main/java
+         gateway/src/main/resources/prompts
+═══════════════════════════════════════════════════════════════════════
+
+CRITICAL violations (hard gate — must be zero for World B):
+
+REVIEW (human judgment — flag, don't auto-fail):
+═══════════════════════════════════════════════════════════════════════
+ World B check — chat clarification surface must carry zero domain knowledge
+ targets:
+         apps/chat/web/src/components/ClarificationForm.tsx
+         apps/chat/bff/src/main/java/ai/conduit/chat/chat/ClarifyController.java
+         apps/chat/bff/src/main/java/ai/conduit/chat/chat/ClarifyResolveRequest.java
+═══════════════════════════════════════════════════════════════════════
+
+CRITICAL violations (hard gate — must be zero for World B):
+
+═══════════════════════════════════════════════════════════════════════
+ RESULT (chat clarify surface)
+   CRITICAL violations : 0   (must be 0 for World B)
+═══════════════════════════════════════════════════════════════════════
+
+ ✓ World B clean — chat clarification surface renders the payload blind.
+
+═══════════════════════════════════════════════════════════════════════
+ RESULT
+   CRITICAL violations : 0   (must be 0 for World B)
+   REVIEW flags        : 0   (resolve or justify each)
+   chat clarify surface: clean
+═══════════════════════════════════════════════════════════════════════
+
+ ✓ World B clean — gateway carries no domain knowledge.
+   Safe to wire into scripts/verify.sh + pre-commit as a hard gate.
