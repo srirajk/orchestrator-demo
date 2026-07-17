@@ -1,0 +1,62 @@
+---
+# TenantEqualityBackstopTest (Axiom Story B2.3) — the business_derived_roles backstop.
+# Once tenant_id is present on BOTH the principal and the resource, every business-role ALLOW
+# denies a cross-tenant tuple even inside a matched scope — defence-in-depth against a
+# mislabeled scope. Parity-neutral today (no tenant_id sent ⇒ backstop TRUE ⇒ ALLOW).
+name: TenantEqualityBackstopTest
+description: A resource mis-scoped to a tenant but carrying a different tenant_id attr is denied.
+
+principals:
+  rm_tenantA:
+    id: rm_tenantA
+    roles: [chat_user]
+    attr: {segments: {wealth: confidential-pii}, domains: [], admin_domains: [], tenant_id: tenantA}
+  rm_no_tenant:      # the single-tenant world: no tenant_id sent (parity control)
+    id: rm_no_tenant
+    roles: [chat_user]
+    attr: {segments: {wealth: confidential-pii}, domains: [], admin_domains: []}
+
+resources:
+  # Mis-scoped: request routed to tenant scope "default" but the resource carries tenant_id=tenantB.
+  ag_wealth_tenantB:
+    kind: agent
+    id: ag_wealth_tenantB
+    scope: "default"
+    attr: {domain: wealth-management, audience: segment, access_mode: read, data_classification: confidential-pii, tenant_id: tenantB}
+  # Same tenant on both sides — control ⇒ ALLOW.
+  ag_wealth_tenantA:
+    kind: agent
+    id: ag_wealth_tenantA
+    scope: "default"
+    attr: {domain: wealth-management, audience: segment, access_mode: read, data_classification: confidential-pii, tenant_id: tenantA}
+  # No tenant_id at all (single-tenant world) — control ⇒ ALLOW (parity-neutral backstop).
+  ag_wealth_notenant:
+    kind: agent
+    id: ag_wealth_notenant
+    scope: ""
+    attr: {domain: wealth-management, audience: segment, access_mode: read, data_classification: confidential-pii}
+
+tests:
+  - name: mislabeledScopeStillDeniedCrossTenant
+    input:
+      principals: [rm_tenantA]
+      resources: [ag_wealth_tenantB]
+      actions: [invoke]
+    expected:
+      - {principal: rm_tenantA, resource: ag_wealth_tenantB, actions: {invoke: EFFECT_DENY}}
+
+  - name: sameTenantAllowedControl
+    input:
+      principals: [rm_tenantA]
+      resources: [ag_wealth_tenantA]
+      actions: [invoke]
+    expected:
+      - {principal: rm_tenantA, resource: ag_wealth_tenantA, actions: {invoke: EFFECT_ALLOW}}
+
+  - name: absentTenantIdParityNeutralControl
+    input:
+      principals: [rm_no_tenant]
+      resources: [ag_wealth_notenant]
+      actions: [invoke]
+    expected:
+      - {principal: rm_no_tenant, resource: ag_wealth_notenant, actions: {invoke: EFFECT_ALLOW}}

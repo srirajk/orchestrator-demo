@@ -5003,5 +5003,60 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-07-16"
+  },
+  {
+    "id": "bug-287",
+    "timestamp": "2026-07-17",
+    "error_message": "cerbos compile: 'Scope permission conflicts \u2014 policies sharing scope  have conflicting scopePermissions' when >1 root-scoped resource policy set scopePermissions: SCOPE_PERMISSIONS_OVERRIDE_PARENT explicitly (same value on both)",
+    "file": "infra/cerbos/policies/*.yaml (Axiom B2 base scoping)",
+    "root_cause": "Cerbos 0.53 false-positive conflict detector: setting scopePermissions EXPLICITLY on multiple root ('') scope policies conflicts even when identical. B1's base_widget only had ONE root policy so never hit it.",
+    "fix": "Leave root scopePermissions UNSET (Cerbos default for a root IS OVERRIDE_PARENT). Verified via live server probe: ceiling holds, silent child fall-through, strict-search absent-scope deny \u2014 identical to B1. Only tenant children set REQUIRE_PARENTAL_CONSENT.",
+    "tags": [
+      "cerbos",
+      "scopePermissions",
+      "scope",
+      "axiom-b2",
+      "compile"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-17"
+  },
+  {
+    "id": "bug-288",
+    "timestamp": "2026-07-17",
+    "error_message": "cerbos-parity-run.sh: ConnectionRefused on :3620/:3621 \u2014 servers never came up",
+    "file": "scripts/cerbos-parity-run.sh",
+    "root_cause": "Explicit cleanup() call at startup ran 'rm -rf $TMP' AFTER the config files were written to $TMP; docker then mounted the missing config path as an empty DIRECTORY, cerbos failed to parse config, server exited.",
+    "fix": "Reordered: remove stale containers before writing configs; never call full cleanup() (which rm -rf $TMP) after writing them \u2014 only the EXIT trap does. Also guarded python calls with '|| RC=$?' so set -e doesn't abort before capturing exit codes.",
+    "tags": [
+      "bash",
+      "docker",
+      "cerbos",
+      "harness",
+      "set-e",
+      "mktemp"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-17"
+  },
+  {
+    "id": "bug-289",
+    "timestamp": "2026-07-17",
+    "error_message": "cerbos-allow-tenant-equality-lint falsely flagged tenant_chat_user etc. as 'DERIVED BYPASS (no tenant-equality)' and flagged REQUIRE_PARENTAL_CONSENT tenant children as raw-role bypasses",
+    "file": "scripts/cerbos-allow-tenant-equality-lint.py",
+    "root_cause": "(a) tenant-equality detection dumped the condition via yaml.safe_dump whose 80-col line-wrap split 'P.attr.tenant_id == R.attr.tenant_id' and defeated the regex; (b) the lint checked tenant children, but REQUIRE_PARENTAL_CONSENT children can only NARROW the base (ADR F3) and the base already carries tenant-equality \u2014 they are gated, not bypasses.",
+    "fix": "(a) walk the parsed condition subtree for CEL strings instead of re-dumping; (b) skip policies whose scopePermissions==REQUIRE_PARENTAL_CONSENT_FOR_ALLOWS \u2014 enforce tenant-equality only on the CEILING (root/OVERRIDE_PARENT) policies.",
+    "tags": [
+      "cerbos",
+      "lint",
+      "yaml",
+      "axiom-b2",
+      "tenant-equality"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-17"
   }
 ]

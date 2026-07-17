@@ -1,0 +1,58 @@
+---
+# Rank0TrapPreservedTest (Axiom Story B2.2) — the resource-side fail-closed guard.
+# agent_resource variables `resourceClassRecognized` + the rank ladder must be preserved
+# VERBATIM: an unrecognised / typo'd / "public" data_classification ranks 0, and without
+# the guard `wealthRank >= 0` is always true ⇒ reachable by every segment member (fail-OPEN).
+# The guard makes it DENY. This asserts the trap still fires after the scoped migration.
+name: Rank0TrapPreservedTest
+description: An unrecognised data_classification is DENIED for every segment member (fail-closed).
+
+principals:
+  rm_jane:            # top tier in wealth
+    id: rm_jane
+    roles: [chat_user]
+    attr: {segments: {wealth: confidential-pii}, domains: [], admin_domains: []}
+  ops_analyst_singh:  # top tier in servicing
+    id: ops_analyst_singh
+    roles: [chat_user]
+    attr: {segments: {servicing: confidential-pii}, domains: [], admin_domains: []}
+  uw_sam:             # top tier in insurance
+    id: uw_sam
+    roles: [chat_user]
+    attr: {segments: {insurance: confidential-pii}, domains: [], admin_domains: []}
+
+resources:
+  ag_wealth_typo:
+    kind: agent
+    id: ag_wealth_typo
+    scope: ""
+    attr: {domain: wealth-management, audience: segment, access_mode: read, data_classification: public}
+  ag_servicing_missing:
+    kind: agent
+    id: ag_servicing_missing
+    scope: ""
+    attr: {domain: asset-servicing, audience: segment, access_mode: read, data_classification: ""}
+  ag_wealth_recognised:   # control — recognised classification, same top-tier member ⇒ ALLOW
+    kind: agent
+    id: ag_wealth_recognised
+    scope: ""
+    attr: {domain: wealth-management, audience: segment, access_mode: read, data_classification: confidential-pii}
+
+tests:
+  - name: unrecognisedClassificationDenied
+    input:
+      principals: [rm_jane, ops_analyst_singh, uw_sam]
+      resources: [ag_wealth_typo, ag_servicing_missing]
+      actions: [invoke]
+    expected:
+      - {principal: rm_jane, resource: ag_wealth_typo, actions: {invoke: EFFECT_DENY}}
+      - {principal: ops_analyst_singh, resource: ag_servicing_missing, actions: {invoke: EFFECT_DENY}}
+      - {principal: uw_sam, resource: ag_wealth_typo, actions: {invoke: EFFECT_DENY}}
+
+  - name: recognisedClassificationStillAllowedControl
+    input:
+      principals: [rm_jane]
+      resources: [ag_wealth_recognised]
+      actions: [invoke]
+    expected:
+      - {principal: rm_jane, resource: ag_wealth_recognised, actions: {invoke: EFFECT_ALLOW}}

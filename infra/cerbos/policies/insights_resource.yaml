@@ -13,9 +13,17 @@ apiVersion: api.cerbos.dev/v1
 resourcePolicy:
   version: "default"
   resource: insights
+  # ── Axiom Story B2: base scope ────────────────────────────────────────────────
+  # BASE scope (root) = ceiling; per-tenant narrowing lives in tenant_default_insights.yaml.
+  # scopePermissions unset ⇒ Cerbos default OVERRIDE_PARENT (root has no parent — ADR F0;
+  # explicit set on multiple roots false-conflicts on 0.53). Byte-identical to pre-migration.
+  scope: ""
+  importDerivedRoles:
+    - business_derived_roles
 
   rules:
     # Platform administrators: full access (superuser across the platform).
+    # CROSS-TENANT SUPERUSER (B2.3 allowlist): intentionally raw / cross-tenant.
     - actions: ["read"]
       effect: EFFECT_ALLOW
       roles: ["platform_admin"]
@@ -24,6 +32,6 @@ resourcePolicy:
     # grants analytics access without any other platform_admin capability.
     - actions: ["read"]
       effect: EFFECT_ALLOW
-      roles: ["conduit_admin"]
+      derivedRoles: ["tenant_conduit_admin"]   # conduit_admin + tenant-equality backstop (B2.3)
 
     # No explicit deny needed — Cerbos denies by default (a chat_user hits the implicit deny).

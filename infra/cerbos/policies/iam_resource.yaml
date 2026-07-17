@@ -2,6 +2,14 @@ apiVersion: api.cerbos.dev/v1
 resourcePolicy:
   version: "default"
   resource: iam-resource
+  # ── Axiom Story B2: base scope ────────────────────────────────────────────────
+  # BASE scope (root) = ceiling; per-tenant narrowing lives in tenant_default_iam.yaml.
+  # scopePermissions unset ⇒ Cerbos default OVERRIDE_PARENT (root has no parent — ADR F0). The IAM rules already
+  # carry tenant-equality (via iam_derived_roles.same_tenant / own_resource / policy_* and the
+  # auditor's inline P.attr.tenant_id == R.attr.tenant_id), so B2 only adds the scope header
+  # here — decisions are byte-identical (B2.1). platform_admin stays the raw cross-tenant
+  # superuser (B2.3 allowlist), matching the runtime policies.
+  scope: ""
   importDerivedRoles:
     - iam_derived_roles
 

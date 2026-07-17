@@ -2,6 +2,22 @@ apiVersion: api.cerbos.dev/v1
 resourcePolicy:
   version: "default"
   resource: agent
+  # ── Axiom Story B2: base/tenant scoped model ──────────────────────────────────
+  # This is the BASE scope (root, scope: "") — the CEILING every tenant narrows from.
+  # scopePermissions is LEFT UNSET on the root: Cerbos's default for a root scope IS
+  # OVERRIDE_PARENT (the root has no parent; REQUIRE_PARENTAL_CONSENT on a root denies
+  # everything — ADR-axiom-scope-posture finding F0). Leaving it unset is also required
+  # empirically: Cerbos 0.53 raises a false "scope permission conflicts" error when MORE
+  # THAN ONE root-scoped resource policy sets scopePermissions explicitly, even to the
+  # same value (verified via cerbos compile). Unset = default OVERRIDE_PARENT = the exact
+  # pre-migration posture ⇒ decisions byte-identical (B2.1). Tenant children set
+  # REQUIRE_PARENTAL_CONSENT_FOR_ALLOWS (see tenant_default_agent.yaml) + the deny-all
+  # bootstrap template for fresh tenants.
+  scope: ""
+  # Shared tenant-equality backstop (B2.3) — every business-role ALLOW below references a
+  # derived role from here, so no ALLOW is a raw cross-tenant bypass. Parity-neutral today.
+  importDerivedRoles:
+    - business_derived_roles
 
   # Resource attributes expected in each CheckResources call (set by CerbosEntitlementAdapter):
   #   R.attr.domain              — business domain, e.g. "wealth-management" | "asset-servicing" | "insurance"
@@ -18,9 +34,16 @@ resourcePolicy:
   #   P.attr.domains       — org domain membership (e.g. "wealth-private-banking")
   #   P.attr.admin_domains — domains this principal administers (domain_admin only)
   #
-  # The domain -> segment name mapping (wealth-management -> "wealth", asset-servicing ->
-  # "servicing", insurance -> "insurance") lives HERE, in policy config — never in gateway Java
-  # (World B: the gateway carries zero domain knowledge; the mapping is deployment configuration).
+  # DOMAIN -> SEGMENT MAPPING (B2.4 relocation): the authoritative declaration of the
+  # domain->segment mapping (wealth-management -> "wealth", asset-servicing -> "servicing",
+  # insurance -> "insurance") now lives in TENANT DEPLOYMENT CONFIG —
+  #   infra/cerbos/tenants/default/domain-segment-map.yaml
+  # — not in these policy comments. It was always deployment config (World B: the gateway
+  # carries zero domain knowledge); B2 promotes it from a free-text comment here to a
+  # structured per-tenant manifest, so onboarding a domain/tenant edits config, not this file.
+  # The base-ceiling ENFORCEMENT of the mapping remains the inline CEL in the rules below (it
+  # IS the ceiling; the mapping literals must stay in the compiled ceiling for byte-identical
+  # decisions — moving the *evaluation* onto the request path is a separate gateway story).
 
   variables:
     local:
@@ -62,6 +85,11 @@ resourcePolicy:
   rules:
 
     # ── platform_admin: unrestricted across all domains and classifications ────────
+    # CROSS-TENANT SUPERUSER (B2.3 allowlist): platform_admin is intentionally cross-tenant —
+    # it is the raw-role ALLOW that the tenant-equality lint exempts (see the CROSS_TENANT_
+    # SUPERUSER set in scripts/cerbos-allow-tenant-equality-lint.py). Same posture as
+    # iam_resource.platform_admin. Every OTHER ALLOW below references a business_derived_roles
+    # role whose condition carries the tenant-equality backstop.
     - actions: ["invoke", "invoke_membership", "register", "deregister"]
       effect: EFFECT_ALLOW
       roles: ["platform_admin"]
@@ -71,7 +99,7 @@ resourcePolicy:
     #    servicing-ops                         →  asset-servicing agents
     - actions: ["invoke", "invoke_membership"]
       effect: EFFECT_ALLOW
-      roles: ["domain_admin"]
+      derivedRoles: ["tenant_domain_admin"]   # domain_admin + tenant-equality backstop (B2.3)
       condition:
         match:
           any:
@@ -88,7 +116,7 @@ resourcePolicy:
     # ── domain_admin: may register/deregister agents in their administered domain ─
     - actions: ["register", "deregister"]
       effect: EFFECT_ALLOW
-      roles: ["domain_admin"]
+      derivedRoles: ["tenant_domain_admin"]   # domain_admin + tenant-equality backstop (B2.3)
       condition:
         match:
           any:
@@ -113,7 +141,7 @@ resourcePolicy:
     #    chat_user migration so old and new tokens resolve to identical logic.)
     - actions: ["invoke"]
       effect: EFFECT_ALLOW
-      roles: ["chat_user", "relationship_manager"]
+      derivedRoles: ["tenant_chat_user"]   # chat_user/relationship_manager + tenant-equality backstop (B2.3)
       condition:
         match:
           all:
@@ -135,7 +163,7 @@ resourcePolicy:
     #    the domain->segment mapping + rank ladder HERE in policy config (World B).
     - actions: ["invoke_membership"]
       effect: EFFECT_ALLOW
-      roles: ["chat_user", "relationship_manager"]
+      derivedRoles: ["tenant_chat_user"]   # chat_user/relationship_manager + tenant-equality backstop (B2.3)
       condition:
         match:
           all:

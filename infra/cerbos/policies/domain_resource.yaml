@@ -2,6 +2,13 @@ apiVersion: api.cerbos.dev/v1
 resourcePolicy:
   version: "default"
   resource: domain
+  # ── Axiom Story B2: base scope ────────────────────────────────────────────────
+  # BASE scope (root) = ceiling; per-tenant narrowing lives in tenant_default_domain.yaml.
+  # scopePermissions unset ⇒ Cerbos default OVERRIDE_PARENT (root has no parent — ADR F0;
+  # explicit set on multiple roots false-conflicts on 0.53). Byte-identical to pre-migration.
+  scope: ""
+  importDerivedRoles:
+    - business_derived_roles
 
   # Governs administrative operations on an org-domain (e.g. "wealth-private-banking").
   #
@@ -13,6 +20,7 @@ resourcePolicy:
   rules:
 
     # ── platform_admin: full control over every domain ───────────────────────────
+    # CROSS-TENANT SUPERUSER (B2.3 allowlist): intentionally raw / cross-tenant.
     - actions: ["view", "create", "update", "delete", "manage_members", "add_member", "remove_member"]
       effect: EFFECT_ALLOW
       roles: ["platform_admin"]
@@ -20,7 +28,7 @@ resourcePolicy:
     # ── domain_admin: can view and manage membership in their own domains ────────
     - actions: ["view", "manage_members", "add_member", "remove_member"]
       effect: EFFECT_ALLOW
-      roles: ["domain_admin"]
+      derivedRoles: ["tenant_domain_admin"]   # domain_admin + tenant-equality backstop (B2.3)
       condition:
         match:
           expr: P.attr.admin_domains.exists(d, d == R.id)
@@ -29,7 +37,7 @@ resourcePolicy:
     #    relationship_manager kept as an alias during the chat_user migration.
     - actions: ["view"]
       effect: EFFECT_ALLOW
-      roles: ["chat_user", "relationship_manager"]
+      derivedRoles: ["tenant_chat_user"]      # chat_user/relationship_manager + tenant-equality backstop (B2.3)
       condition:
         match:
           expr: P.attr.domains.exists(d, d == R.id)

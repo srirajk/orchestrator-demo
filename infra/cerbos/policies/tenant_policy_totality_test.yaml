@@ -1,0 +1,55 @@
+---
+# TenantPolicyTotalityTest (Axiom Story B2.6).
+# The `default` tenant is a TOTAL child: every base-ceiling tuple is covered, so a scope=
+# "default" request resolves IDENTICALLY to the base (nothing falls through to an unintended
+# parent ALLOW). The exhaustive tuple enumeration is scripts/cerbos-tenant-totality-lint.py
+# (test: everyBaseAllowIsMatchedAtChild). This suite asserts the reproduction on representative
+# ceiling tuples across resources, plus an off-ceiling action stays denied.
+name: TenantPolicyTotalityTest
+description: The default-tenant child reproduces base decisions over the ceiling (no fall-through).
+
+principals:
+  rm_jane:
+    id: rm_jane
+    roles: [chat_user]
+    attr: {segments: {wealth: confidential-pii}, domains: [], admin_domains: []}
+  analyst_amy:
+    id: analyst_amy
+    roles: [chat_user]
+    attr: {segments: {wealth: confidential}, domains: [], admin_domains: []}
+  insights_admin:
+    id: insights_admin
+    roles: [conduit_admin]
+    attr: {segments: {}, domains: [], admin_domains: []}
+
+resources:
+  # scope "default" — the tenant child. Effective decision must equal the base ceiling.
+  ag_pii_default:
+    kind: agent
+    id: ag_pii
+    scope: "default"
+    attr: {domain: wealth-management, audience: segment, access_mode: read, data_classification: confidential-pii}
+  ag_write_default:     # off-ceiling by access_mode ⇒ must stay DENY at the child too
+    kind: agent
+    id: ag_write
+    scope: "default"
+    attr: {domain: wealth-management, audience: segment, access_mode: write, data_classification: confidential}
+  insights_default:
+    kind: insights
+    id: insights
+    scope: "default"
+    attr: {}
+
+tests:
+  - name: everyBaseAllowIsMatchedAtChild
+    # chat_user invoke reproduces base (rm_jane pii ALLOW, analyst_amy conf<pii DENY);
+    # insights admin read ALLOW; write stays DENY (off-ceiling, no fall-through).
+    input:
+      principals: [rm_jane, analyst_amy, insights_admin]
+      resources: [ag_pii_default, ag_write_default, insights_default]
+      actions: [invoke, read]
+    expected:
+      - {principal: rm_jane, resource: ag_pii_default, actions: {invoke: EFFECT_ALLOW}}
+      - {principal: analyst_amy, resource: ag_pii_default, actions: {invoke: EFFECT_DENY}}
+      - {principal: rm_jane, resource: ag_write_default, actions: {invoke: EFFECT_DENY}}
+      - {principal: insights_admin, resource: insights_default, actions: {read: EFFECT_ALLOW}}
