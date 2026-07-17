@@ -112,6 +112,32 @@ condition checks `P.attr.tenant_id == R.attr.tenant_id`.
 Docker maps container port 3592 → **host port 3594**. Use `localhost:3594` in tests and
 client code, not 3592.
 
+### Axiom B2 — base/tenant scoped model (delivered 2026-07-17)
+- **The gateway sends NO `tenant_id` and NO `scope` to Cerbos** (`CerbosEntitlementAdapter.addPrincipal`
+  sends only `segments`/`domains`/`admin_domains`; resources carry no scope). So every gateway
+  Cerbos call hits the **base scope ("")**. This is WHY the tenant-equality backstop is parity-neutral
+  today and why `agent`/`relationship`/`domain`/`insights` decisions are byte-identical after scoping.
+  (IAM checks DO send `tenant_id`; only `iam-resource` uses it.)
+- **Cerbos 0.53 `scopePermissions` quirk (VERIFIED):** setting `scopePermissions:
+  SCOPE_PERMISSIONS_OVERRIDE_PARENT` EXPLICITLY on **more than one root-scoped ("") resource
+  policy** raises a false `"scope permission conflicts"` compile error — even when the value is
+  identical on both. Fix: LEAVE the root's `scopePermissions` UNSET (Cerbos default for a root IS
+  OVERRIDE_PARENT). Empirically reproduces B1's exact posture (ceiling holds, silent child
+  fall-through, strict-search absent-scope deny). Only TENANT children set REQUIRE_PARENTAL_CONSENT.
+- **Tenant-equality backstop, parity-safe form:** `(has(P.attr.tenant_id) && has(R.attr.tenant_id))
+  ? P.attr.tenant_id == R.attr.tenant_id : true` — TRUE when either side lacks tenant_id (single-tenant
+  world → parity), denies cross-tenant once both present. Lives in `business_derived_roles.yaml`.
+- **`platform_admin` is the documented cross-tenant SUPERUSER** — raw-role ALLOW, exempt from the
+  tenant-equality lint (`scripts/cerbos-allow-tenant-equality-lint.py` CROSS_TENANT_SUPERUSER set),
+  matching the pre-existing iam_resource.platform_admin posture.
+- **Default-tenant TOTAL child pattern:** grant every base-ceiling (action, role) tuple UNCONDITIONALLY
+  under REQUIRE_PARENTAL_CONSENT → effective = base decision (parental consent gates it). Reproduces
+  today AND is total over the ceiling (totality lint passes). Fresh tenants use the deny-all template.
+- **B2 harness:** `scripts/cerbos-parity-run.sh` (PRE vs POST 800-cell diff — THE gate),
+  `scripts/cerbos-parity-matrix.py`, `scripts/cerbos-allow-tenant-equality-lint.py` (B2.3),
+  `scripts/cerbos-tenant-totality-lint.py` (extended to expand derivedRoles→parentRoles). Run cerbos
+  containers on DISTINCT names/ports (36xx) — never touch `conduit-cerbos` (:3594).
+
 ---
 
 ## Key Learnings (Phase 12 additions)

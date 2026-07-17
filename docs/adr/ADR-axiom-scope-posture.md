@@ -146,5 +146,11 @@ static lint. The config pin (`lenientScopeSearch: false`) closes the unregistere
    0.53.0 via the local `:latest`).
 2. Wire the totality lint into `scripts/verify.sh` / CI when tenant scopes are first introduced
    (today it passes trivially — zero tenant scopes).
-3. Re-home the live Conduit resource policies (`agent`, `relationship`, `iam-resource`, …) under
-   base+tenant scopes — a separate, request-path-touching story.
+3. ~~Re-home the live Conduit resource policies (`agent`, `relationship`, `iam-resource`, …) under
+   base+tenant scopes~~ — **DELIVERED by Story B2** (2026-07-17). All 6 policies moved to the
+   base/tenant scoped model with a shared `business_derived_roles` tenant-equality backstop, the
+   `default` tenant total children, and BYTE-IDENTICAL single-tenant decisions (parity gate:
+   `scripts/cerbos-parity-run.sh`, 800 cells PRE=POST). NB: the root scope leaves `scopePermissions`
+   UNSET (Cerbos default = OVERRIDE_PARENT) — setting it explicitly on >1 root policy false-conflicts
+   on 0.53 (see B2 notes). Turned out to be **NOT** request-path-touching: the gateway sends no
+   `tenant_id`/`scope`, so it was policy-only.
