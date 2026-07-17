@@ -2210,3 +2210,14 @@
 - apps/chat/bff/.../chat/ClarifyController.java — POST /api/clarify/resolve; folds answer, re-drives gateway w/ nonce+selection, streams back. ~1.5k
 - apps/chat/bff/.../chat/ClarifyResolveRequest.java — {conversationId,nonce,selection?,freeText?}. ~0.7k
 - apps/chat/bff/.../chat/GatewayClient.java — openChatStream 5-arg resume overload (X-Clarify-* headers).
+- gateway/.../domain/auth/TenantExecutionContext.java — A2 immutable tenant carrier (tenantId, actorTenantId, activePolicyVersion); isResolved() gate. ~0.6k
+- gateway/.../domain/auth/ProvisionedTenantDirectory.java — A2 read interface: find(tenantId)->ProvisionedTenant, hasSnapshot(), snapshotVersion(). ~0.5k
+- gateway/.../domain/auth/TenantContextResolver.java — A2 sole reader of tenant_id claim; resolves+validates vs directory; throws Missing/NotProvisioned/Unavailable. ~0.9k
+- gateway/.../infrastructure/tenancy/TenantSnapshotSource.java — A2 out-of-band snapshot port + TenantSnapshot(version, tenant->policyVersion). ~0.5k
+- gateway/.../infrastructure/tenancy/SnapshotProvisionedTenantDirectory.java — A2 AtomicReference snapshot holder; atomic install/swap; request-path read-only. ~0.8k
+- gateway/.../infrastructure/tenancy/ConfigBackedTenantSnapshotSource.java — A2 @Profile(!multi-tenant) demo/test source from conduit.tenancy.provisioned-tenants; always includes default. ~0.8k
+- gateway/.../infrastructure/tenancy/TenantDirectorySnapshotClient.java — A2 timed background client; sync initial fetch + daemon refresh; @PreDestroy stop. ~0.9k
+- gateway/.../infrastructure/tenancy/TenantDirectoryReadiness.java — A2 HealthIndicator: DOWN until snapshot loaded (readiness group). ~0.5k
+- gateway/.../test/.../domain/auth/TenantContextFailClosedTest.java — A2.3 filter-level fail-closed (401 missing/403 unknown, chain never entered). ~1.5k
+- gateway/.../test/.../domain/auth/TenantContextPropagationTest.java — A2.2 immutable TEC survives VT hop; invocation/coverage/audit observe exact value. ~1.4k
+- gateway/.../test/.../architecture/TenantContextSeamArchTest.java — A2.1 single claim reader (source scan) + no downstream static getTenant + controllers carry TEC. ~1.6k

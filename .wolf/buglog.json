@@ -5003,5 +5003,46 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-07-16"
+  },
+  {
+    "id": "bug-287",
+    "timestamp": "2026-07-17",
+    "error_message": "All @SpringBootTest contexts failed: 'Included health contributor readinessState in group readiness does not exist' (51 errors, APPLICATION FAILED TO START).",
+    "file": "gateway/src/main/resources/application.yml",
+    "root_cause": "A2 readiness wiring added management.endpoint.health.group.readiness.include: readinessState,tenantDirectory. readinessState is only a registered health contributor when Spring Boot probes are enabled; without probes the group-membership validation fails at context refresh.",
+    "fix": "Gate the readiness group on the custom indicator only (include: tenantDirectory). The TenantDirectoryReadiness HealthIndicator already reports DOWN until the snapshot loads. To also fold in readinessState, enable management.endpoint.health.probes in the environment that runs k8s probes.",
+    "tags": [
+      "gateway",
+      "A2",
+      "tenancy",
+      "actuator",
+      "readiness",
+      "spring-boot",
+      "startup"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-17"
+  },
+  {
+    "id": "bug-288",
+    "timestamp": "2026-07-17",
+    "error_message": "5 capability-clarify full-context tests 401 (expected 200) via CapabilityClarifyFixture \u2014 PRE-EXISTING on base c6d6c27 (conduit-platform-next), not an A2 regression.",
+    "file": "gateway/src/test/java/ai/conduit/gateway/domain/chat/CapabilityClarifyFixture.java",
+    "root_cause": "A1 merge made tenant_id + tenant-qualified audience mandatory at the jwtDecoder, but CapabilityClarifyFixture.mintToken() still minted a bare-audience, tenant-less token, so A1 rejected it 401 before the controller. Verified identical failure on the pristine base.",
+    "fix": "Made the fixture token A1-consistent: audience List.of(\"conduit-gateway\",\"conduit-gateway@default\") + claim tenant_id=default (mirrors AuthzFromMembershipTest). Fixes the pre-existing base breakage and satisfies the A2 request-path tenant resolution.",
+    "tags": [
+      "gateway",
+      "A1",
+      "A2",
+      "test-fixture",
+      "jwt",
+      "audience",
+      "tenant",
+      "pre-existing"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-17"
   }
 ]
