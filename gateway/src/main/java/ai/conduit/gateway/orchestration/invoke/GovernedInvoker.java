@@ -65,6 +65,21 @@ public class GovernedInvoker {
             return r;
         }
 
+        // ── tenant integrity (A2, defense-in-depth) ────────────────────────────────
+        // The authoritative missing/unknown-tenant fail-closed happens at the request filter, before
+        // any I/O. Here we refuse a hop whose ATTACHED tenant envelope is present but not fully resolved
+        // (no tenant id or no captured policy version) — a tenant claim that reached the invoker in a
+        // half-populated state must never authorize or invoke. A context that carries no tenant at all
+        // (legacy executor fallback / unit-test envelope) defers to the filter's guarantee.
+        var tenant = ctx == null ? null : ctx.tenant();
+        if (tenant != null && !tenant.isResolved()) {
+            publishCheckDenied(ctx, boundResource, "tenant-unresolved", "tenant");
+            NodeResult r = terminal(node, NodeResult.Status.DENIED, "invocation denied: tenant-unresolved");
+            audit(ctx, node, AgentInvocationData.VERDICT_DENIED, r.status(), "tenant",
+                    "tenant-unresolved", resourceScoped);
+            return r;
+        }
+
         // ── authorize (fail-closed; a throwing authorizer denies) ──────────────────
         InvocationAuthorizer.AuthorizationDecision decision;
         try {

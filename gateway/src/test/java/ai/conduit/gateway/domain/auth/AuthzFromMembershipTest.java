@@ -288,7 +288,7 @@ class AuthzFromMembershipTest extends RedisContainerTest {
     @Test
     void entitlementService_adminRole_grantsAccess() {
         // platform_admin: Cerbos returns ALLOW — EntitlementService honours the verdict.
-        Principal admin = new Principal("admin", "default", List.of("platform_admin"), List.of(), Map.of(), List.of());
+        Principal admin = new Principal("admin", List.of("platform_admin"), List.of(), Map.of(), List.of());
         when(cerbosAdapter.checkRelationships(any(), any()))
                 .thenReturn(new CerbosEntitlementAdapter.BatchResult(Map.of("REL-00188", true), "cerbos"));
 
@@ -303,7 +303,7 @@ class AuthzFromMembershipTest extends RedisContainerTest {
         // Cerbos denies the relationship — EntitlementService relays the denial.
         // In practice, structural Cerbos check passes for relationship_manager, but the
         // coverage service (DISCOVER/CHECK) would deny Okafor as not in rm_jane's coverage.
-        Principal rm = new Principal("rm_jane", "default", List.of("relationship_manager"),
+        Principal rm = new Principal("rm_jane", List.of("relationship_manager"),
                 List.of(), Map.of("wealth", "confidential-pii"), List.of("wealth-private-banking"));
         when(cerbosAdapter.checkRelationships(any(), any()))
                 .thenReturn(new CerbosEntitlementAdapter.BatchResult(Map.of("REL-00188", false), "cerbos"));
@@ -317,7 +317,7 @@ class AuthzFromMembershipTest extends RedisContainerTest {
     @Test
     void entitlementService_cerbosAllows_resultIsAllowed() {
         // Cerbos allows the relationship — EntitlementService relays the approval.
-        Principal rm = new Principal("rm_jane", "default", List.of("relationship_manager"),
+        Principal rm = new Principal("rm_jane", List.of("relationship_manager"),
                 List.of(), Map.of("wealth", "confidential-pii"), List.of("wealth-private-banking"));
         when(cerbosAdapter.checkRelationships(any(), any()))
                 .thenReturn(new CerbosEntitlementAdapter.BatchResult(Map.of("REL-00188", true), "cerbos"));

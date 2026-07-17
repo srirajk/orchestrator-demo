@@ -1,5 +1,6 @@
 package ai.conduit.gateway.orchestration.invoke;
 
+import ai.conduit.gateway.domain.auth.TenantExecutionContext;
 import ai.conduit.gateway.registry.model.AgentManifest;
 import ai.conduit.gateway.orchestration.model.Plan;
 import ai.conduit.gateway.orchestration.model.PlanNode;
@@ -27,6 +28,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public final class InvocationContext {
 
     private final String principalId;
+    private final TenantExecutionContext tenant;   // A2: immutable tenant scope for this envelope (nullable)
     private final String conversationId;
     private final String requestId;
     private final String callerToken;
@@ -34,23 +36,35 @@ public final class InvocationContext {
     private final Map<String, String> boundResources = new ConcurrentHashMap<>();
     private volatile InvocationReverifier reverifier;   // optional on-path PDP re-check (sub-step b)
 
-    private InvocationContext(String principalId, String conversationId, String requestId,
-                              String callerToken, List<AuthorizationGrant> seed) {
+    private InvocationContext(String principalId, TenantExecutionContext tenant, String conversationId,
+                              String requestId, String callerToken, List<AuthorizationGrant> seed) {
         this.principalId = principalId;
+        this.tenant = tenant;
         this.conversationId = conversationId;
         this.requestId = requestId;
         this.callerToken = callerToken;
         if (seed != null) this.grants.addAll(seed);
     }
 
+    /**
+     * A2 factory — carries the immutable {@link TenantExecutionContext} the request resolved on the
+     * servlet thread, so the {@link GovernedInvoker} can verify tenant integrity for every hop.
+     */
+    public static InvocationContext of(String principalId, TenantExecutionContext tenant,
+                                       String conversationId, String requestId,
+                                       String callerToken, List<AuthorizationGrant> grants) {
+        return new InvocationContext(principalId, tenant, conversationId, requestId, callerToken, grants);
+    }
+
+    /** Legacy factory (no tenant) — used by executor fallbacks and unit tests. */
     public static InvocationContext of(String principalId, String conversationId, String requestId,
                                        String callerToken, List<AuthorizationGrant> grants) {
-        return new InvocationContext(principalId, conversationId, requestId, callerToken, grants);
+        return new InvocationContext(principalId, null, conversationId, requestId, callerToken, grants);
     }
 
     /** An empty, deny-everything context (fail-closed). */
     public static InvocationContext empty(String principalId, String requestId) {
-        return new InvocationContext(principalId, null, requestId, null, null);
+        return new InvocationContext(principalId, null, null, requestId, null, null);
     }
 
     /**
@@ -71,6 +85,8 @@ public final class InvocationContext {
     }
 
     public String principalId()    { return principalId; }
+    /** The immutable tenant scope for this envelope, or {@code null} on a legacy/no-tenant context. */
+    public TenantExecutionContext tenant() { return tenant; }
     public String conversationId() { return conversationId; }
     public String requestId()      { return requestId; }
     public String callerToken()    { return callerToken; }

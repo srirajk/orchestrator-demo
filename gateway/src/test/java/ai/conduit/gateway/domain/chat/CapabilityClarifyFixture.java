@@ -115,11 +115,14 @@ abstract class CapabilityClarifyFixture extends RedisContainerTest {
         JWTClaimsSet claims = new JWTClaimsSet.Builder()
                 .subject("emp_jane")
                 .issuer("http://iam-service:8084")
-                .audience(List.of("conduit-gateway"))
+                .audience(List.of("conduit-gateway", "conduit-gateway@default"))
                 .expirationTime(new Date(System.currentTimeMillis() + 3_600_000L))
                 .issueTime(new Date())
                 .claim("roles", List.of("employee"))
                 .claim("segments", Map.of("hr", "internal"))
+                // A2: single-tenant demo tenant, so the request path's tenant resolution passes
+                // (provisioned) instead of failing closed on a tenant-less token.
+                .claim("tenant_id", "default")
                 .build();
         SignedJWT jwt = new SignedJWT(
                 new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("k1").build(), claims);

@@ -49,7 +49,7 @@ class ReferenceGroundingServiceTest {
             List.of("relationship_id"), true, Map.of(), List.of());
 
     private static final Principal RM = new Principal(
-            "rm_jane", "default", List.of("relationship_manager"),
+            "rm_jane", List.of("relationship_manager"),
             List.of(), Map.of("wealth", "confidential-pii"), List.of("wealth-private-banking"));
 
     private DomainManifestStore manifestStore;

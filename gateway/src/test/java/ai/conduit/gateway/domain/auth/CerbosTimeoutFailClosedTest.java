@@ -59,7 +59,7 @@ class CerbosTimeoutFailClosedTest {
     }
 
     static Principal principal() {
-        return new Principal("rm_jane", "default", List.of("relationship_manager"),
+        return new Principal("rm_jane", List.of("relationship_manager"),
                 List.of(), Map.of(), List.of());
     }
 
