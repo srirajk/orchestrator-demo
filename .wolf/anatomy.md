@@ -1756,7 +1756,7 @@
 
 ## infra/cerbos/
 
-- `config.yaml` (~94 tok)
+- `config.yaml` — PDP config; pinned engine.lenientScopeSearch:false + audit.decisionLogsEnabled:true (Axiom scope-posture) (~180 tok)
 
 ## infra/cerbos/policies/
 
@@ -1765,6 +1765,21 @@
 - `iam_derived_roles.yaml` (~542 tok)
 - `iam_resource.yaml` — Declares in (~1247 tok)
 - `relationship_resource.yaml` (~193 tok)
+
+## infra/cerbos/templates/
+
+- `tenant-deny-all.yaml` — deny-all tenant bootstrap template; explicit EFFECT_DENY per base-ceiling tuple (fail-open-safe) (~600 tok)
+
+## infra/cerbos/proof/
+
+- `README.md` — how to run the scope-posture proof harness (~350 tok)
+- `config.yaml` — proof-server config mirroring the pinned posture (~200 tok)
+- `run-proof.sh` — end-to-end empirical proof harness (strict + lenient contrast + junit suite) (~900 tok)
+- `policies/base_widget.yaml` — base ceiling fixture (OVERRIDE_PARENT) (~150 tok)
+- `policies/tenant_acme_widget.yaml` — grants view, silent on edit (fail-through demo) (~130 tok)
+- `policies/tenant_exceed_widget.yaml` — tries to exceed ceiling (~130 tok)
+- `policies/tenant_boot_widget.yaml` / `tenant_boot2_widget.yaml` — deny-all template before/after grant (~130 tok each)
+- `policies/scope_posture_test.yaml` — cerbos compile assertion suite, 11 tests (~700 tok)
 
 ## infra/clickhouse/
 
@@ -2064,6 +2079,7 @@
 - `verify.sh` — Full verification script — runs after each phase to confirm acceptance criteria. (~713 tok)
 - `wait-for-healthy.sh` — Wait until all core docker-compose services report healthy, then exit 0. (~323 tok)
 - `world-b-check.sh` — ───────────────────────────────────────────────────────────────────────────── (~1434 tok)
+- `cerbos-tenant-totality-lint.py` — rejects a tenant policy leaving any base-allowed (resource,action,role) tuple unmatched (fall-through hole) (~700 tok)
 
 ## scripts/eval-worker/
 
