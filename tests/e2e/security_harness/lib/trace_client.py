@@ -51,3 +51,13 @@ def trace_for_conversation(conversation_id: str) -> tuple[str | None, list[dict[
 
 def events_of_type(events: list[dict[str, Any]], event_type: str) -> list[dict[str, Any]]:
     return [e for e in events if e.get("type") == event_type]
+
+
+def structured_interaction(events: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """The latest `structured_interaction` form payload (nonce + options + free-text escape) emitted on
+    the OOB trace lane for this turn, or None. This is how a form-submitting harness discovers the nonce
+    and offered option values to POST to /api/clarify/resolve — the same payload the SPA form renders."""
+    forms = events_of_type(events, "structured_interaction")
+    if not forms:
+        return None
+    return forms[-1].get("data") or None

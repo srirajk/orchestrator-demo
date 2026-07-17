@@ -111,6 +111,39 @@ def send_message(session: requests.Session, conversation_id: str, content: str,
     )
 
 
+def resolve_clarification(session: requests.Session, conversation_id: str, nonce: str,
+                          selection: str | None = None, free_text: str | None = None,
+                          timeout: int = config.CHAT_TIMEOUT_S) -> ChatTurn:
+    """SUBMIT a structured clarification FORM (not just observe the plain-text twin).
+
+    Drives the Phase-2 resume endpoint the SPA form posts to: POST /api/clarify/resolve with the
+    outstanding form's single-use {nonce} and either a chosen option {selection} or a {free_text}
+    escape answer. The gateway consumes the descriptor and re-drives the whole pipeline (entitlement
+    re-CHECKed), streaming the resumed answer back as a normal turn — which we assemble here.
+
+    This is what keeps eval coverage from silently collapsing onto the text path: a check that only
+    reads the SSE twin never exercises the form's resume + re-CHECK. (Same bug class as an HTTP-200-only
+    load test that never asserts the body.)
+    """
+    payload: dict[str, str] = {"conversationId": conversation_id, "nonce": nonce}
+    if selection:
+        payload["selection"] = selection
+    if free_text:
+        payload["freeText"] = free_text
+    resp = session.post(
+        f"{config.BFF_URL}/api/clarify/resolve",
+        json=payload,
+        timeout=timeout,
+    )
+    text = _collect_sse_text(resp.text) if resp.ok else ""
+    return ChatTurn(
+        conversation_id=conversation_id,
+        answer_text=text,
+        http_status=resp.status_code,
+        raw_sse=resp.text,
+    )
+
+
 def ask(session: requests.Session, content: str, title: str | None = None) -> ChatTurn:
     """Convenience: open a fresh conversation and send one turn."""
     cid = create_conversation(session, title or content)

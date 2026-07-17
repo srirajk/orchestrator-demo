@@ -96,13 +96,30 @@ scan "Domain-specific @Value / env names" \
 
 REVIEW=$(( r1 + r2 ))
 
+# ── Chat clarification surface (apps/chat) ───────────────────────────────────
+# Extend the same zero-domain-knowledge gate to the structured-clarification form
+# (SPA) + resume handler (BFF): every label/option/prompt is DATA from the
+# `structured_interaction` event payload, never hardcoded in the client/BFF.
+CHAT_STATUS=0
+if [[ -f "$ROOT/scripts/world-b-check-chat.sh" ]]; then
+  bash "$ROOT/scripts/world-b-check-chat.sh" "$QUIET"
+  CHAT_STATUS=$?
+fi
+
 # ── Verdict ──────────────────────────────────────────────────────────────────
 echo ""
 echo "═══════════════════════════════════════════════════════════════════════"
 echo " RESULT"
 echo "   CRITICAL violations : $CRITICAL   (must be 0 for World B)"
 echo "   REVIEW flags        : $REVIEW   (resolve or justify each)"
+echo "   chat clarify surface: $([[ $CHAT_STATUS -eq 0 ]] && echo 'clean' || echo 'VIOLATIONS')"
 echo "═══════════════════════════════════════════════════════════════════════"
+
+if [[ "$CHAT_STATUS" -ne 0 ]]; then
+  echo ""
+  echo " ✗ NOT World B clean — the chat clarification surface carries domain knowledge."
+  exit 1
+fi
 
 if [[ "$CRITICAL" -gt 0 ]]; then
   echo ""
