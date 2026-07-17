@@ -1,0 +1,4 @@
+04:02:04.832 [main] INFO com.openwolf.iam.policystudio.breakglass.PersistentBreakGlassAuditPartition -- Break-glass GRANTED tenant='acme' scope='acme' action='register' role='platform_admin' expiresAt=2026-07-17T08:17:04.830671Z requestedBy='alice' approvedBy='carol'
+04:02:04.832 [main] INFO com.openwolf.iam.policystudio.breakglass.PersistentBreakGlassAuditPartition -- Break-glass USED tenant='acme' scope='acme' action='register' by principal='admin-p1'
+04:02:04.832 [main] INFO com.openwolf.iam.policystudio.breakglass.PersistentBreakGlassAuditPartition -- Break-glass USED tenant='acme' scope='acme' action='register' by principal='admin-p2'
+04:02:04.839 [main] INFO com.openwolf.iam.policystudio.breakglass.PersistentBreakGlassAuditPartition -- Break-glass GRANTED tenant='acme' scope='acme' action='register' role='platform_admin' expiresAt=2026-07-17T08:17:04.839068Z requestedBy='alice' approvedBy='carol'

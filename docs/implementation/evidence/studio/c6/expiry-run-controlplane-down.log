@@ -1,0 +1,13 @@
+C6.1 break-glass expiry — PDP ONLY, control plane NOT running.
+cerbos image: ghcr.io/cerbos/cerbos:latest
+now=2026-07-17T08:01:03.213521Z
+expiredAt=2026-07-17T08:01:02Z freshUntil=2026-07-17T08:31:03Z liveUntil=2026-07-17T08:01:31Z
+
+PDP up at http://localhost:55851 (container '/recursing_jemison', NOT conduit-cerbos:3594)
+
+[expired grant] register @ acme-expired -> EFFECT_DENY
+[fresh grant]   register @ acme-fresh   -> EFFECT_ALLOW
+[live grant]    startup consumed the pre-expiry window — before-check skipped
+[live grant]    register @ acme-live (after expiry)  -> EFFECT_DENY
+
+RESULT: expiry is enforced by the CEL time condition IN the artifact, evaluated by the PDP on every CheckResources. No control plane was involved.

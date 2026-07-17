@@ -1,0 +1,50 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: default
+  resource: agent
+  scope: acme-live
+  scopePermissions: SCOPE_PERMISSIONS_REQUIRE_PARENTAL_CONSENT_FOR_ALLOWS
+  rules:
+  - actions:
+    - register
+    effect: EFFECT_ALLOW
+    roles:
+    - platform_admin
+    condition:
+      match:
+        expr: now() < timestamp("2026-07-17T08:01:31Z")
+  - actions:
+    - register
+    effect: EFFECT_DENY
+    roles:
+    - platform_admin
+    condition:
+      match:
+        expr: now() >= timestamp("2026-07-17T08:01:31Z")
+  - actions:
+    - invoke
+    - invoke_membership
+    effect: EFFECT_DENY
+    roles:
+    - chat_user
+  - actions:
+    - deregister
+    - invoke
+    - invoke_membership
+    - register
+    effect: EFFECT_DENY
+    roles:
+    - domain_admin
+  - actions:
+    - deregister
+    - invoke
+    - invoke_membership
+    effect: EFFECT_DENY
+    roles:
+    - platform_admin
+  - actions:
+    - invoke
+    - invoke_membership
+    effect: EFFECT_DENY
+    roles:
+    - relationship_manager
