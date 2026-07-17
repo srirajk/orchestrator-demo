@@ -1,5 +1,7 @@
 package ai.conduit.gateway.resolver.service;
 
+import ai.conduit.gateway.domain.auth.TenantExecutionContext;
+import ai.conduit.gateway.infrastructure.redis.TenantKeyspace;
 import ai.conduit.gateway.registry.index.VectorIndex;
 import ai.conduit.gateway.registry.model.AgentManifest;
 import ai.conduit.gateway.registry.model.RoutingCandidate;
@@ -355,11 +357,13 @@ class AgentResolverRerankerTest {
     @SuppressWarnings("unchecked")
     private static AgentResolver resolver(List<RoutingCandidate> candidates, RoutingRerankerClient reranker) {
         VectorIndex vectorIndex = mock(VectorIndex.class);
-        when(vectorIndex.search(anyString(), nullable(String.class), anyInt(), any(Function.class)))
+        when(vectorIndex.search(anyString(), nullable(String.class), anyInt(),
+                nullable(TenantExecutionContext.class), any(Function.class)))
                 .thenReturn(candidates);
 
         AgentResolver resolver = new AgentResolver(
-                vectorIndex, mock(AgentRegistry.class), new SimpleMeterRegistry(), reranker);
+                vectorIndex, mock(AgentRegistry.class), new SimpleMeterRegistry(), reranker,
+                new TenantKeyspace(false, "default"));
         ReflectionTestUtils.setField(resolver, "confidenceFloor", 0.30);
         ReflectionTestUtils.setField(resolver, "relativeFloorFactor", 0.65);
         ReflectionTestUtils.setField(resolver, "topK", 10);

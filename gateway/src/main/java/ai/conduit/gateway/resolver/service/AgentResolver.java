@@ -1,5 +1,7 @@
 package ai.conduit.gateway.resolver.service;
 
+import ai.conduit.gateway.domain.auth.TenantExecutionContext;
+import ai.conduit.gateway.infrastructure.redis.TenantKeyspace;
 import ai.conduit.gateway.registry.index.VectorIndex;
 import ai.conduit.gateway.registry.model.AgentManifest;
 import ai.conduit.gateway.registry.model.RoutingCandidate;
@@ -119,13 +121,39 @@ public class AgentResolver {
     private final AgentRegistry  registry;
     private final MeterRegistry  meterRegistry;
     private final RoutingRerankerClient rerankerClient;
+    private final TenantKeyspace keyspace;
 
     public AgentResolver(VectorIndex vectorIndex, AgentRegistry registry, MeterRegistry meterRegistry,
-                         RoutingRerankerClient rerankerClient) {
+                         RoutingRerankerClient rerankerClient, TenantKeyspace keyspace) {
         this.vectorIndex     = vectorIndex;
         this.registry        = registry;
         this.meterRegistry   = meterRegistry;
         this.rerankerClient  = rerankerClient;
+        this.keyspace        = keyspace;
+    }
+
+    /**
+     * H5 fail-closed guard for the data plane. Under multi-tenant enforcement a routing query with no
+     * resolved tenant is DENIED rather than served from the shared legacy {@code intent_idx}. Delegates
+     * the multi-tenant/default/off decision to {@link TenantKeyspace} so the rule lives in exactly one
+     * place. A no-op with multi-tenancy OFF and for the default tenant — the demo path is untouched.
+     */
+    private void requireResolvedTenantForDataRoute(TenantExecutionContext tenant) {
+        if (keyspace.deniesTenantlessDataRoute(tenant)) {
+            meterRegistry.counter("resolver.route.tenant_denied").increment();
+            throw new TenantlessRouteDeniedException();
+        }
+    }
+
+    /**
+     * A data-plane routing query arrived without a resolved tenant while multi-tenant enforcement is ON.
+     * Serving it from the shared legacy {@code intent_idx} would leak routing metadata across tenants
+     * (the H5 fail-open hole), so the route is denied rather than silently answered from the legacy index.
+     */
+    public static final class TenantlessRouteDeniedException extends RuntimeException {
+        public TenantlessRouteDeniedException() {
+            super("multi-tenant routing denied: the request carried no resolved tenant on a data route");
+        }
     }
 
     /**
@@ -136,8 +164,22 @@ public class AgentResolver {
      */
     @Observed(name = "resolver.route")
     public ResolverResult resolve(String prompt, String domain) {
+        return resolve(prompt, domain, null);
+    }
+
+    /**
+     * Resolve a user prompt to the set of agents, in the given request tenant's routing keyspace (H5).
+     *
+     * <p>The tenant context is threaded into {@link VectorIndex#search} so the query runs against the
+     * tenant-qualified index ({@code intent_idx__{tenant}} for a real tenant, the legacy
+     * {@code intent_idx} for the default tenant or with multi-tenancy off). This overload backs the
+     * debug/admin inspection path, which carries no tenant context and so reads the legacy index; the
+     * fail-closed guard for a tenant-less DATA route lives on the contextual (chat) path.
+     */
+    @Observed(name = "resolver.route")
+    public ResolverResult resolve(String prompt, String domain, TenantExecutionContext tenant) {
         List<RoutingCandidate> candidates = vectorIndex.search(
-                prompt, domain, topK, id -> registry.find(id).orElse(null));
+                prompt, domain, topK, tenant, id -> registry.find(id).orElse(null));
         return select(candidates, prompt, false, Set.of());
     }
 
@@ -217,8 +259,43 @@ public class AgentResolver {
     @Observed(name = "resolver.route.contextual")
     public ResolverResult resolveContextual(String routingText, boolean entityKnown,
                                              Set<String> groundedDomainIds) {
+        return resolveContextual(routingText, entityKnown, groundedDomainIds, null);
+    }
+
+    /**
+     * Tenant-aware contextual routing (Axiom H5). The chat request path threads the request's resolved
+     * {@link TenantExecutionContext} through here so the routing query runs against that tenant's own
+     * index ({@code intent_idx__{tenant}}), not the shared legacy {@code intent_idx}.
+     *
+     * <p><b>Fail closed.</b> When multi-tenant enforcement is ON and this data route carries no resolved
+     * tenant, the query is DENIED ({@link TenantlessRouteDeniedException}) rather than silently answered
+     * from the legacy shared index — that fallback would leak routing metadata across tenants (the
+     * fail-open hole the audit flagged). With multi-tenancy OFF, or for the configured default tenant,
+     * {@code tenant} resolves to the legacy names and behaviour is byte-identical to the single-tenant
+     * demo.
+     */
+    @Observed(name = "resolver.route.contextual")
+    public ResolverResult resolveContextual(String routingText, boolean entityKnown,
+                                             TenantExecutionContext tenant) {
+        return resolveContextual(routingText, entityKnown, Set.of(), tenant);
+    }
+
+    /**
+     * Tenant-aware contextual routing carrying both the grounded domain set (Piece-5 conflict trigger)
+     * and the request tenant (H5). See {@link #resolveContextual(String, boolean, TenantExecutionContext)}
+     * for the fail-closed contract.
+     */
+    @Observed(name = "resolver.route.contextual")
+    public ResolverResult resolveContextual(String routingText, boolean entityKnown,
+                                             Set<String> groundedDomainIds,
+                                             TenantExecutionContext tenant) {
+        // H5 fail-closed: a data-plane routing query under multi-tenant enforcement MUST carry a resolved
+        // tenant; a tenant-less one is denied here, BEFORE any index read, so it can never fall through to
+        // the legacy shared intent_idx.
+        requireResolvedTenantForDataRoute(tenant);
+
         List<RoutingCandidate> broad = vectorIndex.search(
-                routingText, null, topK, id -> registry.find(id).orElse(null));
+                routingText, null, topK, tenant, id -> registry.find(id).orElse(null));
 
         if (broad.isEmpty()) {
             meterRegistry.counter("resolver.fallback").increment();
