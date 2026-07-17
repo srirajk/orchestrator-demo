@@ -1,0 +1,54 @@
+---
+# RelationshipTenantGapClosedTest (Axiom Story B2.5).
+# The pre-migration relationship policy granted chat_user/relationship_manager read with NO
+# tenant condition — a cross-tenant read bypass once tenants exist. The migration routes that
+# ALLOW through tenant_chat_user (business_derived_roles), which carries the tenant-equality
+# backstop. This asserts the gap is closed: cross-tenant read DENIED; same-tenant + single-
+# tenant (no tenant_id) read ALLOWED (parity preserved).
+name: RelationshipTenantGapClosedTest
+description: relationship read now enforces tenant equality (gap closed) while staying parity-neutral.
+
+principals:
+  rm_tenantA:
+    id: rm_tenantA
+    roles: [chat_user]
+    attr: {tenant_id: tenantA, segments: {}, domains: [], admin_domains: []}
+  rm_no_tenant:
+    id: rm_no_tenant
+    roles: [chat_user]
+    attr: {segments: {}, domains: [], admin_domains: []}
+
+resources:
+  rel_tenantB:
+    kind: relationship
+    id: REL-B
+    scope: ""
+    attr: {tenant_id: tenantB}
+  rel_tenantA:
+    kind: relationship
+    id: REL-A
+    scope: ""
+    attr: {tenant_id: tenantA}
+  rel_notenant:
+    kind: relationship
+    id: REL-N
+    scope: ""
+    attr: {}
+
+tests:
+  - name: relationshipEnforcesTenantEquality
+    input:
+      principals: [rm_tenantA]
+      resources: [rel_tenantB, rel_tenantA]
+      actions: [read]
+    expected:
+      - {principal: rm_tenantA, resource: rel_tenantB, actions: {read: EFFECT_DENY}}   # cross-tenant DENIED (gap closed)
+      - {principal: rm_tenantA, resource: rel_tenantA, actions: {read: EFFECT_ALLOW}}  # same-tenant allowed
+
+  - name: relationshipSingleTenantParityControl
+    input:
+      principals: [rm_no_tenant]
+      resources: [rel_notenant]
+      actions: [read]
+    expected:
+      - {principal: rm_no_tenant, resource: rel_notenant, actions: {read: EFFECT_ALLOW}}  # no tenant_id ⇒ ALLOW (parity)
