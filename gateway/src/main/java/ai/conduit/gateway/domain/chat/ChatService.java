@@ -8,6 +8,7 @@ import ai.conduit.gateway.domain.clarify.ClarificationDescriptor;
 import ai.conduit.gateway.domain.clarify.ClarificationDescriptorFactory;
 import ai.conduit.gateway.domain.clarify.ClarificationDualPlane;
 import ai.conduit.gateway.domain.clarify.ClarificationTrigger;
+import ai.conduit.gateway.domain.clarify.ClarifyResume;
 import ai.conduit.gateway.domain.auth.EntitlementService;
 import ai.conduit.gateway.domain.auth.EntitlementService.EntitlementResult;
 import ai.conduit.gateway.domain.auth.Principal;
@@ -137,6 +138,7 @@ public class ChatService {
     private final ai.conduit.gateway.domain.clarify.ClarificationComposer clarificationComposer;
     private final ClarificationDescriptorFactory clarificationDescriptorFactory;
     private final ClarificationDualPlane   clarificationDualPlane;
+    private final ClarifyResume            clarifyResume;
     private final Tracer                   tracer;
     private final MeterRegistry meterRegistry;
     private final GatewaySloMetrics gatewaySloMetrics;
@@ -203,6 +205,7 @@ public class ChatService {
                        ai.conduit.gateway.domain.clarify.ClarificationComposer clarificationComposer,
                        ClarificationDescriptorFactory clarificationDescriptorFactory,
                        ClarificationDualPlane clarificationDualPlane,
+                       ClarifyResume clarifyResume,
                        Tracer tracer,
                        MeterRegistry meterRegistry,
                        GatewaySloMetrics gatewaySloMetrics,
@@ -228,6 +231,7 @@ public class ChatService {
         this.clarificationComposer = clarificationComposer;
         this.clarificationDescriptorFactory = clarificationDescriptorFactory;
         this.clarificationDualPlane = clarificationDualPlane;
+        this.clarifyResume       = clarifyResume;
         this.tracer              = tracer;
         this.meterRegistry         = meterRegistry;
         this.gatewaySloMetrics     = gatewaySloMetrics;
@@ -274,6 +278,18 @@ public class ChatService {
      */
     public void handleChat(ChatRequest request, SseEmitter emitter, String userId,
                            Principal jwtPrincipal, String headerConvId, String callerToken) {
+        handleChat(request, emitter, userId, jwtPrincipal, headerConvId, callerToken, null, null);
+    }
+
+    /**
+     * Entry point with the Phase-2 structured-clarification RESUME carriers. {@code clarifyNonce} +
+     * {@code clarifySelection} are the {@code X-Clarify-Nonce}/{@code X-Clarify-Selection} headers a resume
+     * turn carries (both null on an ordinary turn). When a nonce consumes a live descriptor, the folded
+     * answer re-drives the FULL pipeline so entitlement is re-CHECKed on the resumed turn (TOCTOU dissolves).
+     */
+    public void handleChat(ChatRequest request, SseEmitter emitter, String userId,
+                           Principal jwtPrincipal, String headerConvId, String callerToken,
+                           String clarifyNonce, String clarifySelection) {
         long   requestStart = System.currentTimeMillis();
         GatewaySloMetrics.RequestScope metricScope = gatewaySloMetrics.start();
         gatewayMetricScope.set(metricScope);
@@ -291,10 +307,33 @@ public class ChatService {
                 ? headerConvId
                 : deriveConversationId(userId, request);
 
-        // Latest-turn-wins: a new user turn supersedes any outstanding structured clarification form.
-        // Capture the superseded lineage depth so a re-clarification THIS turn advances the loop bound,
-        // hard-bounding the structured-clarification loop across turns (brief (d)+(g)).
-        clarifyDepthCarry.set(clarificationDualPlane.supersede(conversationId));
+        // ── PHASE-2 STRUCTURED-CLARIFICATION RESUME ──────────────────────────────
+        // A resume turn presents the outstanding descriptor's single-use nonce. Consuming it (single-use,
+        // latest-turn-wins) decides how the folded answer re-enters the pipeline; the FULL pipeline then
+        // re-runs (grounding → routing → CHECK → invoke → synth), so entitlement is re-CHECKed at resume
+        // and never trusted from the form. A GROUNDED_SELECTION re-drives the descriptor's ORIGINAL query
+        // with the chosen (entitled) id injected as a grounded reference; FREE_TEXT / out-of-set demotions
+        // re-drive the folded message content as an untrusted query (rule 4c). When no live descriptor is
+        // consumed we fall back to the ordinary latest-turn-wins supersede.
+        ClarifyResume.Decision resume = clarifyResume.resolve(conversationId, clarifyNonce, clarifySelection);
+        if (resume.consumed()) {
+            // The consume already burned the descriptor (single-use + latest-turn). Inherit its lineage
+            // depth so a re-clarification THIS turn advances the loop bound instead of resetting it.
+            clarifyDepthCarry.set(resume.inheritedDepth());
+        } else {
+            // Latest-turn-wins: a new user turn supersedes any outstanding structured clarification form.
+            clarifyDepthCarry.set(clarificationDualPlane.supersede(conversationId));
+        }
+
+        // The effective request/prompt the pipeline runs on: a GROUNDED_SELECTION resume re-drives the
+        // descriptor's original query (the chosen id is injected as a grounded reference below); every
+        // other turn (ordinary, free-text, out-of-set demotion) runs on the folded/original message as-is.
+        ChatRequest effectiveRequest = request;
+        if (resume.mode() == ClarifyResume.Mode.GROUNDED_SELECTION && resume.resumedQuery() != null) {
+            effectiveRequest = withLatestUserContent(request, resume.resumedQuery());
+            latestPrompt = resume.resumedQuery();
+        }
+        final ChatRequest pipelineRequest = effectiveRequest;
 
         // ── Span attributes: visible on this span in Phoenix / Tempo ────────────
         rootSpan.setAttribute("session.id", conversationId);
@@ -359,18 +398,29 @@ public class ChatService {
         String streamId = "chatcmpl-" + requestId.replace("-", "").substring(0, 32);
 
         try {
-            IntentResult intentResult = intentClassifier.classify(request.messages());
+            IntentResult intentResult = intentClassifier.classify(pipelineRequest.messages());
             rootSpan.setAttribute("intent", intentResult.intent().name());
             incrementIntentCounter(intentResult.intent());
             tracePublisher.publish(TraceEvent.of("intent_classified", requestId, conversationId,
                     new IntentClassifiedData(intentResult.intent().name(),
                             intentResult.confidence(), intentResult.reasoning())));
 
+            // A GROUNDED_SELECTION resume re-drives the ORIGINAL query as a data fetch with the chosen
+            // entitled id injected as a grounded reference. The pipeline re-runs grounding + coverage
+            // CHECK on that exact id (a denial at resume is honoured — the form is never authorization),
+            // so we bypass the intent switch: the disposition is a fetch by construction of the descriptor.
+            if (resume.mode() == ClarifyResume.Mode.GROUNDED_SELECTION) {
+                EntityBag groundedBag = injectGroundedReference(
+                        intentResult.extractedEntities(), resume.idPattern(), resume.groundedId());
+                handleFetchData(pipelineRequest, emitter, latestPrompt,
+                        conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan,
+                        groundedBag, streamId, true, callerToken, null);
+            } else {
             switch (intentResult.intent()) {
-                case FETCH_DATA -> handleFetchData(request, emitter, latestPrompt,
+                case FETCH_DATA -> handleFetchData(pipelineRequest, emitter, latestPrompt,
                         conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan,
                         intentResult.extractedEntities(), streamId, true, callerToken, null);
-                case FOLLOW_UP  -> handleFollowUp(request, emitter, latestPrompt,
+                case FOLLOW_UP  -> handleFollowUp(pipelineRequest, emitter, latestPrompt,
                         conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan,
                         intentResult.extractedEntities(), streamId, callerToken);
                 // CLARIFY is routed through the SAME deterministic coverage path as FETCH_DATA
@@ -384,10 +434,11 @@ public class ChatService {
                 // it on the bare message only — NOT enriched with prior-turn domain vocabulary — so
                 // it cannot inherit a confident domain from history and be answered; it stays a
                 // clarification. Enriching it would collapse the FETCH_DATA/CLARIFY distinction.
-                case CLARIFY    -> handleFetchData(request, emitter, latestPrompt,
+                case CLARIFY    -> handleFetchData(pipelineRequest, emitter, latestPrompt,
                         conversationId, userId, jwtPrincipal, requestId, requestStart, rootSpan,
                         intentResult.extractedEntities(), streamId, false, callerToken, null);
-                case CHITCHAT   -> handleChitchat(request, emitter, conversationId, requestId, requestStart, streamId, rootSpan);
+                case CHITCHAT   -> handleChitchat(pipelineRequest, emitter, conversationId, requestId, requestStart, streamId, rootSpan);
+            }
             }
 
         } catch (Exception e) {
@@ -2074,7 +2125,10 @@ public class ChatService {
                 primary != null ? primary.idPattern() : null,
                 entitledBook, restrictToIds, originatingQuery, depth);
         clarificationDualPlane.offer(descriptor, requestId);   // OOB structured form (additive)
-        emitRequestOutcome("CLARIFIED");
+        // Disposition telemetry: when the structured form actually rode the OOB lane, this turn is a
+        // FORM_CLARIFY (a distinct disposition), so insights never miscount it as a plain answer or a
+        // no-service. With the OOB plane disabled it degrades to the legacy CLARIFIED text-only outcome.
+        emitRequestOutcome(clarificationDualPlane.isEnabled() ? "FORM_CLARIFY" : "CLARIFIED");
         streamTextAndComplete(emitter, descriptor.plainText(), streamId);   // plain-text twin on the SSE
         tracePublisher.publish(TraceEvent.of("request_complete", requestId, conversationId,
                 new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
@@ -2126,6 +2180,48 @@ public class ChatService {
     }
 
     // ── Private utilities ─────────────────────────────────────────────────────
+
+    /**
+     * Return a copy of {@code req} with the LATEST user message's content replaced by {@code content}
+     * (the Phase-2 GROUNDED_SELECTION resume re-drives the descriptor's original query). The prior turns
+     * are preserved so routing context / conversation memory are unchanged; only the newest user turn is
+     * rewritten. No domain knowledge — pure message-structure surgery.
+     */
+    private ChatRequest withLatestUserContent(ChatRequest req, String content) {
+        if (req.messages() == null || req.messages().isEmpty()) {
+            return new ChatRequest(req.model(), List.of(new Message("user", content)), req.stream(),
+                    req.maxTokens(), req.temperature(), req.topP(), req.user());
+        }
+        List<Message> copy = new ArrayList<>(req.messages());
+        for (int i = copy.size() - 1; i >= 0; i--) {
+            if ("user".equalsIgnoreCase(copy.get(i).role())) {
+                copy.set(i, new Message("user", content));
+                break;
+            }
+        }
+        return new ChatRequest(req.model(), copy, req.stream(),
+                req.maxTokens(), req.temperature(), req.topP(), req.user());
+    }
+
+    /**
+     * Inject a Phase-2 GROUNDED_SELECTION's chosen canonical id into the extracted {@link EntityBag} as a
+     * grounded reference, so the coverage pipeline RESOLVES + re-CHECKS it (a denial at resume is honoured;
+     * the form is never trusted as authorization). The entity KEY to inject under is derived from the
+     * descriptor's manifest {@code id_pattern} (the resolvable entity type whose pattern matches) — World-B
+     * clean: no entity-type literal or ID prefix is authored here. A missing pattern/entity is a no-op.
+     */
+    private EntityBag injectGroundedReference(EntityBag bag, String idPattern, String groundedId) {
+        EntityBag base = (bag != null) ? bag : EntityBag.empty();
+        if (groundedId == null || groundedId.isBlank() || idPattern == null || idPattern.isBlank()) {
+            return base;
+        }
+        EntityType et = manifestStore.entityTypes().stream()
+                .filter(EntityType::isResolvable)
+                .filter(e -> idPattern.equals(e.idPattern()))
+                .findFirst().orElse(null);
+        if (et == null || et.extractAs() == null) return base;
+        return base.withReference(et.extractAs(), groundedId);
+    }
 
     private String extractLatestUserMessage(ChatRequest request) {
         if (request.messages() == null || request.messages().isEmpty()) return "";

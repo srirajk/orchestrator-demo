@@ -67,13 +67,31 @@ public class GatewayClient {
      * @throws GatewayException if the gateway is unreachable.
      */
     public GatewayStream openChatStream(String accessToken, String conversationId, List<ChatMessage> messages) {
+        return openChatStream(accessToken, conversationId, messages, null, null);
+    }
+
+    /**
+     * Opens a streaming completion, optionally carrying the Phase-2 structured-clarification RESUME
+     * headers. {@code clarifyNonce} (+ optional {@code clarifySelection}) tag the turn as the answer to an
+     * outstanding form: the gateway consumes the single-use descriptor and re-drives the full pipeline
+     * (entitlement re-CHECKed). Both null → an ordinary chat turn (byte-identical to before).
+     *
+     * @throws GatewayException if the gateway is unreachable.
+     */
+    public GatewayStream openChatStream(String accessToken, String conversationId, List<ChatMessage> messages,
+                                        String clarifyNonce, String clarifySelection) {
         String payload = serialize(messages);
-        HttpRequest request = request(URI.create(config.baseUrl() + "/v1/chat/completions"))
+        HttpRequest.Builder builder = request(URI.create(config.baseUrl() + "/v1/chat/completions"))
                 .header("Content-Type", "application/json")
                 .header("Authorization", "Bearer " + accessToken)
-                .header("X-Conversation-Id", conversationId)
-                .POST(HttpRequest.BodyPublishers.ofString(payload))
-                .build();
+                .header("X-Conversation-Id", conversationId);
+        if (clarifyNonce != null && !clarifyNonce.isBlank()) {
+            builder = builder.header("X-Clarify-Nonce", clarifyNonce);
+            if (clarifySelection != null && !clarifySelection.isBlank()) {
+                builder = builder.header("X-Clarify-Selection", clarifySelection);
+            }
+        }
+        HttpRequest request = builder.POST(HttpRequest.BodyPublishers.ofString(payload)).build();
         try {
             HttpResponse<java.io.InputStream> response =
                     httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());

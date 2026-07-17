@@ -128,7 +128,7 @@ public class BoardCatalog {
                 // "we couldn't just answer" tail. Outcome labels are metric values, not domain
                 // literals (World B).
                 statDelta(range, "coverage_gaps", "Coverage gaps (clarify + denied)", "count",
-                        "sum(increase(conduit_request_outcome_total{outcome=~\"CLARIFIED|DENIED\"}[" + w + "]))"),
+                        "sum(increase(conduit_request_outcome_total{outcome=~\"CLARIFIED|FORM_CLARIFY|DENIED\"}[" + w + "]))"),
                 donut("decision_mix", "Allow vs deny", "count",
                         "sum by (decision) (increase(conduit_authz_decisions_total[" + w + "]))", "decision"),
                 bars("decisions_by_resource", "Checks by resource type", "count",

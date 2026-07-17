@@ -156,6 +156,12 @@ public class ChatCompletionsController {
         Map<String, String> mdcContext = MDC.getCopyOfContextMap();
         Context otelContext = Context.current();
         String conversationId = httpRequest.getHeader("X-Conversation-Id");
+        // Phase-2 structured-clarification RESUME carriers (both null on an ordinary turn). The BFF's
+        // /api/clarify/resolve folds the user's answer into this normal chat turn and tags it with the
+        // outstanding descriptor's single-use nonce (+ the chosen option value for a chip selection). The
+        // gateway consumes the descriptor and re-drives the full pipeline (entitlement re-CHECKed).
+        String clarifyNonce = httpRequest.getHeader("X-Clarify-Nonce");
+        String clarifySelection = httpRequest.getHeader("X-Clarify-Selection");
 
         // OpenAI spec: `stream` omitted or false → a single chat.completion JSON object;
         // true → SSE stream of chat.completion.chunk events. LibreChat sends stream:true.
@@ -167,7 +173,8 @@ public class ChatCompletionsController {
                 stream, userId, conversationId);
 
         if (!stream) {
-            return nonStreaming(request, userId, principal, conversationId, callerToken, mdcContext);
+            return nonStreaming(request, userId, principal, conversationId, callerToken, mdcContext,
+                    clarifyNonce, clarifySelection);
         }
 
         // ── Streaming path (unchanged) ────────────────────────────────────────────
@@ -192,7 +199,8 @@ public class ChatCompletionsController {
             pipeline = pipelineExecutor.submit(() -> {
                 try (Scope ignored = otelContext.makeCurrent()) {
                     MdcPropagation.run(mdcContext, () ->
-                            chatService.handleChat(request, emitter, userId, principal, conversationId, callerToken));
+                            chatService.handleChat(request, emitter, userId, principal, conversationId, callerToken,
+                                    clarifyNonce, clarifySelection));
                 }
             });
         }
@@ -207,7 +215,8 @@ public class ChatCompletionsController {
      */
     private ResponseEntity<String> nonStreaming(ChatRequest request, String userId,
                                                 Principal principal, String conversationId, String callerToken,
-                                                Map<String, String> mdcContext) {
+                                                Map<String, String> mdcContext,
+                                                String clarifyNonce, String clarifySelection) {
         BufferingSseEmitter buf = new BufferingSseEmitter();
         Context otelContext = Context.current();
         if (chatService.isTitleRequest(request)) {
@@ -220,7 +229,8 @@ public class ChatCompletionsController {
             CompletableFuture.runAsync(() -> {
                 try (Scope ignored = otelContext.makeCurrent()) {
                     MdcPropagation.run(mdcContext, () ->
-                            chatService.handleChat(request, buf, userId, principal, conversationId, callerToken));
+                            chatService.handleChat(request, buf, userId, principal, conversationId, callerToken,
+                                    clarifyNonce, clarifySelection));
                 }
             }, pipelineExecutor);
         }

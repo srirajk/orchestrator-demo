@@ -107,6 +107,84 @@ class GatewayClientTransportTest {
     }
 
     /**
+     * The Phase-2 RESUME overload must carry the structured-clarification carriers as headers so the
+     * gateway can consume the outstanding descriptor and re-CHECK. An ordinary chat turn (the no-arg
+     * overload) must send NEITHER header — the two paths stay distinguishable on the wire.
+     */
+    @Test
+    void resumeOverloadSendsClarifyHeaders_ordinaryTurnSendsNone() throws Exception {
+        CountDownLatch served = new CountDownLatch(1);
+        executor.submit(() -> {
+            try (Socket socket = server.accept()) {
+                var reader = new BufferedReader(
+                        new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
+                String line;
+                while ((line = reader.readLine()) != null && !line.isEmpty()) {
+                    synchronized (requestLines) {
+                        requestLines.add(line);
+                    }
+                }
+                OutputStream out = socket.getOutputStream();
+                out.write(("HTTP/1.1 200 OK\r\n"
+                        + "Content-Type: text/event-stream\r\n"
+                        + "Content-Length: 0\r\n\r\n").getBytes(StandardCharsets.UTF_8));
+                out.flush();
+                served.countDown();
+            } catch (Exception ignored) {
+            }
+            return null;
+        });
+
+        GatewayStream stream = clientFor(5_000)
+                .openChatStream("token", "conv-9", List.of(), "nonce-abc", "REL-00042");
+
+        assertThat(served.await(10, TimeUnit.SECONDS)).isTrue();
+        assertThat(stream.status()).isEqualTo(200);
+
+        synchronized (requestLines) {
+            assertThat(requestLines).anySatisfy(h ->
+                    assertThat(h.toLowerCase()).contains("x-clarify-nonce: nonce-abc"));
+            assertThat(requestLines).anySatisfy(h ->
+                    assertThat(h.toLowerCase()).contains("x-clarify-selection: rel-00042"));
+        }
+    }
+
+    @Test
+    void ordinaryTurnSendsNoClarifyHeaders() throws Exception {
+        CountDownLatch served = new CountDownLatch(1);
+        executor.submit(() -> {
+            try (Socket socket = server.accept()) {
+                var reader = new BufferedReader(
+                        new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
+                String line;
+                while ((line = reader.readLine()) != null && !line.isEmpty()) {
+                    synchronized (requestLines) {
+                        requestLines.add(line);
+                    }
+                }
+                OutputStream out = socket.getOutputStream();
+                out.write(("HTTP/1.1 200 OK\r\n"
+                        + "Content-Type: text/event-stream\r\n"
+                        + "Content-Length: 0\r\n\r\n").getBytes(StandardCharsets.UTF_8));
+                out.flush();
+                served.countDown();
+            } catch (Exception ignored) {
+            }
+            return null;
+        });
+
+        clientFor(5_000).openChatStream("token", "conv-9", List.of());
+
+        assertThat(served.await(10, TimeUnit.SECONDS)).isTrue();
+        synchronized (requestLines) {
+            assertThat(requestLines).noneSatisfy(h ->
+                    assertThat(h.toLowerCase()).contains("x-clarify-nonce"));
+            assertThat(requestLines).noneSatisfy(h ->
+                    assertThat(h.toLowerCase()).contains("x-clarify-selection"));
+        }
+    }
+
+    /**
      * A peer that accepts the socket and then never writes a status line used to park the caller
      * forever, because {@code HttpClient} without a request timeout waits indefinitely for headers.
      */

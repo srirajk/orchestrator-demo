@@ -84,7 +84,7 @@ public class GatewaySloMetrics {
 
     private static String statusClass(String outcome) {
         return switch (safe(outcome).toUpperCase(Locale.ROOT)) {
-            case "ANSWERED", "CLARIFIED" -> "2xx";
+            case "ANSWERED", "CLARIFIED", "FORM_CLARIFY" -> "2xx";
             case "DENIED" -> "4xx";
             default -> "5xx";
         };
