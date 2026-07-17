@@ -9,6 +9,7 @@ import com.openwolf.iam.policystudio.breakglass.BreakGlassApprovalService;
 import com.openwolf.iam.policystudio.breakglass.BreakGlassArtifact;
 import com.openwolf.iam.policystudio.breakglass.BreakGlassAuthoringService;
 import com.openwolf.iam.policystudio.breakglass.BreakGlassGrant;
+import com.openwolf.iam.policystudio.breakglass.BreakGlassPromotionService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -51,13 +52,16 @@ public class StudioBreakGlassController {
 
     private final BreakGlassAuthoringService authoring;
     private final BreakGlassApprovalService approval;
+    private final BreakGlassPromotionService promotion;
     private final StudioSessionStore store;
 
     public StudioBreakGlassController(BreakGlassAuthoringService authoring,
                                       BreakGlassApprovalService approval,
+                                      BreakGlassPromotionService promotion,
                                       StudioSessionStore store) {
         this.authoring = authoring;
         this.approval = approval;
+        this.promotion = promotion;
         this.store = store;
     }
 
@@ -119,6 +123,13 @@ public class StudioBreakGlassController {
     /**
      * {@code POST /admin/studio/break-glass/{grantId}/approve} — the two-person issue step. Approver only;
      * the service rejects self-approval (requester≠approver) and a missing approver role.
+     *
+     * <p><b>S4 — the grant now actually enforces.</b> After the C6 two-person gate passes, the grant is
+     * MERGED into the tenant's current active bundle and PROMOTED through C5
+     * ({@link BreakGlassPromotionService}), so it loads into the serving PDP (S1). The {@code issued} flag
+     * is set only once that promotion succeeds — a failed promotion fails closed and leaves the grant
+     * unissued. The emergency ALLOW is additive (normal grants are preserved) and self-limits inside the
+     * PDP at {@code expiresAt}.
      */
     @PostMapping("/{grantId}/approve")
     @PreAuthorize("hasRole('policy_approver')")
@@ -133,9 +144,13 @@ public class StudioBreakGlassController {
                 .orElseThrow(() -> new IllegalArgumentException("no pending break-glass grant '" + grantId + "'"));
 
         String correlation = correlationId != null ? correlationId : UUID.randomUUID().toString();
-        // SoD is keyed on the VERIFIED author identity captured at author time (pending.requestedBy(),
-        // set from the authenticated sub) — not grant.requestedBy() (a caller field on the grant). (H1)
+        // (1) C6 two-person gate + audit. SoD is keyed on the VERIFIED author identity captured at author
+        //     time (pending.requestedBy(), set from the authenticated sub) — not grant.requestedBy() (a
+        //     caller field on the grant). (H1)
         approval.approveAndIssue(pending.artifact(), pending.requestedBy(), approver, approverRoles, correlation);
+        // (2) S4 — merge the grant into the tenant's active bundle and promote through C5 so it reaches the
+        //     serving PDP. Fails closed: a promotion failure propagates and the grant is NOT marked issued.
+        promotion.mergeAndPromote(pending, approver, approverRoles, correlation);
         store.markIssued(pending);
         return store.getGrant(tenant, grantId).map(GrantView::pending).map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());

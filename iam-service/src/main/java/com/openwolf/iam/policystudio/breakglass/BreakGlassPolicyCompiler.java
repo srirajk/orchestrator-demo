@@ -7,9 +7,9 @@ import org.springframework.stereotype.Component;
 
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
@@ -32,9 +32,21 @@ import java.util.TreeSet;
  * makes expiry fail CLOSED: after {@code expiresAt} the explicit DENY fires (and DENY beats ALLOW in
  * Cerbos), so the grant expires <em>inside the PDP</em> with no external revocation.
  *
- * <p>Every OTHER base-ceiling tuple is denied outright (a deny-all baseline, per the B1 idiom), so the
- * child totally covers the ceiling — no fall-through hole. The result is a break-glass tenant whose
- * only capability is the one time-boxed emergency action.
+ * <p><b>S4 — MERGE, not replace (the fix).</b> A break-glass child must be the tenant's CURRENT active
+ * grants PLUS the one time-boxed emergency tuple — never a standalone policy that DENIES every other
+ * tuple. The old deny-all-else baseline was correct for totality but, once promoted into the serving
+ * PDP (S1), would have <em>revoked the tenant's normal access</em> for the life of the grant. The merge
+ * takes the tenant's current restriction child ({@code currentChild}; {@code null} = the tenant purely
+ * inherits the base ceiling) and, for every ceiling {@code (action, role)} tuple EXCEPT the granted
+ * tuple, re-emits the effect the current bundle already decides — preserving each normal ALLOW and each
+ * deliberate DENY. Only the granted tuple is governed by the complementary time-conditioned pair, so the
+ * emergency ALLOW is additive and, on expiry, collapses to its DENY while the rest of the bundle stays
+ * intact. Totality over the ceiling is still complete, so nothing falls through to the parent ALLOW.
+ *
+ * <p>Tenant restriction children in this system are authored as unconditional per-role ALLOW/DENY rules
+ * (the base ceiling carries the CEL conditions — classification ladder, tenant-equality backstop); the
+ * merge therefore reproduces each tuple's effect unconditionally, exactly as {@code tenant_default_agent}
+ * and the C5 bodies are written.
  */
 @Component
 public class BreakGlassPolicyCompiler {
@@ -82,13 +94,30 @@ public class BreakGlassPolicyCompiler {
     }
 
     /**
-     * Compile the grant into the typed IR. The caller runs the produced IR through the C2
-     * {@link GeneratedPolicyValidator} to confirm admissibility (see {@code BreakGlassAuthoringService}).
+     * Compile the grant against the tenant's inherited base ceiling ({@code currentChild = null}) — the
+     * tenant has no restriction child yet, so every ceiling tuple is preserved (ALLOWed) and only the
+     * granted tuple is time-boxed. Convenience overload used by the C6 authoring/bounds harness.
      */
     public PolicyIR compile(BreakGlassGrant grant, BaseCeiling ceiling) {
+        return compile(grant, ceiling, null);
+    }
+
+    /**
+     * Compile the grant into a tenant restriction child that MERGES the temporary emergency tuple with the
+     * tenant's CURRENT active grants (S4). The caller runs the produced IR through the C2
+     * {@link GeneratedPolicyValidator} to confirm admissibility (see {@code BreakGlassAuthoringService}).
+     *
+     * @param grant        the bounds-validated emergency grant
+     * @param ceiling      the immutable base ceiling (the totality target)
+     * @param currentChild the tenant's current active restriction child ({@code null} = inherits the base
+     *                     ceiling directly); its per-tuple effects are preserved, so normal access survives
+     */
+    public PolicyIR compile(BreakGlassGrant grant, BaseCeiling ceiling, PolicyIR currentChild) {
         List<PolicyIR.Rule> rules = new ArrayList<>();
 
-        // ── The break-glass grant: a complementary time-conditioned ALLOW/DENY on the granted tuple ──
+        // ── The break-glass grant: a complementary time-conditioned ALLOW/DENY on the granted tuple.
+        //    Emitted FIRST so the granted tuple is governed solely by the time pair (and so a scan for the
+        //    emergency ALLOW/DENY finds the time-conditioned rule, not a merged baseline rule). ──
         rules.add(new PolicyIR.Rule(
                 List.of(grant.action()), "EFFECT_ALLOW", List.of(grant.role()), List.of(),
                 matchCondition(activeWindow(grant))));
@@ -96,18 +125,24 @@ public class BreakGlassPolicyCompiler {
                 List.of(grant.action()), "EFFECT_DENY", List.of(grant.role()), List.of(),
                 matchCondition(outsideWindow(grant))));
 
-        // ── Deny-all baseline: explicit DENY for every remaining ceiling (action, role) tuple ──
-        // Group by role; exclude the granted (action, role) so the conditional pair alone governs it.
-        Map<String, TreeSet<String>> withheldByRole = new LinkedHashMap<>();
+        // ── MERGE baseline: for every remaining ceiling tuple, re-emit the effect the tenant's CURRENT
+        //    bundle already decides — preserving normal ALLOWs (so break-glass is additive, not a revoke)
+        //    and deliberate DENYs. Grouped by effect + role for deterministic, total coverage. ──
+        Map<String, TreeSet<String>> allowByRole = new TreeMap<>();
+        Map<String, TreeSet<String>> denyByRole = new TreeMap<>();
         for (BaseCeiling.Tuple t : ceiling.tuples()) {
             if (t.role().equals(grant.role()) && t.action().equals(grant.action())) {
                 continue; // governed by the time-conditioned pair above
             }
-            withheldByRole.computeIfAbsent(t.role(), r -> new TreeSet<>()).add(t.action());
+            Map<String, TreeSet<String>> target = currentlyAllows(currentChild, t) ? allowByRole : denyByRole;
+            target.computeIfAbsent(t.role(), r -> new TreeSet<>()).add(t.action());
         }
-        // Deterministic rule order: roles sorted, actions sorted.
-        for (Map.Entry<String, TreeSet<String>> e : new TreeSet<>(withheldByRole.keySet()).stream()
-                .map(r -> Map.entry(r, withheldByRole.get(r))).toList()) {
+        // Deterministic rule order: ALLOWs then DENYs, roles sorted, actions sorted.
+        for (Map.Entry<String, TreeSet<String>> e : allowByRole.entrySet()) {
+            rules.add(new PolicyIR.Rule(
+                    List.copyOf(e.getValue()), "EFFECT_ALLOW", List.of(e.getKey()), List.of(), null));
+        }
+        for (Map.Entry<String, TreeSet<String>> e : denyByRole.entrySet()) {
             rules.add(new PolicyIR.Rule(
                     List.copyOf(e.getValue()), "EFFECT_DENY", List.of(e.getKey()), List.of(), null));
         }
@@ -120,5 +155,30 @@ public class BreakGlassPolicyCompiler {
                 GeneratedPolicyValidator.TENANT_CHILD_POSTURE,
                 List.of(),
                 rules);
+    }
+
+    /**
+     * The effect the tenant's current bundle assigns a ceiling tuple. A {@code null} current child means
+     * the tenant inherits the base ceiling directly, so every tuple is preserved (ALLOW). Otherwise the
+     * child's own rules decide: DENY beats ALLOW (Cerbos semantics), and an uncovered tuple fails CLOSED
+     * (DENY) — which is exactly how the base bundle already treats it under parental consent.
+     */
+    private static boolean currentlyAllows(PolicyIR currentChild, BaseCeiling.Tuple tuple) {
+        if (currentChild == null) {
+            return true;
+        }
+        boolean allowed = false;
+        for (PolicyIR.Rule rule : currentChild.rules()) {
+            boolean actionMatch = rule.actions().contains(tuple.action());
+            boolean roleMatch = rule.roles().contains(tuple.role())
+                    || rule.derivedRoles().contains(tuple.role());
+            if (actionMatch && roleMatch) {
+                if (!rule.isAllow()) {
+                    return false; // an explicit DENY on the tuple wins
+                }
+                allowed = true;
+            }
+        }
+        return allowed;
     }
 }

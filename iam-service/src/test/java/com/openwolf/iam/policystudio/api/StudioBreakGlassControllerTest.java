@@ -7,6 +7,7 @@ import com.openwolf.iam.policystudio.breakglass.BreakGlassApprovalService;
 import com.openwolf.iam.policystudio.breakglass.BreakGlassArtifact;
 import com.openwolf.iam.policystudio.breakglass.BreakGlassAuthoringService;
 import com.openwolf.iam.policystudio.breakglass.BreakGlassGrant;
+import com.openwolf.iam.policystudio.breakglass.BreakGlassPromotionService;
 import com.openwolf.iam.policystudio.breakglass.BreakGlassSodException;
 import com.openwolf.iam.policystudio.breakglass.BreakGlassValidator;
 import org.junit.jupiter.api.Test;
@@ -47,6 +48,7 @@ class StudioBreakGlassControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean BreakGlassAuthoringService authoring;
     @MockitoBean BreakGlassApprovalService approval;
+    @MockitoBean BreakGlassPromotionService promotion;
     @MockitoBean StudioSessionStore store;
 
     private static String body(String scope, long ttl) {
