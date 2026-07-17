@@ -97,6 +97,14 @@ class ChatServiceResumeReCheckTest extends RedisContainerTest {
                     ((ai.conduit.gateway.registry.model.AgentManifest) m).agentId(), true));
             return new CerbosEntitlementAdapter.BatchResult(decisions, "cerbos");
         });
+        // S1c: mirror the stub for the ctx-aware overload the PRIMARY filterAgents gate now calls.
+        when(cerbosAdapter.checkAgents(any(), any(), any())).thenAnswer(inv -> {
+            List<?> ms = inv.getArgument(1);
+            Map<String, Boolean> decisions = new HashMap<>();
+            if (ms != null) ms.forEach(m -> decisions.put(
+                    ((ai.conduit.gateway.registry.model.AgentManifest) m).agentId(), true));
+            return new CerbosEntitlementAdapter.BatchResult(decisions, "cerbos");
+        });
         // The classifier runs on the descriptor's ORIGINAL query — a vague in-domain fetch with no entity;
         // the resume injects the chosen id as the grounded reference.
         when(intentClassifier.classify(any())).thenReturn(new IntentResult(

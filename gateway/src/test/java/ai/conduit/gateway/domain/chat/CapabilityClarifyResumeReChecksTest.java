@@ -46,6 +46,14 @@ class CapabilityClarifyResumeReChecksTest extends CapabilityClarifyFixture {
             if (ms != null) ms.forEach(m -> decisions.put(m.agentId(), allow.get()));
             return new CerbosEntitlementAdapter.BatchResult(decisions, "cerbos");
         });
+        // S1c: mirror the stub for the ctx-aware overload the PRIMARY filterAgents gate now calls
+        // (same revocable verdict via the shared `allow` flag, so the resume still re-CHECKs and denies).
+        when(cerbosAdapter.checkAgents(any(), any(), any())).thenAnswer(inv -> {
+            List<AgentManifest> ms = inv.getArgument(1);
+            Map<String, Boolean> decisions = new HashMap<>();
+            if (ms != null) ms.forEach(m -> decisions.put(m.agentId(), allow.get()));
+            return new CerbosEntitlementAdapter.BatchResult(decisions, "cerbos");
+        });
         // Routing abstains (low margin) with the two plausible capabilities — on BOTH turns.
         when(resolver.resolveContextual(anyString(), anyBoolean())).thenReturn(new ResolverResult(
                 List.of(),

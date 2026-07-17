@@ -33,6 +33,13 @@ class CapabilityClarifyEnumerationTest extends CapabilityClarifyFixture {
             if (ms != null) ms.forEach(m -> decisions.put(m.agentId(), POLICY.agentId().equals(m.agentId())));
             return new CerbosEntitlementAdapter.BatchResult(decisions, "cerbos");
         });
+        // S1c: mirror the stub for the ctx-aware overload the PRIMARY filterAgents gate now calls.
+        when(cerbosAdapter.checkAgents(any(), any(), any())).thenAnswer(inv -> {
+            List<AgentManifest> ms = inv.getArgument(1);
+            Map<String, Boolean> decisions = new HashMap<>();
+            if (ms != null) ms.forEach(m -> decisions.put(m.agentId(), POLICY.agentId().equals(m.agentId())));
+            return new CerbosEntitlementAdapter.BatchResult(decisions, "cerbos");
+        });
         when(resolver.resolveContextual(anyString(), anyBoolean())).thenReturn(new ResolverResult(
                 List.of(),
                 List.of(new RoutingCandidate(POLICY, 0.44), new RoutingCandidate(PAYROLL, 0.43)),
