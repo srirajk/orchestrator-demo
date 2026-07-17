@@ -69,6 +69,39 @@ public class TenantProvisioningController {
         return ResponseEntity.ok(directory.snapshot());
     }
 
+    /** One tenant's atomic 4-artifact activation status, derived from the active directory. */
+    public record TenantStatus(String tenantId, boolean active, String policyVersion, long directoryVersion) {}
+
+    /** The list envelope — the current directory version plus every active tenant's status. */
+    public record TenantList(long directoryVersion, java.util.List<TenantStatus> tenants) {}
+
+    /**
+     * {@code GET /admin/tenants} — list every active tenant with its status. "Active" means the
+     * activation compare-and-set (the last step of a provision, after all four artifacts verified)
+     * committed; a half-provisioned or deprovisioned tenant is simply absent.
+     */
+    @GetMapping
+    public ResponseEntity<TenantList> list() {
+        ActiveTenantDirectory.Snapshot snapshot = directory.snapshot();
+        java.util.List<TenantStatus> tenants = snapshot.tenantPolicyVersions().entrySet().stream()
+                .map(e -> new TenantStatus(e.getKey(), true, e.getValue(), snapshot.version()))
+                .sorted(java.util.Comparator.comparing(TenantStatus::tenantId))
+                .toList();
+        return ResponseEntity.ok(new TenantList(snapshot.version(), tenants));
+    }
+
+    /**
+     * {@code GET /admin/tenants/{tenantId}} — one tenant's status. Present ⇒ {@code active=true} with
+     * its live policy version; absent ⇒ {@code active=false} (fails closed, never a guess).
+     */
+    @GetMapping("/{tenantId}")
+    public ResponseEntity<TenantStatus> status(@PathVariable String tenantId) {
+        ActiveTenantDirectory.Snapshot snapshot = directory.snapshot();
+        String policyVersion = snapshot.tenantPolicyVersions().get(tenantId);
+        return ResponseEntity.ok(new TenantStatus(
+                tenantId, policyVersion != null, policyVersion, snapshot.version()));
+    }
+
     private static String actorOf(Authentication authentication) {
         return authentication != null && authentication.getName() != null
                 ? authentication.getName() : "system";

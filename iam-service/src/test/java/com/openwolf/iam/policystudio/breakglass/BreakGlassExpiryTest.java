@@ -50,8 +50,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class BreakGlassExpiryTest {
 
+    // Pinned to 0.53.0 — the exact version the runtime Cerbos PDP + the provisioning gate run
+    // (ProvisioningTestSupport, cerbos-policy-gate). An unpinned :latest could silently drift the
+    // CEL semantics this expiry proof depends on. Overridable via CERBOS_IMAGE for local pins.
     private static final DockerImageName CERBOS_IMAGE = DockerImageName.parse(
-            System.getenv().getOrDefault("CERBOS_IMAGE", "ghcr.io/cerbos/cerbos:latest"));
+            System.getenv().getOrDefault("CERBOS_IMAGE", "ghcr.io/cerbos/cerbos:0.53.0"));
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final BreakGlassPolicyCompiler compiler = new BreakGlassPolicyCompiler();
@@ -116,7 +119,7 @@ class BreakGlassExpiryTest {
 
     @Test
     void expiresWithControlPlaneDown() throws Exception {
-        Assumptions.assumeTrue(dockerAvailable(), "Docker not available — skipping the live-PDP headline");
+        requireDocker();
 
         Path work = Files.createTempDirectory("breakglass-c6-");
         Path conf = work.resolve("conf");
@@ -220,6 +223,26 @@ class BreakGlassExpiryTest {
             return p.waitFor() == 0;
         } catch (Exception e) {
             return false;
+        }
+    }
+
+    /**
+     * Docker gate (H7). Locally — for a dev without Docker — a missing daemon is an assume-skip so
+     * the unit suite still runs. In CI, where Docker is guaranteed present, the workflow sets
+     * {@code CONDUIT_DOCKER_REQUIRED=true}, which turns the skip into a HARD FAILURE: a
+     * silently-skipped security proof must NOT pass the gate green.
+     */
+    private static void requireDocker() {
+        boolean docker = dockerAvailable();
+        boolean requiredInCi = Boolean.parseBoolean(
+                System.getenv().getOrDefault("CONDUIT_DOCKER_REQUIRED", "false"));
+        if (requiredInCi) {
+            assertThat(docker)
+                    .as("CONDUIT_DOCKER_REQUIRED=true (CI) but Docker is unavailable — this "
+                            + "live-PDP security proof must RUN, not skip green")
+                    .isTrue();
+        } else {
+            Assumptions.assumeTrue(docker, "Docker not available — skipping the live-PDP headline");
         }
     }
 }
