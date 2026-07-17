@@ -20,8 +20,9 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -97,10 +98,11 @@ public class StudioBreakGlassController {
             throw new IllegalArgumentException(
                     "ttlMinutes must be within (0, 60] against the server clock — was " + ttl);
         }
-        Instant now = Instant.now();
-        BreakGlassGrant grant = new BreakGlassGrant(
-                TenantScope.of(payload.scope()), payload.resourceKind(), payload.action(), payload.role(),
-                now, now.plus(ttl, ChronoUnit.MINUTES), payload.justification(), requester);
+        // issuedAt is stamped from the SERVER clock inside the factory; there is no caller issuedAt to
+        // ignore, and expiresAt = issuedAt + ttl (H1). The bounds gate re-validates against the server clock.
+        BreakGlassGrant grant = BreakGlassGrant.issue(
+                Clock.systemUTC(), TenantScope.of(payload.scope()), payload.resourceKind(),
+                payload.action(), payload.role(), Duration.ofMinutes(ttl), payload.justification(), requester);
 
         // Cross-tenant guard: the grant's scope root must be the principal's own tenant.
         StudioPrincipal.assertSameTenant(tenant, grant.tenantId());
@@ -131,7 +133,9 @@ public class StudioBreakGlassController {
                 .orElseThrow(() -> new IllegalArgumentException("no pending break-glass grant '" + grantId + "'"));
 
         String correlation = correlationId != null ? correlationId : UUID.randomUUID().toString();
-        approval.approveAndIssue(pending.artifact(), approver, approverRoles, correlation);
+        // SoD is keyed on the VERIFIED author identity captured at author time (pending.requestedBy(),
+        // set from the authenticated sub) — not grant.requestedBy() (a caller field on the grant). (H1)
+        approval.approveAndIssue(pending.artifact(), pending.requestedBy(), approver, approverRoles, correlation);
         store.markIssued(pending);
         return store.getGrant(tenant, grantId).map(GrantView::pending).map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());

@@ -3,6 +3,7 @@ package com.openwolf.iam.tenancy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -11,28 +12,33 @@ import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
- * Axiom B4.1 — a half-provisioned tenant is FULLY UNUSABLE. Inject a failure after 2 of the 4
- * artifacts; the tenant must be absent from the active directory, and a request under it must fail
- * closed at the A2 seam with zero I/O. Red if a partial tenant can do anything.
+ * Axiom B4.1 / H6 — a half-provisioned tenant is FULLY UNUSABLE <b>and</b> leaves NO ORPHANED
+ * ARTIFACTS. Inject a failure after 2 of the 4 artifacts; the tenant must be absent from the active
+ * directory (a request under it fails closed at the A2 seam with zero I/O) AND the already-staged
+ * non-audit artifacts (Redis namespace, staged policy bundle) must be COMPENSATED/CLEANED — not merely
+ * left absent from the directory. Red if a partial tenant can do anything, or if an orphaned namespace
+ * or staged policy bundle survives the failed run.
  */
 class ProvisioningAtomicityTest {
 
     private static final String TENANT = "acme";
 
     @Test
-    void halfProvisionedTenantIsFullyUnusable(@TempDir Path staging) {
+    void halfProvisionedTenantIsFullyUnusableAndArtifactsCleaned(@TempDir Path staging) {
         ActiveTenantRepository activeRepo = ProvisioningTestSupport.activeRepo();
         ActiveTenantDirectory directory = new ActiveTenantDirectory(activeRepo);
 
         // POLICY + REDIS succeed; REGISTRY (artifact 3) fails → exactly 2 of 4 staged.
+        InProcessTenantNamespaceAdapter namespaceAdapter = new InProcessTenantNamespaceAdapter();
+        PolicyBootstrapAdapter policyAdapter = ProvisioningTestSupport.realPolicyAdapterNoProbe(staging);
         RegistrySpaceAdapter failingRegistry =
                 new ProvisioningTestSupport.FailingRegistryAdapter(new InProcessRegistrySpaceAdapter(), 1);
 
         TenantProvisioningService service = new TenantProvisioningService(
                 ProvisioningTestSupport.opsRepo(),
                 directory,
-                ProvisioningTestSupport.realPolicyAdapterNoProbe(staging),
-                new InProcessTenantNamespaceAdapter(),
+                policyAdapter,
+                namespaceAdapter,
                 failingRegistry,
                 new PersistentAuditPartitionAdapter(ProvisioningTestSupport.auditRepo()));
 
@@ -52,6 +58,17 @@ class ProvisioningAtomicityTest {
         assertThat(directory.isActive(TENANT)).isFalse();
         assertThat(directory.find(TENANT)).isEmpty();
         assertThat(directory.snapshot().tenantPolicyVersions()).doesNotContainKey(TENANT);
+
+        // H6 — the staged artifacts were COMPENSATED, not merely left absent from the directory. The
+        // ledger above proves POLICY + REDIS were genuinely staged; these prove they were then cleaned.
+        assertThat(namespaceAdapter.namespaceExists(TENANT))
+                .as("the staged Redis namespace must be compensated on a failed provision — "
+                        + "an orphaned namespace must FAIL this test")
+                .isFalse();
+        assertThat(Files.exists(staging.resolve(TENANT)))
+                .as("the staged policy bundle must be compensated on a failed provision — "
+                        + "an orphaned staging directory must FAIL this test")
+                .isFalse();
 
         // Fail-closed at A2 with ZERO I/O: the lookup reads only the in-memory snapshot; the durable
         // directory repository is never touched on a resolve.

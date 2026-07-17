@@ -14,12 +14,15 @@ import java.util.Optional;
  * bootstrap ({@link PolicyBootstrapAdapter}), a Redis namespace ({@link TenantNamespaceAdapter}), a
  * registry manifest space ({@link RegistrySpaceAdapter}), and an audit partition
  * ({@link AuditPartitionAdapter}) — and only THEN flips the {@link ActiveTenantDirectory} with a
- * compare-and-set as the very LAST step. A crash or injected failure at any stage leaves partial
- * artifacts but the tenant ABSENT from the directory, so it resolves as unknown and every gateway
- * request under it fails closed at the A2 seam with zero I/O — a half-provisioned tenant is fully
- * unusable. The persisted {@link ProvisioningOperation} (keyed by idempotency key) records how far a
- * run got; a retry with the same key resumes and idempotently reconciles (content-addressed policy
- * version + idempotent adapters ⇒ one active tenant, no conflicting artifacts).
+ * compare-and-set as the very LAST step. On an injected/crash failure the tenant is ABSENT from the
+ * directory (so it resolves as unknown and every gateway request under it fails closed at the A2 seam
+ * with zero I/O — a half-provisioned tenant is fully unusable) AND the already-staged NON-AUDIT
+ * artifacts are COMPENSATED (H6): the Redis namespace/index, registry space, and staged policy bundle
+ * are cleaned so a failed run leaves no orphaned artifact — not merely absence from the directory. The
+ * AUDIT partition is append-only evidence and is never deleted. The persisted
+ * {@link ProvisioningOperation} (keyed by idempotency key) records how far a run got; a retry with the
+ * same key resumes and idempotently reconciles (content-addressed policy version + idempotent adapters
+ * ⇒ one active tenant, no conflicting artifacts).
  *
  * <p><b>Deprovision</b> reverses the order: remove the tenant from the directory FIRST (every gateway
  * request then fails closed), wait for gateway instances to ack the new directory version, then clean
@@ -88,11 +91,14 @@ public class TenantProvisioningService {
             return ProvisioningResult.of(op, directory.version());
         }
 
+        // Track the staged policy bundle so a failure can COMPENSATE it (H6) — a failed run must leave
+        // no orphaned staged artifact, not merely be absent from the directory.
+        TenantBootstrapBundle bundle = null;
         try {
             // ── Stage the four artifacts. Each adapter is idempotent, so a retry re-runs safely. ──
 
             // 1. Cerbos policy bootstrap — deny-all bundle, content-addressed, staged + probed.
-            TenantBootstrapBundle bundle = policyAdapter.stage(tenantId);
+            bundle = policyAdapter.stage(tenantId);
             policyAdapter.probe(bundle);
             op.setPolicyVersion(bundle.policyVersion());
             op.markStaged(ProvisioningOperation.Artifact.POLICY);
@@ -126,15 +132,53 @@ public class TenantProvisioningService {
             return ProvisioningResult.of(op, directoryVersion);
 
         } catch (RuntimeException e) {
+            // COMPENSATE (H6): clean the already-staged NON-AUDIT artifacts so a failed run leaves no
+            // orphaned Redis namespace/index or staged policy bundle — not merely absence from the
+            // directory. Runs BEFORE the FAILED save so the durable ledger reflects the compensated state.
+            compensateStaged(op, tenantId, bundle);
+
             op.setStatus(ProvisioningOperation.Status.FAILED);
             op.setLastError(e.toString());
             operations.save(op);
             // FAIL CLOSED: the tenant is NOT in the directory; a request under it resolves unknown at A2.
-            log.warn("FAIL-CLOSED: provision of tenant '{}' failed after staging {} — tenant is ABSENT "
-                            + "from the active directory and fully unusable (retry key {} to reconcile): {}",
+            log.warn("FAIL-CLOSED: provision of tenant '{}' failed after staging {} — staged artifacts "
+                            + "compensated, tenant is ABSENT from the active directory and fully unusable "
+                            + "(retry key {} to reconcile): {}",
                     tenantId, op.stagedArtifacts(), key, e.toString());
             throw (e instanceof ProvisioningException pe)
                     ? pe : new ProvisioningException("provisioning failed for tenant '" + tenantId + "'", e);
+        }
+    }
+
+    /**
+     * H6 compensation for a FAILED provision: clean up the NON-AUDIT artifacts already staged in this
+     * run. Redis namespace/index and the staged policy bundle are debris from a never-activated run and
+     * MUST NOT linger. The registry space is likewise cleaned. The AUDIT partition is append-only
+     * evidence (the genesis event) and is NEVER deleted — matching the deprovision contract. Each step
+     * is best-effort and guarded so a cleanup failure never masks the original provisioning error.
+     */
+    private void compensateStaged(ProvisioningOperation op, String tenantId, TenantBootstrapBundle bundle) {
+        if (op.isStaged(ProvisioningOperation.Artifact.REGISTRY)) {
+            try {
+                registryAdapter.removeSpace(tenantId);
+            } catch (RuntimeException ce) {
+                log.warn("H6 compensation: failed to remove registry space for '{}': {}", tenantId, ce.toString());
+            }
+        }
+        if (op.isStaged(ProvisioningOperation.Artifact.REDIS)) {
+            try {
+                namespaceAdapter.removeNamespace(tenantId);
+            } catch (RuntimeException ce) {
+                log.warn("H6 compensation: failed to remove Redis namespace for '{}': {}", tenantId, ce.toString());
+            }
+        }
+        if (bundle != null) {
+            try {
+                policyAdapter.discardStaged(bundle);
+            } catch (RuntimeException ce) {
+                log.warn("H6 compensation: failed to discard staged policy bundle {} for '{}': {}",
+                        bundle.policyVersion(), tenantId, ce.toString());
+            }
         }
     }
 

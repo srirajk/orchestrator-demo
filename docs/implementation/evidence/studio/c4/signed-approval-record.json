@@ -9,7 +9,7 @@
   "approverRoles" : [ "security_reviewer" ],
   "decision" : "APPROVE",
   "signatureAlg" : "HmacSHA256",
-  "signature" : "1bd09892436759349b61eb09bea11e38ce8d18e1fb58d1d99a67961e4cdc9f56",
-  "signedAt" : "2026-07-17T06:22:22.076379Z",
-  "signingPayload" : "consequence-approval-v1\ntenant=acme\ncurrent=bundle-945d0077e148d713\ncandidate=bundle-597093abcbe5c3a3\nfixtureSet=3fe688bf96fe63784705785ece80962f1aa6076cb50a94ac7e788bbe064888dd\nreviewHash=crh-192d36b1bcae41895d6ae4ffc0de48ce0a2eddf6d57cf8871a44f2a7653ea9e7\nalarm=true\napprover=sec-reviewer-01\nroles=[security_reviewer]\ndecision=APPROVE\nsignedAt=2026-07-17T06:22:22.076379Z"
+  "signature" : "d239339d4943e0b26dae96cea37c35f8fae9732319ec54041e31d26c6e707e34",
+  "signedAt" : "2026-07-17T11:06:39.412392Z",
+  "signingPayload" : "consequence-approval-v1\ntenant=acme\ncurrent=bundle-945d0077e148d713\ncandidate=bundle-597093abcbe5c3a3\nfixtureSet=3fe688bf96fe63784705785ece80962f1aa6076cb50a94ac7e788bbe064888dd\nreviewHash=crh-192d36b1bcae41895d6ae4ffc0de48ce0a2eddf6d57cf8871a44f2a7653ea9e7\nalarm=true\napprover=sec-reviewer-01\nroles=[security_reviewer]\ndecision=APPROVE\nsignedAt=2026-07-17T11:06:39.412392Z"
 }

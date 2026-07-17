@@ -188,6 +188,31 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
+
+            <!--
+                maven-failsafe-plugin — bind the integration-test + verify goals so `mvn verify`
+                actually RUNS the *IT integration proofs (Testcontainers-backed). Surefire's
+                default `**/*Test.java` pattern EXCLUDES `**/*IT.java`, and failsafe is not bound
+                to any lifecycle phase by default (the Spring Boot parent manages its version but
+                declares no execution). Without this binding the security ITs
+                (RedisTenantIsolationProbeIT, CerbosDecisionLogDurabilityIT, PayloadStoreIT,
+                CoverageClientTenantHeaderIT, SecurityRejectionIT, HttpAdapterSpillIT,
+                AgentHarnessResilienceIT) never execute in the deterministic gate. See H7.
+                Version is inherited from spring-boot-starter-parent.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>integration-tests</id>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 </project>

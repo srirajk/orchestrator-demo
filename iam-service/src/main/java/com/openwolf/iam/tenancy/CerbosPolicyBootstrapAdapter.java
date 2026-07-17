@@ -133,6 +133,54 @@ public class CerbosPolicyBootstrapAdapter implements PolicyBootstrapAdapter {
         return compileGate.isAvailable();
     }
 
+    /**
+     * H6 compensation — delete the staged (never-activated) version directory for a FAILED provision,
+     * and prune the now-empty tenant staging root. Best-effort and idempotent: a missing directory is
+     * a no-op. The live bundle is never under the staging root, so this can never touch it.
+     */
+    @Override
+    public void discardStaged(TenantBootstrapBundle bundle) {
+        if (bundle == null || bundle.stagingDir() == null) {
+            return;
+        }
+        Path stagingDir = bundle.stagingDir();
+        try {
+            deleteRecursively(stagingDir);
+            // Prune the tenant-level parent (…/staging/<tenant>) if this was its last staged version.
+            Path tenantDir = stagingDir.getParent();
+            if (tenantDir != null && Files.isDirectory(tenantDir)) {
+                try (Stream<Path> siblings = Files.list(tenantDir)) {
+                    if (siblings.findAny().isEmpty()) {
+                        Files.deleteIfExists(tenantDir);
+                    }
+                }
+            }
+            log.info("H6 compensation: discarded staged bootstrap bundle {} for tenant '{}' at {}",
+                    bundle.policyVersion(), bundle.tenantId(), stagingDir);
+        } catch (IOException e) {
+            // Best-effort: log and continue — the tenant is already absent from the directory (fail-closed).
+            log.warn("H6 compensation: could not fully discard staged bundle {} for tenant '{}' at {}: {}",
+                    bundle.policyVersion(), bundle.tenantId(), stagingDir, e.toString());
+        }
+    }
+
+    private static void deleteRecursively(Path root) throws IOException {
+        if (!Files.exists(root)) {
+            return;
+        }
+        try (Stream<Path> walk = Files.walk(root)) {
+            walk.sorted(java.util.Comparator.reverseOrder()).forEach(p -> {
+                try {
+                    Files.deleteIfExists(p);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            });
+        } catch (UncheckedIOException e) {
+            throw e.getCause();
+        }
+    }
+
     // ── deny-all construction ────────────────────────────────────────────────────────────────
 
     private PolicyIR denyAll(String tenantId, Ceiling ceiling) {
