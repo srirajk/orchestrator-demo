@@ -30,11 +30,11 @@ import java.util.UUID;
  * body field: the controller builds {@code authorScope = TenantScope.of(<claim>)}, so a drafter cannot
  * author a policy targeting another tenant's subtree. Requires the {@code policy_author} role.
  *
- * <p><b>Grounding note (documented gap):</b> the closed manifest {@code vocabulary} and the immutable
- * {@code baseCeiling} are supplied in the request body. There is currently no {@code
- * ManifestVocabularyProvider}/{@code BaseCeilingProvider} bean that derives them per-tenant from the
- * effective manifest (they are test fixtures today). Sourcing them server-side is the intended
- * follow-up; until then the caller supplies them (World-B config, not domain code).
+ * <p><b>Trusted grounding only (Axiom S2).</b> The closed manifest {@code vocabulary} and the immutable
+ * {@code baseCeiling} are <b>always derived server-side</b> for the principal's tenant via {@link
+ * StudioGroundingProvider} — they are never accepted from the request body, so a caller cannot poison the
+ * authoring gate with a widened vocabulary or a relaxed ceiling. The only caller inputs are the NL
+ * {@code intent}, the {@code resourceKind} selector, and the {@code subscopesEnabled} flag.
  */
 @RestController
 @RequestMapping("/admin/studio")
@@ -50,9 +50,12 @@ public class StudioAuthoringController {
         this.grounding = grounding;
     }
 
-    /** The draft request. {@code authorScope} is intentionally absent — it is derived from the principal. */
-    public record DraftPayload(String intent, String resourceKind, ManifestVocabulary vocabulary,
-                               boolean subscopesEnabled, BaseCeiling baseCeiling) {}
+    /**
+     * The draft request. {@code authorScope} is intentionally absent — it is derived from the principal —
+     * and so are {@code vocabulary}/{@code baseCeiling}: those are server-derived grounding, never caller
+     * input.
+     */
+    public record DraftPayload(String intent, String resourceKind, boolean subscopesEnabled) {}
 
     /** The deterministic-gate outcome the SPA renders. */
     public record Validation(boolean ok, List<String> violations, String stage) {}
@@ -70,18 +73,18 @@ public class StudioAuthoringController {
         String author = StudioPrincipal.actor(auth);
         String tenant = StudioPrincipal.tenant(auth);
         String resourceKind = payload.resourceKind() == null || payload.resourceKind().isBlank()
-                ? (payload.vocabulary() == null ? "agent" : payload.vocabulary().resourceKind())
+                ? "agent"
                 : payload.resourceKind();
-        StudioGroundingSnapshot serverGrounding = null;
-        if (payload.vocabulary() == null || payload.baseCeiling() == null) {
-            StudioGroundingProvider provider = grounding.getIfAvailable();
-            if (provider == null) {
-                throw new IllegalStateException("server manifest grounding is not available");
-            }
-            serverGrounding = provider.snapshot(tenant, resourceKind);
+
+        // Grounding (vocabulary + immutable base ceiling) is ALWAYS server-derived for the principal's
+        // tenant — never a body field — so a caller cannot widen the vocabulary or relax the ceiling.
+        StudioGroundingProvider provider = grounding.getIfAvailable();
+        if (provider == null) {
+            throw new IllegalStateException("server manifest grounding is not available");
         }
-        ManifestVocabulary vocabulary = payload.vocabulary() == null ? serverGrounding.vocabulary() : payload.vocabulary();
-        BaseCeiling baseCeiling = payload.baseCeiling() == null ? serverGrounding.baseCeiling() : payload.baseCeiling();
+        StudioGroundingSnapshot serverGrounding = provider.snapshot(tenant, resourceKind);
+        ManifestVocabulary vocabulary = serverGrounding.vocabulary();
+        BaseCeiling baseCeiling = serverGrounding.baseCeiling();
 
         // Author scope is the principal's own tenant — never a body field.
         TenantScope authorScope = TenantScope.of(tenant);
