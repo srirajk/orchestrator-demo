@@ -12,7 +12,7 @@ resourcePolicy:
     - platform_admin
     condition:
       match:
-        expr: now() < timestamp("2026-07-17T08:01:31Z")
+        expr: now() < timestamp("2026-07-17T11:06:04Z")
   - actions:
     - register
     effect: EFFECT_DENY
@@ -20,7 +20,7 @@ resourcePolicy:
     - platform_admin
     condition:
       match:
-        expr: now() >= timestamp("2026-07-17T08:01:31Z")
+        expr: now() >= timestamp("2026-07-17T11:06:04Z")
   - actions:
     - invoke
     - invoke_membership

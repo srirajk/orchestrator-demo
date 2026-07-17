@@ -10,12 +10,27 @@ echo "════════════════════════�
 echo "  Conduit Gateway — Verify Script"
 echo "═══════════════════════════════════════════════════════════════════════"
 
-# ── Phase 1: unit tests ───────────────────────────────────────────────────────
+# ── Phase 1: unit tests + integration proofs (*IT via failsafe) ───────────────
+# `mvn verify` (NOT `mvn test`) so the failsafe-bound *IT integration proofs actually
+# RUN in the gate — a single lifecycle pass runs surefire (unit) then failsafe (*IT), so
+# unit tests are not double-run. The gateway *IT proofs (Testcontainers): RedisTenant-
+# IsolationProbeIT (cross-tenant Redis isolation), CerbosDecisionLogDurabilityIT, PayloadStoreIT,
+# CoverageClientTenantHeaderIT, SecurityRejectionIT, HttpAdapterSpillIT, AgentHarnessResilienceIT.
+# The IAM run adds the break-glass live-PDP expiry proof (BreakGlassExpiryTest). These are the
+# security proofs that surefire-only (`mvn test`) silently excluded. See H7.
+#
+# CONDUIT_DOCKER_REQUIRED=true turns any Docker assume-skip into a HARD FAILURE — Docker is
+# guaranteed here (the compose bring-up below needs it), so a skipped security proof must not
+# pass the gate green.
+export CONDUIT_DOCKER_REQUIRED=true
 echo ""
-echo "▶  [1/3] Building gateway and running unit tests..."
+echo "▶  [1/3] Building gateway + IAM: unit tests AND integration proofs (*IT via failsafe)..."
 cd "$ROOT/gateway"
-mvn test -q
-echo "   ✅  Unit tests passed."
+mvn verify -q
+echo "   ✅  Gateway unit + integration (*IT) proofs passed."
+cd "$ROOT/iam-service"
+mvn verify -q
+echo "   ✅  IAM unit + integration proofs passed (incl. break-glass live-PDP expiry)."
 
 # ── Cerbos policy gate: HARD gate on the authz policies (Axiom Story B3) ──────
 # Runs `cerbos compile --test-output=junit` (pinned 0.53.0 — same as the runtime PDP)
