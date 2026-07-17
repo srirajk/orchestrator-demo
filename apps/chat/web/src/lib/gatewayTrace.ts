@@ -57,6 +57,56 @@ export interface TraceEvent {
   data?: TraceEventData
 }
 
+// ── Structured clarification (the form payload) ──────────────────────────────
+// Mirror of the gateway's StructuredInteraction record, ridden on the OOB trace lane as a
+// `structured_interaction` event. Every field is DATA authored by the manifest/coverage — the SPA
+// renders it blind (World B): it shows only what the payload carries and never a hidden-candidate count.
+
+export interface StructuredInteractionOption {
+  value: string
+  label: string
+  secondaryLabel?: string
+}
+
+export interface StructuredInteractionFreeText {
+  enabled: boolean
+  prompt?: string
+  inputContract?: string
+}
+
+export interface StructuredInteraction {
+  kind?: string
+  nonce: string
+  question?: string
+  entityNoun?: string
+  options: StructuredInteractionOption[]
+  freeText?: StructuredInteractionFreeText
+  clarifyDepth?: number
+  maxClarifyDepth?: number
+  atCap?: boolean
+  /** true = a blocking form that REPLACES a no-service; false = non-blocking refinement chips beside an answer. */
+  blocking?: boolean
+}
+
+export const STRUCTURED_INTERACTION_EVENT = 'structured_interaction'
+
+/**
+ * The active structured-clarification form for the current turn, or null. Scans the current turn's
+ * frames for the LATEST `structured_interaction` (frames reset on `request_start`, so this is always
+ * the form for the question in flight). A payload with no `nonce` is ignored (it cannot be resumed).
+ * `options` is normalized to an array so a pure free-text ask still renders.
+ */
+export function selectStructuredInteraction(events: TraceEvent[]): StructuredInteraction | null {
+  let latest: StructuredInteraction | null = null
+  for (const evt of events) {
+    if (evt.type !== STRUCTURED_INTERACTION_EVENT) continue
+    const data = (evt.data ?? {}) as unknown as StructuredInteraction
+    if (!data || typeof data.nonce !== 'string' || !data.nonce) continue
+    latest = { ...data, options: Array.isArray(data.options) ? data.options : [] }
+  }
+  return latest
+}
+
 // ── SSE parsing (mirror of gateway-client/src/sse.ts) ────────────────────────
 
 /** Extract the joined `data:` payload from one SSE event block, or null. */
