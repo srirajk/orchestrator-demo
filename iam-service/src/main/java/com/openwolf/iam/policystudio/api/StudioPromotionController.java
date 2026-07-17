@@ -47,9 +47,9 @@ import java.util.Set;
  *
  * <p><b>Server-side hash re-verification:</b> {@link ConsequenceApprovalService#approve} recomputes the
  * consequence-review hash from the review's truth fields and refuses to sign a tampered review, and blocks
- * a stale review (the active bundle drifted). See {@code docs/studio-api-contract.md} → "Known
- * service-layer hardening TODOs" for the checks {@code PolicyPromotionService.promote()} still does NOT
- * perform (GeneratedPolicyValidator re-run; hard-fail when the real Cerbos PDP is unavailable).
+ * a stale review (the active bundle drifted). {@link PolicyPromotionService#promote} (H2) additionally
+ * re-runs {@code GeneratedPolicyValidator} unconditionally on the candidate, recomputes the review hash
+ * server-side, and hard-fails when the pinned Cerbos is unavailable (never version-stamp-only).
  */
 @RestController
 @RequestMapping("/admin/studio")

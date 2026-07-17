@@ -1,6 +1,7 @@
 package com.openwolf.iam.policystudio.api;
 
 import com.openwolf.iam.policystudio.ConsequenceReview;
+import com.openwolf.iam.policystudio.ReviewAuthorRegistry;
 import com.openwolf.iam.policystudio.breakglass.BreakGlassArtifact;
 import org.springframework.stereotype.Component;
 
@@ -23,7 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * documented follow-up, not silent behaviour.
  */
 @Component
-public class StudioSessionStore {
+public class StudioSessionStore implements ReviewAuthorRegistry {
 
     /**
      * A stored consequence review, tagged with the tenant that computed it AND the VERIFIED identity of
@@ -54,6 +55,16 @@ public class StudioSessionStore {
     public Optional<StoredReview> getReview(String tenantId, String reviewId) {
         return Optional.ofNullable(reviews.get(reviewId))
                 .filter(r -> r.tenantId().equals(tenantId));
+    }
+
+    /**
+     * (H3) The VERIFIED author of a review, keyed by (tenant, {@code consequenceReviewHash}) — the review
+     * id IS the hash. Feeds {@code ConsequenceApprovalService}'s author≠approver gate from a trusted,
+     * server-recorded value the approver cannot forge.
+     */
+    @Override
+    public Optional<String> authorFor(String tenantId, String consequenceReviewHash) {
+        return getReview(tenantId, consequenceReviewHash).map(StoredReview::authorId);
     }
 
     // ── Break-glass artifacts (C6) ──

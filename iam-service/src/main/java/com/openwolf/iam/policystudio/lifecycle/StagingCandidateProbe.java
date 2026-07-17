@@ -15,8 +15,12 @@ import java.nio.file.Path;
  * {@code bundleId} as its {@code policyVersion} and leave no unresolved
  * {@link BundleCanonicalizer#BUNDLE_VERSION_SENTINEL} — and, when the pinned Cerbos is available, stages
  * each rendered file alongside the immutable base bundle and {@code cerbos compile}s it. A compile
- * failure aborts. On a Cerbos-less box the structural compile is skipped (the deterministic invariants
- * still gate), matching how the C4 real-PDP evidence run degrades.
+ * failure aborts.
+ *
+ * <p><b>(H2) The compile probe is MANDATORY for promotion.</b> When the pinned Cerbos is unavailable this
+ * probe HARD-FAILS the promotion rather than degrading to version-stamp-only — a candidate must never be
+ * activated on a compile-less host. (This is stricter than the C4 real-PDP <em>evidence</em> run, which may
+ * be skipped on a Cerbos-less box because it is not on the activation path.)
  */
 @Component
 public class StagingCandidateProbe implements CandidateProbe {
@@ -48,11 +52,17 @@ public class StagingCandidateProbe implements CandidateProbe {
         }
 
         // (2) Structural: stage each rendered file alongside the live base bundle and cerbos compile it.
+        //     (H2) The compile probe is MANDATORY for a promotion — it HARD-FAILS when the pinned Cerbos is
+        //     unavailable. A promotion must never degrade to version-stamp-only on a compile-less host.
         Path base = Path.of(baseBundleDir);
-        if (!compileGate.isAvailable() || !Files.isDirectory(base)) {
-            log.debug("cerbos compile probe skipped for '{}' (no pinned Cerbos / base bundle) — deterministic "
-                    + "version-stamping invariant still gated", candidate.bundleId());
-            return;
+        if (!compileGate.isAvailable()) {
+            throw new IllegalStateException("cerbos compile probe is MANDATORY for promotion but no pinned "
+                    + "Cerbos (local binary or Docker image) is available — refusing to promote candidate '"
+                    + candidate.bundleId() + "' on a compile-less host (never version-stamp-only)");
+        }
+        if (!Files.isDirectory(base)) {
+            throw new IllegalStateException("base bundle dir '" + base + "' is missing — cannot stage + "
+                    + "cerbos-compile candidate '" + candidate.bundleId() + "'; refusing to promote");
         }
         for (BundleFile rendered : candidate.renderedFiles()) {
             String fileName = "staged_" + rendered.path().replace('/', '_').replace('@', '_');

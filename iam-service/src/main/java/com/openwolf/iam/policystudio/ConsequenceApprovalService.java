@@ -1,8 +1,13 @@
 package com.openwolf.iam.policystudio;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -19,26 +24,110 @@ import java.util.Set;
 @Service
 public class ConsequenceApprovalService {
 
+    /** Default approver roles when none is configured — the roles legitimately empowered to sign a
+     *  consequence approval. {@code platform_admin} is deliberately absent (it is a super-admin, never an
+     *  auto-approver of a policy change). Configurable via {@code iam.policy-studio.approver-roles}. */
+    private static final Set<String> DEFAULT_APPROVER_ROLES =
+            Set.of("policy_approver", "security_reviewer", "domain_owner");
+
     private final ConsequenceReviewSigner signer;
     private final TenantActiveBundleRegistry activeBundles;
+    private final ReviewAuthorRegistry authors;
+    private final Set<String> approverRoles;
 
-    public ConsequenceApprovalService(ConsequenceReviewSigner signer, TenantActiveBundleRegistry activeBundles) {
+    /**
+     * Production wiring. The approver-role set is config-driven (World B: config, not code);
+     * {@code platform_admin} is not in the default set, so it can never be an auto-approver.
+     */
+    @Autowired
+    public ConsequenceApprovalService(
+            ConsequenceReviewSigner signer,
+            TenantActiveBundleRegistry activeBundles,
+            ReviewAuthorRegistry authors,
+            @Value("${iam.policy-studio.approver-roles:policy_approver,security_reviewer,domain_owner}")
+            Set<String> approverRoles) {
         this.signer = signer;
         this.activeBundles = activeBundles;
+        this.authors = authors;
+        this.approverRoles = approverRoles == null || approverRoles.isEmpty()
+                ? DEFAULT_APPROVER_ROLES : Set.copyOf(approverRoles);
     }
 
     /**
-     * Sign an approval for a review. Fails closed if the review is stale or tampered.
+     * Convenience constructor (no author registry) — the C4 hash-binding / staleness contract with no
+     * separation-of-duties source. author≠approver is inert (no recorded author to match); the approver
+     * role gate uses the default approver-role set.
+     */
+    public ConsequenceApprovalService(ConsequenceReviewSigner signer, TenantActiveBundleRegistry activeBundles) {
+        this(signer, activeBundles, (tenantId, reviewHash) -> Optional.empty(), DEFAULT_APPROVER_ROLES);
+    }
+
+    /**
+     * Sign an approval for a review — the API entry point (approver identity is the VERIFIED principal;
+     * the approver's tenant is the review's tenant, already asserted at the controller). Delegates to the
+     * enforced {@link #approve(ConsequenceReview, ApproverIdentity, ApprovalDecision)}.
      *
      * @throws StaleReviewException if the tenant's active bundle no longer equals the review's captured
      *                              current bundle (C4.5) — a fresh diff is required first
-     * @throws IllegalStateException if the review's hash does not match its truth fields (tamper)
+     * @throws IllegalStateException if the review's hash does not match its truth fields (tamper), the
+     *                               approver lacks an approver role, the approver is the review's author,
+     *                               or the approver identity is null (fail closed)
      */
     public ConsequenceApprovalRecord approve(
             ConsequenceReview review, String approverId, Set<String> approverRoles, ApprovalDecision decision) {
+        return approve(review, new ApproverIdentity(review.tenantId(), approverId, approverRoles), decision);
+    }
+
+    /**
+     * Sign an approval for a review, enforcing the Axiom H3 approver gate from VERIFIED identity before
+     * the C4 staleness/tamper checks:
+     * <ul>
+     *   <li><b>null approver → fail closed</b> (never a skipped check);</li>
+     *   <li><b>approver role required</b> — the approver must hold a configured approver role;
+     *       {@code platform_admin} alone is rejected (no auto-approval);</li>
+     *   <li><b>tenant match</b> — the approver must be in the review's tenant;</li>
+     *   <li><b>author≠approver</b> — from the author recorded server-side at review-compute time
+     *       ({@link ReviewAuthorRegistry}), never a caller-supplied id.</li>
+     * </ul>
+     */
+    public ConsequenceApprovalRecord approve(
+            ConsequenceReview review, ApproverIdentity approver, ApprovalDecision decision) {
+
+        // (H3) VERIFIED approver identity — a null/blank subject FAILS CLOSED, never skips the gate.
+        if (approver == null || approver.subject() == null || approver.subject().isBlank()) {
+            throw new IllegalStateException(
+                    "approver identity is null/blank — refusing to sign an approval (fail closed)");
+        }
+        String approverId = approver.subject();
+
+        // (H3) approver role — must hold a configured approver role; platform_admin alone is excluded.
+        if (Collections.disjoint(approver.roles(), approverRoles)) {
+            throw new IllegalStateException(
+                    "approver '" + approverId + "' holds none of the approver roles " + sorted(approverRoles)
+                            + " (roles were " + sorted(approver.roles())
+                            + ") — a policy approval requires an approver role; platform_admin is not an "
+                            + "auto-approver");
+        }
+
+        // (H3) tenant match — the approver must be in the review's tenant (defence in depth for the API).
+        if (!review.tenantId().equals(approver.tenantId())) {
+            throw new IllegalStateException(
+                    "approver '" + approverId + "' is in tenant '" + approver.tenantId()
+                            + "' but the review is for tenant '" + review.tenantId()
+                            + "' — an approver may only approve its own tenant's review");
+        }
+
+        // (H3) author≠approver — from the server-recorded author, never a caller-supplied id.
+        Optional<String> author = authors.authorFor(review.tenantId(), review.consequenceReviewHash());
+        if (author.isPresent() && author.get().equals(approverId)) {
+            throw new IllegalStateException(
+                    "separation of duties: '" + approverId + "' authored this review and may not also "
+                            + "approve it (author≠approver)");
+        }
 
         // (C4.5) staleness: the diff must have been computed against the tenant's CURRENT active bundle.
         String active = activeBundles.activeBundleId(review.tenantId());
+        Set<String> approverRolesForRecord = approver.roles();
         if (active == null || !active.equals(review.currentBundleId())) {
             throw new StaleReviewException(
                     "consequence review is stale: it was computed against current bundle '"
@@ -62,7 +151,7 @@ public class ConsequenceApprovalService {
                 review.consequenceReviewHash(),
                 review.overPermissionAlarm(),
                 approverId,
-                approverRoles,
+                approverRolesForRecord,
                 decision,
                 /* signature */ "",
                 Instant.now());
@@ -93,5 +182,10 @@ public class ConsequenceApprovalService {
             return false;
         }
         return signer.verify(record.signingPayload(), record.signature());
+    }
+
+    /** Deterministic, order-stable rendering of a role set for messages. */
+    private static Set<String> sorted(Set<String> roles) {
+        return new LinkedHashSet<>(new java.util.TreeSet<>(roles));
     }
 }

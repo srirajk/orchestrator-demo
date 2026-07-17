@@ -4,6 +4,8 @@ import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -142,12 +144,49 @@ public class ActiveTenantDirectory {
             Snapshot updated = new Snapshot(version, next);
             if (current.compareAndSet(prev, updated)) {
                 repository.save(new ActiveTenant(tenantId, toPolicyVersion, version));
+                // (H4) The in-memory pointer advance must be undone WITH the JPA transaction. The
+                // repository.save above is rolled back by JPA on failure, but this AtomicReference is not
+                // transactional — so register a compensation that reverts the published snapshot to `prev`
+                // if the surrounding promotion transaction rolls back after this CAS. Without it a post-CAS
+                // failure would leave the live pointer diverged from the durable store until a restart
+                // reload(). No transaction active (e.g. a direct provisioning call) ⇒ nothing to compensate.
+                registerRollbackCompensation(tenantId, prev, updated);
                 log.info("Promoted tenant '{}' policy version {} → {} — directory snapshot v{}",
                         tenantId, expectedFromPolicyVersion, toPolicyVersion, version);
                 return version;
             }
             // A concurrent snapshot swap won the CAS — re-read and re-check the precondition.
         }
+    }
+
+    /**
+     * (H4) Register a transaction-scoped compensation for a published promotion CAS: if the surrounding
+     * JPA transaction rolls back after this in-memory advance, revert the snapshot from {@code after} back
+     * to {@code before}, so the live pointer stays consistent with the durable store (whose {@code save}
+     * was rolled back with the transaction) instead of diverging until the next {@link #reload()}.
+     *
+     * <p>The revert is a guarded {@code compareAndSet(after, before)}: if a concurrent control-plane
+     * operation already advanced the pointer past {@code after}, we do not clobber it (the durable store
+     * remains the ultimate truth, reconciled on the next reload) and log that the compensation could not
+     * apply. Under the single-writer control plane the guarded revert restores the exact prior snapshot.
+     */
+    private void registerRollbackCompensation(String tenantId, Snapshot before, Snapshot after) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return; // no transaction to bind to — a direct (non-transactional) call, nothing to compensate
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status != STATUS_ROLLED_BACK) {
+                    return;
+                }
+                boolean reverted = current.compareAndSet(after, before);
+                log.warn("Promotion transaction ROLLED BACK — {} the active-tenant pointer for '{}' from "
+                                + "snapshot v{} back to v{} (durable store save was rolled back with the txn)",
+                        reverted ? "compensated" : "could NOT compensate (pointer advanced concurrently);",
+                        tenantId, after.version(), before.version());
+            }
+        });
     }
 
     /** Zero-I/O lookup — reads only the in-memory snapshot. Absent ⇒ unknown ⇒ fail closed. */

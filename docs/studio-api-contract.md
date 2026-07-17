@@ -339,20 +339,30 @@ An adversarial audit found the underlying services bind some enforcement to call
 SoD gates. The following are **service-layer** gaps that a later hardening pass must close — the frontend and any security copy
 must **not** claim these are enforced:
 
-1. **`PolicyPromotionService.promote()` does not re-run `GeneratedPolicyValidator` on the candidate**, and **does not
-   hard-fail when the real Cerbos PDP is unavailable** (it can promote a candidate that was only deterministically gated).
-   *Controllers cannot cheaply add this — the validator needs the candidate's vocabulary/ceiling/scope, which promotion does
-   not carry.* The consequence-review **hash IS re-verified server-side** by `ConsequenceApprovalService.approve` (tamper +
-   staleness), so that part is covered; the validator-rerun + Cerbos-down hard-fail are not.
+1. **~~`PolicyPromotionService.promote()` does not re-run `GeneratedPolicyValidator`~~ — CLOSED (H2).** `promote()` now
+   re-runs `GeneratedPolicyValidator` **unconditionally** on the candidate's tenant-child policies (scope-containment,
+   no-wildcard, base-ceiling totality), **recomputes the `consequenceReviewHash` server-side** from the review's truth fields
+   (a tampered hash is rejected), and the `cerbos compile` probe now **HARD-FAILS** promotion when Cerbos is unavailable
+   (never version-stamp-only). The validator's vocabulary/ceiling/author-scope come from a trusted
+   `PromotionValidationContextProvider` keyed off the bundle — never the request. **Honest note:** the promotion candidate is
+   a `PolicyBundle` (rendered YAML + test metadata) and does **not** carry a typed vocabulary/ceiling, and the base ceiling
+   cannot be reconstructed from the bundle's YAML (its derived-role modules aren't the single `resourcePolicy` the parser
+   accepts) — so this needed a **provider**, not derivation from the snapshot. The production provider
+   (`ManifestPromotionValidationContextProvider`) **fails closed** until a per-tenant manifest→vocabulary/ceiling source is
+   wired (the same grounding gap `StudioAuthoringController` documents); the deterministic gate injects a fixture provider to
+   prove the re-validation rejects wildcard / sibling-scope / omitted-tuple candidates.
 2. **Break-glass TTL is only checked as a relative span in `BreakGlassValidator`** — a future-dated `issuedAt` would defeat it.
    *Mitigated at the controller* (server-stamped `issuedAt`, `(0,60]` clamp against the server clock), but the **CEL condition
    should also carry a `now() >= issuedAt` lower bound** and the service should clamp against the server clock independently.
 3. **`BreakGlassApprovalService` uses a configured approver role** (`iam.break-glass.approver-role`, default
    `studio_policy_approver`) distinct from the studio `policy_approver` role the method gate checks. A break-glass approver
    must currently hold **both**. Reconcile the role names (or make the method gate read the configured role).
-4. **A null/absent approver id must fail closed everywhere.** The controllers do (verified `sub`, else `403`); confirm the
-   services never treat a null approver as a skip.
-5. **C4/C5 active-pointer vs JPA transaction**: the active-directory CAS (`ActiveTenantDirectory`) is an in-memory
-   `AtomicReference` published inside `@Transactional promote()`. If the surrounding JPA transaction rolls back **after** the
-   CAS published, the in-memory pointer is not rolled back with it. Make the pointer swap participate in (or follow) the
-   transaction commit.
+4. **~~A null/absent approver id must fail closed everywhere~~ — CLOSED (H3).** `ConsequenceApprovalService.approve` now
+   enforces the approver gate at the **service** from verified identity: a null/blank approver **fails closed**, an approver
+   role is required (`platform_admin` alone is not an auto-approver), the approver must be in the review's tenant, and
+   **author≠approver** is enforced from the author recorded server-side at review-compute time (`ReviewAuthorRegistry`), never
+   a caller-supplied id. This is defence-in-depth behind the controller gate.
+5. **~~C4/C5 active-pointer vs JPA transaction~~ — CLOSED (H4).** The `ActiveTenantDirectory` promotion CAS now registers a
+   **transaction synchronization**: if the surrounding `@Transactional promote()` rolls back after the in-memory advance, the
+   pointer is **compensated back** to the prior snapshot (the durable `save` rolls back with the txn), so the live pointer
+   never diverges from the durable store until a restart `reload()`.

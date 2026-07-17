@@ -1,11 +1,20 @@
 package com.openwolf.iam.policystudio.lifecycle;
 
 import com.openwolf.iam.policystudio.ConsequenceApprovalService;
+import com.openwolf.iam.policystudio.GeneratedPolicyValidator;
+import com.openwolf.iam.policystudio.PolicyAuthoringRequest;
+import com.openwolf.iam.policystudio.PolicyIR;
+import com.openwolf.iam.policystudio.PolicyParseException;
+import com.openwolf.iam.policystudio.PolicyYamlParser;
+import com.openwolf.iam.policystudio.TenantScope;
 import com.openwolf.iam.tenancy.ActiveTenantDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * The one promotion machine for policy bundles (Axiom Story C5) — the SAME authorized compare-and-set
@@ -39,6 +48,9 @@ public class PolicyPromotionService {
     private final BundleCanonicalizer canonicalizer;
     private final GitCommitResolver gitResolver;
     private final CandidateProbe probe;
+    private final GeneratedPolicyValidator validator;
+    private final PolicyYamlParser parser;
+    private final PromotionValidationContextProvider contextProvider;
 
     public PolicyPromotionService(ActiveTenantDirectory directory,
                                   ConsequenceApprovalService approvals,
@@ -47,7 +59,10 @@ public class PolicyPromotionService {
                                   ApprovalRepository approvalStore,
                                   BundleCanonicalizer canonicalizer,
                                   GitCommitResolver gitResolver,
-                                  CandidateProbe probe) {
+                                  CandidateProbe probe,
+                                  GeneratedPolicyValidator validator,
+                                  PolicyYamlParser parser,
+                                  PromotionValidationContextProvider contextProvider) {
         this.directory = directory;
         this.approvals = approvals;
         this.promotions = promotions;
@@ -56,6 +71,9 @@ public class PolicyPromotionService {
         this.canonicalizer = canonicalizer;
         this.gitResolver = gitResolver;
         this.probe = probe;
+        this.validator = validator;
+        this.parser = parser;
+        this.contextProvider = contextProvider;
     }
 
     /**
@@ -91,6 +109,15 @@ public class PolicyPromotionService {
                         "approval authorizes candidate '" + request.approval().candidateBundleId()
                                 + "' but the promotion candidate is '" + candidateId + "'");
             }
+            // ── 1a. (H2) Recompute the consequence-review hash SERVER-SIDE from the review's own truth
+            //        fields and reject a tampered hash — never trust the client-supplied hash field. ──
+            String recomputed = request.review().recomputeHash();
+            if (!recomputed.equals(request.review().consequenceReviewHash())) {
+                throw new UnauthorizedPromotionException(
+                        "consequence review hash does not match its truth fields (recomputed '" + recomputed
+                                + "', request carried '" + request.review().consequenceReviewHash()
+                                + "') — refusing to promote against a tampered review");
+            }
             if (!approvals.authorizesPromotion(request.approval(), request.review())) {
                 throw new UnauthorizedPromotionException(
                         "approval does not authorize this review (bad signature, non-APPROVE decision, or "
@@ -108,7 +135,16 @@ public class PolicyPromotionService {
             // ── 3. Content-addressed integrity — a tampered candidate is rejected. ──
             request.candidate().verifyIntegrity(canonicalizer);
 
-            // ── 4. Stage alongside live + load + probe every invariant at policyVersion = candidate id. ──
+            // ── 3a. (H2) Re-run the deterministic GeneratedPolicyValidator UNCONDITIONALLY on the
+            //        candidate (scope-containment, no-wildcard, base-ceiling totality). The grounding
+            //        vocabulary + immutable ceiling come from a trusted server-side provider keyed off the
+            //        bundle — NEVER from the promotion request. A candidate that was mutated or authored
+            //        past the C2 gate is rejected here and stays INACTIVE. ──
+            revalidate(request.candidate());
+
+            // ── 4. Stage alongside live + load + probe every invariant at policyVersion = candidate id.
+            //        The compile probe HARD-FAILS when the pinned Cerbos is unavailable (never
+            //        version-stamp-only) — see StagingCandidateProbe. ──
             probe.verify(request.candidate());
 
             // ── 5. Compare-and-set the live pointer from the reviewed OLD id to the candidate. ──
@@ -139,6 +175,55 @@ public class PolicyPromotionService {
                     + "INACTIVE: {}", candidateId, tenantId, e.toString());
             throw e;
         }
+    }
+
+    /**
+     * (H2) Re-run the deterministic generation gate on the candidate's tenant restriction child policies.
+     * The vocabulary + author scope + immutable base ceiling come from a trusted {@link
+     * PromotionValidationContextProvider} keyed off the bundle (fail-closed if none) — the request cannot
+     * supply a looser ceiling. Every non-root {@code resourcePolicy} in the bundle is parsed and validated;
+     * base/derived-role files (which the studio parser rejects as non-resource-policy) are skipped — they
+     * are the ceiling, not the child being narrowed. A single violation aborts the promotion.
+     */
+    private void revalidate(PolicyBundle candidate) {
+        PromotionValidationContext ctx = contextProvider.contextFor(candidate);
+        List<String> violations = new ArrayList<>();
+        int childrenValidated = 0;
+        for (BundleFile file : candidate.renderedFiles()) {
+            PolicyIR ir;
+            try {
+                ir = parser.parse(file.yaml());
+            } catch (PolicyParseException notAResourcePolicy) {
+                // A base ceiling / derived-role / variable file — not a tenant restriction child. The
+                // wildcard/scope/totality invariants live on the child; skip non-child files.
+                continue;
+            }
+            TenantScope scope;
+            try {
+                scope = TenantScope.of(ir.scope());
+            } catch (IllegalArgumentException badScope) {
+                violations.add("file '" + file.path() + "' has an invalid scope: " + badScope.getMessage());
+                continue;
+            }
+            if (scope.isRoot()) {
+                continue; // the root ceiling policy, not a tenant child
+            }
+            childrenValidated++;
+            PolicyAuthoringRequest req = new PolicyAuthoringRequest(
+                    "promotion re-validation of bundle " + candidate.bundleId(),
+                    ctx.vocabulary(), ctx.authorScope(), ctx.subscopesEnabled(), ctx.baseCeiling());
+            GeneratedPolicyValidator.Result result = validator.validate(ir, req);
+            if (!result.accepted()) {
+                for (String v : result.violations()) {
+                    violations.add("file '" + file.path() + "': " + v);
+                }
+            }
+        }
+        if (!violations.isEmpty()) {
+            throw new PolicyRevalidationException(candidate.bundleId(), violations);
+        }
+        log.debug("Candidate '{}' re-validated OK ({} tenant-child polic(ies))",
+                candidate.bundleId(), childrenValidated);
     }
 
     /**

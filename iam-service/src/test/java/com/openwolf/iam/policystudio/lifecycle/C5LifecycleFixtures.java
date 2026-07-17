@@ -10,6 +10,7 @@ import com.openwolf.iam.policystudio.ConsequenceFixtureMatrix;
 import com.openwolf.iam.policystudio.ConsequenceReview;
 import com.openwolf.iam.policystudio.ConsequenceReviewSigner;
 import com.openwolf.iam.policystudio.FixtureCell;
+import com.openwolf.iam.policystudio.GeneratedPolicyValidator;
 import com.openwolf.iam.policystudio.InMemoryTenantActiveBundleRegistry;
 import com.openwolf.iam.policystudio.ManifestVocabulary;
 import com.openwolf.iam.policystudio.PdpDecisionSource;
@@ -17,6 +18,7 @@ import com.openwolf.iam.policystudio.PolicyExpectationEvaluator;
 import com.openwolf.iam.policystudio.ConditionEvaluator;
 import com.openwolf.iam.policystudio.LocalPdpDecisionSource;
 import com.openwolf.iam.policystudio.PolicyYamlParser;
+import com.openwolf.iam.policystudio.TenantScope;
 import com.openwolf.iam.tenancy.ActiveTenantDirectory;
 import com.openwolf.iam.tenancy.ActiveTenantRepository;
 
@@ -197,6 +199,26 @@ final class C5LifecycleFixtures {
         return reviewBetween(current, currentBody(), candidate, candidateBody());
     }
 
+    /**
+     * A self-consistent review binding two C5 bundle ids WITHOUT running the diff (so it works for
+     * structurally-bad candidates the PDP evaluator would choke on). Empty delta; the hash is recomputed
+     * from the truth fields so it passes the promotion's server-side hash re-check.
+     */
+    static ConsequenceReview handReview(PolicyBundle current, PolicyBundle candidate) {
+        String fs = candidate.testMetadata().fixtureSetHash();
+        ConsequenceReview tmp = new ConsequenceReview(TENANT, "agent", current.bundleId(), candidate.bundleId(),
+                fs, List.of(), false, 0, "[]", "PLACEHOLDER", null, null, now(), null);
+        return new ConsequenceReview(TENANT, "agent", current.bundleId(), candidate.bundleId(),
+                fs, List.of(), false, 0, "[]", tmp.recomputeHash(), null, null, now(), null);
+    }
+
+    /** A review whose {@code consequenceReviewHash} does NOT match its truth fields (H2 tamper). */
+    static ConsequenceReview tamperedReview(PolicyBundle current, PolicyBundle candidate) {
+        String fs = candidate.testMetadata().fixtureSetHash();
+        return new ConsequenceReview(TENANT, "agent", current.bundleId(), candidate.bundleId(),
+                fs, List.of(), false, 0, "[]", "crh-TAMPERED-does-not-match", null, null, now(), null);
+    }
+
     static ConsequenceReviewSigner signer() {
         return ConsequenceReviewSigner.withKey(SIGNING_KEY);
     }
@@ -295,6 +317,23 @@ final class C5LifecycleFixtures {
         return candidate -> { /* no-op: version-stamping/compile invariants covered by their own test */ };
     }
 
+    /** A probe that always hard-fails — models the mandatory cerbos-compile probe on a Cerbos-down host. */
+    static CandidateProbe cerbosDownProbe() {
+        return candidate -> {
+            throw new IllegalStateException("cerbos compile probe is MANDATORY for promotion but no pinned "
+                    + "Cerbos is available — refusing to promote candidate '" + candidate.bundleId() + "'");
+        };
+    }
+
+    /** The H2 re-validation grounding: the `agent` vocabulary + immutable ceiling at author scope `acme`. */
+    static PromotionValidationContextProvider validationProvider() {
+        return candidate -> new PromotionValidationContext(vocab(), TenantScope.of("acme"), false, agentCeiling());
+    }
+
+    static GeneratedPolicyValidator validator() {
+        return new GeneratedPolicyValidator();
+    }
+
     /** A deterministic git resolver. */
     static GitCommitResolver gitResolver(String commit) {
         return () -> commit;
@@ -309,12 +348,12 @@ final class C5LifecycleFixtures {
         return new ActiveTenantDirectory(activeRepo());
     }
 
-    /** Build the promotion service over the given directory + repos. */
+    /** Build the promotion service over the given directory + repos (fixture re-validation provider). */
     static PolicyPromotionService promotionService(ActiveTenantDirectory dir, PromotionRepository pr,
                                                    PolicyBundleRepository br, ApprovalRepository ar,
                                                    CandidateProbe probe, String gitCommit) {
         return new PolicyPromotionService(dir, approvalService(), pr, br, ar, canon(),
-                gitResolver(gitCommit), probe);
+                gitResolver(gitCommit), probe, validator(), new PolicyYamlParser(), validationProvider());
     }
 
     static Instant now() {
