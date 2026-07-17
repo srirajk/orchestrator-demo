@@ -310,3 +310,9 @@ Decision rule gateway-vs-agent: did the LLM faithfully echo the agent's output? 
 
 ### Do-Not-Repeat (2026-07-11)
 - An Edit can silently write intended spaces in string literals as NUL bytes (`"\x00"`). This makes the .java "data" to `file` and BINARY to grep/ugrep, which defeats `world-b-check`'s `strip_comments()` and turns pre-existing in-comment domain tokens (e.g. REL-00188/Okafor in a class javadoc) into phantom CRITICAL violations. If world-b-check spikes and reports "Binary file matches", run `file <path>` — if it says "data", hunt NUL/control bytes (`python3 -c "print(open(p,'rb').read().count(0))"`), don't chase non-ASCII glyphs. This repo's `grep` is `ugrep`.
+
+## Key Learnings (clarify P234 session)
+- BFF (apps/chat/bff) pom requires Java 25 (`<java.version>25</java.version>`); the shell's default Homebrew mvn uses JDK 23 → "release version 25 not supported". Build/test the BFF with `JAVA_HOME=/Library/Java/JavaVirtualMachines/zulu-25.jdk/Contents/Home`. Gateway builds fine on 23.
+- apps/chat/web had NO test tooling and an EMPTY node_modules; `npm install` + add vitest/jsdom/@testing-library. jsdom lacks `Element.prototype.scrollIntoView` — stub it in the vitest setup (MessageList calls it in an effect).
+- Structured-clarification RESUME design: gateway consumes the descriptor by X-Clarify-Nonce header, GROUNDED_SELECTION re-drives descriptor.originatingQuery() with the chosen id injected into the EntityBag (via idPattern→extractAs lookup, World-B clean) so the coverage CHECK re-runs; FREE_TEXT/out-of-set demote → no privileged ground. BFF folds the answer + posts /api/clarify/resolve.
+- The actual Phase-1 `structured_interaction` event shape uses `question`/`freeText`/`options[{value,label,secondaryLabel}]` (NOT the brief's `prompt`/`freeTextEscape`) — follow the emitted code, not the brief.

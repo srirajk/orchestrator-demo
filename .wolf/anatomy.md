@@ -2179,3 +2179,11 @@
 - `DomainManifestStoreValidationTest.java` — test: malformed domain/sub-domain manifests fail loud (schema validation) instead of silent drop (~700 tok)
 - `synthesis/answer/AnswerSynthesizerCompareTest.java` — Entity-qualified DATA headers, WITHHELD ENTITY (verbatim+manifest copy, no canonical leak), cap note, figure sourceAgent=nodeId. (~800 tok)
 - `test_user_mgmt.py` — Tests: jwks_has_correct_structure, jwks_e_is_65537, jwks_n_length, issue_token_returns_rs256_jwt + 20 more (~7203 tok)
+
+## Structured Clarification Surface — Phase 2/3/4 (feature/clarify-P234)
+- gateway/.../domain/clarify/ClarifyResume.java — resume read-side: consume descriptor by nonce, classify submission (GROUNDED_SELECTION | FREE_TEXT | NONE); no pipeline. ~2k
+- gateway/.../domain/chat/ChatService.java — handleChat(+nonce,+selection) resume overload; withLatestUserContent/injectGroundedReference; FORM_CLARIFY outcome. (large)
+- gateway/.../api/v1/chat/ChatCompletionsController.java — reads X-Clarify-Nonce / X-Clarify-Selection headers.
+- apps/chat/bff/.../chat/ClarifyController.java — POST /api/clarify/resolve; folds answer, re-drives gateway w/ nonce+selection, streams back. ~1.5k
+- apps/chat/bff/.../chat/ClarifyResolveRequest.java — {conversationId,nonce,selection?,freeText?}. ~0.7k
+- apps/chat/bff/.../chat/GatewayClient.java — openChatStream 5-arg resume overload (X-Clarify-* headers).
