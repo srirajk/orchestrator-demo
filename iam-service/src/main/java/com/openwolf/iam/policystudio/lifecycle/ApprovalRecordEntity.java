@@ -27,7 +27,7 @@ public class ApprovalRecordEntity {
 
     @Id
     @Column(name = "id")
-    private String id;
+    private UUID id;
 
     @Column(name = "tenant_id", nullable = false)
     private String tenantId;
@@ -65,7 +65,7 @@ public class ApprovalRecordEntity {
     protected ApprovalRecordEntity() {}
 
     public ApprovalRecordEntity(ConsequenceApprovalRecord record) {
-        this.id = UUID.randomUUID().toString();
+        this.id = UUID.randomUUID();
         this.tenantId = record.tenantId();
         this.currentBundleId = record.currentBundleId();
         this.candidateBundleId = record.candidateBundleId();
@@ -89,7 +89,7 @@ public class ApprovalRecordEntity {
                 ApprovalDecision.valueOf(decision), signature, signedAt);
     }
 
-    public String getId() { return id; }
+    public String getId() { return id.toString(); }
     public String getTenantId() { return tenantId; }
     public String getCurrentBundleId() { return currentBundleId; }
     public String getCandidateBundleId() { return candidateBundleId; }

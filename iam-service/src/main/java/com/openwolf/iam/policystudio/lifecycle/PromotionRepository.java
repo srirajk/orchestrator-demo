@@ -5,6 +5,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * The durable promotion/rollback ledger (Axiom Story C5). The idempotency-key lookup is what makes a
@@ -12,7 +13,7 @@ import java.util.Optional;
  * driving a second CAS (C5.3).
  */
 @Repository
-public interface PromotionRepository extends JpaRepository<PromotionRecord, String> {
+public interface PromotionRepository extends JpaRepository<PromotionRecord, UUID> {
 
     Optional<PromotionRecord> findByIdempotencyKey(String idempotencyKey);
 

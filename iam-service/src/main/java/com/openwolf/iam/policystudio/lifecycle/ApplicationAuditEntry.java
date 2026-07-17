@@ -23,7 +23,7 @@ public class ApplicationAuditEntry {
 
     @Id
     @Column(name = "id")
-    private String id;
+    private UUID id;
 
     @Column(name = "transaction_id", nullable = false)
     private String transactionId;
@@ -44,7 +44,7 @@ public class ApplicationAuditEntry {
 
     public ApplicationAuditEntry(String transactionId, String tenantId, String cerbosCallId,
                                  String activePolicyVersion, Instant occurredAt) {
-        this.id = UUID.randomUUID().toString();
+        this.id = UUID.randomUUID();
         this.transactionId = transactionId;
         this.tenantId = tenantId;
         this.cerbosCallId = cerbosCallId;
@@ -52,7 +52,7 @@ public class ApplicationAuditEntry {
         this.occurredAt = occurredAt;
     }
 
-    public String getId() { return id; }
+    public String getId() { return id.toString(); }
     public String getTransactionId() { return transactionId; }
     public String getTenantId() { return tenantId; }
     public String getCerbosCallId() { return cerbosCallId; }

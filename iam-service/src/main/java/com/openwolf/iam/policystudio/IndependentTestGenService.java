@@ -3,6 +3,7 @@ package com.openwolf.iam.policystudio;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Path;
@@ -39,6 +40,7 @@ import java.util.List;
  * {@code PolicyAuthoringBoundaryArchTest}) proves no runtime-enforcement code can reach this service.
  */
 @Service
+@ConditionalOnBean(TestScenarioModelClient.class)
 public class IndependentTestGenService {
 
     private static final Logger log = LoggerFactory.getLogger(IndependentTestGenService.class);

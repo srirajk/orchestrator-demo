@@ -29,7 +29,7 @@ public class PromotionRecord {
 
     @Id
     @Column(name = "id")
-    private String id;
+    private UUID id;
 
     @Column(name = "idempotency_key", nullable = false, unique = true)
     private String idempotencyKey;
@@ -70,7 +70,7 @@ public class PromotionRecord {
 
     public PromotionRecord(String idempotencyKey, String tenantId, String fromBundleId, String toBundleId,
                            String consequenceReviewHash, String approverId, Kind kind) {
-        this.id = UUID.randomUUID().toString();
+        this.id = UUID.randomUUID();
         this.idempotencyKey = idempotencyKey;
         this.tenantId = tenantId;
         this.fromBundleId = fromBundleId;
@@ -93,7 +93,7 @@ public class PromotionRecord {
         this.lastError = error;
     }
 
-    public String getId() { return id; }
+    public String getId() { return id.toString(); }
     public String getIdempotencyKey() { return idempotencyKey; }
     public String getTenantId() { return tenantId; }
     public String getFromBundleId() { return fromBundleId; }
