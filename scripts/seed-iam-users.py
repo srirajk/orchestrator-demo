@@ -387,6 +387,22 @@ def _set_principal_teams(cur, p: Principal) -> None:
         )
 
 
+def repair_flyway_placeholder_passwords(cur, seed_password: str) -> None:
+    """Repair any Flyway-seeded user still carrying the SEED_REPLACE_ME placeholder
+    (e.g. the studio roles policy_author/policy_approver seeded in V2 — emma.watson,
+    james.kim). BCrypt cannot be computed in SQL, so Flyway leaves a placeholder and
+    this seeder sets it to the shared demo password. Idempotent: a repaired row no
+    longer matches the WHERE, so re-runs never churn an already-hashed password."""
+    cur.execute(
+        "UPDATE principals SET password_hash = %s "
+        "WHERE password_hash = 'SEED_REPLACE_ME'",
+        (_bcrypt(seed_password),),
+    )
+    if cur.rowcount:
+        print(f"[seed-iam] repaired {cur.rowcount} Flyway placeholder password(s) "
+              f"→ '{seed_password}' (login-capable)")
+
+
 def main() -> int:
     host = os.environ.get("IAM_DB_HOST", "postgres")
     port = os.environ.get("IAM_DB_PORT", "5432")
@@ -408,6 +424,7 @@ def main() -> int:
                 upsert_roles(cur)
                 upsert_teams(cur)
                 upsert_principals(cur, lambda pid: hashes[pid])
+                repair_flyway_placeholder_passwords(cur, seed_password)
             conn.commit()
     except Exception as exc:  # noqa: BLE001 — surface loudly, exit non-zero for seed-all.sh
         print(f"[seed-iam] ERROR: {exc}", file=sys.stderr)
