@@ -5066,7 +5066,15 @@
     "file": "gateway/src/main/resources/application.yml",
     "root_cause": "A2 readiness wiring added management.endpoint.health.group.readiness.include: readinessState,tenantDirectory. readinessState is only a registered health contributor when Spring Boot probes are enabled; without probes the group-membership validation fails at context refresh.",
     "fix": "Gate the readiness group on the custom indicator only (include: tenantDirectory). TenantDirectoryReadiness reports DOWN until the snapshot loads. To also fold in readinessState, enable management.endpoint.health.probes where k8s probes run.",
-    "tags": ["gateway", "A2", "tenancy", "actuator", "readiness", "spring-boot", "startup"],
+    "tags": [
+      "gateway",
+      "A2",
+      "tenancy",
+      "actuator",
+      "readiness",
+      "spring-boot",
+      "startup"
+    ],
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-07-17"
@@ -5074,13 +5082,46 @@
   {
     "id": "bug-291",
     "timestamp": "2026-07-17",
-    "error_message": "5 capability-clarify full-context tests 401 (expected 200) via CapabilityClarifyFixture — PRE-EXISTING on base conduit-platform-next (f30d5f0), independently reproduced, NOT an A2 regression. A1's gate missed it.",
+    "error_message": "5 capability-clarify full-context tests 401 (expected 200) via CapabilityClarifyFixture \u2014 PRE-EXISTING on base conduit-platform-next (f30d5f0), independently reproduced, NOT an A2 regression. A1's gate missed it.",
     "file": "gateway/src/test/java/ai/conduit/gateway/domain/chat/CapabilityClarifyFixture.java",
     "root_cause": "A1 merge made tenant_id + tenant-qualified audience mandatory at jwtDecoder, but CapabilityClarifyFixture.mintToken() still minted a bare-audience, tenant-less token, so A1 rejected it 401 before the controller. Reproduced identically on the pristine base f30d5f0 (5 tests 401).",
     "fix": "Made the fixture token A1-consistent: audience List.of(\"conduit-gateway\",\"conduit-gateway@default\") + claim tenant_id=default (mirrors AuthzFromMembershipTest). Fixes the pre-existing base breakage and satisfies A2 request-path tenant resolution. PROCESS: the A1 gate must run the full suite, not just the touched suites.",
-    "tags": ["gateway", "A1", "A2", "test-fixture", "jwt", "audience", "tenant", "pre-existing", "gate-miss"],
+    "tags": [
+      "gateway",
+      "A1",
+      "A2",
+      "test-fixture",
+      "jwt",
+      "audience",
+      "tenant",
+      "pre-existing",
+      "gate-miss"
+    ],
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-07-17"
+  },
+  {
+    "id": "bug-292",
+    "timestamp": "2026-07-17T21:40:00.000Z",
+    "error_message": "BreakGlassMergeAndPromoteIT flaky: 'A grants the normal tuple' expected EFFECT_ALLOW but was EFFECT_DENY (line 209); and 'emergency tuple self-limits to DENY past expiry' expected EFFECT_DENY but was EFFECT_ALLOW",
+    "file": "iam-service/src/main/java/com/openwolf/iam/policystudio/lifecycle/PromotedBundleLoader.java",
+    "root_cause": "NOT a policy/compiler bug (every compiled bundle resolves correctly under a static Cerbos load, verified). A self-contained promoted bundle carries a scoped tenant child (scope 'acme') AND its same-version root ceiling (scope '') and the child declares the root as its ancestor. PromotedBundleLoader wrote files in renderedFiles() path order, which places 'agent@acme.yaml' BEFORE 'agent_resource.yaml' (child before ancestor). Cerbos watchForChanges processes each file event and looks the ancestor up in the CURRENT index; a child indexed before its root fails 'failed to load ancestor ... policy not found' and Cerbos 'maintains last valid state' (never recovers) -> promotion silently un-enforced (invoke DENY). Reverse partial state (root delivered, child dropped) -> root grants platform_admin everything -> register ALLOW past expiry. Aggravated by Docker Desktop VirtioFS bind-mount inotify latency (host->container events arrive seconds late / coalesce), so a sub-second write burst races.",
+    "fix": "PromotedBundleLoader now writes ANCESTOR-FIRST, grouped into scope-depth tiers (root scope ''=0, 'acme'=1, ...), with a configurable inter-tier settle (iam.policy-studio.runtime-load-tier-settle-ms, default 3000ms) so each ancestor tier is observed/indexed by the PDP watcher before its children land. 3s reliably clears VirtioFS propagation latency (sub-second dropped ~50% of reloads; 3s => 8/8 then 4/4 IT + gate runs green). Added scopeDepth() parser and PromotedBundleLoaderAncestorOrderTest (deterministic, no Docker).",
+    "tags": [
+      "cerbos",
+      "policystudio",
+      "break-glass",
+      "watchForChanges",
+      "virtiofs",
+      "scoped-policy",
+      "ancestor",
+      "promotion",
+      "S4",
+      "S5"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-17T21:40:00.000Z"
   }
 ]

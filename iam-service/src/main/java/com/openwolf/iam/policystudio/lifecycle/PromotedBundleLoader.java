@@ -41,10 +41,36 @@ public class PromotedBundleLoader {
     private static final Logger log = LoggerFactory.getLogger(PromotedBundleLoader.class);
 
     private final String runtimePoliciesDir;
+    private final long tierSettleMs;
+    private final int emitPasses;
 
+    /** Test/convenience constructor: default settle + re-emit passes, no Spring binding. */
+    public PromotedBundleLoader(String runtimePoliciesDir) {
+        this(runtimePoliciesDir, 3000L, 2);
+    }
+
+    /**
+     * @param tierSettleMs the pause between scope-depth tiers (ancestors then children) — gives the PDP's
+     *                     directory watcher time to observe and index each ancestor tier before its
+     *                     children land, so no scoped child is ever presented (and rejected) before its
+     *                     same-version ancestor. Sized for the SLOWEST watcher the runtime may sit behind
+     *                     (a bind-mounted volume whose host→container inotify propagation is high-latency —
+     *                     e.g. Docker Desktop VirtioFS). Control-plane latency only (promotion is off the
+     *                     request path); configurable down where the watcher is fast. Tests may set 0.
+     * @param emitPasses   how many times the whole ancestor-first write is repeated. A single write is
+     *                     enough where every filesystem event is delivered; over a lossy watcher (VirtioFS
+     *                     drops ~a third of host→container events) an idempotent re-write re-fires the
+     *                     event for any file whose prior event was dropped, so the promoted bundle
+     *                     converges into the index. Byte-identical re-writes ⇒ no spurious churn.
+     */
+    @org.springframework.beans.factory.annotation.Autowired
     public PromotedBundleLoader(
-            @Value("${iam.policy-studio.runtime-policies-dir:}") String runtimePoliciesDir) {
+            @Value("${iam.policy-studio.runtime-policies-dir:}") String runtimePoliciesDir,
+            @Value("${iam.policy-studio.runtime-load-tier-settle-ms:3000}") long tierSettleMs,
+            @Value("${iam.policy-studio.runtime-load-emit-passes:2}") int emitPasses) {
         this.runtimePoliciesDir = runtimePoliciesDir == null ? "" : runtimePoliciesDir.trim();
+        this.tierSettleMs = Math.max(0L, tierSettleMs);
+        this.emitPasses = Math.max(1, emitPasses);
     }
 
     /** True iff a runtime-policies directory is configured — otherwise {@link #load} is a no-op. */
@@ -68,37 +94,107 @@ public class PromotedBundleLoader {
         try {
             Path dir = Path.of(runtimePoliciesDir);
             Files.createDirectories(dir);
-            List<Path> written = new ArrayList<>();
+
+            // Select the version-stamped policies to write, then order them ANCESTOR-FIRST (by scope depth).
+            //
+            // renderedFiles() stamps the concrete bundleId into the version position; the
+            // StagingCandidateProbe already verified every version-keyed rendered file carries it and no
+            // sentinel survives, so what lands in the watched dir is exactly what cerbos compile validated.
+            //
+            // S3: a self-contained bundle also captures GLOBAL, name-keyed modules (derived-roles /
+            // variables) for its own compile identity. Those must NOT be written into the shared runtime dir
+            // — the base bundle already serves them by name, and a second copy of the same module name would
+            // be a duplicate-identity load error that breaks the whole PDP. A version-keyed resource policy
+            // stamped version=<bundleId> coexists additively with the base version=default; a global module
+            // does not. Write ONLY the version-stamped policies (those whose rendered form carries the
+            // content-addressed id); imported global modules resolve from the base set unchanged.
+            List<BundleFile> writable = new ArrayList<>();
             for (BundleFile file : bundle.renderedFiles()) {
-                // renderedFiles() stamps the concrete bundleId into the version position; the
-                // StagingCandidateProbe already verified every version-keyed rendered file carries it and
-                // no sentinel survives, so what lands in the watched dir is exactly what cerbos compile
-                // validated.
-                //
-                // S3: a self-contained bundle also captures GLOBAL, name-keyed modules (derived-roles /
-                // variables) for its own compile identity. Those must NOT be written into the shared
-                // runtime dir — the base bundle already serves them by name, and a second copy of the same
-                // module name would be a duplicate-identity load error that breaks the whole PDP. A
-                // version-keyed resource policy stamped version=<bundleId> coexists additively with the
-                // base version=default; a global module does not. Load ONLY the version-stamped policies
-                // (those whose rendered form carries the content-addressed id); imported global modules
-                // resolve from the base set unchanged.
-                if (!file.yaml().contains(bundle.bundleId())) {
-                    continue;
+                if (file.yaml().contains(bundle.bundleId())) {
+                    writable.add(file);
                 }
-                Path target = dir.resolve(stagedFileName(bundle.bundleId(), file.path()));
-                Files.writeString(target, file.yaml(), StandardCharsets.UTF_8,
-                        StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-                written.add(target);
+            }
+            // A self-contained bundle carries a whole scope chain at the SAME version — the tenant child
+            // (scope: "acme") AND its root ceiling (scope: "") — and the child declares the root as its
+            // ancestor. Cerbos' watchForChanges processes each file's storage event as it lands and looks
+            // the ancestor up in the CURRENT index: if the scoped child is indexed before its same-version
+            // root, the compilation unit fails ("failed to load ancestor ... policy not found") and Cerbos
+            // "maintains the last valid state" — leaving the promotion silently un-enforced. renderedFiles()
+            // is path-sorted, so "agent@acme.yaml" precedes "agent_resource.yaml" — child before ancestor,
+            // exactly the losing order.
+            //
+            // Fix: write ANCESTOR-FIRST, grouped into scope-depth TIERS (root scope "" = tier 0, "acme" =
+            // tier 1, …), and settle briefly between tiers. Ordering alone is not enough — a single rapid
+            // write burst coalesces into one watch batch the PDP may process child-first; the inter-tier
+            // settle lets the watcher observe and index each ancestor tier before its children land, so no
+            // scoped child is ever presented ahead of its same-version ancestor (verified against a live
+            // pinned Cerbos with disk + watchForChanges, standalone and under full-suite load).
+            java.util.SortedMap<Integer, List<BundleFile>> byDepth = new java.util.TreeMap<>();
+            for (BundleFile file : writable) {
+                byDepth.computeIfAbsent(scopeDepth(file.yaml()), d -> new ArrayList<>()).add(file);
+            }
+
+            // Repeat the ancestor-first tiered write `emitPasses` times. The first pass loads the bundle;
+            // each subsequent pass re-fires the storage event for every file (idempotent, byte-identical),
+            // so any file whose event a lossy watcher dropped is re-presented — with its ancestors already
+            // on disk — until the whole bundle has converged into the index.
+            java.util.LinkedHashSet<Path> written = new java.util.LinkedHashSet<>();
+            for (int pass = 0; pass < emitPasses; pass++) {
+                int tiersRemaining = byDepth.size();
+                for (List<BundleFile> tier : byDepth.values()) {
+                    for (BundleFile file : tier) {
+                        Path target = dir.resolve(stagedFileName(bundle.bundleId(), file.path()));
+                        Files.writeString(target, file.yaml(), StandardCharsets.UTF_8,
+                                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+                        written.add(target);
+                    }
+                    if (--tiersRemaining > 0 && tierSettleMs > 0) {
+                        settle(); // let the watcher index this ancestor tier before its children land
+                    }
+                }
+                if (pass + 1 < emitPasses && tierSettleMs > 0) {
+                    settle(); // space passes so a re-fired event is a distinct watch event
+                }
             }
             log.info("Loaded promoted bundle '{}' into runtime policies dir '{}' ({} file(s)) — "
                     + "Cerbos watchForChanges will reload; version={} now enforceable, base default unchanged",
                     bundle.bundleId(), dir.toAbsolutePath(), written.size(), bundle.bundleId());
-            return written;
+            return new ArrayList<>(written);
         } catch (IOException e) {
             throw new PromotedBundleLoadException(bundle.bundleId(), runtimePoliciesDir, e);
         }
     }
+
+    /** Pause between scope-depth tiers so the PDP watcher indexes each ancestor tier before its children. */
+    private void settle() {
+        try {
+            Thread.sleep(tierSettleMs);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /**
+     * The scope depth of a rendered resource policy — {@code scope: ""} (root ceiling) = 0, {@code
+     * scope: "acme"} = 1, {@code scope: "acme.eng"} = 2, … — used to order writes ancestor-first so a
+     * scoped child is never indexed before its same-version ancestor during a watch reload. A file with no
+     * {@code scope:} line (not expected on the write path — globals are excluded above) sorts as root.
+     */
+    static int scopeDepth(String yaml) {
+        java.util.regex.Matcher m = SCOPE_LINE.matcher(yaml);
+        if (!m.find()) {
+            return 0;
+        }
+        String scope = m.group(1).trim();
+        if (scope.startsWith("\"") || scope.startsWith("'")) {
+            scope = scope.substring(1, scope.length() - 1);
+        }
+        return scope.isBlank() ? 0 : scope.split("\\.").length;
+    }
+
+    /** Matches the resource-policy {@code scope:} line (quoted or bare), capturing the scope value. */
+    private static final java.util.regex.Pattern SCOPE_LINE =
+            java.util.regex.Pattern.compile("(?m)^\\s*scope:\\s*(\"[^\"]*\"|'[^']*'|\\S*)\\s*$");
 
     /** A filesystem-safe, bundle-namespaced file name so promoted versions coexist and re-promotion is idempotent. */
     private static String stagedFileName(String bundleId, String path) {
