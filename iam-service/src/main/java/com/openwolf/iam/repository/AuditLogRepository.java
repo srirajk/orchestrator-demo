@@ -17,4 +17,7 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, UUID> {
     List<AuditLog> findByTenantIdOrderByOccurredAtDesc(String tenantId);
 
     List<AuditLog> findByActorIdOrderByOccurredAtDesc(String actorId);
+
+    boolean existsByTenantIdAndActionAndResourceTypeAndResourceIdAndCorrelationId(
+            String tenantId, String action, String resourceType, String resourceId, String correlationId);
 }

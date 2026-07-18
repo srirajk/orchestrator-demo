@@ -1,0 +1,18 @@
+{
+  "fixtures": [
+    {
+      "match": {
+        "userMessage": "USER: What is Meridian's house view on equities this quarter?\n\n--- LATEST USER MESSAGE (classify THIS; if it names an entity, that mention wins) ---\nWhat is Meridian's house view on equities this quarter?",
+        "model": "gpt-4.1-nano",
+        "turnIndex": 0,
+        "hasToolResult": false
+      },
+      "response": {
+        "content": "{\n  \"intent\": \"FETCH_DATA\",\n  \"confidence\": 0.95,\n  \"reasoning\": \"the user is requesting Meridian's house view on equities for this quarter, which requires retrieving current policy or market outlook data\",\n  \"research_topic\": null,\n  \"relationship_reference\": \"Meridian\",\n  \"fund_reference\": null,\n  \"period\": \"QTD\",\n  \"ticker_references\": [],\n  \"policy_topic\": null,\n  \"account_id\": null,\n  \"currency\": null,\n  \"security_id\": null,\n  \"valuation_date\": \"latest available\",\n  \"policy_reference\": null,\n  \"claim_reference\": null,\n  \"settlement_id\": null,\n  \"mentions\": [\n    {\"entity\": \"relationship_reference\", \"text\": \"Meridian\", \"source\": \"explicit\"},\n    {\"entity\": \"period\", \"text\": \"this quarter\", \"source\": \"explicit\"}\n  ]\n}"
+      },
+      "metadata": {
+        "systemHash": "b621a81b"
+      }
+    }
+  ]
+}

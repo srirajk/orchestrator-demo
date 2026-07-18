@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Activity, AlertTriangle, ArrowRight, CheckCircle, Clock, Code, FileCheck,
@@ -9,7 +9,7 @@ import {
   type BreakGlassRequest,
   type ConsequenceReview,
   type DraftRequest,
-  type PolicyBundle,
+  type ReviewHandoff,
 } from '../api/client'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
@@ -25,14 +25,6 @@ const EMPTY_BUNDLE = JSON.stringify({
   testMetadata: { fixtureSetHash: 'replace', testCount: 0, oracle: 'independent-c3', pdpSourceId: 'cerbos-0.53.0' },
   canonicalContent: 'replace',
 }, null, 2)
-
-function parseJson<T>(label: string, value: string): T {
-  try {
-    return JSON.parse(value) as T
-  } catch (error) {
-    throw new Error(`${label} is not valid JSON: ${(error as Error).message}`)
-  }
-}
 
 function formatTime(value?: string) {
   if (!value) return '—'
@@ -63,7 +55,7 @@ function AdvancedJson({ title, hint, value, onChange, rows = 12 }: {
   title: string
   hint: string
   value: string
-  onChange: (value: string) => void
+  onChange?: (value: string) => void
   rows?: number
 }) {
   return (
@@ -77,7 +69,8 @@ function AdvancedJson({ title, hint, value, onChange, rows = 12 }: {
         <textarea
           aria-label={title}
           value={value}
-          onChange={(event) => onChange(event.target.value)}
+          onChange={onChange ? (event) => onChange(event.target.value) : undefined}
+          readOnly={!onChange}
           rows={rows}
           spellCheck={false}
           className="w-full resize-y rounded-md border border-slate-300 bg-axiom-950 p-3 font-mono text-xs leading-5 text-slate-100 focus:border-gold-400 focus:outline-none focus:ring-2 focus:ring-gold-300"
@@ -147,6 +140,7 @@ export function PolicyStudio() {
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const tenant = user?.tenantId || 'tenant from verified token'
+  const identityScope = `${user?.tenantId || 'none'}:${user?.id || 'anonymous'}`
   const canDraft = user?.roles.some((role) => role === 'policy_author') ?? false
   const canApprove = user?.roles.some((role) => role === 'policy_approver') ?? false
   const [tab, setTab] = useState<StudioTab>('author')
@@ -160,12 +154,36 @@ export function PolicyStudio() {
   const [idempotencyKey, setIdempotencyKey] = useState(() => `studio-${Date.now()}`)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [consequencesConfirmed, setConsequencesConfirmed] = useState(false)
+  useEffect(() => {
+    setIntent('')
+    setResourceKind('agent')
+    setSubscopesEnabled(false)
+    setDraft(null)
+    setReview(null)
+    setCandidateJson(EMPTY_BUNDLE)
+    setIdempotencyKey(`studio-${Date.now()}`)
+    setConfirmOpen(false)
+    setConsequencesConfirmed(false)
+  }, [identityScope])
   const grounding = useQuery({
-    queryKey: ['studio-grounding', resourceKind],
+    queryKey: ['studio-grounding', identityScope, resourceKind],
     queryFn: () => studioApi.getVocabulary(resourceKind),
     enabled: Boolean(user),
     retry: false,
   })
+  const pendingReviews = useQuery({
+    queryKey: ['studio-pending-reviews', identityScope],
+    queryFn: studioApi.listPendingReviews,
+    enabled: canApprove,
+    retry: false,
+  })
+
+  const loadHandoff = (handoff: ReviewHandoff) => {
+    setReview(handoff.review)
+    setCandidateJson(JSON.stringify(handoff.candidate, null, 2))
+    setIdempotencyKey(`studio-${Date.now()}`)
+    toast('success', `Loaded review from ${handoff.authorId}`)
+  }
 
   const draftMutation = useMutation({
     mutationFn: async () => {
@@ -195,15 +213,12 @@ export function PolicyStudio() {
   })
 
   const promotionMutation = useMutation({
-    mutationFn: () => studioApi.promote(
-      review?.consequenceReviewHash || '',
-      parseJson<PolicyBundle>('Candidate bundle', candidateJson),
-      idempotencyKey,
-    ),
+    mutationFn: () => studioApi.promote(review?.consequenceReviewHash || '', idempotencyKey),
     onSuccess: (receipt) => {
       setConfirmOpen(false)
       setConsequencesConfirmed(false)
       void queryClient.invalidateQueries({ queryKey: ['studio-bundles'] })
+      void queryClient.invalidateQueries({ queryKey: ['studio-pending-reviews'] })
       toast('success', `${receipt.kind === 'ROLLBACK' ? 'Rollback' : 'Promotion'} committed at directory version ${receipt.directoryVersion}`)
     },
     onError: (error: Error) => toast('error', error.message),
@@ -235,6 +250,39 @@ export function PolicyStudio() {
 
       {tab === 'author' && (
         <div className="space-y-6">
+          {canApprove && (
+            <section className="surface-card p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="section-heading">Pending approvals</h2>
+                  <p className="mt-1 text-xs leading-5 text-ink-500">Same-tenant reviews submitted by a separate verified author.</p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => void pendingReviews.refetch()} loading={pendingReviews.isFetching}>
+                  <RefreshCw size={14} /> Refresh
+                </Button>
+              </div>
+              {pendingReviews.isError ? (
+                <p className="mt-4 text-sm text-red-700">{(pendingReviews.error as Error).message}</p>
+              ) : pendingReviews.data?.length ? (
+                <div className="mt-4 space-y-2">
+                  {pendingReviews.data.map((handoff) => (
+                    <div key={handoff.reviewId} className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-line bg-slate-50 p-3">
+                      <div>
+                        <p className="text-sm font-medium text-ink-900">Review by {handoff.authorId}</p>
+                        <p className="mt-1 font-mono text-[11px] text-ink-500">{handoff.reviewId}</p>
+                        <p className="mt-1 text-xs text-ink-500">{formatTime(handoff.storedAt)} · {handoff.review.deltas.length} changed decisions</p>
+                      </div>
+                      <Button size="sm" onClick={() => loadHandoff(handoff)}>
+                        <UserCheck size={14} /> Load for approval
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-4 text-sm text-ink-500">No pending reviews for this tenant.</p>
+              )}
+            </section>
+          )}
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3" aria-label="Policy workflow">
             {[
               ['1', 'Draft', 'LLM proposes; deterministic gate decides'],
@@ -382,8 +430,8 @@ export function PolicyStudio() {
         </div>
       )}
 
-      {tab === 'lifecycle' && <LifecyclePanel canApprove={canApprove} />}
-      {tab === 'emergency' && <BreakGlassPanel canDraft={canDraft} canApprove={canApprove} tenant={user?.tenantId || ''} />}
+      {tab === 'lifecycle' && <LifecyclePanel canApprove={canApprove} identityScope={identityScope} />}
+      {tab === 'emergency' && <BreakGlassPanel canDraft={canDraft} canApprove={canApprove} tenant={user?.tenantId || ''} identityScope={identityScope} />}
 
       <Dialog
         open={confirmOpen}
@@ -400,9 +448,8 @@ export function PolicyStudio() {
           </div>
           <AdvancedJson
             title="Immutable candidate bundle"
-            hint="The bundle id and canonical content are re-verified by the server before promotion."
+            hint="Display-only evidence. Promotion loads this exact reviewed bundle from the server; browser edits are not accepted."
             value={candidateJson}
-            onChange={setCandidateJson}
             rows={11}
           />
           <Input label="Idempotency key" value={idempotencyKey} onChange={(event) => setIdempotencyKey(event.target.value)} />
@@ -431,11 +478,15 @@ export function PolicyStudio() {
   )
 }
 
-function LifecyclePanel({ canApprove }: { canApprove: boolean }) {
+function LifecyclePanel({ canApprove, identityScope }: { canApprove: boolean; identityScope: string }) {
   const { toast } = useToast()
   const [callId, setCallId] = useState('')
   const [examiner, setExaminer] = useState<Awaited<ReturnType<typeof studioApi.getExaminerChain>> | null>(null)
-  const bundles = useQuery({ queryKey: ['studio-bundles'], queryFn: studioApi.listBundles, retry: false })
+  useEffect(() => {
+    setCallId('')
+    setExaminer(null)
+  }, [identityScope])
+  const bundles = useQuery({ queryKey: ['studio-bundles', identityScope], queryFn: studioApi.listBundles, retry: false })
   const examinerMutation = useMutation({
     mutationFn: () => studioApi.getExaminerChain(callId),
     onSuccess: setExaminer,
@@ -498,7 +549,7 @@ function LifecyclePanel({ canApprove }: { canApprove: boolean }) {
   )
 }
 
-function BreakGlassPanel({ canDraft, canApprove, tenant }: { canDraft: boolean; canApprove: boolean; tenant: string }) {
+function BreakGlassPanel({ canDraft, canApprove, tenant, identityScope }: { canDraft: boolean; canApprove: boolean; tenant: string; identityScope: string }) {
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const [resourceKind, setResourceKind] = useState('')
@@ -506,9 +557,16 @@ function BreakGlassPanel({ canDraft, canApprove, tenant }: { canDraft: boolean; 
   const [role, setRole] = useState('')
   const [ttl, setTtl] = useState(30)
   const [justification, setJustification] = useState('')
-  const grants = useQuery({ queryKey: ['studio-break-glass'], queryFn: studioApi.listBreakGlass, retry: false })
+  useEffect(() => {
+    setResourceKind('')
+    setAction('')
+    setRole('')
+    setTtl(30)
+    setJustification('')
+  }, [identityScope])
+  const grants = useQuery({ queryKey: ['studio-break-glass', identityScope], queryFn: studioApi.listBreakGlass, retry: false })
   const grounding = useQuery({
-    queryKey: ['studio-grounding', resourceKind || 'agent'],
+    queryKey: ['studio-grounding', identityScope, resourceKind || 'agent'],
     queryFn: () => studioApi.getVocabulary(resourceKind || 'agent'),
     enabled: Boolean(tenant && resourceKind),
     retry: false,
@@ -519,9 +577,6 @@ function BreakGlassPanel({ canDraft, canApprove, tenant }: { canDraft: boolean; 
       if (!grounding.data) throw new Error('Manifest grounding is not loaded yet.')
       const payload: BreakGlassRequest = {
         scope: tenant, resourceKind, action, role, ttlMinutes: ttl, justification,
-        vocabulary: grounding.data.vocabulary,
-        baseCeiling: grounding.data.baseCeiling,
-        allowlist: { resources: [resourceKind], actions: [action] },
       }
       return studioApi.requestBreakGlass(payload)
     },

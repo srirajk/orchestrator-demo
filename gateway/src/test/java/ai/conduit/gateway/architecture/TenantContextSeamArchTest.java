@@ -29,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *       exactly the resolver and the A1 audience/tenant verifier, nowhere else. A future direct reader
  *       (e.g. a consumer that re-reads the claim instead of taking the resolved context) turns this red.</li>
  *   <li><b>noDownstreamStaticTenantLookup</b> — only the servlet capture seam (the filter that sets it and
- *       the two controllers that capture it) may touch {@link RequestContext#getTenant()}. Every other
+ *       the protected controllers that capture it) may touch {@link RequestContext#getTenant()}. Every other
  *       production class must receive the {@link TenantExecutionContext} explicitly.</li>
  *   <li><b>protectedControllerEntriesCarryTenant</b> — the service entry methods the protected controllers
  *       call ({@code ChatService.handleChat} / {@code decideRoute}) declare a {@link TenantExecutionContext}
@@ -89,6 +89,8 @@ public class TenantContextSeamArchTest {
                         "ai.conduit.gateway.api.v1.chat.ChatCompletionsController")
                 .and().doNotHaveFullyQualifiedName(
                         "ai.conduit.gateway.api.v1.admin.RouteDecisionController")
+                .and().doNotHaveFullyQualifiedName(
+                        "ai.conduit.gateway.api.v1.insights.InsightsController")
                 .should(callMethodWhere(REQUEST_CONTEXT_GET_TENANT))
                 .because("the tenant is captured on the servlet thread by the controller capture seam and "
                         + "threaded EXPLICITLY as a TenantExecutionContext; downstream code must never "

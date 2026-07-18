@@ -33,7 +33,7 @@ class DeprovisioningTest {
         TenantProvisioningService service = new TenantProvisioningService(
                 ProvisioningTestSupport.opsRepo(), directory,
                 ProvisioningTestSupport.realPolicyAdapterNoProbe(staging),
-                namespace, registry, audit);
+                namespace, registry, audit, ProvisioningTestSupport.acceptingPublisher());
 
         // Provision → ACTIVE, all artifacts present.
         ProvisioningResult provisioned = service.provision(
@@ -75,7 +75,8 @@ class DeprovisioningTest {
                 ProvisioningTestSupport.opsRepo(), directory,
                 ProvisioningTestSupport.realPolicyAdapterNoProbe(staging),
                 new InProcessTenantNamespaceAdapter(), new InProcessRegistrySpaceAdapter(),
-                new PersistentAuditPartitionAdapter(ProvisioningTestSupport.auditRepo()));
+                new PersistentAuditPartitionAdapter(ProvisioningTestSupport.auditRepo()),
+                ProvisioningTestSupport.acceptingPublisher());
 
         service.provision(new ProvisioningRequest(TENANT, "Acme", "acme"), "p", "admin");
         service.deprovision(TENANT, "d", "admin");

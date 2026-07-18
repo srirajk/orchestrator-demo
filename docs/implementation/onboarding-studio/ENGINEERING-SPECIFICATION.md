@@ -1,9 +1,9 @@
 # Conduit Onboarding Studio — Engineering Specification
 
 **Status:** Proposed  
-**Depends on:** `PRODUCT-REQUIREMENTS.md`, current registry schemas, gateway registry profile  
-**Primary constraint:** Reuse the registry control plane; do not add onboarding logic to the gateway
-request path.
+**Depends on:** `PRODUCT-REQUIREMENTS.md`, current registry schemas, external registry-ingestion profile
+**Primary constraint:** Reuse the shared registry admission logic externally; do not add onboarding
+or ingestion logic to the gateway request path.
 
 This document is the cross-cutting contract. Focused production specifications are authoritative for
 their areas:
@@ -38,16 +38,17 @@ Onboarding API / Workflow  -- LLM --> interview + proposals
                          platform approval
                                |
                                v
-                     existing gateway registry ingest
+                     external registry ingestion
 ```
 
 ### Recommended v1 placement
 
 Implement a separate Java/Spring Boot Studio control plane plus a separate React Studio UI. Extract
 the gateway's manifest, JMESPath projection, condition and bounded-map admission semantics into a
-shared Java module used by both Studio and gateway. Keep live execution probes and registry mutation
-behind narrow gateway registry-profile APIs. This preserves one executable definition of
-composition without putting long-running Studio workflow state in the request-path gateway.
+shared Java module used by Studio, external registry ingestion and the read-only gateway. Keep live
+execution probes and registry mutation behind narrow external registry-ingestion APIs. This
+preserves one executable definition of composition without putting workflow or ingestion state in
+the request-path gateway.
 
 Do not add the UI to the Axiom identity admin console. Axiom owns identity governance; Studio owns
 Conduit capability admission.
@@ -664,7 +665,7 @@ candidate bundle and expected verdict without editing JSON/YAML.
 1. PostgreSQL is authoritative for workflow state; object storage is authoritative for immutable
    evidence and bundles. Redis is non-authoritative cache/coordination only.
 2. Studio publishes a content-addressed downloadable bundle and promotes its exact hash through the
-   gateway registry API. Git PR integration and a registry draft store are deferred.
+   external registry-ingestion API. Git PR integration and a registry draft store are deferred.
 3. V1 accepts text, Markdown, JSON, OpenAPI JSON/YAML and PDF. DOCX and arbitrary archive ingestion
    are deferred until isolated extraction and adversarial-file tests exist.
 4. Hard routing policy requires every approved ownership example to select the candidate, every

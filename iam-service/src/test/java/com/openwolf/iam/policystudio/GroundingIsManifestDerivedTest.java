@@ -1,9 +1,7 @@
 package com.openwolf.iam.policystudio;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.openwolf.iam.policystudio.lifecycle.PolicyBundleRepository;
 import com.openwolf.iam.tenancy.ActiveTenantDirectory;
-import com.openwolf.iam.tenancy.ActiveTenantRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -12,7 +10,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
 
 /**
  * S5 — the studio grounding vocabulary (resource kind, actions, roles, approved imports) and the base
@@ -26,7 +23,10 @@ import static org.mockito.Mockito.mock;
 class GroundingIsManifestDerivedTest {
 
     @Test
-    void vocabularyActionsRolesAndCeilingComeFromTheBaseBundleNotLiterals(@TempDir Path baseBundle) throws IOException {
+    void vocabularyActionsRolesAndCeilingComeFromTheBaseBundleNotLiterals(@TempDir Path temp) throws IOException {
+        Path baseBundle = Files.createDirectories(temp.resolve("policies"));
+        Path tenantRoot = temp.resolve("tenants");
+        StudioGroundingTestFixtures.writeTenantDeployment(tenantRoot, "acme");
         // A distinctive base bundle for a made-up kind: actions {frobnicate, inspect, manage}, a raw role
         // {overlord}, and a derived role {tenant_wizard → wizard} carrying the tenant-equality backstop.
         Files.writeString(baseBundle.resolve("widget_resource.yaml"), """
@@ -58,17 +58,28 @@ class GroundingIsManifestDerivedTest {
                             (has(P.attr.tenant_id) && has(R.attr.tenant_id))
                               ? P.attr.tenant_id == R.attr.tenant_id : true
                 """);
+        Files.writeString(baseBundle.resolve("tenant_acme_widget.yaml"), """
+                apiVersion: api.cerbos.dev/v1
+                resourcePolicy:
+                  version: "default"
+                  resource: widget
+                  scope: "acme"
+                  scopePermissions: SCOPE_PERMISSIONS_REQUIRE_PARENTAL_CONSENT_FOR_ALLOWS
+                  rules:
+                    - actions: ["frobnicate"]
+                      effect: EFFECT_ALLOW
+                      roles: ["wizard"]
+                """);
 
         ManifestBackedStudioGroundingProvider provider = new ManifestBackedStudioGroundingProvider(
                 new ObjectMapper(),
                 new CanonicalPolicyWriter(),
                 new PolicyYamlParser(),
                 freshDirectory(),
-                mock(PolicyBundleRepository.class),
+                StudioGroundingTestFixtures.emptyBundleRepository(),
                 "registry",                       // real registry supplies data classifications
                 baseBundle.toString(),            // the distinctive base bundle above
-                "infra/cerbos/tenants",
-                "default");
+                tenantRoot.toString());
 
         StudioGroundingSnapshot snapshot = provider.snapshot("acme", "widget");
         ManifestVocabulary vocab = snapshot.vocabulary();
@@ -101,7 +112,9 @@ class GroundingIsManifestDerivedTest {
 
         // The backstop flag is read from the imported module's condition, not hardcoded true.
         assertThat(ceiling.carriesTenantEqualityBackstop()).isTrue();
-        assertThat(ceiling.reservedIdentities()).contains("widget@");
+        assertThat(ceiling.reservedIdentities())
+                .as("the immutable root is reserved; the tenant-owned child remains replaceable")
+                .containsExactly("widget@");
     }
 
     @Test
@@ -120,8 +133,8 @@ class GroundingIsManifestDerivedTest {
 
         ManifestBackedStudioGroundingProvider provider = new ManifestBackedStudioGroundingProvider(
                 new ObjectMapper(), new CanonicalPolicyWriter(), new PolicyYamlParser(),
-                freshDirectory(), mock(PolicyBundleRepository.class),
-                "registry", baseBundle.toString(), "infra/cerbos/tenants", "default");
+                freshDirectory(), StudioGroundingTestFixtures.emptyBundleRepository(),
+                "registry", baseBundle.toString(), "infra/cerbos/tenants");
 
         BaseCeiling ceiling = provider.snapshot("acme", "widget").baseCeiling();
         assertThat(ceiling.carriesTenantEqualityBackstop())
@@ -132,6 +145,6 @@ class GroundingIsManifestDerivedTest {
 
     /** A fresh B4 directory (empty in-memory snapshot) — the tenant resolves as unknown → base-only current. */
     private static ActiveTenantDirectory freshDirectory() {
-        return new ActiveTenantDirectory(mock(ActiveTenantRepository.class));
+        return StudioGroundingTestFixtures.emptyTenantDirectory();
     }
 }

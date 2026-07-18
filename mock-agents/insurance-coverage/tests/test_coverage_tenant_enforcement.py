@@ -74,3 +74,19 @@ class TestCoverageTenantEnforcement:
         token = mint_token("default", sub="uw_sam")
         resp = client.get("/coverage/uw_sam", headers={"Authorization": f"Bearer {token}"})
         assert resp.status_code == 403, resp.text
+
+    def test_bare_coverage_audience_rejected(self):
+        token = mint_token("default", audience="conduit-coverage")
+        resp = client.get(
+            "/coverage/uw_sam",
+            headers={"Authorization": f"Bearer {token}", "X-Tenant-Id": "default"},
+        )
+        assert resp.status_code == 401, resp.text
+
+    def test_other_principals_book_rejected(self):
+        resp = client.get(
+            "/coverage/uw_sam",
+            headers=auth_headers("default", sub="another-user"),
+        )
+        assert resp.status_code == 403, resp.text
+        assert "verified token subject" in resp.json()["detail"]

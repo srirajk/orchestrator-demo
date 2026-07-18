@@ -128,7 +128,7 @@ class TestDiscoverEndpoint:
             assert "sub_domain" in r
 
     def test_discover_unknown_principal_returns_empty_list(self):
-        resp = client.get("/coverage/nobody", headers=DEFAULT_AUTH)
+        resp = client.get("/coverage/nobody", headers=auth_headers("default", sub="nobody"))
         assert resp.status_code == 200
         assert resp.json() == []
 

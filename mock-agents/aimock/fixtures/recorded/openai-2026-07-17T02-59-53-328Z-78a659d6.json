@@ -1,0 +1,60 @@
+{
+  "fixtures": [
+    {
+      "match": {
+        "userMessage": "--- DATA: meridian.servicing.nav (mcp) ---\n{\n  \"_verified_sub\" : \"rm_jane\",\n  \"fund_id\" : \"FND-7781\",\n  \"fund_name\" : \"Meridian Global Equity Fund\",\n  \"nav\" : 128.45,\n  \"as_of_date\" : \"2026-06-22\",\n  \"currency\" : \"USD\",\n  \"aum\" : 4500000000,\n  \"shares_outstanding\" : 35030000,\n  \"nav_change_pct\" : 0.82,\n  \"agent_narrative\" : \"The Meridian Global Equity Fund has a NAV per unit of $128.45 and total assets under management (AUM) of $4.5 billion as of June 22, 2026. The day's NAV change percentage is 0.82%.\"\n}\n--- END DATA ---\n\n\n\nQuestion: What's the latest NAV on fund FND-7781?",
+        "model": "gpt-5-mini",
+        "turnIndex": 0,
+        "hasToolResult": false
+      },
+      "response": {
+        "content": "The latest NAV for fund FND-7781 (Meridian Global Equity Fund) is 128.45 USD as of 2026-06-22."
+      },
+      "recordedTimings": {
+        "ttftMs": 5457,
+        "interChunkDelaysMs": [
+          6,
+          0,
+          18,
+          0,
+          7,
+          0,
+          12,
+          0,
+          14,
+          0,
+          23,
+          0,
+          15,
+          0,
+          6,
+          0,
+          19,
+          0,
+          10,
+          0,
+          13,
+          0,
+          2,
+          0,
+          24,
+          0,
+          13,
+          0,
+          10,
+          0,
+          9,
+          0,
+          32,
+          0,
+          18,
+          0
+        ],
+        "totalDurationMs": 5708
+      },
+      "metadata": {
+        "systemHash": "8a91fc0c"
+      }
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "fixtures": [
+    {
+      "match": {
+        "userMessage": "USER: Show me the holdings\n\n--- LATEST USER MESSAGE (classify THIS; if it names an entity, that mention wins) ---\nShow me the holdings",
+        "model": "gpt-4.1-nano",
+        "turnIndex": 0,
+        "hasToolResult": false
+      },
+      "response": {
+        "content": "{\n  \"intent\": \"FETCH_DATA\",\n  \"confidence\": 0.95,\n  \"reasoning\": \"the user requests holdings, which typically refers to asset data, and no specific entity is named, so fetch general holdings data\",\n  \"research_topic\": null,\n  \"relationship_reference\": null,\n  \"fund_reference\": null,\n  \"period\": \"QTD\",\n  \"ticker_references\": [],\n  \"policy_topic\": null,\n  \"account_id\": null,\n  \"currency\": null,\n  \"security_id\": null,\n  \"valuation_date\": \"latest available\",\n  \"policy_reference\": null,\n  \"claim_reference\": null,\n  \"settlement_id\": null,\n  \"mentions\": [ {\"entity\": \"[]\", \"text\": \"holdings\", \"source\": \"explicit\"} ]\n}"
+      },
+      "metadata": {
+        "systemHash": "b621a81b"
+      }
+    }
+  ]
+}

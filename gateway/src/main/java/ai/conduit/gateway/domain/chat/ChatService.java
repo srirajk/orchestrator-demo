@@ -660,7 +660,7 @@ public class ChatService {
                             new RequestCompleteData(System.currentTimeMillis() - requestStart, 0, 0)));
                     return;
                 }
-                if (attemptRequiredEntityClarify(resolved, preExtracted, principal, tenantId, callerToken,
+                if (attemptRequiredEntityClarify(resolved, preExtracted, principal, tenant, tenantId, callerToken,
                         emitter, streamId, requestId, conversationId, requestStart, request)) {
                     return;
                 }
@@ -670,7 +670,7 @@ public class ChatService {
                 // capabilities instead of a bare no-service — the user picks WHICH capability and the resume
                 // re-drives the full pipeline + CHECK. Returns false (→ honest no-service below) when there
                 // is no plausible, entitled capability to disambiguate (the genuinely-unroutable tail).
-                if (attemptCapabilityClarify(resolved, principal, emitter, streamId, requestId,
+                if (attemptCapabilityClarify(resolved, principal, tenant, emitter, streamId, requestId,
                         conversationId, requestStart, request)) {
                     return;
                 }
@@ -713,7 +713,7 @@ public class ChatService {
             // pass/deny + plain-english reason. This EXPLAINS the Cerbos verdict enforced
             // just below by filterAgents. Reasons are built from manifest/principal data
             // (segment, tier, classification) — no hardcoded domain literal (World B).
-            entitlementService.explainStructuralGates(principal, manifests)
+            entitlementService.explainStructuralGates(principal, manifests, tenant)
                     .forEach(g -> tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
                             new GateData(g.gate(), g.allow() ? GateData.EFFECT_ALLOW : GateData.EFFECT_DENY,
                                     g.reason(), g.agent()))));
@@ -1038,7 +1038,7 @@ public class ChatService {
 
             String resolvedRelId = extractResolvedId(synthesis, coverageEntity);
             if (resolvedRelId != null) {
-                EntitlementResult ent = entitlementService.checkRelationship(principal, resolvedRelId);
+                EntitlementResult ent = entitlementService.checkRelationship(principal, resolvedRelId, tenant);
                 tracePublisher.publish(TraceEvent.of("entitlement_check", requestId, conversationId,
                         new EntitlementCheckData(resolvedRelId, userId, ent.allowed(), ent.reason(), ent.source())));
                 annotateCoverageDecision(span, rootSpan, "entitlement", ent.allowed(), ent.reason());
@@ -1712,7 +1712,7 @@ public class ChatService {
             allCandidates.addAll(group.candidates());
 
             // (1) Structural authz over THIS group's own candidates (scoped, not request-global).
-            entitlementService.explainStructuralGates(principal, group.candidates())
+            entitlementService.explainStructuralGates(principal, group.candidates(), tenant)
                     .forEach(g -> tracePublisher.publish(TraceEvent.of("gate", requestId, conversationId,
                             new GateData(g.gate(), g.allow() ? GateData.EFFECT_ALLOW : GateData.EFFECT_DENY,
                                     g.reason(), g.agent()))));
@@ -1721,7 +1721,7 @@ public class ChatService {
             // (2) DAG producer prune → deny this group (never a silent flat-fallback). Closure is derived
             //     intra-group here (ground/bind → closure → authz), not at group formation (spec Piece 4/6).
             boolean dagProducerDenied = group.isDag()
-                    && dagProducerPruned(group, principal, preExtracted);
+                    && dagProducerPruned(group, principal, tenant, preExtracted);
 
             if (allowed.isEmpty() || dagProducerDenied) {
                 recordGroupDenied(group, requestId, conversationId, userId, dagProducerDenied);
@@ -1999,7 +1999,7 @@ public class ChatService {
      * runs as an ordinary flat group.
      */
     private boolean dagProducerPruned(RequestedPlan.RequestedGroup group, Principal principal,
-                                      EntityBag preExtracted) {
+                                      TenantExecutionContext tenant, EntityBag preExtracted) {
         if (!dagEnabled || group.goalId() == null || preExtracted == null) return false;
         Set<String> availableEntities = entityResolver.resolve(preExtracted).resolved().keySet();
         DagResolution resolution = dagResolver.resolve(group.goalId(), registry.listAll(), availableEntities);
@@ -2008,7 +2008,7 @@ public class ChatService {
         }
         List<AgentManifest> planManifests = resolution.plan().nodes().stream()
                 .map(PlanNode::agent).collect(Collectors.toList());
-        return entitlementService.filterAgents(principal, planManifests).size() < planManifests.size();
+        return entitlementService.filterAgents(principal, planManifests, tenant).size() < planManifests.size();
     }
 
     /** Records (trace only — never streamed) that one requested group was denied and is withheld. */
@@ -2439,7 +2439,8 @@ public class ChatService {
      * @return true if a clarification (or empty-book denial) was streamed and the request is complete
      */
     private boolean attemptRequiredEntityClarify(ResolverResult resolved, EntityBag preExtracted,
-                                                 Principal principal, String tenantId, String callerToken,
+                                                 Principal principal, TenantExecutionContext tenant,
+                                                 String tenantId, String callerToken,
                                                  SseEmitter emitter, String streamId, String requestId,
                                                  String conversationId, long requestStart,
                                                  ChatRequest request) throws Exception {
@@ -2451,7 +2452,7 @@ public class ChatService {
         if (candidateManifests.isEmpty()) return false;
 
         // FAIL-CLOSED: only ever clarify over capabilities the principal may actually invoke.
-        List<AgentManifest> allowed = entitlementService.filterAgents(principal, candidateManifests);
+        List<AgentManifest> allowed = entitlementService.filterAgents(principal, candidateManifests, tenant);
         for (AgentManifest m : allowed) {
             if (!entitlementService.requiresCoverage(m)) continue;
             EffectiveManifest em = manifestStore.getEffective(m.agentId(), m.domain(), m.subDomain());
@@ -2511,6 +2512,7 @@ public class ChatService {
      * @return true if a capability clarification was streamed and the request is complete
      */
     private boolean attemptCapabilityClarify(ResolverResult resolved, Principal principal,
+                                             TenantExecutionContext tenant,
                                              SseEmitter emitter, String streamId, String requestId,
                                              String conversationId, long requestStart,
                                              ChatRequest request) throws Exception {
@@ -2526,7 +2528,8 @@ public class ChatService {
         if (byId.isEmpty()) return false;
 
         // Enumeration-oracle fix: only ever offer capabilities the principal may actually invoke (Cerbos).
-        List<AgentManifest> allowed = entitlementService.filterAgents(principal, new ArrayList<>(byId.values()));
+        List<AgentManifest> allowed = entitlementService.filterAgents(
+                principal, new ArrayList<>(byId.values()), tenant);
         if (!ClarificationTrigger.shouldOfferForm(true, allowed.size())) return false;   // nothing to disambiguate
 
         // Loop bound — a capability clarify advances the shared lineage depth (entity + capability may chain

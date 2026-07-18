@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -38,15 +39,12 @@ import java.util.TreeSet;
  * PDP (S1), would have <em>revoked the tenant's normal access</em> for the life of the grant. The merge
  * takes the tenant's current restriction child ({@code currentChild}; {@code null} = the tenant purely
  * inherits the base ceiling) and, for every ceiling {@code (action, role)} tuple EXCEPT the granted
- * tuple, re-emits the effect the current bundle already decides — preserving each normal ALLOW and each
- * deliberate DENY. Only the granted tuple is governed by the complementary time-conditioned pair, so the
- * emergency ALLOW is additive and, on expiry, collapses to its DENY while the rest of the bundle stays
- * intact. Totality over the ceiling is still complete, so nothing falls through to the parent ALLOW.
- *
- * <p>Tenant restriction children in this system are authored as unconditional per-role ALLOW/DENY rules
- * (the base ceiling carries the CEL conditions — classification ladder, tenant-equality backstop); the
- * merge therefore reproduces each tuple's effect unconditionally, exactly as {@code tenant_default_agent}
- * and the C5 bodies are written.
+ * tuple, copies the current rules byte-for-semantics, including their CEL condition trees. Rules that also
+ * cover the granted tuple are split: their non-granted combinations remain unchanged and the exact tuple
+ * is active only outside the new grant window. This lets the emergency ALLOW override the old decision
+ * while it is live and restores the complete previous decision afterwards. It is also safe for sequential
+ * break-glass grants: the earlier grant's time conditions remain nested and intact rather than becoming an
+ * unconditional permanent grant.
  */
 @Component
 public class BreakGlassPolicyCompiler {
@@ -121,30 +119,16 @@ public class BreakGlassPolicyCompiler {
         rules.add(new PolicyIR.Rule(
                 List.of(grant.action()), "EFFECT_ALLOW", List.of(grant.role()), List.of(),
                 matchCondition(activeWindow(grant))));
-        rules.add(new PolicyIR.Rule(
-                List.of(grant.action()), "EFFECT_DENY", List.of(grant.role()), List.of(),
-                matchCondition(outsideWindow(grant))));
 
-        // ── MERGE baseline: for every remaining ceiling tuple, re-emit the effect the tenant's CURRENT
-        //    bundle already decides — preserving normal ALLOWs (so break-glass is additive, not a revoke)
-        //    and deliberate DENYs. Grouped by effect + role for deterministic, total coverage. ──
-        Map<String, TreeSet<String>> allowByRole = new TreeMap<>();
-        Map<String, TreeSet<String>> denyByRole = new TreeMap<>();
-        for (BaseCeiling.Tuple t : ceiling.tuples()) {
-            if (t.role().equals(grant.role()) && t.action().equals(grant.action())) {
-                continue; // governed by the time-conditioned pair above
-            }
-            Map<String, TreeSet<String>> target = currentlyAllows(currentChild, t) ? allowByRole : denyByRole;
-            target.computeIfAbsent(t.role(), r -> new TreeSet<>()).add(t.action());
-        }
-        // Deterministic rule order: ALLOWs then DENYs, roles sorted, actions sorted.
-        for (Map.Entry<String, TreeSet<String>> e : allowByRole.entrySet()) {
+        if (currentChild == null) {
+            // No restriction child existed: preserve inherited base ALLOWs for every other ceiling tuple,
+            // while the granted tuple gets the explicit outside-window DENY needed to self-limit.
             rules.add(new PolicyIR.Rule(
-                    List.copyOf(e.getValue()), "EFFECT_ALLOW", List.of(e.getKey()), List.of(), null));
-        }
-        for (Map.Entry<String, TreeSet<String>> e : denyByRole.entrySet()) {
-            rules.add(new PolicyIR.Rule(
-                    List.copyOf(e.getValue()), "EFFECT_DENY", List.of(e.getKey()), List.of(), null));
+                    List.of(grant.action()), "EFFECT_DENY", List.of(grant.role()), List.of(),
+                    matchCondition(outsideWindow(grant))));
+            appendInheritedBaseline(rules, grant, ceiling);
+        } else {
+            appendConditionPreservingMerge(rules, grant, currentChild);
         }
 
         return new PolicyIR(
@@ -153,32 +137,120 @@ public class BreakGlassPolicyCompiler {
                 grant.resourceKind(),
                 grant.scope().value(),
                 GeneratedPolicyValidator.TENANT_CHILD_POSTURE,
-                List.of(),
+                currentChild == null ? List.of() : currentChild.importDerivedRoles(),
                 rules);
     }
 
-    /**
-     * The effect the tenant's current bundle assigns a ceiling tuple. A {@code null} current child means
-     * the tenant inherits the base ceiling directly, so every tuple is preserved (ALLOW). Otherwise the
-     * child's own rules decide: DENY beats ALLOW (Cerbos semantics), and an uncovered tuple fails CLOSED
-     * (DENY) — which is exactly how the base bundle already treats it under parental consent.
-     */
-    private static boolean currentlyAllows(PolicyIR currentChild, BaseCeiling.Tuple tuple) {
-        if (currentChild == null) {
-            return true;
-        }
-        boolean allowed = false;
-        for (PolicyIR.Rule rule : currentChild.rules()) {
-            boolean actionMatch = rule.actions().contains(tuple.action());
-            boolean roleMatch = rule.roles().contains(tuple.role())
-                    || rule.derivedRoles().contains(tuple.role());
-            if (actionMatch && roleMatch) {
-                if (!rule.isAllow()) {
-                    return false; // an explicit DENY on the tuple wins
-                }
-                allowed = true;
+    private static void appendInheritedBaseline(List<PolicyIR.Rule> rules,
+                                                BreakGlassGrant grant,
+                                                BaseCeiling ceiling) {
+        Map<String, TreeSet<String>> allowByRole = new TreeMap<>();
+        for (BaseCeiling.Tuple tuple : ceiling.tuples()) {
+            if (!isGrantedTuple(grant, tuple.action(), tuple.role())) {
+                allowByRole.computeIfAbsent(tuple.role(), ignored -> new TreeSet<>()).add(tuple.action());
             }
         }
-        return allowed;
+        allowByRole.forEach((role, actions) -> rules.add(new PolicyIR.Rule(
+                List.copyOf(actions), "EFFECT_ALLOW", List.of(role), List.of(), null)));
+    }
+
+    /** Copy every current rule, splitting only the exact granted action/role cross-product. */
+    private static void appendConditionPreservingMerge(List<PolicyIR.Rule> out,
+                                                       BreakGlassGrant grant,
+                                                       PolicyIR currentChild) {
+        List<Object> previousConditionalMatches = new ArrayList<>();
+        boolean previousUnconditionalMatch = false;
+
+        for (PolicyIR.Rule rule : currentChild.rules()) {
+            boolean actionMatch = rule.actions().contains(grant.action());
+            if (actionMatch && !rule.derivedRoles().isEmpty()) {
+                // The child IR carries derived-role names, while the ceiling/grant carries expanded parent
+                // roles. Without the exact module expansion here we cannot prove whether this rule also
+                // governs the granted tuple, so copying or splitting it could leave a DENY active during the
+                // emergency window or silently widen a conditional ALLOW. Reject instead of guessing.
+                throw new IllegalArgumentException("cannot safely merge break-glass action '"
+                        + grant.action() + "' while current policy rule uses derivedRoles "
+                        + rule.derivedRoles() + "; trusted parent-role expansion is required");
+            }
+            boolean rawRoleMatch = rule.roles().contains(grant.role());
+            if (!actionMatch || !rawRoleMatch) {
+                out.add(rule);
+                continue;
+            }
+
+            // Preserve all other actions with all original identities and the untouched condition.
+            List<String> otherActions = without(rule.actions(), grant.action());
+            if (!otherActions.isEmpty()) {
+                out.add(new PolicyIR.Rule(otherActions, rule.effect(), rule.roles(), rule.derivedRoles(),
+                        rule.condition()));
+            }
+
+            // Preserve this action for every other role/derived-role, also untouched.
+            List<String> otherRoles = without(rule.roles(), grant.role());
+            List<String> otherDerivedRoles = rule.derivedRoles();
+            if (!otherRoles.isEmpty() || !otherDerivedRoles.isEmpty()) {
+                out.add(new PolicyIR.Rule(List.of(grant.action()), rule.effect(), otherRoles,
+                        otherDerivedRoles, rule.condition()));
+            }
+
+            // Restore the old exact-tuple decision outside the new emergency window. Keeping the raw
+            // match subtree inside an `all` retains expr/all/any/none semantics without flattening CEL.
+            List<String> exactRoles = rawRoleMatch ? List.of(grant.role()) : List.of();
+            out.add(new PolicyIR.Rule(List.of(grant.action()), rule.effect(), exactRoles, List.of(),
+                    andWithExpression(rule.condition(), outsideWindow(grant))));
+
+            if (rule.condition() == null) {
+                previousUnconditionalMatch = true;
+            } else {
+                previousConditionalMatches.add(matchNode(rule.condition()));
+            }
+        }
+
+        // If the old policy was silent when none of its conditional rules matched, make that case an
+        // explicit DENY outside the emergency window. This prevents parental-consent fall-through without
+        // overriding any old conditional ALLOW/DENY that actually matched.
+        if (!previousUnconditionalMatch) {
+            Object condition = previousConditionalMatches.isEmpty()
+                    ? matchCondition(outsideWindow(grant))
+                    : outsideAndNoneOf(outsideWindow(grant), previousConditionalMatches);
+            out.add(new PolicyIR.Rule(List.of(grant.action()), "EFFECT_DENY", List.of(grant.role()),
+                    List.of(), condition));
+        }
+    }
+
+    private static boolean isGrantedTuple(BreakGlassGrant grant, String action, String role) {
+        return grant.action().equals(action) && grant.role().equals(role);
+    }
+
+    private static List<String> without(List<String> values, String excluded) {
+        return values.stream().filter(value -> !excluded.equals(value)).toList();
+    }
+
+    private static Object andWithExpression(Object condition, String expression) {
+        if (condition == null) {
+            return matchCondition(expression);
+        }
+        Map<String, Object> all = new LinkedHashMap<>();
+        all.put("of", List.of(matchNode(condition), Map.of("expr", expression)));
+        return Map.of("match", Map.of("all", all));
+    }
+
+    private static Object outsideAndNoneOf(String outsideExpression, List<Object> previousMatches) {
+        Map<String, Object> none = new LinkedHashMap<>();
+        none.put("of", List.copyOf(previousMatches));
+        Map<String, Object> all = new LinkedHashMap<>();
+        all.put("of", List.of(Map.of("expr", outsideExpression), Map.of("none", none)));
+        return Map.of("match", Map.of("all", all));
+    }
+
+    private static Object matchNode(Object condition) {
+        if (!(condition instanceof Map<?, ?> conditionMap) || !conditionMap.containsKey("match")) {
+            throw new IllegalArgumentException("cannot safely merge a policy rule whose condition has no match node");
+        }
+        Object match = conditionMap.get("match");
+        if (!(match instanceof Map<?, ?>)) {
+            throw new IllegalArgumentException("cannot safely merge a policy rule with a non-object match node");
+        }
+        return match;
     }
 }

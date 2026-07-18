@@ -43,6 +43,9 @@ class BundleImmutabilityTest {
         // Durable record with swapped-out canonical bytes but the original id fails the store integrity check.
         PolicyBundle contentSwapped = new PolicyBundle(bundle.bundleId(), bundle.tenantId(), bundle.files(),
                 bundle.manifestRefs(), bundle.testMetadata(), "TAMPERED-CANONICAL-BYTES");
+        assertThatThrownBy(() -> contentSwapped.verifyIntegrity(canon))
+                .isInstanceOf(BundleTamperException.class)
+                .hasMessageContaining("canonical content match=false");
         PolicyBundleRecord tamperedRecord = new PolicyBundleRecord(contentSwapped, "commit-1");
         assertThat(tamperedRecord.contentMatchesId(canon)).isFalse();
     }

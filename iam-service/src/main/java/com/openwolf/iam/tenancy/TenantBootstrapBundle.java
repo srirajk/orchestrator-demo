@@ -1,5 +1,7 @@
 package com.openwolf.iam.tenancy;
 
+import com.openwolf.iam.policystudio.lifecycle.PolicyBundle;
+
 import java.nio.file.Path;
 import java.util.Map;
 
@@ -15,14 +17,26 @@ import java.util.Map;
  * @param stagingDir     where the child policies were written, ALONGSIDE (never overwriting) the
  *                       live bundle — retained for the evidence-retention period on deprovision
  * @param childByResource canonical child YAML keyed by resource kind (e.g. {@code agent → yaml})
+ * @param policyBundle    the normal C5 tenant-wide immutable bundle published and persisted before
+ *                        directory activation; {@code policyVersion == policyBundle.bundleId()}
  */
 public record TenantBootstrapBundle(
         String tenantId,
         String policyVersion,
         Path stagingDir,
-        Map<String, String> childByResource) {
+        Map<String, String> childByResource,
+        PolicyBundle policyBundle) {
 
     public TenantBootstrapBundle {
         childByResource = Map.copyOf(childByResource);
+        if (policyBundle == null) {
+            throw new IllegalArgumentException("policyBundle must be set");
+        }
+        if (!tenantId.equals(policyBundle.tenantId())) {
+            throw new IllegalArgumentException("bootstrap tenant does not match policy bundle tenant");
+        }
+        if (!policyVersion.equals(policyBundle.bundleId())) {
+            throw new IllegalArgumentException("bootstrap policyVersion must equal policyBundle.bundleId");
+        }
     }
 }

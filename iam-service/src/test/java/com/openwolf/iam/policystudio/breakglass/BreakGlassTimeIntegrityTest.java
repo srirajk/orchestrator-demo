@@ -118,7 +118,7 @@ class BreakGlassTimeIntegrityTest {
 
     private BreakGlassApprovalService approvals() {
         return new BreakGlassApprovalService(
-                new PersistentBreakGlassAuditPartition(BreakGlassFixtures.auditRepo()), "studio_policy_approver");
+                new PersistentBreakGlassAuditPartition(BreakGlassFixtures.auditRepo()));
     }
 
     private BreakGlassArtifact admissibleArtifact(String author) {
@@ -135,7 +135,7 @@ class BreakGlassTimeIntegrityTest {
     @Test
     void authorEqualsApproverRejectedViaVerifiedIdentity() {
         assertThatThrownBy(() -> approvals().approveAndIssue(
-                admissibleArtifact("alice"), "alice", "alice", Set.of("studio_policy_approver"), "corr"))
+                admissibleArtifact("alice"), "alice", "alice", Set.of("policy_approver"), "corr"))
                 .isInstanceOf(BreakGlassSodException.class)
                 .hasMessageContaining("author≠approver");
     }
@@ -144,7 +144,7 @@ class BreakGlassTimeIntegrityTest {
     void nullApproverIdentityFailsClosed() {
         // A null approver must DENY (fail closed), never skip the self-approval check.
         assertThatThrownBy(() -> approvals().approveAndIssue(
-                admissibleArtifact("alice"), "alice", null, Set.of("studio_policy_approver"), "corr"))
+                admissibleArtifact("alice"), "alice", null, Set.of("policy_approver"), "corr"))
                 .isInstanceOf(BreakGlassSodException.class)
                 .hasMessageContaining("approver identity is required");
     }

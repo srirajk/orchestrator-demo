@@ -21,51 +21,70 @@ conditions, JMESPath projections, DAG layers or bounded maps into another langua
 
 ## Specifications
 
+For implementation, begin with the **[four-milestone Delivery Package](delivery/README.md)**. It is
+the authoritative source for child stories, dependency/parallelism rules, harnesses, acceptance
+gates, evidence and definition of done. The documents below govern product and technical behavior.
+
 Read in this order:
 
-1. **[Product Requirements](PRODUCT-REQUIREMENTS.md)**  
+1. **[UI-First Artifact Buildout](UI-FIRST-ARTIFACT-BUILDOUT.md)**
+   Authoritative implementation order, revalidated catalog inventory, flagship navigation,
+   deterministic artifact folder, snapshot proof and the rule that ingestion/gateway work comes
+   last.
+
+2. **[Business Line and Use Case Onboarding](BUSINESS-LINE-USE-CASE-SPECIFICATION.md)**
+   Canonical Organization → Business Line → Use Case → Capability model, existing-agent import,
+   intent/routing integration, tenant catalog activation, UI/API, persistence, demo conversion,
+   testing and end-to-end definition of done.
+
+3. **[Product Requirements](PRODUCT-REQUIREMENTS.md)**
    Users, problem, journeys, verdicts, requirements, success metrics, risks and v1 claim.
 
-2. **[Studio Architecture](SOLUTION-ARCHITECTURE.md)**  
+4. **[Studio Architecture](SOLUTION-ARCHITECTURE.md)**
    Separate deployables, data stores, trust boundaries, APIs, jobs, environments and failure model.
 
-3. **[Studio UX](STUDIO-UX.md)**  
+5. **[Studio UX](STUDIO-UX.md)**
    Information architecture, guided questioning, capability review, routing lab, evidence,
    certification, approvals, promotion and accessibility.
 
-4. **[Identity, Authorization and Promotion](AUTHORIZATION-APPROVAL-PROMOTION.md)**  
+6. **[Identity, Authorization and Promotion](AUTHORIZATION-APPROVAL-PROMOTION.md)**
    Axiom OIDC, roles, field ownership, separation of duties, environment gates, exact-hash promotion,
    rollback and audit.
 
-5. **[Guidance Model Runtime](MODEL-RUNTIME.md)**  
+7. **[Guidance Model Runtime](MODEL-RUNTIME.md)**
    Bounded inference, typed proposals, prompt-injection boundaries, privacy, cost and runtime evals.
 
-6. **[Manifest Compiler](MANIFEST-COMPILER.md)**  
+8. **[Manifest Compiler](MANIFEST-COMPILER.md)**
    Deterministic dossier-to-artifact mappings, provenance, canonical output, versioning and failures.
 
-7. **[Certification and Admission](CERTIFICATION-ADMISSION.md)**  
+9. **[Certification and Admission](CERTIFICATION-ADMISSION.md)**
    Pinned inputs, hard/measured gates, dataset separation, routing regression, security, composition,
    verdicts and remediation.
 
-8. **[Cross-cutting Engineering Specification](ENGINEERING-SPECIFICATION.md)**  
+10. **[Cross-cutting Engineering Specification](ENGINEERING-SPECIFICATION.md)**
    Canonical dossier/evidence model, workflow, APIs, standards crosswalk and hardness/generation
    agreements.
 
-9. **[Phased Implementation Plan](IMPLEMENTATION-PLAN.md)**  
+11. **[Phased Implementation Plan](IMPLEMENTATION-PLAN.md)**
    Bounded slices, tests, acceptance criteria and eleven production implementation scenarios for a
    lower-cost coding model.
 
-10. **[Execution Model](EXECUTION-MODEL.md)**  
+12. **[Execution Model](EXECUTION-MODEL.md)**
     Dependency gates, safe parallel lanes, sequential work, critical path and Codex work packets.
 
-11. **[Reference Package Structure](REFERENCE-PACKAGE-STRUCTURE.md)**  
+13. **[Reference Package Structure](REFERENCE-PACKAGE-STRUCTURE.md)**
     Java, React, shared contracts and optional eval-worker packages with enforced dependency rules.
 
-12. **[ADR-001: Studio Runtime](ADR-001-STUDIO-RUNTIME.md)**  
+14. **[ADR-001: Studio Runtime](ADR-001-STUDIO-RUNTIME.md)**
     Why Java/Spring owns the Studio backend and OpenAI inference remains a bounded adapter.
 
-13. **[Codex Handoff](CODEX-HANDOFF.md)**  
+15. **[Codex Handoff](CODEX-HANDOFF.md)**
     Exact implementation entrypoint, constraints, commands and completion reporting contract.
+
+The Business Line and Use Case specification governs product vocabulary and catalog activation.
+Older documents still use `case`, `domain` and `sub-domain` in some API/internal descriptions; treat
+those as legacy compatibility terms until their contracts are migrated, not as the intended UI
+hierarchy.
 
 ---
 
@@ -79,7 +98,8 @@ Read in this order:
 - Certification protects the existing catalog, not only the candidate.
 - Generated tests cannot self-certify generated artifacts.
 - No agent/model has production activation authority or tool.
-- Gateway registry subsystem remains the only manifest/index mutation authority.
+- The external registry-ingestion subsystem remains the only manifest/index mutation authority.
+- The request-path gateway has no ingestion endpoint, ingestion bean or registry write credential.
 - Request-path gateway contains no Studio workflow state/endpoints.
 
 ---

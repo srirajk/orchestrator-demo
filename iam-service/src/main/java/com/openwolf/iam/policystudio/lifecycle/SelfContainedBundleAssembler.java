@@ -130,6 +130,70 @@ public class SelfContainedBundleAssembler {
         return files;
     }
 
+    /**
+     * Capture the complete immutable base policy universe for a tenant bundle: every resource policy
+     * (all resource kinds and scopes) plus every derived-role/variable module imported by any of them.
+     * C5 has one live {@code activePolicyVersion} per tenant, so a promotable bundle cannot contain only
+     * the resource kind most recently edited; every authorization call pinned to that version must resolve.
+     */
+    public List<BundleFile> captureFullPolicySet() {
+        if (!Files.isDirectory(baseBundleDir)) {
+            throw new IllegalStateException("base bundle dir '" + baseBundleDir
+                    + "' is missing — cannot assemble a full tenant policy snapshot");
+        }
+
+        Map<Path, String> allPolicies = readPolicyFiles();
+        Map<String, BundleFile> captured = new LinkedHashMap<>();
+        Set<String> importedDerivedRoleNames = new LinkedHashSet<>();
+        Set<String> importedVariableNames = new LinkedHashSet<>();
+        Set<String> resources = new LinkedHashSet<>();
+        Set<String> resourcesWithRoot = new LinkedHashSet<>();
+
+        for (Map.Entry<Path, String> e : allPolicies.entrySet()) {
+            Map<String, Object> doc = parse(e.getValue());
+            Map<String, Object> resourcePolicy = asMap(doc.get("resourcePolicy"));
+            if (resourcePolicy == null) {
+                continue;
+            }
+            String resource = String.valueOf(resourcePolicy.get("resource"));
+            resources.add(resource);
+            if (String.valueOf(resourcePolicy.getOrDefault("scope", "")).isEmpty()) {
+                resourcesWithRoot.add(resource);
+            }
+            String bundlePath = "policies/" + e.getKey().getFileName();
+            captured.put(bundlePath, new BundleFile(bundlePath, stampVersion(e.getValue())));
+            importedDerivedRoleNames.addAll(stringList(resourcePolicy.get("importDerivedRoles")));
+            importedVariableNames.addAll(importedVariables(resourcePolicy));
+        }
+        if (resources.isEmpty()) {
+            throw new IllegalStateException("no resource policies under '" + baseBundleDir
+                    + "' — cannot build a full tenant policy snapshot");
+        }
+        Set<String> missingRoots = new LinkedHashSet<>(resources);
+        missingRoots.removeAll(resourcesWithRoot);
+        if (!missingRoots.isEmpty()) {
+            throw new IllegalStateException("resource kinds without a root ceiling under '" + baseBundleDir
+                    + "': " + missingRoots);
+        }
+
+        for (Map.Entry<Path, String> e : allPolicies.entrySet()) {
+            Map<String, Object> doc = parse(e.getValue());
+            String derivedName = moduleName(doc.get("derivedRoles"));
+            String variableName = moduleName(doc.get("exportVariables"));
+            boolean include = (derivedName != null && importedDerivedRoleNames.contains(derivedName))
+                    || (variableName != null && importedVariableNames.contains(variableName));
+            if (include) {
+                String bundlePath = "policies/" + e.getKey().getFileName();
+                captured.putIfAbsent(bundlePath, new BundleFile(bundlePath, e.getValue()));
+            }
+        }
+
+        List<BundleFile> files = new ArrayList<>(captured.values());
+        files.sort((a, b) -> a.path().compareTo(b.path()));
+        log.debug("Assembled full tenant policy base: {} file(s), resourceKinds={}", files.size(), resources);
+        return files;
+    }
+
     // ── plumbing ──────────────────────────────────────────────────────────────────────────────────
 
     private Map<Path, String> readPolicyFiles() {

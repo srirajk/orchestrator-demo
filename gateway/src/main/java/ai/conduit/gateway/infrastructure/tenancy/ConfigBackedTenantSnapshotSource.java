@@ -30,12 +30,12 @@ public class ConfigBackedTenantSnapshotSource implements TenantSnapshotSource {
 
     /** The tenant every single-tenant demo request carries; always provisioned by this source. */
     static final String DEFAULT_TENANT = "default";
-    static final String DEFAULT_POLICY_VERSION = "config-v1";
+    static final String DEFAULT_POLICY_VERSION = "default";
 
     private final TenantSnapshotSource.TenantSnapshot snapshot;
 
     public ConfigBackedTenantSnapshotSource(
-            @Value("${conduit.tenancy.provisioned-tenants:default:config-v1}") String provisionedSpec) {
+            @Value("${conduit.tenancy.provisioned-tenants:default:default}") String provisionedSpec) {
         Map<String, String> tenants = new LinkedHashMap<>();
         if (provisionedSpec != null) {
             for (String pair : provisionedSpec.split(",")) {

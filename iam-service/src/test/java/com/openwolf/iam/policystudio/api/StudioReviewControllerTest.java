@@ -2,6 +2,7 @@ package com.openwolf.iam.policystudio.api;
 
 import com.openwolf.iam.policystudio.ConsequenceReview;
 import com.openwolf.iam.policystudio.GroundedStudioReviewService;
+import com.openwolf.iam.policystudio.lifecycle.PolicyBundle;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -76,6 +77,10 @@ class StudioReviewControllerTest {
                 List.of(), true, 3, "cd", "crh-1", null, null, Instant.now(), null);
     }
 
+    private static PolicyBundle candidate() {
+        return new PolicyBundle("b1", "meridian", List.of(), List.of(), null, "content");
+    }
+
     @Test
     void computeReturnsReviewFromServerDerivedGrounding() throws Exception {
         when(reviews.assembleAndReview(eq("meridian"), eq("drafter-dan"), any(), any())).thenReturn(review());
@@ -114,11 +119,34 @@ class StudioReviewControllerTest {
     @Test
     void getFetchesCachedReview() throws Exception {
         when(store.getReview("meridian", "crh-1")).thenReturn(Optional.of(
-                new StudioSessionStore.StoredReview("crh-1", "meridian", "drafter-dan", review(), Instant.now())));
+                new StudioSessionStore.StoredReview("crh-1", "meridian", "drafter-dan", review(),
+                        candidate(), false, Instant.now())));
         mvc.perform(get("/admin/studio/reviews/crh-1")
                         .with(StudioMvc.principal("bob", "meridian", "policy_approver")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.consequenceReviewHash").value("crh-1"));
+    }
+
+    @Test
+    void approverListsSameTenantPendingReviewWithExactCandidate() throws Exception {
+        when(store.pendingReviews("meridian")).thenReturn(List.of(
+                new StudioSessionStore.StoredReview("crh-1", "meridian", "drafter-dan", review(),
+                        candidate(), false, Instant.now())));
+
+        mvc.perform(get("/admin/studio/reviews/pending")
+                        .with(StudioMvc.principal("approver-bob", "meridian", "policy_approver")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].reviewId").value("crh-1"))
+                .andExpect(jsonPath("$[0].authorId").value("drafter-dan"))
+                .andExpect(jsonPath("$[0].candidate.bundleId").value("b1"));
+        verify(store).pendingReviews("meridian");
+    }
+
+    @Test
+    void authorCannotListApproverInbox() throws Exception {
+        mvc.perform(get("/admin/studio/reviews/pending")
+                        .with(StudioMvc.principal("drafter-dan", "meridian", "policy_author")))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -133,6 +161,15 @@ class StudioReviewControllerTest {
     void nonStudioRoleIsDenied403() throws Exception {
         mvc.perform(post("/admin/studio/reviews")
                         .with(StudioMvc.principal("rm", "meridian", "chat_user"))
+                        .contentType(MediaType.APPLICATION_JSON).content(BODY))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(reviews);
+    }
+
+    @Test
+    void approverCannotCreateReview403() throws Exception {
+        mvc.perform(post("/admin/studio/reviews")
+                        .with(StudioMvc.principal("bob", "meridian", "policy_approver"))
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isForbidden());
         verifyNoInteractions(reviews);

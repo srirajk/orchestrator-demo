@@ -1,0 +1,18 @@
+{
+  "fixtures": [
+    {
+      "match": {
+        "userMessage": "USER: Any upcoming corporate actions — dividends or splits — for REL-00042?\n\n--- LATEST USER MESSAGE (classify THIS; if it names an entity, that mention wins) ---\nAny upcoming corporate actions — dividends or splits — for REL-00042?",
+        "model": "gpt-4.1-nano",
+        "turnIndex": 0,
+        "hasToolResult": false
+      },
+      "response": {
+        "content": "{\n  \"intent\": \"FETCH_DATA\",\n  \"confidence\": 0.95,\n  \"reasoning\": \"the user is asking for upcoming corporate actions for REL-00042, which is a specific entity\",\n  \"research_topic\": null,\n  \"relationship_reference\": \"REL-00042\",\n  \"fund_reference\": null,\n  \"period\": \"QTD\",\n  \"ticker_references\": [],\n  \"policy_topic\": null,\n  \"account_id\": null,\n  \"currency\": null,\n  \"security_id\": null,\n  \"valuation_date\": \"latest available\",\n  \"policy_reference\": null,\n  \"claim_reference\": null,\n  \"settlement_id\": null,\n  \"mentions\": [\n    {\n      \"entity\": \"relationship_reference\",\n      \"text\": \"REL-00042\",\n      \"source\": \"explicit\"\n    }\n  ]\n}"
+      },
+      "metadata": {
+        "systemHash": "b621a81b"
+      }
+    }
+  ]
+}

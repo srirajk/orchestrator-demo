@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * The one promotion machine for policy bundles (Axiom Story C5) — the SAME authorized compare-and-set
@@ -93,10 +94,14 @@ public class PolicyPromotionService {
 
         // ── Idempotency: a prior PROMOTED run replays; never a second CAS. ──
         PromotionRecord op = promotions.findByIdempotencyKey(request.idempotencyKey()).orElse(null);
+        if (op != null) {
+            assertSameIntent(op, tenantId, request.reviewedCurrentBundleId(), candidateId,
+                    request.review().consequenceReviewHash(), request.approval().approverId(), request.kind());
+        }
         if (op != null && op.getStatus() == PromotionRecord.Status.PROMOTED) {
             log.info("Promotion (key {}) already PROMOTED {} → {} — idempotent replay",
                     request.idempotencyKey(), op.getFromBundleId(), op.getToBundleId());
-            return replay(op);
+            return receiptForReplay(op);
         }
         if (op == null) {
             op = new PromotionRecord(request.idempotencyKey(), tenantId,
@@ -150,7 +155,18 @@ public class PolicyPromotionService {
             //        version-stamp-only) — see StagingCandidateProbe. ──
             probe.verify(request.candidate());
 
-            // ── 5. Compare-and-set the live pointer from the reviewed OLD id to the candidate. ──
+            // ── 5. Publish to the serving runtime BEFORE changing the tenant-visible pointer. A promotion
+            //        with no runtime backend is a configuration error, never a successful control-plane-only
+            //        pointer flip. The publication barrier covers the blob poll / disk reload interval. ──
+            if (!runtimeLoader.isConfigured()) {
+                throw new PromotedBundleLoadException(candidateId, "<unconfigured>",
+                        new IllegalStateException("no runtime policy backend configured"));
+            }
+            runtimeLoader.load(request.candidate());
+            runtimeLoader.awaitPublication(request.candidate());
+
+            // ── 6. Compare-and-set the live pointer from the reviewed OLD id to the already-published
+            //        candidate. Until this atomic step completes every request stays on the old version. ──
             long directoryVersion;
             try {
                 directoryVersion = directory.compareAndActivate(
@@ -159,15 +175,7 @@ public class PolicyPromotionService {
                 throw new StalePromotionException(stale.getMessage());
             }
 
-            // ── 5a. (S1a) RUNTIME LOAD — the missing wire. Now that the pointer is flipped, materialise
-            //        the candidate's bundleId-stamped policies into the directory the serving Cerbos
-            //        watches so watchForChanges reloads them and the gateway's policyVersion=<bundleId>
-            //        checks actually resolve to this bundle. Additive: base default policies are untouched.
-            //        A load failure fail-closes the promotion — the @Transactional rolls back the CAS, so a
-            //        tenant is never advanced to a bundle the PDP could not be given. ──
-            runtimeLoader.load(request.candidate());
-
-            // ── 6. Persist the immutable bundle record + the signed approval; mark PROMOTED. ──
+            // ── 7. Persist the immutable bundle record + the signed approval; mark PROMOTED. ──
             if (!bundles.existsById(candidateId)) {
                 bundles.save(new PolicyBundleRecord(request.candidate(), gitResolver.currentCommit()));
             }
@@ -197,7 +205,6 @@ public class PolicyPromotionService {
      * are the ceiling, not the child being narrowed. A single violation aborts the promotion.
      */
     private void revalidate(PolicyBundle candidate) {
-        PromotionValidationContext ctx = contextProvider.contextFor(candidate);
         List<String> violations = new ArrayList<>();
         int childrenValidated = 0;
         for (BundleFile file : candidate.renderedFiles()) {
@@ -228,6 +235,11 @@ public class PolicyPromotionService {
                 continue; // the root ceiling policy, not a tenant child
             }
             childrenValidated++;
+            // Resolve trusted grounding independently for this parsed child. One tenant-wide bundle can
+            // contain agent, relationship, domain, and Policy Studio children; a context selected from the
+            // first child is not a valid ceiling for the remaining resource kinds.
+            PromotionValidationContext ctx = contextProvider.contextFor(
+                    candidate, ir.resource(), ir.scope());
             PolicyAuthoringRequest req = new PolicyAuthoringRequest(
                     "promotion re-validation of bundle " + candidate.bundleId(),
                     ctx.vocabulary(), ctx.authorScope(), ctx.subscopesEnabled(), ctx.baseCeiling());
@@ -237,6 +249,10 @@ public class PolicyPromotionService {
                     violations.add("file '" + file.path() + "': " + v);
                 }
             }
+        }
+        if (childrenValidated == 0) {
+            violations.add("candidate carries no tenant-child resource policy for tenant '"
+                    + candidate.tenantId() + "'");
         }
         if (!violations.isEmpty()) {
             throw new PolicyRevalidationException(candidate.bundleId(), violations);
@@ -263,7 +279,44 @@ public class PolicyPromotionService {
                 rollbackRequest.idempotencyKey(), PromotionRecord.Kind.ROLLBACK));
     }
 
-    private PromotionReceipt replay(PromotionRecord op) {
+    /**
+     * Replay a completed operation before creating a fresh approval. This is the lost-response path:
+     * the active pointer has already advanced, so re-running the approval staleness gate would reject a
+     * legitimate retry. Every trusted intent field is bound before returning the receipt.
+     */
+    @Transactional(readOnly = true)
+    public Optional<PromotionReceipt> replayCompleted(String idempotencyKey, String tenantId,
+                                                       String fromBundleId, String toBundleId,
+                                                       String consequenceReviewHash, String approverId,
+                                                       PromotionRecord.Kind kind) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            throw new IllegalArgumentException("idempotencyKey must be set");
+        }
+        PromotionRecord op = promotions.findByIdempotencyKey(idempotencyKey).orElse(null);
+        if (op == null) {
+            return Optional.empty();
+        }
+        assertSameIntent(op, tenantId, fromBundleId, toBundleId, consequenceReviewHash, approverId, kind);
+        return op.getStatus() == PromotionRecord.Status.PROMOTED
+                ? Optional.of(receiptForReplay(op))
+                : Optional.empty();
+    }
+
+    private static void assertSameIntent(PromotionRecord op, String tenantId, String fromBundleId,
+                                         String toBundleId, String consequenceReviewHash,
+                                         String approverId, PromotionRecord.Kind kind) {
+        if (!op.getTenantId().equals(tenantId)
+                || !java.util.Objects.equals(op.getFromBundleId(), fromBundleId)
+                || !op.getToBundleId().equals(toBundleId)
+                || !op.getConsequenceReviewHash().equals(consequenceReviewHash)
+                || !op.getApproverId().equals(approverId)
+                || op.getKind() != kind) {
+            throw new UnauthorizedPromotionException("idempotency key '" + op.getIdempotencyKey()
+                    + "' is already bound to a different tenant, kind, approver, candidate, baseline, or review");
+        }
+    }
+
+    private PromotionReceipt receiptForReplay(PromotionRecord op) {
         long v = op.getDirectoryVersion() == null ? 0L : op.getDirectoryVersion();
         return new PromotionReceipt(op.getId(), op.getTenantId(), op.getFromBundleId(),
                 op.getToBundleId(), v, op.getKind(), true);

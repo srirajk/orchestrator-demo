@@ -3283,3 +3283,24 @@
 | 21:40 | S4/S5 break-glass IT flake root-caused+fixed: loader writes scope-chain ANCESTOR-FIRST w/ inter-tier settle (VirtioFS latency); not a policy bug | PromotedBundleLoader.java, PromotedBundleLoaderAncestorOrderTest, buglog | 4/4 IT + gate green | ~120k |
 | 12-CERBOS-BLOB | reset worktree to c9d3ef9 (was wrong base); implement Cerbos blob runtime storage | compose/config/loader | in-progress | ~40k |
 | 18:30 | Cerbos blob runtime storage: loader→S3 sink, config→blob, minio-init seeds base, blob IT | loader/config/compose/pom | blob IT 2/2 green, cerbos-gate 74/74, world-b 0 | ~55k |
+| 19:12 | Edited docker-compose.yml | inline fix | ~30 |
+| 19:16 | Session end: 1 writes across 1 files (docker-compose.yml) | 0 reads | ~30 tok |
+| 19:22 | Session end: 1 writes across 1 files (docker-compose.yml) | 0 reads | ~30 tok |
+| 19:25 | Session end: 1 writes across 1 files (docker-compose.yml) | 0 reads | ~30 tok |
+| 19:26 | Session end: 1 writes across 1 files (docker-compose.yml) | 0 reads | ~30 tok |
+| 20:47 | Session end: 1 writes across 1 files (docker-compose.yml) | 0 reads | ~30 tok |
+| 20:56 | Session end: 1 writes across 1 files (docker-compose.yml) | 0 reads | ~30 tok |
+| 20:57 | Created vision/next-steps/LIVE-E2E-FINDING-policy-version.md | — | ~960 |
+| 20:57 | Session end: 2 writes across 2 files (docker-compose.yml, LIVE-E2E-FINDING-policy-version.md) | 0 reads | ~1059 tok |
+| 21:48 | Session end: 2 writes across 2 files (docker-compose.yml, LIVE-E2E-FINDING-policy-version.md) | 0 reads | ~1059 tok |
+| 21:51 | Session end: 2 writes across 2 files (docker-compose.yml, LIVE-E2E-FINDING-policy-version.md) | 0 reads | ~1059 tok |
+| 21:54 | Session end: 2 writes across 2 files (docker-compose.yml, LIVE-E2E-FINDING-policy-version.md) | 0 reads | ~1059 tok |
+| 21:54 | Session end: 2 writes across 2 files (docker-compose.yml, LIVE-E2E-FINDING-policy-version.md) | 0 reads | ~1059 tok |
+| 22:09 | Session end: 2 writes across 2 files (docker-compose.yml, LIVE-E2E-FINDING-policy-version.md) | 0 reads | ~1059 tok |
+| 22:10 | Session end: 2 writes across 2 files (docker-compose.yml, LIVE-E2E-FINDING-policy-version.md) | 0 reads | ~1059 tok |
+| 22:13 | Session end: 2 writes across 2 files (docker-compose.yml, LIVE-E2E-FINDING-policy-version.md) | 0 reads | ~1059 tok |
+| 22:13 | Session end: 2 writes across 2 files (docker-compose.yml, LIVE-E2E-FINDING-policy-version.md) | 0 reads | ~1059 tok |
+| 22:15 | Session end: 2 writes across 2 files (docker-compose.yml, LIVE-E2E-FINDING-policy-version.md) | 0 reads | ~1059 tok |
+| 22:18 | Session end: 2 writes across 2 files (docker-compose.yml, LIVE-E2E-FINDING-policy-version.md) | 0 reads | ~1059 tok |
+| 22:27 | Session end: 2 writes across 2 files (docker-compose.yml, LIVE-E2E-FINDING-policy-version.md) | 0 reads | ~1059 tok |
+| 22:30 | Session end: 2 writes across 2 files (docker-compose.yml, LIVE-E2E-FINDING-policy-version.md) | 0 reads | ~1059 tok |

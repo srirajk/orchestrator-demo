@@ -73,7 +73,9 @@ public class StudioLifecycleController {
      */
     @GetMapping("/examiner/{cerbosCallId}")
     public ResponseEntity<ExaminerChain> examiner(@PathVariable String cerbosCallId, Authentication auth) {
-        StudioPrincipal.tenant(auth); // require a tenant-scoped principal; the chain itself is audit-global
-        return ResponseEntity.ok(examiner.reconstruct(cerbosCallId));
+        String tenant = StudioPrincipal.tenant(auth);
+        ExaminerChain chain = examiner.reconstruct(cerbosCallId);
+        StudioPrincipal.assertSameTenant(tenant, chain.tenantId());
+        return ResponseEntity.ok(chain);
     }
 }

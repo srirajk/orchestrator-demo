@@ -9,7 +9,7 @@ See `docs/adr/ADR-axiom-scope-posture.md` for the findings and rationale.
 bash infra/cerbos/proof/run-proof.sh
 ```
 
-Uses `ghcr.io/cerbos/cerbos:latest` (which is **0.53.0** offline) on **distinct** ports
+Uses the pinned `ghcr.io/cerbos/cerbos:0.53.0` image on **distinct** ports
 (3600/3601 strict, 3610/3611 lenient contrast) and container names — it never touches the demo's
 `conduit-cerbos` (:3594/:3595). Override the image with `CERBOS_IMAGE=…`.
 

@@ -5,6 +5,7 @@ import com.openwolf.iam.repository.AuditLogRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.List;
 
@@ -31,7 +32,7 @@ public class PersistentBreakGlassAuditPartition implements BreakGlassAuditPartit
 
     @Override
     public void recordGranted(BreakGlassGrant grant, String approverId, String correlationId) {
-        auditLogRepository.save(new AuditLog(
+        appendIdempotently(grant.tenantId(), ACTION_GRANTED, grant.scope().value(), correlationId, new AuditLog(
                 grant.tenantId(), grant.requestedBy(), "system",
                 ACTION_GRANTED, RESOURCE_TYPE, grant.scope().value(),
                 null, grantedState(grant, approverId), null, correlationId));
@@ -43,10 +44,17 @@ public class PersistentBreakGlassAuditPartition implements BreakGlassAuditPartit
 
     @Override
     public void recordUsed(BreakGlassGrant grant, String principalId, String action, String correlationId) {
-        auditLogRepository.save(new AuditLog(
+        recordUsed(null, grant, principalId, action, correlationId);
+    }
+
+    @Override
+    public void recordUsed(String grantId, BreakGlassGrant grant, String principalId,
+                           String action, String correlationId) {
+        String auditResourceId = grantId == null || grantId.isBlank() ? grant.scope().value() : grantId;
+        appendIdempotently(grant.tenantId(), ACTION_USED, auditResourceId, correlationId, new AuditLog(
                 grant.tenantId(), principalId, "system",
-                ACTION_USED, RESOURCE_TYPE, grant.scope().value(),
-                null, usedState(grant, principalId, action), null, correlationId));
+                ACTION_USED, RESOURCE_TYPE, auditResourceId,
+                null, usedState(grantId, grant, principalId, action), null, correlationId));
         log.info("Break-glass USED tenant='{}' scope='{}' action='{}' by principal='{}'",
                 grant.tenantId(), grant.scope().value(), action, principalId);
     }
@@ -54,6 +62,24 @@ public class PersistentBreakGlassAuditPartition implements BreakGlassAuditPartit
     @Override
     public List<AuditLog> partition(String tenantId) {
         return auditLogRepository.findByTenantIdOrderByOccurredAtDesc(tenantId);
+    }
+
+    private void appendIdempotently(String tenantId, String action, String resourceId,
+                                    String correlationId, AuditLog entry) {
+        if (correlationId != null && auditLogRepository
+                .existsByTenantIdAndActionAndResourceTypeAndResourceIdAndCorrelationId(
+                        tenantId, action, RESOURCE_TYPE, resourceId, correlationId)) {
+            return;
+        }
+        try {
+            auditLogRepository.saveAndFlush(entry);
+        } catch (DataIntegrityViolationException duplicate) {
+            if (correlationId == null || !auditLogRepository
+                    .existsByTenantIdAndActionAndResourceTypeAndResourceIdAndCorrelationId(
+                            tenantId, action, RESOURCE_TYPE, resourceId, correlationId)) {
+                throw duplicate;
+            }
+        }
     }
 
     private static String grantedState(BreakGlassGrant grant, String approverId) {
@@ -69,8 +95,9 @@ public class PersistentBreakGlassAuditPartition implements BreakGlassAuditPartit
                 + ",\"justification\":\"" + escape(grant.justification()) + "\"}";
     }
 
-    private static String usedState(BreakGlassGrant grant, String principalId, String action) {
+    private static String usedState(String grantId, BreakGlassGrant grant, String principalId, String action) {
         return "{\"event\":\"used\""
+                + ",\"grantId\":\"" + escape(grantId) + "\""
                 + ",\"scope\":\"" + grant.scope().value() + "\""
                 + ",\"action\":\"" + action + "\""
                 + ",\"principal\":\"" + principalId + "\""

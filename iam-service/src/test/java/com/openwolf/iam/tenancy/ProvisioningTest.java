@@ -1,5 +1,6 @@
 package com.openwolf.iam.tenancy;
 
+import com.openwolf.iam.policystudio.BaseBundleGrounding;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.yaml.snakeyaml.Yaml;
@@ -34,7 +35,14 @@ class ProvisioningTest {
         TenantBootstrapBundle bundle = policy.stage(TENANT);
 
         assertThat(bundle.childByResource()).isNotEmpty();
-        assertThat(bundle.policyVersion()).startsWith("pv_");
+        assertThat(bundle.childByResource()).hasSize(8);
+        assertThat(bundle.policyVersion()).startsWith("b_");
+        assertThat(bundle.policyBundle().bundleId()).isEqualTo(bundle.policyVersion());
+        assertThat(bundle.policyBundle().renderedFiles())
+                .allMatch(file -> !file.yaml().contains("__BUNDLE_VERSION__"));
+        assertThat(bundle.policyBundle().renderedFiles().stream()
+                .filter(file -> file.yaml().contains("resourcePolicy:")))
+                .allMatch(file -> file.yaml().contains(bundle.policyVersion()));
 
         Yaml yaml = new Yaml();
         for (Map.Entry<String, String> child : bundle.childByResource().entrySet()) {
@@ -73,13 +81,14 @@ class ProvisioningTest {
                 ProvisioningTestSupport.opsRepo(), directory,
                 ProvisioningTestSupport.realPolicyAdapterNoProbe(staging),
                 new InProcessTenantNamespaceAdapter(), new InProcessRegistrySpaceAdapter(),
-                new PersistentAuditPartitionAdapter(ProvisioningTestSupport.auditRepo()));
+                new PersistentAuditPartitionAdapter(ProvisioningTestSupport.auditRepo()),
+                ProvisioningTestSupport.acceptingPublisher());
 
         ProvisioningResult result = service.provision(
                 new ProvisioningRequest(TENANT, "Acme", "acme"), "key-fresh-1", "admin");
 
         assertThat(result.isActive()).isTrue();
-        assertThat(result.policyVersion()).startsWith("pv_");
+        assertThat(result.policyVersion()).startsWith("b_");
         assertThat(directory.find(TENANT)).contains(result.policyVersion());
     }
 
@@ -98,23 +107,10 @@ class ProvisioningTest {
         return out;
     }
 
-    @SuppressWarnings("unchecked")
-    private static Set<String> ceilingTuples(String resource) throws IOException {
-        Path base = ProvisioningTestSupport.baseBundleDir();
-        Yaml yaml = new Yaml();
-        try (Stream<Path> files = Files.list(base)) {
-            List<Path> defaults = files
-                    .filter(p -> p.getFileName().toString().matches("tenant_default_.*\\.ya?ml"))
-                    .toList();
-            for (Path p : defaults) {
-                Map<String, Object> doc = yaml.load(Files.readString(p, StandardCharsets.UTF_8));
-                Map<String, Object> rp = (Map<String, Object>) doc.get("resourcePolicy");
-                if (!resource.equals(String.valueOf(rp.get("resource")))) continue;
-                List<Map<String, Object>> rules = new ArrayList<>();
-                for (Object o : (List<Object>) rp.get("rules")) rules.add((Map<String, Object>) o);
-                return tuples(rules);
-            }
-        }
-        throw new IllegalStateException("no ceiling default policy for resource " + resource);
+    private static Set<String> ceilingTuples(String resource) {
+        return BaseBundleGrounding.read(ProvisioningTestSupport.baseBundleDir(), resource)
+                .ceiling().tuples().stream()
+                .map(t -> t.action() + "@" + t.role())
+                .collect(java.util.stream.Collectors.toSet());
     }
 }

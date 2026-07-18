@@ -83,6 +83,7 @@ public class CerbosBatchDecisionSource implements PdpDecisionSource {
             String scope = bundle.policy() == null ? "" : nullToEmpty(bundle.policy().scope());
             if (bundle.policy() != null) {
                 String childYaml = writer.write(bundle.policy());
+                CerbosCompileGate.removeReplaceableTenantChild(work, childYaml);
                 String candidateFile = "generated_" + resourceKind + "_"
                         + (scope.isEmpty() ? "root" : scope.replace('.', '_')) + ".yaml";
                 Files.writeString(work.resolve(candidateFile), childYaml, StandardCharsets.UTF_8);

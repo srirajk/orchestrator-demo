@@ -66,6 +66,7 @@ class ExaminerChainTest {
         ExaminerChain chain = examiner.reconstruct(callId);
         assertThat(chain.complete()).isTrue();
         assertThat(chain.transactionId()).isEqualTo("txn-9001");
+        assertThat(chain.tenantId()).isEqualTo(C5LifecycleFixtures.TENANT);
         assertThat(chain.activePolicyVersion()).isEqualTo(candidate.bundleId());
         assertThat(chain.bundleId()).isEqualTo(candidate.bundleId());
         assertThat(chain.decision()).isEqualTo("ALLOW");
@@ -96,7 +97,15 @@ class ExaminerChainTest {
         assertThatThrownBy(() -> examiner.reconstruct("call-mismatch"))
                 .isInstanceOf(AuditIntegrityException.class).hasMessageContaining("split across bundle versions");
 
-        // (c) missing bundle record — decision references a bundle that was never recorded.
+        // (c) tenant mismatch — an audit entry can never join a decision from another tenant.
+        auditRepo.save(new ApplicationAuditEntry("txn-tenant", C5LifecycleFixtures.TENANT, "call-tenant-mismatch",
+                candidate.bundleId(), Instant.parse("2026-07-17T10:05:30Z")));
+        decisionRepo.save(new CerbosDecisionEntry("call-tenant-mismatch", "other-tenant",
+                candidate.bundleId(), "ALLOW", "agent", "invoke", Instant.parse("2026-07-17T10:05:30Z")));
+        assertThatThrownBy(() -> examiner.reconstruct("call-tenant-mismatch"))
+                .isInstanceOf(AuditIntegrityException.class).hasMessageContaining("tenant mismatch");
+
+        // (d) missing bundle record — decision references a bundle that was never recorded.
         auditRepo.save(new ApplicationAuditEntry("txn-3", C5LifecycleFixtures.TENANT, "call-ghost",
                 "b_ghost_bundle", Instant.parse("2026-07-17T10:06:00Z")));
         decisionRepo.save(new CerbosDecisionEntry("call-ghost", C5LifecycleFixtures.TENANT,
@@ -120,6 +129,7 @@ class ExaminerChainTest {
         Map<String, Object> chainView = new LinkedHashMap<>();
         chainView.put("reconstructedWith", "immutable records only; LLM subsystem disabled (no model client on the examiner)");
         chainView.put("transactionId", chain.transactionId());
+        chainView.put("tenantId", chain.tenantId());
         chainView.put("cerbosCallId", chain.cerbosCallId());
         chainView.put("activePolicyVersion", chain.activePolicyVersion());
         chainView.put("decision", chain.decision());

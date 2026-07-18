@@ -28,8 +28,7 @@ class BreakGlassAuditedTest {
     void grantAndUseFullyAudited() {
         PersistentBreakGlassAuditPartition partition =
                 new PersistentBreakGlassAuditPartition(BreakGlassFixtures.auditRepo());
-        BreakGlassApprovalService approvals =
-                new BreakGlassApprovalService(partition, "studio_policy_approver");
+        BreakGlassApprovalService approvals = new BreakGlassApprovalService(partition);
 
         BreakGlassGrant grant = BreakGlassFixtures.grant("acme", 900, "alice");
         BreakGlassArtifact art = authoring.author(
@@ -37,7 +36,7 @@ class BreakGlassAuditedTest {
         assertThat(art.admissible()).isTrue();
 
         // 1. Issuance — two-person approved (author "alice", approver "carol"), audited.
-        approvals.approveAndIssue(art, "alice", "carol", Set.of("studio_policy_approver"), "corr-grant");
+        approvals.approveAndIssue(art, "alice", "carol", Set.of("policy_approver"), "corr-grant");
 
         // 2. Two uses of the active grant — each audited.
         approvals.recordUse(grant, "admin-p1", "register", "corr-use-1");

@@ -50,7 +50,6 @@ public class ManifestBackedStudioGroundingProvider implements StudioGroundingPro
     private final Path registryRoot;
     private final Path baseBundleDir;
     private final Path tenantDeploymentRoot;
-    private final String deploymentTenant;
 
     public ManifestBackedStudioGroundingProvider(
             ObjectMapper objectMapper,
@@ -60,8 +59,7 @@ public class ManifestBackedStudioGroundingProvider implements StudioGroundingPro
             PolicyBundleRepository bundles,
             @Value("${iam.policy-studio.registry-root:registry}") String registryRoot,
             @Value("${iam.policy-studio.base-bundle-dir:infra/cerbos/policies}") String baseBundleDir,
-            @Value("${iam.policy-studio.tenant-deployment-root:infra/cerbos/tenants}") String tenantDeploymentRoot,
-            @Value("${iam.policy-studio.deployment-tenant:default}") String deploymentTenant) {
+            @Value("${iam.policy-studio.tenant-deployment-root:infra/cerbos/tenants}") String tenantDeploymentRoot) {
         this.objectMapper = objectMapper;
         this.writer = writer;
         this.parser = parser;
@@ -70,7 +68,6 @@ public class ManifestBackedStudioGroundingProvider implements StudioGroundingPro
         this.registryRoot = resolveExisting(registryRoot);
         this.baseBundleDir = resolveExisting(baseBundleDir);
         this.tenantDeploymentRoot = resolveExisting(tenantDeploymentRoot);
-        this.deploymentTenant = deploymentTenant;
     }
 
     /** Resolve a configured relative path from the process cwd, with a {@code ..} fallback (module-cwd runs). */
@@ -140,7 +137,8 @@ public class ManifestBackedStudioGroundingProvider implements StudioGroundingPro
      */
     private BundleSnapshot materializeCurrent(String activeVersion, PolicyBundleRecord record, BaseCeiling ceiling) {
         String canonicalContent = record.getCanonicalContent();
-        Optional<String> childYaml = BundleContentReader.tenantChildYaml(canonicalContent);
+        Optional<String> childYaml = BundleContentReader.tenantChildYaml(
+                canonicalContent, ceiling.resourceKind(), record.getTenantId());
         if (childYaml.isEmpty()) {
             // A promoted bundle with no tenant restriction child inherits the base ceiling directly.
             return new BundleSnapshot(activeVersion, null, ceiling, canonicalContent);
@@ -184,37 +182,37 @@ public class ManifestBackedStudioGroundingProvider implements StudioGroundingPro
     /**
      * Build the positive + four negative-class cells (attribute-removed, cross-tenant, missing-attribute,
      * wrong-segment) for the front-door role, anchored on a real segment-audience agent and the deployment's
-     * domain→segment map. Returns an empty list (never throws) if the deployment map or a suitable manifest
-     * is unavailable — grounding must still produce a matrix (the same-tenant positives stand alone).
+     * domain→segment map. If a front-door role exists, every negative class is mandatory: missing or
+     * malformed tenant deployment grounding fails closed rather than silently reviewing a positive-only
+     * matrix.
      */
     private List<FixtureCell> negativeClassCells(String tenantId, BaseBundleGrounding.Facts base, ManifestFacts facts) {
-        Optional<DeploymentSegments> segmentsOpt = loadDeploymentSegments();
-        if (segmentsOpt.isEmpty() || base.frontDoorRoles().isEmpty()) {
+        if (base.frontDoorRoles().isEmpty()) {
             return List.of();
         }
-        DeploymentSegments segments = segmentsOpt.get();
+        DeploymentSegments segments = loadDeploymentSegments(tenantId);
 
         // A segment-audience agent whose domain is in the deployment map — its declared attributes are the
         // positive; the negatives perturb exactly one dimension each.
         Optional<AgentProfile> profileOpt = facts.profiles().stream()
                 .filter(p -> segments.domainToSegment().containsKey(p.domain()))
                 .filter(p -> p.audience() != null && !"enterprise".equals(p.audience()))
+                .filter(ManifestBackedStudioGroundingProvider::hasRequiredResourceAttributes)
                 .findFirst();
         if (profileOpt.isEmpty()) {
-            return List.of();
+            throw negativeGroundingFailure(tenantId,
+                    "no segment-audience agent manifest with domain, audience, access_mode, and data_classification "
+                            + "matches the tenant domain-segment map");
         }
         AgentProfile profile = profileOpt.get();
-        String role = base.frontDoorRoles().iterator().next();          // deterministic (sorted set)
-        String action = firstCeilingAction(base.ceiling(), role);
-        if (action == null) {
-            return List.of();
-        }
 
         String domain = profile.domain();
         String segment = segments.domainToSegment().get(domain);
         String topTier = segments.topTier();                            // holds >= any resource classification
         String otherSegment = segments.domainToSegment().values().stream()
-                .filter(s -> !s.equals(segment)).sorted().findFirst().orElse(segment);
+                .filter(s -> !s.equals(segment)).sorted().findFirst()
+                .orElseThrow(() -> negativeGroundingFailure(tenantId,
+                        "domain-segment map must contain at least two distinct segments for wrong-segment coverage"));
         String crossTenant = tenantId + "__other";
 
         Map<String, Object> resourceAttrs = new LinkedHashMap<>();
@@ -224,33 +222,56 @@ public class ManifestBackedStudioGroundingProvider implements StudioGroundingPro
         putIfPresent(resourceAttrs, "data_classification", profile.classification());
         Map<String, Object> memberPrincipal = Map.of("segments", Map.of(segment, topTier));
 
-        String label = role + "-" + action + "-" + domain;
         List<FixtureCell> out = new ArrayList<>();
-        // positive: a member of the mapped segment at the ceiling tier — allowed.
-        out.add(new FixtureCell(Set.of(role), tenantId, memberPrincipal, tenantId, resourceAttrs,
-                action, label + "::segment_positive"));
-        // attribute-removed: the principal's segment membership attribute is removed — must deny.
-        out.add(new FixtureCell(Set.of(role), tenantId, Map.of(), tenantId, resourceAttrs,
-                action, label + "::attribute_removed"));
-        // cross-tenant: the resource is homed in a different tenant — must deny (tenant-equality backstop).
-        out.add(new FixtureCell(Set.of(role), tenantId, memberPrincipal, crossTenant, resourceAttrs,
-                action, label + "::cross_tenant"));
-        // missing-attribute: the resource's data-classification guard attribute is omitted — must deny.
-        out.add(new FixtureCell(Set.of(role), tenantId, memberPrincipal, tenantId,
-                withoutKey(resourceAttrs, "data_classification"), action, label + "::missing_attribute"));
-        // wrong-segment: the principal holds a segment that does not map to the resource domain — must deny.
-        out.add(new FixtureCell(Set.of(role), tenantId, Map.of("segments", Map.of(otherSegment, topTier)),
-                tenantId, resourceAttrs, action, label + "::wrong_segment"));
+        base.frontDoorRoles().stream().sorted().forEach(role -> {
+            List<String> actions = ceilingActions(base.ceiling(), role);
+            if (actions.isEmpty()) {
+                throw negativeGroundingFailure(tenantId,
+                        "front-door role '" + role + "' has no ceiling action");
+            }
+            actions.forEach(action -> {
+                String label = role + "-" + action + "-" + domain;
+                // positive: a member of the mapped segment at the ceiling tier — allowed.
+                out.add(new FixtureCell(Set.of(role), tenantId, memberPrincipal, tenantId, resourceAttrs,
+                        action, label + "::segment_positive"));
+                // attribute-removed: the principal's segment membership attribute is removed — must deny.
+                out.add(new FixtureCell(Set.of(role), tenantId, Map.of(), tenantId, resourceAttrs,
+                        action, label + "::attribute_removed"));
+                // cross-tenant: the resource is homed in a different tenant — must deny.
+                out.add(new FixtureCell(Set.of(role), tenantId, memberPrincipal, crossTenant, resourceAttrs,
+                        action, label + "::cross_tenant"));
+                // missing-attribute: the classification guard attribute is omitted — must deny.
+                out.add(new FixtureCell(Set.of(role), tenantId, memberPrincipal, tenantId,
+                        withoutKey(resourceAttrs, "data_classification"), action, label + "::missing_attribute"));
+                // wrong-segment: membership does not map to the resource domain — must deny.
+                out.add(new FixtureCell(Set.of(role), tenantId, Map.of("segments", Map.of(otherSegment, topTier)),
+                        tenantId, resourceAttrs, action, label + "::wrong_segment"));
+            });
+        });
         return out;
     }
 
-    private static String firstCeilingAction(BaseCeiling ceiling, String role) {
+    private static List<String> ceilingActions(BaseCeiling ceiling, String role) {
         return ceiling.tuples().stream()
                 .filter(t -> t.role().equals(role))
                 .map(BaseCeiling.Tuple::action)
+                .distinct()
                 .sorted()
-                .findFirst()
-                .orElse(null);
+                .toList();
+    }
+
+    private static boolean hasRequiredResourceAttributes(AgentProfile profile) {
+        return isPresent(profile.domain()) && isPresent(profile.audience())
+                && isPresent(profile.accessMode()) && isPresent(profile.classification());
+    }
+
+    private static boolean isPresent(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private static IllegalStateException negativeGroundingFailure(String tenantId, String detail) {
+        return new IllegalStateException("cannot ground mandatory negative consequence fixtures for tenant '"
+                + tenantId + "': " + detail);
     }
 
     private static void putIfPresent(Map<String, Object> map, String key, String value) {
@@ -270,20 +291,27 @@ public class ManifestBackedStudioGroundingProvider implements StudioGroundingPro
     /** The deployment's domain→segment mapping + classification ladder, read from tenant deployment config. */
     private record DeploymentSegments(Map<String, String> domainToSegment, List<String> ladder) {
         String topTier() {
-            return ladder.isEmpty() ? "confidential-pii" : ladder.get(ladder.size() - 1);
+            return ladder.get(ladder.size() - 1);
         }
     }
 
-    private Optional<DeploymentSegments> loadDeploymentSegments() {
-        Path mapFile = tenantDeploymentRoot.resolve(deploymentTenant).resolve("domain-segment-map.yaml");
+    private DeploymentSegments loadDeploymentSegments(String tenantId) {
+        Path tenantDir = tenantDeploymentRoot.resolve(tenantId).normalize();
+        if (!tenantDir.startsWith(tenantDeploymentRoot.normalize())) {
+            throw negativeGroundingFailure(tenantId, "tenant id escapes the deployment root");
+        }
+        Path mapFile = tenantDir.resolve("domain-segment-map.yaml");
         if (!Files.isRegularFile(mapFile)) {
-            log.debug("no domain-segment map at '{}' — matrix carries same-tenant positives only", mapFile);
-            return Optional.empty();
+            throw negativeGroundingFailure(tenantId, "domain-segment map is missing at '" + mapFile + "'");
         }
         try {
             Object loaded = new Yaml(new SafeConstructor(new LoaderOptions())).load(Files.readString(mapFile));
             if (!(loaded instanceof Map<?, ?> doc)) {
-                return Optional.empty();
+                throw negativeGroundingFailure(tenantId, "domain-segment map is not a YAML object");
+            }
+            if (!tenantId.equals(String.valueOf(doc.get("tenant")))) {
+                throw negativeGroundingFailure(tenantId,
+                        "domain-segment map tenant field does not exactly match the authenticated tenant");
             }
             Map<String, String> mapping = new LinkedHashMap<>();
             Object raw = doc.get("domain_segment_map");
@@ -296,12 +324,24 @@ public class ManifestBackedStudioGroundingProvider implements StudioGroundingPro
                 l.forEach(t -> ladder.add(String.valueOf(t)));
             }
             if (mapping.isEmpty()) {
-                return Optional.empty();
+                throw negativeGroundingFailure(tenantId, "domain_segment_map is empty");
             }
-            return Optional.of(new DeploymentSegments(mapping, ladder));
-        } catch (IOException | RuntimeException e) {
-            log.debug("failed to read domain-segment map '{}': {}", mapFile, e.getMessage());
-            return Optional.empty();
+            if (mapping.entrySet().stream().anyMatch(e -> !isPresent(e.getKey()) || !isPresent(e.getValue()))) {
+                throw negativeGroundingFailure(tenantId, "domain_segment_map contains a blank domain or segment");
+            }
+            if (ladder.isEmpty()) {
+                throw negativeGroundingFailure(tenantId, "classification_ladder is empty");
+            }
+            if (ladder.stream().anyMatch(tier -> !isPresent(tier))) {
+                throw negativeGroundingFailure(tenantId, "classification_ladder contains a blank tier");
+            }
+            return new DeploymentSegments(Map.copyOf(mapping), List.copyOf(ladder));
+        } catch (IOException e) {
+            throw new IllegalStateException("failed to read domain-segment map '" + mapFile + "'", e);
+        } catch (IllegalStateException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            throw new IllegalStateException("failed to parse domain-segment map '" + mapFile + "'", e);
         }
     }
 

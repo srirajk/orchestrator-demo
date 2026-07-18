@@ -5,10 +5,18 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
@@ -40,7 +48,8 @@ class ProvisioningAtomicityTest {
                 policyAdapter,
                 namespaceAdapter,
                 failingRegistry,
-                new PersistentAuditPartitionAdapter(ProvisioningTestSupport.auditRepo()));
+                new PersistentAuditPartitionAdapter(ProvisioningTestSupport.auditRepo()),
+                ProvisioningTestSupport.acceptingPublisher());
 
         assertThatThrownBy(() -> service.provision(
                 new ProvisioningRequest(TENANT, "Acme Bank", "acme"), "key-atomic-1", "admin@bank"))
@@ -96,7 +105,8 @@ class ProvisioningAtomicityTest {
                 default -> { }
             }
             TenantProvisioningService service = new TenantProvisioningService(
-                    ProvisioningTestSupport.opsRepo(), directory, policy, ns, reg, audit);
+                    ProvisioningTestSupport.opsRepo(), directory, policy, ns, reg, audit,
+                    ProvisioningTestSupport.acceptingPublisher());
 
             String tenant = "t" + failAt;
             String key = "k-" + failAt;
@@ -107,5 +117,70 @@ class ProvisioningAtomicityTest {
             assertThat(directory.isActive(tenant))
                     .as("tenant must be absent when artifact %d fails", failAt).isFalse();
         }
+    }
+
+    @Test
+    void failureAfterDirectoryCasPreservesDependenciesAndRetryReconciles(@TempDir Path staging) {
+        Map<String, ProvisioningOperation> byKey = new HashMap<>();
+        AtomicBoolean failActiveSaveOnce = new AtomicBoolean(true);
+        ProvisioningOperationRepository operations = mock(ProvisioningOperationRepository.class);
+        when(operations.findByIdempotencyKey(anyString()))
+                .thenAnswer(a -> Optional.ofNullable(byKey.get(a.<String>getArgument(0))));
+        when(operations.save(any(ProvisioningOperation.class))).thenAnswer(a -> {
+            ProvisioningOperation op = a.getArgument(0);
+            if (op.getStatus() == ProvisioningOperation.Status.ACTIVE
+                    && failActiveSaveOnce.compareAndSet(true, false)) {
+                throw new IllegalStateException("injected post-CAS ACTIVE ledger failure");
+            }
+            byKey.put(op.getIdempotencyKey(), op);
+            return op;
+        });
+
+        ActiveTenantDirectory directory = new ActiveTenantDirectory(ProvisioningTestSupport.activeRepo());
+        InProcessTenantNamespaceAdapter namespace = new InProcessTenantNamespaceAdapter();
+        InProcessRegistrySpaceAdapter registry = new InProcessRegistrySpaceAdapter();
+        TenantProvisioningService service = new TenantProvisioningService(
+                operations, directory, ProvisioningTestSupport.realPolicyAdapterNoProbe(staging),
+                namespace, registry,
+                new PersistentAuditPartitionAdapter(ProvisioningTestSupport.auditRepo()),
+                ProvisioningTestSupport.acceptingPublisher());
+
+        ProvisioningRequest request = new ProvisioningRequest(TENANT, "Acme", "acme");
+        assertThatThrownBy(() -> service.provision(request, "post-cas-key", "admin"))
+                .isInstanceOf(ProvisioningException.class)
+                .hasMessageContaining("provisioning failed");
+
+        assertThat(directory.find(TENANT)).hasValueSatisfying(v -> assertThat(v).startsWith("b_"));
+        assertThat(namespace.namespaceExists(TENANT)).isTrue();
+        assertThat(registry.spaceExists(TENANT)).isTrue();
+        assertThat(Files.isDirectory(staging.resolve(TENANT))).isTrue();
+
+        ProvisioningResult reconciled = service.provision(request, "post-cas-key", "admin");
+        assertThat(reconciled.isActive()).isTrue();
+        assertThat(directory.find(TENANT)).contains(reconciled.policyVersion());
+        assertThat(namespace.namespaceExists(TENANT)).isTrue();
+        assertThat(registry.spaceExists(TENANT)).isTrue();
+    }
+
+    @Test
+    void runtimePublicationFailureNeverActivatesAndCompensatesDependencies(@TempDir Path staging) {
+        ActiveTenantDirectory directory = new ActiveTenantDirectory(ProvisioningTestSupport.activeRepo());
+        InProcessTenantNamespaceAdapter namespace = new InProcessTenantNamespaceAdapter();
+        InProcessRegistrySpaceAdapter registry = new InProcessRegistrySpaceAdapter();
+        TenantProvisioningService service = new TenantProvisioningService(
+                ProvisioningTestSupport.opsRepo(), directory,
+                ProvisioningTestSupport.realPolicyAdapterNoProbe(staging), namespace, registry,
+                new PersistentAuditPartitionAdapter(ProvisioningTestSupport.auditRepo()),
+                bundle -> { throw new ProvisioningException("injected runtime publication failure"); });
+
+        assertThatThrownBy(() -> service.provision(
+                new ProvisioningRequest(TENANT, "Acme", "acme"), "runtime-fail-key", "admin"))
+                .isInstanceOf(ProvisioningException.class)
+                .hasMessageContaining("runtime publication failure");
+
+        assertThat(directory.find(TENANT)).isEmpty();
+        assertThat(namespace.namespaceExists(TENANT)).isFalse();
+        assertThat(registry.spaceExists(TENANT)).isFalse();
+        assertThat(Files.exists(staging.resolve(TENANT))).isFalse();
     }
 }

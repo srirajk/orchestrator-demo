@@ -82,6 +82,6 @@ class CapabilityClarifyResumeReChecksTest extends CapabilityClarifyFixture {
         assertThat(resume).doesNotContain("Reply with the name");  // not a re-offered clarify form
 
         // The entitlement CHECK fired on the resume (offer + resume ⇒ ≥2 invocations).
-        verify(cerbosAdapter, atLeast(2)).checkAgents(any(), any());
+        verify(cerbosAdapter, atLeast(2)).checkAgents(any(), any(), any());
     }
 }

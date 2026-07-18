@@ -5,24 +5,28 @@
 Read, in order:
 
 1. `README.md`
-2. `ADR-001-STUDIO-RUNTIME.md`
-3. `EXECUTION-MODEL.md`
-4. `REFERENCE-PACKAGE-STRUCTURE.md`
-5. `IMPLEMENTATION-PLAN.md`
-6. only the focused specification for the assigned slice
-7. repository `CLAUDE.md` and applicable `.claude/rules/*`
+2. `delivery/README.md`
+3. `delivery/MASTER-PLAN.md`
+4. the assigned milestone and child story from `delivery/`
+5. `UI-FIRST-ARTIFACT-BUILDOUT.md`
+6. `ADR-001-STUDIO-RUNTIME.md`
+7. only the focused governing specification referenced by the story
+8. repository `CLAUDE.md` and applicable `.claude/rules/*`
 
 ## First implementation assignment
 
-Implement Wave 0 and the characterization half of Wave 1 only. Do not scaffold the entire Studio.
+Implement M1-S01 first, then follow the dependency order in `delivery/STORY-MAP.md`. Do not change
+external ingestion or the request-path gateway before Milestone 4.
 
 Required result:
 
-- sanitized fixtures for knowledge, resource-scoped and composable archetypes;
-- overlap and insufficient-evidence fixtures;
-- characterization tests pinning current manifest, projection, condition and bounded-map behavior;
-- a proposed Maven aggregator/module change presented separately if it affects existing builds;
-- no runtime behavior change.
+- a deterministic imported-catalog snapshot proving the 4/7/18/18 inventory and six current
+  integrity findings;
+- versioned Business Line, Use Case, route-target, dossier and bundle contracts;
+- sanitized Insurance renewal-risk and supporting boundary/insufficient-evidence fixtures;
+- Spring-free manifest/artifact SDK skeletons with canonical serialization tests;
+- typed UI/API fixtures generated from the same contracts;
+- no registry mutation, ingestion implementation or gateway runtime behavior change.
 
 ## Hard constraints
 
@@ -57,4 +61,3 @@ Next gate:
 ```
 
 Stop when an assigned gate is complete. Do not opportunistically implement the next wave.
-

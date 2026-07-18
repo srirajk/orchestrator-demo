@@ -110,6 +110,26 @@ class C4RealPdpEvidenceTest {
         writeEvidence(baseBundleDir, current, candidate, matrix, review, record, writer);
     }
 
+    @Test
+    void seededDefaultTenantCandidateReplacesExistingChildDuringRealPdpEvaluation() {
+        CanonicalPolicyWriter writer = new CanonicalPolicyWriter();
+        Path productionBundle = Path.of("../infra/cerbos/policies").toAbsolutePath().normalize();
+        CerbosBatchDecisionSource cerbos = new CerbosBatchDecisionSource(
+                "ghcr.io/cerbos/cerbos:0.53.0", 120, "0.53.0", productionBundle.toString(), writer);
+        Assumptions.assumeTrue(cerbos.isAvailable(),
+                "neither a pinned cerbos binary nor Docker is available — skipping the real-PDP evaluation");
+
+        PolicyIR replacement = new PolicyYamlParser().parse(
+                PolicyStudioFixtures.candidateWithScope("default"));
+        BundleSnapshot candidate = BundleSnapshot.of(replacement, PolicyStudioFixtures.agentCeiling(), writer);
+        FixtureCell invoke = new FixtureCell(Set.of("platform_admin"), "default", Map.of(),
+                "default", Map.of(), "invoke", "default-platform-admin-invoke");
+
+        PdpBatchResult result = cerbos.evaluate(candidate, List.of(invoke));
+
+        assertThat(result.byCell().get("default-platform-admin-invoke")).isEqualTo(Effect.ALLOW);
+    }
+
     private void writeEvidence(Path baseBundleDir, BundleSnapshot current, BundleSnapshot candidate,
                                ConsequenceFixtureMatrix matrix, ConsequenceReview review,
                                ConsequenceApprovalRecord record, CanonicalPolicyWriter writer) throws Exception {

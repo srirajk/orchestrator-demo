@@ -7,6 +7,7 @@ import com.openwolf.iam.policystudio.ConsequenceProseModelClient;
 import com.openwolf.iam.policystudio.ConsequenceReview;
 import com.openwolf.iam.policystudio.GroundedStudioReviewService;
 import com.openwolf.iam.policystudio.ManifestBackedStudioGroundingProvider;
+import com.openwolf.iam.policystudio.StudioGroundingTestFixtures;
 import com.openwolf.iam.policystudio.PolicyYamlParser;
 import com.openwolf.iam.policystudio.ProductionPdpDecisionSource;
 import com.openwolf.iam.policystudio.CerbosBatchDecisionSource;
@@ -15,8 +16,11 @@ import com.openwolf.iam.tenancy.ActiveTenantDirectory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.ObjectProvider;
 
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.List;
 
@@ -37,7 +41,9 @@ class SecondPromotionReviewsAgainstActiveBundleIT {
     private static final String TENANT = C5LifecycleFixtures.TENANT; // "acme"
 
     @Test
-    void secondPromotionReviewsAgainstTheRealActiveBundleAndCasSucceeds() {
+    void secondPromotionReviewsAgainstTheRealActiveBundleAndCasSucceeds(@TempDir Path tenantRoot)
+            throws IOException {
+        StudioGroundingTestFixtures.writeTenantDeployment(tenantRoot, TENANT);
         CanonicalPolicyWriter writer = new CanonicalPolicyWriter();
         PolicyYamlParser parser = new PolicyYamlParser();
         ObjectMapper mapper = new ObjectMapper();
@@ -59,7 +65,7 @@ class SecondPromotionReviewsAgainstActiveBundleIT {
         // tenant's ACTUAL active bundle as `current` from the shared directory + bundle store.
         ManifestBackedStudioGroundingProvider grounding =
                 new ManifestBackedStudioGroundingProvider(mapper, writer, parser, directory, bundleRepo,
-                        "registry", baseDir, "infra/cerbos/tenants", "default");
+                        "registry", baseDir, tenantRoot.toString());
 
         StudioSessionStore store = new StudioSessionStore();
         GroundedStudioReviewService reviews = new GroundedStudioReviewService(

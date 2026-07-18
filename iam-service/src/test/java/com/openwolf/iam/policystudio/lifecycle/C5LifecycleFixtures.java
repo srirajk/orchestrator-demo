@@ -327,7 +327,13 @@ final class C5LifecycleFixtures {
 
     /** The H2 re-validation grounding: the `agent` vocabulary + immutable ceiling at author scope `acme`. */
     static PromotionValidationContextProvider validationProvider() {
-        return candidate -> new PromotionValidationContext(vocab(), TenantScope.of("acme"), false, agentCeiling());
+        return (candidate, resourceKind, childScope) -> {
+            if (!"agent".equals(resourceKind)) {
+                throw new IllegalStateException("fixture has no grounding for resource kind '"
+                        + resourceKind + "'");
+            }
+            return new PromotionValidationContext(vocab(), TenantScope.of("acme"), false, agentCeiling());
+        };
     }
 
     static GeneratedPolicyValidator validator() {
@@ -354,7 +360,15 @@ final class C5LifecycleFixtures {
                                                    CandidateProbe probe, String gitCommit) {
         return new PolicyPromotionService(dir, approvalService(), pr, br, ar, canon(),
                 gitResolver(gitCommit), probe, validator(), new PolicyYamlParser(), validationProvider(),
-                new PromotedBundleLoader(""));
+                configuredTestLoader());
+    }
+
+    private static PromotedBundleLoader configuredTestLoader() {
+        try {
+            return new PromotedBundleLoader(java.nio.file.Files.createTempDirectory("c5-runtime-").toString(), 0L, 1);
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("could not create C5 runtime fixture directory", e);
+        }
     }
 
     static Instant now() {

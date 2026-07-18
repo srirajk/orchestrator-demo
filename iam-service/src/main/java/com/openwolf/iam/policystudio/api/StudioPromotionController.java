@@ -70,10 +70,10 @@ public class StudioPromotionController {
     /**
      * The promotion request the SPA posts. {@code reviewId} references a C4 review previously computed by
      * {@code POST /reviews} (which recorded the verified author + tenant + the trusted review itself) — the
-     * review and its author are NOT taken from this body. {@code candidate} is the immutable bundle to
-     * activate (the service binds it to the signed approval's candidate id + verifies its integrity).
+     * review, author, and candidate are NOT taken from this body. The exact reviewed candidate is loaded
+     * from the tenant-scoped server store.
      */
-    public record PromotePayload(String reviewId, PolicyBundle candidate, String idempotencyKey) {}
+    public record PromotePayload(String reviewId, String idempotencyKey) {}
 
     /** {@code POST /admin/studio/promotions} — approve (sign) the review, then promote the candidate. */
     @PostMapping("/promotions")
@@ -92,14 +92,14 @@ public class StudioPromotionController {
     }
 
     private PromotionReceipt execute(PromotePayload payload, Authentication auth, PromotionRecord.Kind kind) {
-        if (payload == null || payload.reviewId() == null || payload.candidate() == null) {
-            throw new IllegalArgumentException("reviewId and candidate are required");
+        if (payload == null || payload.reviewId() == null || payload.idempotencyKey() == null
+                || payload.idempotencyKey().isBlank()) {
+            throw new IllegalArgumentException("reviewId and idempotencyKey are required");
         }
         // Verified identity only — a null/absent principal fails closed here (never skips the SoD check).
         String approver = StudioPrincipal.actor(auth);
         String tenant = StudioPrincipal.tenant(auth);
         Set<String> approverRoles = StudioPrincipal.roles(auth);
-        PolicyBundle candidate = payload.candidate();
 
         // Look up the trusted, server-recorded review (tenant-scoped): a miss (wrong tenant / unknown /
         // never computed here) FAILS CLOSED — you cannot promote a review the server never produced.
@@ -108,6 +108,7 @@ public class StudioPromotionController {
                         "no consequence review '" + payload.reviewId() + "' for tenant '" + tenant
                                 + "' — compute the review first; promotion binds to the server's own review record"));
         ConsequenceReview review = stored.review();
+        PolicyBundle candidate = stored.candidate();
         String author = stored.authorId(); // the VERIFIED drafter identity captured at compute time
 
         // Tenant scope: never from the body — the review (already tenant-scoped) and candidate must match.
@@ -122,6 +123,16 @@ public class StudioPromotionController {
                             + "promote it (author≠approver)");
         }
 
+        // Lost-response retry: authorize tenant/role/SoD and bind the global key to this exact trusted
+        // handoff before replaying. Do this before approval because the active baseline already moved.
+        java.util.Optional<PromotionReceipt> replay = promotion.replayCompleted(
+                payload.idempotencyKey(), tenant, review.currentBundleId(), candidate.bundleId(),
+                review.consequenceReviewHash(), approver, kind);
+        if (replay.isPresent()) {
+            store.markReviewCompleted(stored);
+            return replay.get();
+        }
+
         // (1) sign the approval over the exact C4 review hash — approve() recomputes the hash from the
         //     review's truth fields and refuses a tampered/stale review (server-side re-verification).
         ConsequenceApprovalRecord approval =
@@ -130,8 +141,11 @@ public class StudioPromotionController {
         // (2) promote: verify signature, stage + probe candidate, CAS the live pointer.
         PromotionRequest request = new PromotionRequest(
                 candidate, review, approval, payload.idempotencyKey(), kind);
-        return kind == PromotionRecord.Kind.ROLLBACK
+        PromotionReceipt receipt = kind == PromotionRecord.Kind.ROLLBACK
                 ? promotion.rollback(request)
                 : promotion.promote(request);
+        // Keep failed attempts available to another approver/retry. Retire only after activation succeeds.
+        store.markReviewCompleted(stored);
+        return receipt;
     }
 }

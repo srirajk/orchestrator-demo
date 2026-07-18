@@ -81,7 +81,7 @@ conduit:
   # contain `default` — every demo request carries tenant_id=default. In real multi-tenant prod a
   # `multi-tenant`-profile IAM-HTTP source replaces it. Format: comma-separated tenantId:policyVersion.
   tenancy:
-    provisioned-tenants: ${CONDUIT_TENANCY_PROVISIONED_TENANTS:default:config-v1}
+    provisioned-tenants: ${CONDUIT_TENANCY_PROVISIONED_TENANTS:default:default}
     snapshot:
       refresh-interval-ms: ${CONDUIT_TENANCY_SNAPSHOT_REFRESH_MS:60000}
   # End-to-end deadline for ONE chat turn. The SSE emitter times out here AND the pipeline

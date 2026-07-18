@@ -14,7 +14,7 @@ place its workflow, UI, guidance runtime or persistence inside the request-path 
 its UI inside the Axiom identity administration console.
 
 Use bounded OpenAI inference for guided questions, explanations, evidence analysis and typed
-proposals. Use deterministic Java application services for case state, dossier facts, manifest
+proposals. Use deterministic Java application services for project state, dossier facts, manifest
 compilation, composition admission, certification, approvals and promotion.
 
 ```text
@@ -32,15 +32,20 @@ Onboarding Studio Web/BFF  <---- OIDC ----> Axiom
   +--> Guidance model adapter                |
           |                                  |
           +--> authorized context builder    |
-          +--> typed proposal validator -----+--> Gateway registry profile
+          +--> typed proposal validator -----+--> External registry-ingestion profile
           +--> proposal store                |      - catalog reads
                                              |      - introspection dry run
 Deterministic compiler/certifier ------------+      - candidate validation
                                                     - approved activation
 ```
 
-The Studio creates a candidate package. The existing gateway registry subsystem remains the only authority
-that can validate, store and index an activated agent manifest.
+The Studio creates a candidate package. An external registry-ingestion component, assembled from
+shared Java admission logic, remains the only authority that can validate, store and index an
+activated agent manifest. The request-path gateway only reads immutable activated catalogs.
+
+This diagram is the target architecture, not the first build sequence. The UI-first milestone stops
+after deterministic package generation and snapshot proof. External ingestion is implemented next
+to last; read-only gateway integration is last.
 
 ---
 
@@ -51,7 +56,7 @@ that can validate, store and index an activated agent manifest.
 - Studio users and permissions differ from chat users and Axiom identity administrators.
 - Onboarding model/tool failures must not affect serving traffic.
 - Studio can evolve model providers independently while retaining Java composition semantics.
-- Production activation retains a narrow, auditable gateway registry-profile API boundary.
+- Production activation retains a narrow, auditable external registry-ingestion API boundary.
 
 ---
 
@@ -59,7 +64,7 @@ that can validate, store and index an activated agent manifest.
 
 ### 3.1 `onboarding-studio-web`
 
-React/TypeScript application for cases, interviews, evidence, contract review, certification,
+React/TypeScript application for Business Lines, Use Cases, Onboarding Projects, evidence, contract review, certification,
 approvals and promotion. Served behind the Studio BFF; no direct registry credentials in the browser.
 
 ### 3.2 `onboarding-studio-api`
@@ -68,7 +73,7 @@ Java/Spring Boot service that acts as BFF and application API. Responsibilities:
 
 - Axiom OIDC login/session integration;
 - authorization enforcement;
-- case/dossier/evidence commands and reads;
+- project/dossier/evidence commands and reads;
 - job submission and progress streaming;
 - approval and promotion commands;
 - artifact download;
@@ -102,11 +107,11 @@ Deterministic job runner that coordinates schema, introspection, dataflow, routi
 authorization, golden, regression and security gates. Model-judged evals may contribute measured
 quality evidence but cannot override hard gates.
 
-### 3.6 Shared admission engine and gateway registry extensions
+### 3.6 Shared admission engine and external registry-ingestion extensions
 
 Extract domain-free manifest models and static composition admission from the gateway into
-`libs/conduit-admission`. Both gateway and Studio use this artifact. Characterization tests must
-prove parity before the gateway switches to it.
+`libs/conduit-admission`. External registry ingestion and the read-only gateway use this artifact.
+Characterization tests must prove parity before either switches to it.
 
 Add registry-profile-only APIs for:
 
@@ -116,7 +121,8 @@ Add registry-profile-only APIs for:
 - approved activation of an exact certified bundle hash;
 - deactivation/rollback using existing registry authority.
 
-The request-path gateway receives no Studio endpoints or beans.
+The request-path gateway receives no Studio or ingestion endpoints, ingestion beans, or registry
+write credentials.
 
 ---
 
@@ -132,11 +138,11 @@ The request-path gateway receives no Studio endpoints or beans.
 | Async work | PostgreSQL outbox/job table with leased workers; no external broker in v1 |
 | Authentication | Axiom OIDC Authorization Code flow; secure BFF session cookie |
 | Authorization | Studio policy enforcement plus domain scope; Axiom supplies identity/roles |
-| Registry mutation | Existing Java gateway registry subsystem only |
+| Registry mutation | External Java registry-ingestion component only |
 | Model observability | Studio OTel spans, audit records and usage metrics with sensitive data disabled |
 | Platform observability | Existing OTel/Prometheus/Langfuse conventions where applicable |
 
-PostgreSQL is selected over Redis as the production system of record because cases contain durable
+PostgreSQL is selected over Redis as the production system of record because projects contain durable
 relationships, approvals, versions, jobs and promotion history. Redis may be used only for caches,
 locks or ephemeral coordination.
 
@@ -158,7 +164,7 @@ Conversation history, model confidence and generated prose are never above any i
 
 ## 6. Core aggregate model
 
-### Onboarding case
+### Onboarding Project
 
 Owns scope, archetype, current dossier version, workflow state and domain/tenant boundary.
 
@@ -198,9 +204,9 @@ environments.
 ## 7. Main data flow
 
 1. User authenticates through Axiom.
-2. API creates a case scoped to tenant/domain and intended environment.
+2. API creates a project scoped to tenant/Business Line and intended environment.
 3. User uploads requirements and supplies a non-production URL/credential reference.
-4. Inspection job captures protocol evidence through a bounded gateway registry dry run.
+4. Studio inspection adapters capture bounded protocol evidence without catalog mutation.
 5. Guidance adapter receives only authorized evidence summaries and unresolved dossier paths.
 6. Adapter produces typed questions/proposals; UI records human answers.
 7. Catalog analysis produces ownership exercises and regression neighborhood.
@@ -218,7 +224,7 @@ environments.
 
 ```text
 /studio/session/*             authentication/session
-/studio/cases/*               workflow and dossier
+/studio/projects/*            workflow and dossier
 /studio/evidence/*            uploads, snapshots, redacted reads
 /studio/interviews/*          agent runs, questions and proposals
 /studio/catalog/*             neighbors and ownership exercises
@@ -262,7 +268,7 @@ No registry mutation. Evidence, dossier, compiler and static certification only.
 ### Sandbox
 
 Ephemeral/shadow catalog and test credentials. Live probes and routing evaluation permitted within
-case policy. No production user traffic.
+project policy. No production user traffic.
 
 ### Staging
 
@@ -278,11 +284,11 @@ immutable receipt. No model has production mutation credentials or an activation
 ## 11. Failure boundaries
 
 - OpenAI outage: interview/proposals pause; deterministic workflow, evidence and review remain usable.
-- Agent run timeout: job fails/retries; case state remains unchanged.
+- Agent run timeout: job fails/retries; project state remains unchanged.
 - Registry dry-run outage: certification becomes `UNABLE_TO_ASSESS`; no fallback schema is invented.
 - Compiler failure: typed field/path error; no partial candidate promoted.
 - Certification failure: actionable gate result; prior production activation unchanged.
-- Approval rejection: case returns to the specified decision state with reason; artifact remains immutable.
+- Approval rejection: project returns to the specified decision state with reason; artifact remains immutable.
 - Promotion interruption: idempotent registry receipt check determines actual state before retry.
 - Catalog changes: affected routing/certification hashes become stale before approval/promotion.
 
@@ -303,16 +309,19 @@ services/onboarding-studio/src/main/java/ai/conduit/studio/
   promotion/
 services/onboarding-studio/src/test/java/ai/conduit/studio/
 
+libs/conduit-manifest-contracts/src/main/java/ai/conduit/contracts/
+libs/conduit-artifact-sdk/src/main/java/ai/conduit/artifacts/
 libs/conduit-admission/src/main/java/ai/conduit/admission/
 
-gateway/src/main/java/ai/conduit/gateway/registry/onboarding/
-  api/             registry dry-run/snapshot/activation endpoints
-  service/         existing-validator orchestration
+gateway/src/main/java/ai/conduit/gateway/registry/              # existing external registry profile
+  api/             dry-run/snapshot/activation endpoints in registry profile only
+  service/         shared-validator orchestration and mutation beans
 ```
 
-The shared admission module may not depend on Spring, network, persistence or model code. Studio may
-not duplicate gateway composition rules; it uses the shared module for static admission and
-versioned gateway APIs for live/shadow execution.
+The shared contract, artifact and admission modules may not depend on Spring, network, persistence
+or model code. Studio may not duplicate runtime composition rules. The existing external registry
+profile adopts shared admission in the penultimate phase; the read-only gateway adopts immutable
+snapshot contracts in the final phase. A new ingestion deployable requires an ADR.
 
 ---
 

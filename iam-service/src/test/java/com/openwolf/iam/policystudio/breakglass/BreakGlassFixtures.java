@@ -99,6 +99,11 @@ final class BreakGlassFixtures {
             logs.add(l);
             return l;
         });
+        when(repo.saveAndFlush(any(AuditLog.class))).thenAnswer(a -> {
+            AuditLog l = a.getArgument(0);
+            logs.add(l);
+            return l;
+        });
         when(repo.findByTenantIdOrderByOccurredAtDesc(anyString())).thenAnswer(a -> logs.stream()
                 .filter(l -> l.getTenantId().equals(a.<String>getArgument(0)))
                 .toList());

@@ -1,6 +1,5 @@
 package com.openwolf.iam.policystudio.breakglass;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.Set;
@@ -19,19 +18,18 @@ import java.util.Set;
 @Service
 public class BreakGlassApprovalService {
 
-    private final BreakGlassAuditPartition audit;
-    private final String approverRole;
+    /** One product role shared by the HTTP gate, UI, and service-level SoD enforcement. */
+    public static final String APPROVER_ROLE = "policy_approver";
 
-    public BreakGlassApprovalService(
-            BreakGlassAuditPartition audit,
-            @Value("${iam.break-glass.approver-role:studio_policy_approver}") String approverRole) {
+    private final BreakGlassAuditPartition audit;
+
+    public BreakGlassApprovalService(BreakGlassAuditPartition audit) {
         this.audit = audit;
-        this.approverRole = approverRole;
     }
 
     /**
-     * Approve and issue a break-glass grant. Fails closed on an inadmissible artifact or an SoD
-     * violation; audits the issuance on success.
+     * Authorize issuance of a break-glass grant. Fails closed on an inadmissible artifact or an SoD
+     * violation. This method does not audit GRANTED; the caller records that only after promotion.
      *
      * <p><b>Separation of duties over VERIFIED identity (H1).</b> The author is the {@code authorId}
      * captured from the authenticated {@code sub} at author time and passed by the caller context —
@@ -46,8 +44,8 @@ public class BreakGlassApprovalService {
      * @throws BreakGlassSodException  if either identity is missing, the approver is the author, or the
      *                                 approver lacks the approver role
      */
-    public void approveAndIssue(BreakGlassArtifact artifact, String authorId, String approverId,
-                                Set<String> approverRoles, String correlationId) {
+    public void authorizeIssue(BreakGlassArtifact artifact, String authorId, String approverId,
+                               Set<String> approverRoles) {
         if (!artifact.admissible()) {
             throw new IllegalStateException(
                     "refusing to approve an inadmissible break-glass artifact — bounds="
@@ -75,13 +73,29 @@ public class BreakGlassApprovalService {
                             + "may not also approve it (author≠approver)");
         }
         // C6.4 / C1.3 — approval flows only through a studio approver, never an auto-approving superuser.
-        if (approverRoles == null || !approverRoles.contains(approverRole)) {
+        if (approverRoles == null || !approverRoles.contains(APPROVER_ROLE)) {
             throw new BreakGlassSodException(
-                    "approver '" + approverId + "' must hold the studio approver role '" + approverRole
+                    "approver '" + approverId + "' must hold the studio approver role '" + APPROVER_ROLE
                             + "' to approve a break-glass grant (roles=" + approverRoles + ")");
         }
+    }
 
+    /**
+     * Persist the issuance audit only after promotion has succeeded. Keeping this separate from
+     * {@link #authorizeIssue} prevents a failed runtime promotion from leaving a false GRANTED event.
+     */
+    public void recordIssued(BreakGlassArtifact artifact, String approverId, String correlationId) {
         audit.recordGranted(artifact.grant(), approverId, correlationId);
+    }
+
+    /**
+     * Convenience operation for non-promoting callers and focused gate tests. Production HTTP issuance
+     * deliberately calls {@link #authorizeIssue}, promotes, and only then calls {@link #recordIssued}.
+     */
+    public void approveAndIssue(BreakGlassArtifact artifact, String authorId, String approverId,
+                                Set<String> approverRoles, String correlationId) {
+        authorizeIssue(artifact, authorId, approverId, approverRoles);
+        recordIssued(artifact, approverId, correlationId);
     }
 
     /** Record a single use of an issued, still-valid break-glass grant (C6.3). */

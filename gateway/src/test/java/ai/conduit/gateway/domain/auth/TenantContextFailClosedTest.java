@@ -114,7 +114,7 @@ class TenantContextFailClosedTest {
     private static final class StubDirectory implements ProvisionedTenantDirectory {
         @Override public Optional<ProvisionedTenant> find(String tenantId) {
             return "default".equals(tenantId)
-                    ? Optional.of(new ProvisionedTenant("default", "config-v1"))
+                    ? Optional.of(new ProvisionedTenant("default", "default"))
                     : Optional.empty();
         }
         @Override public boolean hasSnapshot() { return true; }

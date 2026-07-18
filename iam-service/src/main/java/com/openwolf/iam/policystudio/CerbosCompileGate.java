@@ -16,6 +16,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 import com.openwolf.iam.policystudio.lifecycle.BundleFile;
+import com.openwolf.iam.policystudio.lifecycle.ResourcePolicyIdentity;
 
 /**
  * Compiles a generated candidate together with the EXACT immutable base bundle it targets, using
@@ -65,6 +66,7 @@ public class CerbosCompileGate {
         try {
             work = Files.createTempDirectory("policystudio-compile-");
             copyBundle(baseBundleDir, work);
+            removeReplaceableTenantChild(work, candidateYaml);
             Files.writeString(work.resolve(candidateFileName), candidateYaml, StandardCharsets.UTF_8);
             return runCompile(work);
         } catch (IOException | InterruptedException e) {
@@ -174,9 +176,40 @@ public class CerbosCompileGate {
         try (Stream<Path> walk = Files.walk(from)) {
             for (Path p : (Iterable<Path>) walk::iterator) {
                 if (Files.isRegularFile(p)
-                        && (p.toString().endsWith(".yaml") || p.toString().endsWith(".yml"))) {
+                        && isDeployablePolicyYaml(from, p)) {
                     Path target = to.resolve(from.relativize(p).toString().replace('/', '_'));
                     Files.copy(p, target, StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+        }
+    }
+
+    /** Cerbos test suites are verification inputs, not deployable policy/module definitions. */
+    private static boolean isDeployablePolicyYaml(Path root, Path file) {
+        String name = file.getFileName().toString();
+        if (!(name.endsWith(".yaml") || name.endsWith(".yml"))
+                || name.endsWith("_test.yaml") || name.endsWith("_test.yml")) {
+            return false;
+        }
+        String relative = root.relativize(file).toString().replace('\\', '/');
+        return !relative.startsWith("tests/") && !relative.contains("/tests/");
+    }
+
+    /**
+     * A tenant draft replaces that tenant's existing child for the same resource kind. The immutable root
+     * ceiling remains in the compile universe, but retaining the old child beside its replacement would
+     * create a false duplicate-identity failure (notably for the seeded {@code default} tenant).
+     */
+    static void removeReplaceableTenantChild(Path stagedDir, String candidateYaml) throws IOException {
+        ResourcePolicyIdentity candidate = ResourcePolicyIdentity.fromYaml(candidateYaml).orElse(null);
+        if (candidate == null || candidate.scope().isBlank()) {
+            return; // root policies are immutable and must never be removed/replaced here
+        }
+        try (Stream<Path> files = Files.list(stagedDir)) {
+            for (Path file : files.filter(Files::isRegularFile).toList()) {
+                if (ResourcePolicyIdentity.fromYaml(Files.readString(file))
+                        .map(candidate::equals).orElse(false)) {
+                    Files.delete(file);
                 }
             }
         }

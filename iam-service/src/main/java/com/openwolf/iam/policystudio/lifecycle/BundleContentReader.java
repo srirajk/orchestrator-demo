@@ -60,6 +60,16 @@ public final class BundleContentReader {
                 .findFirst();
     }
 
+    /** Recover a specific tenant child by resource kind from a tenant-wide C5 bundle. */
+    public static Optional<String> tenantChildYaml(String canonicalContent, String resourceKind,
+                                                    String tenantId) {
+        if (resourceKind == null || tenantId == null) {
+            return Optional.empty();
+        }
+        String expected = "policies/" + resourceKind + "@" + tenantId + ".yaml";
+        return Optional.ofNullable(filesFrom(canonicalContent).get(expected));
+    }
+
     private static void flush(Map<String, String> files, String path, StringBuilder body) {
         if (path != null && !path.isBlank()) {
             files.put(path, body.toString().stripTrailing() + "\n");

@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TenantContextPropagationTest {
 
     private static final TenantExecutionContext CAPTURED =
-            new TenantExecutionContext("default", "default", "config-v1");
+            new TenantExecutionContext("default", "default", "default");
 
     @Test
     void contextSurvivesTheVirtualThreadHopUnchanged() throws Exception {
@@ -39,7 +39,7 @@ class TenantContextPropagationTest {
         // Same immutable instance observed on the other side of the boundary — nothing re-derived it.
         assertThat(seenOnVThread.get()).isSameAs(CAPTURED);
         assertThat(seenOnVThread.get().tenantId()).isEqualTo("default");
-        assertThat(seenOnVThread.get().activePolicyVersion()).isEqualTo("config-v1");
+        assertThat(seenOnVThread.get().activePolicyVersion()).isEqualTo("default");
         assertThat(seenOnVThread.get().isResolved()).isTrue();
     }
 
@@ -49,7 +49,7 @@ class TenantContextPropagationTest {
                 "tok", List.of(AuthorizationGrant.structural("rm_jane", "a1", "cerbos", "req")));
         // The GovernedInvoker reads the tenant off THIS envelope (explicit), not a static holder.
         assertThat(ctx.tenant()).isSameAs(CAPTURED);
-        assertThat(ctx.tenant().activePolicyVersion()).isEqualTo("config-v1");
+        assertThat(ctx.tenant().activePolicyVersion()).isEqualTo("default");
     }
 
     @Test
@@ -72,6 +72,6 @@ class TenantContextPropagationTest {
         // A half-populated tenant (no captured policy version) must never pass the invoker's integrity
         // gate — isResolved() is the predicate GovernedInvoker denies on.
         assertThat(new TenantExecutionContext("default", "default", null).isResolved()).isFalse();
-        assertThat(new TenantExecutionContext("", "", "config-v1").isResolved()).isFalse();
+        assertThat(new TenantExecutionContext("", "", "default").isResolved()).isFalse();
     }
 }

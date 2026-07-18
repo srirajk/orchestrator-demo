@@ -15,26 +15,29 @@ promotion state.
 Primary navigation:
 
 ```text
-Cases
-Catalog
-Certification
-Approvals
-Promotions
-Audit
+Overview
+Business Lines
+Use Cases
+Agent Network
+Onboarding Projects
+Generated Packages
+Proof
 ```
 
-Visibility is role-scoped. A submitter does not see organization-wide audit or unrelated domains.
+The first implementation follows `UI-FIRST-ARTIFACT-BUILDOUT.md`; approvals, activation and gateway
+views appear only after their real workflows exist. Visibility is role-scoped. A submitter does not
+see organization-wide audit or unrelated Business Lines.
 
 ---
 
 ## 2. Core information architecture
 
-### Case list
+### Onboarding Project list
 
-Filters by ownership, domain, archetype, state, verdict, environment and age. Each row shows next
-action and responsible role, not merely a technical status.
+Filters by ownership, Business Line, Use Case, project type, state, verdict and age. Each row shows
+next action and responsible role, not merely a technical status.
 
-### Case workspace
+### Onboarding Project workspace
 
 Persistent left navigation:
 
@@ -62,13 +65,14 @@ proposals. It never hides the structured record in chat history.
 
 ---
 
-## 3. Case creation
+## 3. Onboarding Project creation
 
-Step 1: choose scope.
+Step 1: choose the business change.
 
-- Add capability to existing sub-domain.
-- Add sub-domain to existing domain.
-- Add business domain.
+- Define a Use Case in an existing Business Line.
+- Create a new Business Line and its first Use Case.
+- Connect an agent to an existing Use Case.
+- Repair an imported catalog relationship.
 
 Step 2: choose supported archetype.
 
@@ -82,7 +86,8 @@ Step 3: owners and intended environment.
 Step 4: service protocol/URL and credential reference.
 
 The UI explains unsupported choices before submission. A2A or write-agent input can still create an
-assessment case, but the expected result is a platform-gap assessment rather than false onboarding.
+assessment project, but the expected result is a platform-gap assessment rather than false
+onboarding.
 
 ---
 
@@ -281,7 +286,7 @@ Do not blame the user. Explain the platform requirement and the shortest safe re
 
 ## 11. Approvals UX
 
-Approvers receive an inbox containing only cases they are authorized and required to decide.
+Approvers receive an inbox containing only projects they are authorized and required to decide.
 
 Approval screen shows:
 
@@ -359,10 +364,10 @@ empty screens, decorative AI gradients and false “magic” language.
 ## 15. UX acceptance scenarios
 
 - New submitter completes knowledge-agent onboarding without platform assistance.
-- Domain owner resolves an overlap using concrete ownership cases.
+- Business Line owner resolves an overlap using concrete ownership examples.
 - Security owner sees only classification/coverage decisions requiring them.
 - Technical owner diagnoses an invalid output contract from linked evidence.
 - Reviewer understands a generated DAG without reading JMESPath.
 - Release manager promotes an exact approved hash and sees receipt.
 - Auditor reconstructs who declared, proposed, approved and promoted every material field.
-- User with insufficient domain access cannot discover case names/evidence.
+- User with insufficient Business Line access cannot discover project names or evidence.

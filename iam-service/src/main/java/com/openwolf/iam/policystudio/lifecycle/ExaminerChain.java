@@ -18,6 +18,7 @@ package com.openwolf.iam.policystudio.lifecycle;
  */
 public record ExaminerChain(
         String transactionId,
+        String tenantId,
         String cerbosCallId,
         String activePolicyVersion,
         String decision,

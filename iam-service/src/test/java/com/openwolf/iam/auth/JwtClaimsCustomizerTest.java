@@ -36,7 +36,8 @@ class JwtClaimsCustomizerTest {
 
         CapturingAuditService audit = new CapturingAuditService();
         OAuth2TokenCustomizer<JwtEncodingContext> customizer =
-                new JwtClaimsCustomizer(enricher, audit, "conduit-gateway,secondary-api", "conduit-chat")
+                new JwtClaimsCustomizer(enricher, audit, "conduit-gateway,secondary-api",
+                        "conduit-coverage", "conduit-chat")
                         .jwtTokenCustomizer();
         JwtEncodingContext context = contextFor(OAuth2TokenType.ACCESS_TOKEN, "test-client");
 
@@ -47,7 +48,8 @@ class JwtClaimsCustomizerTest {
         // variant so the gateway can bind the token to its tenant_id claim.
         assertThat(claims.getAudience()).containsExactly(
                 "conduit-gateway", "conduit-gateway@default",
-                "secondary-api", "secondary-api@default");
+                "secondary-api", "secondary-api@default",
+                "conduit-coverage", "conduit-coverage@default");
         assertThat(claims.getClaimAsStringList("roles")).containsExactly("relationship_manager");
         assertThat(claims.getClaimAsStringList("segments")).containsExactly("wealth");
         assertThat(claims.getClaimAsStringList("admin_domains")).isEmpty();
@@ -65,7 +67,7 @@ class JwtClaimsCustomizerTest {
         CapturingAuditService audit = new CapturingAuditService();
 
         OAuth2TokenCustomizer<JwtEncodingContext> customizer =
-                new JwtClaimsCustomizer(enricher, audit, "conduit-gateway", "conduit-chat")
+                new JwtClaimsCustomizer(enricher, audit, "conduit-gateway", "conduit-coverage", "conduit-chat")
                         .jwtTokenCustomizer();
         // A fresh authorization_code login for the conduit-chat client → one chat_access event.
         customizer.customize(contextFor(OAuth2TokenType.ACCESS_TOKEN, "conduit-chat"));
@@ -84,7 +86,8 @@ class JwtClaimsCustomizerTest {
                         "name", "Jane Kowalski"));
 
         OAuth2TokenCustomizer<JwtEncodingContext> customizer =
-                new JwtClaimsCustomizer(enricher, new CapturingAuditService(), "conduit-gateway", "conduit-chat")
+                new JwtClaimsCustomizer(enricher, new CapturingAuditService(), "conduit-gateway",
+                        "conduit-coverage", "conduit-chat")
                         .jwtTokenCustomizer();
         JwtEncodingContext context = contextFor(new OAuth2TokenType(OidcParameterNames.ID_TOKEN), "conduit-chat");
 

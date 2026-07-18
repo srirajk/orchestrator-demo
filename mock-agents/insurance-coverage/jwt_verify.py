@@ -27,7 +27,7 @@ log = logging.getLogger(__name__)
 
 JWKS_URL = os.getenv("JWKS_URL", "http://iam-service:8084/oauth2/jwks")
 VALID_ISSUERS = {"http://host.docker.internal:8084", "http://iam-service:8084", "http://localhost:8084"}
-EXPECTED_AUDIENCE = os.getenv("AGENT_JWT_AUDIENCE", "conduit-gateway")
+EXPECTED_AUDIENCE = os.getenv("AGENT_JWT_AUDIENCE", "conduit-coverage")
 
 # Simple in-process JWKS cache: {kid: public_key_pem, "_fetched_at": float}
 _jwks_cache: dict = {}
@@ -159,6 +159,14 @@ def verify_bearer_token(authorization: str | None) -> tuple[bool, str | None, di
     if issuer not in VALID_ISSUERS:
         return False, f"Untrusted issuer: {issuer}", None
 
+    tenant_id = claims.get("tenant_id")
+    audiences = claims.get("aud", [])
+    if isinstance(audiences, str):
+        audiences = [audiences]
+    required_tenant_audience = f"{EXPECTED_AUDIENCE}@{tenant_id}" if tenant_id else ""
+    if not required_tenant_audience or required_tenant_audience not in audiences:
+        return False, "Missing or mismatched tenant-qualified coverage audience", None
+
     log.debug("JWT verified: sub=%s iss=%s", claims.get("sub"), issuer)
     return True, None, claims
 
@@ -216,4 +224,12 @@ def verify_tenant_binding(
             f"book owned by tenant '{book_owner_tenant}'"
         )
 
+    return True, None
+
+
+def verify_book_principal(claims: dict | None, principal_id: str) -> tuple[bool, str | None]:
+    """Bind DISCOVER/CHECK's requested book principal to the verified token subject."""
+    subject = claims.get("sub") if claims else None
+    if not subject or subject != principal_id:
+        return False, "Requested book principal does not match verified token subject"
     return True, None

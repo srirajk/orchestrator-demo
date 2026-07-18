@@ -83,4 +83,28 @@ class GeneratedYamlCompilesTest {
         // Stored form is the IR-derived canonical YAML, not the model's raw text.
         assertThat(result.canonicalYaml()).contains("resource: agent").contains("scope: acme");
     }
+
+    @Test
+    void seededDefaultTenantCanReplaceItsExistingChildAndStillCompile() {
+        PolicyAuthoringRequest request = PolicyStudioFixtures.request(
+                "Replace the default tenant child without editing the immutable root.",
+                TenantScope.of("default"), false);
+        java.nio.file.Path productionBundle = java.nio.file.Path.of("../infra/cerbos/policies")
+                .toAbsolutePath().normalize();
+        assertThat(java.nio.file.Files.exists(productionBundle.resolve("decision_parity_matrix_test.yaml")))
+                .as("regression fixture: the real infra copy includes Cerbos test-suite YAML")
+                .isTrue();
+        PolicyStudioGenerationService productionBundleService = new PolicyStudioGenerationService(
+                PolicyStudioFixtures.stubReturning(PolicyStudioFixtures.candidateWithScope("default")),
+                parser, validator, writer, gate,
+                productionBundle.toString());
+
+        StudioGenerationResult result = productionBundleService.generate(request);
+
+        assertThat(result.accepted())
+                .as("the tenant's existing child is replaceable; only the root identity is reserved")
+                .isTrue();
+        assertThat(result.stage()).isEqualTo(StudioGenerationResult.Stage.ACCEPTED);
+        assertThat(result.canonicalYaml()).contains("scope: default");
+    }
 }

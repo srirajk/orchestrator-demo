@@ -1,7 +1,8 @@
 package com.openwolf.iam.policystudio.lifecycle;
 
-import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * An IMMUTABLE, content-addressed full policy bundle for one tenant (Axiom Story C5). A candidate is a
@@ -48,22 +49,50 @@ public record PolicyBundle(
         if (tenantId == null || tenantId.isBlank()) {
             throw new IllegalArgumentException("tenantId must be set");
         }
+        assertUniqueResourcePolicyIdentities(files);
         String content = canon.canonicalContent(tenantId, files, manifestRefs, testMetadata, null);
         String id = canon.bundleId(content);
         return new PolicyBundle(id, tenantId, files, manifestRefs, testMetadata, content);
     }
 
     /**
-     * The files with the version sentinel replaced by the concrete {@code bundleId} — the deployable form
-     * staged alongside the live bundle and fed to {@code cerbos compile}. Never mutates this record.
+     * A tenant-wide snapshot may contain many resources and scopes, but never two definitions for the
+     * same Cerbos identity. Enforce this before hashing so an ambiguous bundle cannot pass review and
+     * fail only when the promotion probe stages it under different file names.
+     */
+    private static void assertUniqueResourcePolicyIdentities(List<BundleFile> files) {
+        Map<String, Boolean> paths = new LinkedHashMap<>();
+        Map<ResourcePolicyIdentity, String> firstPath = new LinkedHashMap<>();
+        for (BundleFile file : files) {
+            if (paths.putIfAbsent(file.path(), Boolean.TRUE) != null) {
+                throw new IllegalArgumentException("duplicate bundle file path '" + file.path()
+                        + "' — canonicalization and content recovery require one file per path");
+            }
+            ResourcePolicyIdentity.fromYaml(file.yaml()).ifPresent(identity -> {
+                if (!BundleCanonicalizer.BUNDLE_VERSION_SENTINEL.equals(identity.version())) {
+                    throw new IllegalArgumentException("resource policy file '" + file.path()
+                            + "' must use bundle version sentinel '"
+                            + BundleCanonicalizer.BUNDLE_VERSION_SENTINEL + "', not '"
+                            + identity.version() + "'");
+                }
+                String existing = firstPath.putIfAbsent(identity, file.path());
+                if (existing != null) {
+                    throw new IllegalArgumentException("duplicate resource policy identity '"
+                            + identity.resource() + "@" + identity.scope() + "#" + identity.version()
+                            + "' in bundle files '"
+                            + existing + "' and '" + file.path() + "'");
+                }
+            });
+        }
+    }
+
+    /**
+     * The deployable form: resource-policy version sentinels are replaced by the concrete {@code bundleId},
+     * while global module names and their imports are namespaced by that same id. This keeps an active
+     * bundle's derived-role/variable dependencies immutable. Never mutates this record.
      */
     public List<BundleFile> renderedFiles() {
-        List<BundleFile> out = new ArrayList<>(files.size());
-        for (BundleFile f : files) {
-            out.add(new BundleFile(f.path(),
-                    f.yaml().replace(BundleCanonicalizer.BUNDLE_VERSION_SENTINEL, bundleId)));
-        }
-        return out;
+        return BundleModuleVersioner.render(files, bundleId);
     }
 
     /**
@@ -75,10 +104,11 @@ public record PolicyBundle(
     public void verifyIntegrity(BundleCanonicalizer canon) {
         String recomputedContent = canon.canonicalContent(tenantId, files, manifestRefs, testMetadata, bundleId);
         String recomputedId = canon.bundleId(recomputedContent);
-        if (!recomputedId.equals(bundleId)) {
+        if (!recomputedId.equals(bundleId) || !recomputedContent.equals(canonicalContent)) {
             throw new BundleTamperException(
                     "policy bundle '" + bundleId + "' failed integrity: recomputed id is '" + recomputedId
-                            + "' — a promoted bundle is immutable and cannot be edited in place");
+                            + "' and canonical content match=" + recomputedContent.equals(canonicalContent)
+                            + " — a promoted bundle is immutable and cannot be edited in place");
         }
     }
 }

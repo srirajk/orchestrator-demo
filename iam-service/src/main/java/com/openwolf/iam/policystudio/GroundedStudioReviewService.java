@@ -2,16 +2,20 @@ package com.openwolf.iam.policystudio;
 
 import com.openwolf.iam.policystudio.api.StudioSessionStore;
 import com.openwolf.iam.policystudio.lifecycle.BundleCanonicalizer;
+import com.openwolf.iam.policystudio.lifecycle.BundleContentReader;
 import com.openwolf.iam.policystudio.lifecycle.BundleFile;
 import com.openwolf.iam.policystudio.lifecycle.BundleTestMetadata;
 import com.openwolf.iam.policystudio.lifecycle.PolicyBundle;
+import com.openwolf.iam.policystudio.lifecycle.ResourcePolicyIdentity;
 import com.openwolf.iam.policystudio.lifecycle.SelfContainedBundleAssembler;
 import com.openwolf.iam.policystudio.lifecycle.StudioBaselineActivationService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * The single server-side path that turns an <em>authored candidate policy</em> (canonical YAML) into a
@@ -87,7 +91,7 @@ public class GroundedStudioReviewService {
         if (client != null) {
             review = diff.attachProse(review, client);
         }
-        store.putReview(tenant, author, review);
+        store.putReview(tenant, author, review, bundle);
         return review;
     }
 
@@ -120,12 +124,29 @@ public class GroundedStudioReviewService {
                 grounded.matrix().cells().size(),
                 "manifest-grounded-sampled-matrix",
                 "cerbos-0.53.0");
-        // S3 (Bug B): capture the WHOLE self-contained set — base ceiling + every scope-chain policy for
-        // the kind + imported derived-roles / variables — plus the authored tenant child, so the bundleId
-        // hashes a complete policy universe and the candidate compiles from its own captured contents
-        // (never the mutable external base dir). The manifest refs used for validation are captured too.
-        List<BundleFile> files = new ArrayList<>(assembler.captureScopeChain(parsed.resource()));
-        files.add(new BundleFile("policies/" + parsed.resource() + "@" + tenant + ".yaml", yaml));
+        // C5 has ONE activePolicyVersion per tenant. Capture every resource kind, then carry forward every
+        // tenant child from the current immutable bundle and replace only the child being edited. This makes
+        // the candidate a genuine tenant-wide snapshot: agent, relationship, domain, tools/meta-authz, etc.
+        // all resolve at the same bundle id, while a shared-base change naturally rebases the whole tenant.
+        Map<String, BundleFile> byPath = new LinkedHashMap<>();
+        for (BundleFile file : assembler.captureFullPolicySet()) {
+            byPath.put(file.path(), file);
+        }
+        for (Map.Entry<String, String> current :
+                BundleContentReader.filesFrom(grounded.current().canonicalContent()).entrySet()) {
+            ResourcePolicyIdentity.fromYaml(current.getValue())
+                    .filter(identity -> identity.belongsToTenant(tenant))
+                    .ifPresent(identity -> ResourcePolicyIdentity.putReplacing(
+                            byPath, new BundleFile(current.getKey(), current.getValue())));
+        }
+        String tenantMarker = "@" + tenant;
+        String authoredPath = "policies/" + parsed.resource() + tenantMarker + ".yaml";
+        BundleFile authored = new BundleFile(authoredPath, yaml);
+        ResourcePolicyIdentity.fromYaml(yaml).orElseThrow(
+                () -> new IllegalStateException("canonical authored resource policy has no semantic identity"));
+        ResourcePolicyIdentity.putReplacing(byPath, authored);
+        List<BundleFile> files = new ArrayList<>(byPath.values());
+        files.sort((a, b) -> a.path().compareTo(b.path()));
         return PolicyBundle.materialize(
                 tenant,
                 files,
@@ -133,4 +154,5 @@ public class GroundedStudioReviewService {
                 metadata,
                 canonicalizer);
     }
+
 }

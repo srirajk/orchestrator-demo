@@ -51,6 +51,7 @@ public class PromotedBundleLoader {
     private final String runtimePoliciesDir;
     private final long tierSettleMs;
     private final int emitPasses;
+    private final CerbosRuntimeActivationProbe activationProbe;
 
     /** Production blob backend — non-null iff a runtime bucket is configured; then it wins over the dir. */
     private final S3RuntimePolicySink s3Sink;
@@ -65,6 +66,7 @@ public class PromotedBundleLoader {
         this.runtimePoliciesDir = "";
         this.tierSettleMs = 0L;
         this.emitPasses = 1;
+        this.activationProbe = null;
         this.s3Sink = s3Sink;
     }
 
@@ -86,6 +88,7 @@ public class PromotedBundleLoader {
         this.runtimePoliciesDir = runtimePoliciesDir == null ? "" : runtimePoliciesDir.trim();
         this.tierSettleMs = Math.max(0L, tierSettleMs);
         this.emitPasses = Math.max(1, emitPasses);
+        this.activationProbe = null;
         this.s3Sink = null;
     }
 
@@ -99,6 +102,7 @@ public class PromotedBundleLoader {
             @Value("${iam.policy-studio.runtime-policies-dir:}") String runtimePoliciesDir,
             @Value("${iam.policy-studio.runtime-load-tier-settle-ms:3000}") long tierSettleMs,
             @Value("${iam.policy-studio.runtime-load-emit-passes:2}") int emitPasses,
+            CerbosRuntimeActivationProbe activationProbe,
             @Value("${iam.policy-studio.runtime.s3.bucket:}") String s3Bucket,
             @Value("${iam.policy-studio.runtime.s3.prefix:runtime}") String s3Prefix,
             @Value("${iam.policy-studio.runtime.s3.endpoint:}") String s3Endpoint,
@@ -109,6 +113,7 @@ public class PromotedBundleLoader {
         this.runtimePoliciesDir = runtimePoliciesDir == null ? "" : runtimePoliciesDir.trim();
         this.tierSettleMs = Math.max(0L, tierSettleMs);
         this.emitPasses = Math.max(1, emitPasses);
+        this.activationProbe = activationProbe;
         this.s3Sink = (s3Bucket == null || s3Bucket.isBlank())
                 ? null
                 : new S3RuntimePolicySink(s3Bucket, s3Prefix, s3Endpoint, s3Region, s3PathStyle,
@@ -121,6 +126,17 @@ public class PromotedBundleLoader {
      */
     public boolean isConfigured() {
         return s3Sink != null || !runtimePoliciesDir.isBlank();
+    }
+
+    /**
+     * Runtime publication barrier used before the tenant pointer is made visible. Blob-backed Cerbos polls
+     * its bucket, and disk-backed Cerbos reloads asynchronously; this configured settle interval must be
+     * longer than the serving PDP's poll/reload interval. Direct test constructors use zero delay.
+     */
+    public void awaitPublication(PolicyBundle bundle) {
+        if (activationProbe != null) {
+            activationProbe.awaitLoaded(bundle);
+        }
     }
 
     /**
@@ -138,35 +154,27 @@ public class PromotedBundleLoader {
             return List.of();
         }
 
-        // Select the version-stamped policies to write, then order them ANCESTOR-FIRST (by scope depth).
+        // Select the complete rendered snapshot, then publish modules first and resource policies ancestor-first.
         //
         // renderedFiles() stamps the concrete bundleId into the version position; the StagingCandidateProbe
         // already verified every version-keyed rendered file carries it and no sentinel survives, so what
         // lands in the store is exactly what cerbos compile validated.
         //
-        // A self-contained bundle also captures GLOBAL, name-keyed modules (derived-roles / variables) for
-        // its own compile identity. Those must NOT be written into the shared runtime store — the base set
-        // already serves them by name, and a second copy of the same module name would be a duplicate-identity
-        // load error that breaks the whole PDP. A version-keyed resource policy stamped version=<bundleId>
-        // coexists additively with the base version=default; a global module does not. Write ONLY the
-        // version-stamped policies (those whose rendered form carries the content-addressed id); imported
-        // global modules resolve from the base set unchanged.
-        List<BundleFile> writable = new ArrayList<>();
-        for (BundleFile file : bundle.renderedFiles()) {
-            if (file.yaml().contains(bundle.bundleId())) {
-                writable.add(file);
-            }
-        }
+        // Global modules are name-keyed rather than version-keyed. PolicyBundle.renderedFiles() therefore
+        // versions every captured derived-role/exported-variable module name AND all imports with the same
+        // content-addressed bundle id. Publish the complete rendered snapshot: old b_* policies keep importing
+        // their old immutable module identity, while this bundle's modules coexist without duplicate names.
+        List<BundleFile> writable = new ArrayList<>(bundle.renderedFiles());
 
         // ── Production: write to the blob bucket Cerbos polls. ──
         // A poll reads the WHOLE bucket snapshot and compiles it as one unit, so the per-file watch-event
-        // ordering the disk path had to defend against does not arise. We still emit ANCESTOR-FIRST (root
-        // scope before scoped children) so that if a poll ever catches a partially-written prefix, the
-        // ancestor is already present rather than a child dangling without its ceiling. No inter-tier settle
-        // and no re-emit passes are needed: an object PUT is atomic and the poll re-reads on the next tick.
+        // ordering the disk path had to defend against does not arise. We still emit dependency-first (modules,
+        // then root scope, then scoped children) so a poll that catches a partially-written prefix never sees
+        // a child ahead of its ceiling. No inter-tier settle and no re-emit passes are needed: an object PUT is
+        // atomic and the poll re-reads on the next tick.
         if (s3Sink != null) {
             List<BundleFile> ordered = new ArrayList<>(writable);
-            ordered.sort(java.util.Comparator.comparingInt(f -> scopeDepth(f.yaml())));
+            ordered.sort(java.util.Comparator.comparingInt(f -> publicationTier(f.yaml())));
             LinkedHashMap<String, String> objects = new LinkedHashMap<>();
             for (BundleFile file : ordered) {
                 objects.put(stagedFileName(bundle.bundleId(), file.path()), file.yaml());
@@ -191,15 +199,15 @@ public class PromotedBundleLoader {
             // is path-sorted, so "agent@acme.yaml" precedes "agent_resource.yaml" — child before ancestor,
             // exactly the losing order.
             //
-            // Fix: write ANCESTOR-FIRST, grouped into scope-depth TIERS (root scope "" = tier 0, "acme" =
-            // tier 1, …), and settle briefly between tiers. Ordering alone is not enough — a single rapid
+            // Fix: write DEPENDENCY-FIRST, grouped into tiers (global module = -1, root scope "" = 0,
+            // "acme" = 1, …), and settle briefly between tiers. Ordering alone is not enough — a single rapid
             // write burst coalesces into one watch batch the PDP may process child-first; the inter-tier
             // settle lets the watcher observe and index each ancestor tier before its children land, so no
             // scoped child is ever presented ahead of its same-version ancestor (verified against a live
             // pinned Cerbos with disk + watchForChanges, standalone and under full-suite load).
             java.util.SortedMap<Integer, List<BundleFile>> byDepth = new java.util.TreeMap<>();
             for (BundleFile file : writable) {
-                byDepth.computeIfAbsent(scopeDepth(file.yaml()), d -> new ArrayList<>()).add(file);
+                byDepth.computeIfAbsent(publicationTier(file.yaml()), d -> new ArrayList<>()).add(file);
             }
 
             // Repeat the ancestor-first tiered write `emitPasses` times. The first pass loads the bundle;
@@ -246,7 +254,8 @@ public class PromotedBundleLoader {
      * The scope depth of a rendered resource policy — {@code scope: ""} (root ceiling) = 0, {@code
      * scope: "acme"} = 1, {@code scope: "acme.eng"} = 2, … — used to order writes ancestor-first so a
      * scoped child is never indexed before its same-version ancestor during a watch reload. A file with no
-     * {@code scope:} line (not expected on the write path — globals are excluded above) sorts as root.
+     * {@code scope:} line sorts as root for this resource-only calculation; {@link #publicationTier} places
+     * global modules ahead of it.
      */
     static int scopeDepth(String yaml) {
         java.util.regex.Matcher m = SCOPE_LINE.matcher(yaml);
@@ -260,9 +269,20 @@ public class PromotedBundleLoader {
         return scope.isBlank() ? 0 : scope.split("\\.").length;
     }
 
+    /**
+     * A bundle-versioned global module must be visible before a root policy imports it. Modules therefore
+     * occupy tier -1, followed by root policies (0) and increasingly deep scoped children.
+     */
+    static int publicationTier(String yaml) {
+        return GLOBAL_MODULE.matcher(yaml).find() ? -1 : scopeDepth(yaml);
+    }
+
     /** Matches the resource-policy {@code scope:} line (quoted or bare), capturing the scope value. */
     private static final java.util.regex.Pattern SCOPE_LINE =
             java.util.regex.Pattern.compile("(?m)^\\s*scope:\\s*(\"[^\"]*\"|'[^']*'|\\S*)\\s*$");
+
+    private static final java.util.regex.Pattern GLOBAL_MODULE =
+            java.util.regex.Pattern.compile("(?m)^(?:derivedRoles|exportVariables):\\s*$");
 
     /** A filesystem-safe, bundle-namespaced file name so promoted versions coexist and re-promotion is idempotent. */
     private static String stagedFileName(String bundleId, String path) {

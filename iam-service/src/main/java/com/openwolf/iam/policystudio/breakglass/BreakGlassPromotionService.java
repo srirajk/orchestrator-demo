@@ -107,8 +107,9 @@ public class BreakGlassPromotionService {
 
         // 5. Build the immutable candidate bundle (same id the review was diffed for) and promote it.
         PolicyBundle candidate = reviews.assembleCandidateBundle(tenant, kind, mergedYaml, null);
-        String idempotencyKey = "break-glass:" + pending.grantId() + ":" + candidate.bundleId()
-                + ":" + (correlationId == null ? "" : correlationId);
+        // Stable across retries, including a crash after promotion but before the C6 issuance ledger is
+        // marked ACTIVATED. PolicyPromotionService replays this key without a second CAS.
+        String idempotencyKey = "break-glass:" + pending.grantId();
         PromotionReceipt receipt = promotion.promote(new PromotionRequest(
                 candidate, review, approval, idempotencyKey, PromotionRecord.Kind.PROMOTION));
 

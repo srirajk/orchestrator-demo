@@ -3,11 +3,13 @@ package com.openwolf.iam.policystudio.api;
 import com.openwolf.iam.policystudio.ConsequenceReview;
 import com.openwolf.iam.policystudio.ReviewAuthorRegistry;
 import com.openwolf.iam.policystudio.breakglass.BreakGlassArtifact;
+import com.openwolf.iam.policystudio.lifecycle.PolicyBundle;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -33,7 +35,8 @@ public class StudioSessionStore implements ReviewAuthorRegistry {
      * author≠approver against a trusted value rather than caller-supplied text.
      */
     public record StoredReview(String reviewId, String tenantId, String authorId,
-                               ConsequenceReview review, Instant storedAt) {}
+                               ConsequenceReview review, PolicyBundle candidate,
+                               boolean completed, Instant storedAt) {}
 
     /** A stored break-glass artifact awaiting two-person approval, tagged with tenant + requester. */
     public record PendingGrant(String grantId, String tenantId, String requestedBy,
@@ -44,17 +47,51 @@ public class StudioSessionStore implements ReviewAuthorRegistry {
 
     // ── Consequence reviews (C4) ──
 
-    public StoredReview putReview(String tenantId, String authorId, ConsequenceReview review) {
+    public StoredReview putReview(String tenantId, String authorId, ConsequenceReview review,
+                                  PolicyBundle candidate) {
+        Objects.requireNonNull(review, "review");
+        Objects.requireNonNull(candidate, "candidate");
+        if (!tenantId.equals(review.tenantId()) || !tenantId.equals(candidate.tenantId())
+                || !review.candidateBundleId().equals(candidate.bundleId())) {
+            throw new IllegalArgumentException("stored review, candidate and tenant must describe the same handoff");
+        }
         String id = review.consequenceReviewHash(); // already content-addressed over the truth fields
-        StoredReview stored = new StoredReview(id, tenantId, authorId, review, Instant.now());
-        reviews.put(id, stored);
-        return stored;
+        StoredReview stored = new StoredReview(id, tenantId, authorId, review, candidate, false, Instant.now());
+        StoredReview existing = reviews.putIfAbsent(id, stored);
+        if (existing == null) {
+            return stored;
+        }
+        if (existing.tenantId().equals(tenantId) && existing.authorId().equals(authorId)
+                && existing.review().equals(review) && existing.candidate().equals(candidate)
+                && !existing.completed()) {
+            return existing; // idempotent repeat by the same verified author
+        }
+        throw new IllegalStateException("consequence review '" + id
+                + "' is already owned by another author or completed handoff; refusing to replace it");
     }
 
     /** Fetch a review by id, but only if it belongs to the caller's tenant (else empty ⇒ 404). */
     public Optional<StoredReview> getReview(String tenantId, String reviewId) {
         return Optional.ofNullable(reviews.get(reviewId))
                 .filter(r -> r.tenantId().equals(tenantId));
+    }
+
+    /** Pending reviews visible to an approver in the same tenant, newest first. */
+    public List<StoredReview> pendingReviews(String tenantId) {
+        return reviews.values().stream()
+                .filter(r -> r.tenantId().equals(tenantId))
+                .filter(r -> !r.completed())
+                .sorted((a, b) -> b.storedAt().compareTo(a.storedAt()))
+                .toList();
+    }
+
+    /** Retire a review from the pending inbox after (and only after) promotion succeeds. */
+    public void markReviewCompleted(StoredReview review) {
+        reviews.computeIfPresent(review.reviewId(), (id, current) ->
+                current.equals(review)
+                        ? new StoredReview(current.reviewId(), current.tenantId(), current.authorId(),
+                                current.review(), current.candidate(), true, current.storedAt())
+                        : current);
     }
 
     /**
@@ -92,6 +129,16 @@ public class StudioSessionStore implements ReviewAuthorRegistry {
         return grants.values().stream()
                 .filter(g -> g.tenantId().equals(tenantId))
                 .filter(PendingGrant::issued)
+                .filter(g -> g.artifact().grant().expiresAt().isAfter(now))
+                .sorted((a, b) -> b.storedAt().compareTo(a.storedAt()))
+                .toList();
+    }
+
+    /** Pending requests plus active issued grants for the same tenant's two-person handoff surface. */
+    public List<PendingGrant> visibleGrants(String tenantId) {
+        Instant now = Instant.now();
+        return grants.values().stream()
+                .filter(g -> g.tenantId().equals(tenantId))
                 .filter(g -> g.artifact().grant().expiresAt().isAfter(now))
                 .sorted((a, b) -> b.storedAt().compareTo(a.storedAt()))
                 .toList();

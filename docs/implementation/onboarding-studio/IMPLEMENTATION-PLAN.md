@@ -6,6 +6,7 @@
 
 Also read the focused specifications before implementing their slices:
 
+- `UI-FIRST-ARTIFACT-BUILDOUT.md`
 - `SOLUTION-ARCHITECTURE.md`
 - `MODEL-RUNTIME.md`
 - `STUDIO-UX.md`
@@ -21,8 +22,9 @@ Also read the focused specifications before implementing their slices:
 
 1. Do not change request-path routing, authorization, synthesis or execution behavior unless a task
    explicitly requires a generic platform fix.
-2. Studio beans live only in the separate Studio service. Gateway onboarding bridge beans must be
-   absent outside the `registry` Spring profile.
+2. Studio beans live only in the separate Studio service. Ingestion beans and mutation endpoints
+   live only in the later external registry-ingestion component and are absent from the request-path
+   gateway.
 3. Do not write directly to the registry or vector index during draft, compile or certify flows.
 4. Do not let model output advance workflow state, approve facts, change thresholds or activate.
 5. Do not ask users to author JSON, YAML, regex or JMESPath.
@@ -40,12 +42,29 @@ Also read the focused specifications before implementing their slices:
 ## 2. Delivery strategy
 
 Build vertical slices. Each slice must be independently reviewable and leave the repository runnable.
-Do not begin with document ingestion, a broad autonomous agent or production activation.
+Do not begin with external ingestion, gateway changes, document ingestion, a broad autonomous agent
+or production activation.
 
 The first useful milestone is:
 
-> Given a structured confirmed dossier for an existing sub-domain, deterministically compile and
-> dry-run validate one single-step agent manifest without mutating the registry.
+> Import the real current catalog, let a user understand its Business Lines and agents, define one
+> Use Case through the UI, and deterministically generate a validated, content-addressed Conduit
+> Package into a visible folder without mutating the registry or changing the gateway.
+
+The four-milestone package under `delivery/` is authoritative for execution, child stories,
+parallelism and gates. `UI-FIRST-ARTIFACT-BUILDOUT.md` governs the flagship product sequence. The
+numbered slices below are legacy work-packet identifiers retained for detailed requirements; they
+are not permission to execute the registry slice early.
+
+| Order | Work packets | Demonstrable outcome |
+|---:|---|---|
+| 1 | Slice 0 + contract/inventory portion of Slice 1 | Revalidated 4/7/18/18 catalog snapshot and typed contracts |
+| 2 | UI shell and catalog portions of Slices 3–4 | Overview, Business Lines, Agent Network and catalog health |
+| 3 | Project portions of Slices 3–8 and 10 | Guided signals, consent, ownership, evidence and composition journey |
+| 4 | Compiler/artifact portions of Slices 1 and 11 | Real deterministic package folder and package explorer |
+| 5 | Slice 9 plus approval/audit UI | Snapshot proof, certification and durable governance |
+| 6 | Slice 2 | External ingestion dry-run using the already-proven package/SDK |
+| 7 | Slice 12 | External activation and read-only gateway integration |
 
 ---
 
@@ -113,17 +132,21 @@ work begins in Slice 2 for non-mutating live dry-run APIs.
 
 ---
 
-## 5. Slice 2 — Registry dry-run validation
+## 5. Slice 2 — External ingestion dry-run validation (late integration)
 
 ### Goal
 
 Validate and introspect a candidate without persistence or index mutation.
 
+Do not execute this slice until the UI, project workflow and deterministic artifact folder have
+proven the package contract. It is work packet 6 in the authoritative order above.
+
 ### Work
 
-- Add an `OnboardingRegistryDryRun` application service under registry profile.
+- Add an `OnboardingRegistryDryRun` application service to the external registry-ingestion profile.
 - Reuse `ManifestValidator`, `AgentIntrospector`, `SelectContractValidator` and catalog reads.
-- Add `POST /admin/registry/dry-run` with platform/domain-admin authorization.
+- Add `POST /admin/registry/dry-run` to external registry ingestion with platform/domain-admin
+  authorization; do not expose it from the request-path gateway.
 - Return typed gate results and derived schemas.
 - Prove no calls to `storeAndIndex`, Redis writes or vector-index writes.
 

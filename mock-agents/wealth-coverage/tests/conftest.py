@@ -45,7 +45,7 @@ def mint_token(tenant_id, sub="rm_jane", audience=None, issuer=TEST_ISSUER,
     claims = {
         "sub": sub,
         "iss": issuer,
-        "aud": TEST_AUDIENCE if audience is None else audience,
+        "aud": [TEST_AUDIENCE, f"{TEST_AUDIENCE}@{tenant_id}"] if audience is None else audience,
         "iat": now,
         "exp": now + expires_in,
         "tenant_id": tenant_id,

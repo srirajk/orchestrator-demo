@@ -1,0 +1,32 @@
+# Non-destructive z.ai override — apply with:
+#   docker compose -f docker-compose.yml -f docker-compose.zai.yml -p orchestrator-demo up -d gateway wealth-http servicing-mcp
+# Drop the extra -f to return to the OpenAI config in .env (which is left untouched).
+# Single-user only: z.ai GLM is fine for functional/multi-turn runs; use aimock for concurrency.
+services:
+  gateway:
+    environment:
+      CONDUIT_LLM_INTENT_CLASSIFIER_BASE_URL: https://api.z.ai/api/paas/v4
+      CONDUIT_LLM_INTENT_CLASSIFIER_API_KEY: ${ZAI_API_KEY}
+      CONDUIT_LLM_INTENT_CLASSIFIER_MODEL: glm-4.5-flash
+      CONDUIT_LLM_ENTITY_EXTRACTOR_BASE_URL: https://api.z.ai/api/paas/v4
+      CONDUIT_LLM_ENTITY_EXTRACTOR_API_KEY: ${ZAI_API_KEY}
+      CONDUIT_LLM_ENTITY_EXTRACTOR_MODEL: glm-4.5-flash
+      CONDUIT_LLM_SYNTHESIZER_BASE_URL: https://api.z.ai/api/paas/v4
+      CONDUIT_LLM_SYNTHESIZER_API_KEY: ${ZAI_API_KEY}
+      CONDUIT_LLM_SYNTHESIZER_MODEL: glm-4.6
+      CONDUIT_LLM_ROUTING_RERANKER_BASE_URL: https://api.z.ai/api/paas/v4
+      CONDUIT_LLM_ROUTING_RERANKER_API_KEY: ${ZAI_API_KEY}
+      CONDUIT_LLM_ROUTING_RERANKER_MODEL: glm-4.5-flash
+      CONDUIT_LLM_CLARIFICATION_COMPOSER_BASE_URL: https://api.z.ai/api/paas/v4
+      CONDUIT_LLM_CLARIFICATION_COMPOSER_API_KEY: ${ZAI_API_KEY}
+      CONDUIT_LLM_CLARIFICATION_COMPOSER_MODEL: glm-4.5-flash
+  wealth-http:
+    environment:
+      WEALTH_AGENT_LLM_BASE_URL: https://api.z.ai/api/paas/v4
+      WEALTH_AGENT_LLM_API_KEY: ${ZAI_API_KEY}
+      WEALTH_AGENT_LLM_MODEL: glm-4.5-flash
+  servicing-mcp:
+    environment:
+      SERVICING_AGENT_LLM_BASE_URL: https://api.z.ai/api/paas/v4
+      SERVICING_AGENT_LLM_API_KEY: ${ZAI_API_KEY}
+      SERVICING_AGENT_LLM_MODEL: glm-4.5-flash

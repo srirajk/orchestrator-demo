@@ -67,6 +67,9 @@ public class AuthController {
     @Value("${iam.oauth2.gateway.audience:conduit-gateway}")
     private String gatewayAudienceRaw;
 
+    @Value("${iam.oauth2.coverage.audience:conduit-coverage}")
+    private String coverageAudienceRaw;
+
     @Value("${iam.auth.token-ttl-seconds:3600}")
     private long tokenTtlSeconds;
 
@@ -296,7 +299,7 @@ public class AuthController {
                 .subject(principal.getId())
                 .issuedAt(now)
                 .expiresAt(expiry)
-                .audience(TenantClaims.gatewayAudiences(gatewayAudiences(), tenantId))
+                .audience(TenantClaims.gatewayAudiences(accessAudiences(), tenantId))
                 .claim("username", principal.getUsername())
                 .claim("email", principal.getEmail())
                 .claim("roles", roles)
@@ -319,6 +322,15 @@ public class AuthController {
                 .map(String::trim)
                 .filter(s -> !s.isBlank())
                 .toList();
+    }
+
+    private List<String> accessAudiences() {
+        List<String> all = new ArrayList<>(gatewayAudiences());
+        Arrays.stream(coverageAudienceRaw.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .forEach(all::add);
+        return List.copyOf(all);
     }
 
     private List<String> delegationAudiences() {

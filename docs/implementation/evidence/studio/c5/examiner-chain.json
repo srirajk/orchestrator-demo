@@ -1,6 +1,7 @@
 {
   "reconstructedWith" : "immutable records only; LLM subsystem disabled (no model client on the examiner)",
   "transactionId" : "txn-9001",
+  "tenantId" : "acme",
   "cerbosCallId" : "cerbos-call-7f3a",
   "activePolicyVersion" : "b_4bb6c0d46ba4101403fe81555104475ba54c06a6c80ba3548a5e05e497afa764",
   "decision" : "ALLOW",

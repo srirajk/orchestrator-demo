@@ -5,9 +5,12 @@ import com.openwolf.iam.policystudio.ConsequenceApprovalRecord;
 import com.openwolf.iam.policystudio.ConsequenceApprovalService;
 import com.openwolf.iam.policystudio.ConsequenceReview;
 import com.openwolf.iam.policystudio.lifecycle.PolicyPromotionService;
+import com.openwolf.iam.policystudio.lifecycle.PolicyBundle;
 import com.openwolf.iam.policystudio.lifecycle.PromotionReceipt;
 import com.openwolf.iam.policystudio.lifecycle.PromotionRecord;
+import com.openwolf.iam.policystudio.lifecycle.PromotionRequest;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -27,6 +30,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -62,11 +66,15 @@ class StudioPromotionControllerTest {
                 List.of(), false, 0, "cd", "crh-1", null, null, Instant.now(), null);
     }
 
+    private static PolicyBundle candidate() {
+        return new PolicyBundle("b1", "meridian", List.of(), List.of(), null, "content");
+    }
+
     /** A stored review computed (verified) by {@code author}, tenant meridian. */
     private void storedReviewBy(String author) {
         when(store.getReview(eq("meridian"), eq("rev-1")))
                 .thenReturn(Optional.of(new StudioSessionStore.StoredReview(
-                        "rev-1", "meridian", author, review(), Instant.now())));
+                        "rev-1", "meridian", author, review(), candidate(), false, Instant.now())));
     }
 
     private ConsequenceApprovalRecord signed() {
@@ -92,6 +100,7 @@ class StudioPromotionControllerTest {
                 .andExpect(jsonPath("$.directoryVersion").value(42))
                 .andExpect(jsonPath("$.kind").value("PROMOTION"))
                 .andExpect(jsonPath("$.idempotentReplay").value(false));
+        verify(store).markReviewCompleted(any());
     }
 
     @Test
@@ -130,15 +139,20 @@ class StudioPromotionControllerTest {
     }
 
     @Test
-    void candidateFromAnotherTenantIsRejected403() throws Exception {
+    void callerCandidateIsIgnoredAndExactStoredCandidateIsPromoted() throws Exception {
         storedReviewBy("alice");
+        when(approvals.approve(any(), anyString(), any(), eq(ApprovalDecision.APPROVE))).thenReturn(signed());
+        when(promotion.promote(any())).thenReturn(new PromotionReceipt(
+                "promo-1", "meridian", "b0", "b1", 42L, PromotionRecord.Kind.PROMOTION, false));
         mvc.perform(post("/admin/studio/promotions")
                         .with(StudioMvc.principal("approver-bob", "meridian", "policy_approver"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body("acme")))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error").value("tenant_scope_violation"));
-        verifyNoInteractions(approvals, promotion);
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<PromotionRequest> request = ArgumentCaptor.forClass(PromotionRequest.class);
+        verify(promotion).promote(request.capture());
+        assertThat(request.getValue().candidate()).isEqualTo(candidate());
     }
 
     @Test
@@ -155,5 +169,39 @@ class StudioPromotionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.kind").value("ROLLBACK"));
         verify(promotion, never()).promote(any());
+        verify(store).markReviewCompleted(any());
+    }
+
+    @Test
+    void failedPromotionLeavesReviewPending() throws Exception {
+        storedReviewBy("alice");
+        when(approvals.approve(any(), anyString(), any(), eq(ApprovalDecision.APPROVE))).thenReturn(signed());
+        when(promotion.promote(any())).thenThrow(new IllegalStateException("probe failed"));
+
+        mvc.perform(post("/admin/studio/promotions")
+                        .with(StudioMvc.principal("approver-bob", "meridian", "policy_approver"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body("meridian")))
+                .andExpect(status().isUnprocessableEntity());
+        verify(store, never()).markReviewCompleted(any());
+    }
+
+    @Test
+    void completedSameKeyReplaysBeforeStaleApprovalCheck() throws Exception {
+        storedReviewBy("alice");
+        when(promotion.replayCompleted("idem-1", "meridian", "b0", "b1", "crh-1",
+                "approver-bob", PromotionRecord.Kind.PROMOTION)).thenReturn(Optional.of(new PromotionReceipt(
+                "promo-1", "meridian", "b0", "b1", 42L, PromotionRecord.Kind.PROMOTION, true)));
+
+        mvc.perform(post("/admin/studio/promotions")
+                        .with(StudioMvc.principal("approver-bob", "meridian", "policy_approver"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body("acme")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.idempotentReplay").value(true));
+
+        verifyNoInteractions(approvals);
+        verify(promotion, never()).promote(any());
+        verify(store).markReviewCompleted(any());
     }
 }

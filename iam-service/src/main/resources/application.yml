@@ -79,6 +79,10 @@ iam:
     cerbos-version: ${CERBOS_VERSION:0.53.0}
     base-bundle-dir: ${IAM_POLICY_STUDIO_BASE_BUNDLE_DIR:infra/cerbos/policies}
     compile-timeout-seconds: ${IAM_POLICY_STUDIO_COMPILE_TIMEOUT_SECONDS:60}
+  break-glass:
+    # Exact server-owned tenant|resourceKind|action triples. Empty is intentionally fail-closed;
+    # callers can never submit or widen this emergency surface in the API request.
+    allowed-grants: ${IAM_BREAK_GLASS_ALLOWED_GRANTS:}
   oauth2:
     authorization-store:
       redis:
@@ -101,6 +105,8 @@ iam:
       client-id: ${IAM_GATEWAY_CLIENT_ID:gateway-client}
       client-secret: ${IAM_GATEWAY_CLIENT_SECRET}
       audience: ${IAM_GATEWAY_AUDIENCE:conduit-gateway}
+    coverage:
+      audience: ${IAM_COVERAGE_AUDIENCE:conduit-coverage}
 
 management:
   endpoints:

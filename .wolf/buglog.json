@@ -5142,5 +5142,27 @@
     "related_bugs": [],
     "occurrences": 2,
     "last_seen": "2026-07-17T18:29:35.930374"
+  },
+  {
+    "id": "bug-296",
+    "timestamp": "2026-07-18",
+    "error_message": "Live SERVED chat returns 'I can't reach a service authorized'; Cerbos 400: principal/resource policy_version does not match regex ^[\\w]*$",
+    "file": "gateway/src/main/java/ai/conduit/gateway/infrastructure/tenancy/ConfigBackedTenantSnapshotSource.java:33; gateway/src/main/resources/application.yml:84",
+    "root_cause": "S1b/S1c integration stamps policyVersion=activePolicyVersion() on Cerbos CheckResources; default tenant's activePolicyVersion is 'config-v1' which (1) fails Cerbos ^[\\w]*$ (hyphen) -> HTTP 400, and (2) matches no policy (all base policies version:'default'). Unit tests assert value threads as 'config-v1' but never send it to real Cerbos, so 513/156 stay green while live 400s.",
+    "fix": "config-v1 -> default in ConfigBackedTenantSnapshotSource.DEFAULT_POLICY_VERSION, application.yml:84 default, and the 4 config-v1 test assertions; add gap IT sending default tenant activePolicyVersion to real Cerbos asserting SERVED. Rebuild+recreate gateway, re-verify live chat.",
+    "tags": [
+      "cerbos",
+      "policy-version",
+      "entitlement",
+      "tenancy",
+      "live-regression",
+      "test-gap",
+      "integration",
+      "codex",
+      "axiom"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-07-18"
   }
 ]

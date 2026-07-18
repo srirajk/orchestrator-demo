@@ -39,16 +39,19 @@ public class JwtClaimsCustomizer {
     private final OidcClaimEnricher enricher;
     private final AuditService auditService;
     private final String gatewayAudienceRaw;
+    private final String coverageAudienceRaw;
     private final String chatClientId;
 
     public JwtClaimsCustomizer(
             OidcClaimEnricher enricher,
             AuditService auditService,
             @Value("${iam.oauth2.gateway.audience:conduit-gateway}") String gatewayAudienceRaw,
+            @Value("${iam.oauth2.coverage.audience:conduit-coverage}") String coverageAudienceRaw,
             @Value("${iam.oauth2.conduit-chat.client-id:conduit-chat}") String chatClientId) {
         this.enricher = enricher;
         this.auditService = auditService;
         this.gatewayAudienceRaw = gatewayAudienceRaw;
+        this.coverageAudienceRaw = coverageAudienceRaw;
         this.chatClientId = chatClientId;
     }
 
@@ -73,7 +76,7 @@ public class JwtClaimsCustomizer {
                 // token whose @<suffix> disagrees with its tenant_id claim.
                 Object rawTenant = enriched.get("tenant_id");
                 String tenantId = TenantClaims.requireTenant(rawTenant == null ? null : rawTenant.toString());
-                List<String> audiences = TenantClaims.gatewayAudiences(gatewayAudiences(), tenantId);
+                List<String> audiences = TenantClaims.gatewayAudiences(accessAudiences(), tenantId);
                 if (!audiences.isEmpty()) {
                     context.getClaims().audience(audiences);
                 }
@@ -98,6 +101,15 @@ public class JwtClaimsCustomizer {
                 .map(String::trim)
                 .filter(s -> !s.isBlank())
                 .toList();
+    }
+
+    private List<String> accessAudiences() {
+        List<String> all = new java.util.ArrayList<>(gatewayAudiences());
+        Arrays.stream(coverageAudienceRaw.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .forEach(all::add);
+        return List.copyOf(all);
     }
 
     /**

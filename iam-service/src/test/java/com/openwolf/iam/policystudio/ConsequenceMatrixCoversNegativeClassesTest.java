@@ -6,20 +6,20 @@ import com.openwolf.iam.policystudio.lifecycle.PolicyBundleRepository;
 import com.openwolf.iam.policystudio.lifecycle.SelfContainedBundleAssembler;
 import com.openwolf.iam.policystudio.lifecycle.StudioBaselineActivationService;
 import com.openwolf.iam.tenancy.ActiveTenantDirectory;
-import com.openwolf.iam.tenancy.ActiveTenantRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.ObjectProvider;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
 
 /**
  * S5 — the consequence fixture matrix is no longer only same-tenant positives with empty attributes. For the
@@ -55,18 +55,20 @@ class ConsequenceMatrixCoversNegativeClassesTest {
                   roles: ["chat_user", "relationship_manager"]
             """;
 
-    private ManifestBackedStudioGroundingProvider provider(ActiveTenantDirectory directory, String baseDir) {
+    private ManifestBackedStudioGroundingProvider provider(
+            ActiveTenantDirectory directory, String baseDir, Path tenantDeploymentRoot) {
         return new ManifestBackedStudioGroundingProvider(
                 new ObjectMapper(), new CanonicalPolicyWriter(), new PolicyYamlParser(),
-                directory, mock(PolicyBundleRepository.class),
-                "registry", baseDir, "infra/cerbos/tenants", "default");
+                directory, StudioGroundingTestFixtures.emptyBundleRepository(),
+                "registry", baseDir, tenantDeploymentRoot.toString());
     }
 
     @Test
-    void matrixCarriesTheFourNegativeClassesAndRealPdpEvaluatesThem() {
+    void matrixCarriesTheFourNegativeClassesAndRealPdpEvaluatesThem(@TempDir Path tenantRoot) throws IOException {
+        StudioGroundingTestFixtures.writeTenantDeployment(tenantRoot, TENANT);
         String baseDir = infraBaseDir();
-        ActiveTenantDirectory directory = new ActiveTenantDirectory(mock(ActiveTenantRepository.class));
-        ManifestBackedStudioGroundingProvider grounding = provider(directory, baseDir);
+        ActiveTenantDirectory directory = StudioGroundingTestFixtures.emptyTenantDirectory();
+        ManifestBackedStudioGroundingProvider grounding = provider(directory, baseDir, tenantRoot);
 
         // ── the matrix contains all four negative classes (+ the attributed positive), by label ──
         StudioGroundingSnapshot snapshot = grounding.snapshot(TENANT, "agent");
@@ -78,6 +80,9 @@ class ConsequenceMatrixCoversNegativeClassesTest {
         assertThat(labels).anyMatch(l -> l.endsWith("::missing_attribute"));
         assertThat(labels).anyMatch(l -> l.endsWith("::wrong_segment"));
         assertThat(labels).anyMatch(l -> l.endsWith("::segment_positive"));
+        assertThat(labels.stream().filter(l -> l.endsWith("::segment_positive")))
+                .as("every front-door role/action tuple receives attributed positive and negative coverage")
+                .hasSize(4);
         // a genuine cross-tenant cell (principal tenant ≠ resource tenant) exists — not just same-tenant.
         assertThat(cells).anyMatch(FixtureCell::isCrossTenant);
         // the matrix is strictly richer than the same-tenant positives alone.
@@ -121,6 +126,37 @@ class ConsequenceMatrixCoversNegativeClassesTest {
         assertThat(currentByCell.get(attributeRemoved)).isEqualTo(Effect.DENY);
         assertThat(currentByCell.get(missingAttribute)).isEqualTo(Effect.DENY);
         assertThat(currentByCell.get(wrongSegment)).isEqualTo(Effect.DENY);
+    }
+
+    @Test
+    void missingExactTenantDeploymentFailsClosed(@TempDir Path tenantRoot) {
+        String baseDir = infraBaseDir();
+        ActiveTenantDirectory directory = StudioGroundingTestFixtures.emptyTenantDirectory();
+        ManifestBackedStudioGroundingProvider grounding = provider(directory, baseDir, tenantRoot);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> grounding.snapshot(TENANT, "agent"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("mandatory negative consequence fixtures")
+                .hasMessageContaining(TENANT)
+                .hasMessageContaining("domain-segment map is missing");
+    }
+
+    @Test
+    void exactTenantDeploymentCoversEveryFrontDoorRoleAction(@TempDir Path tenantRoot) throws IOException {
+        StudioGroundingTestFixtures.writeTenantDeployment(tenantRoot, TENANT);
+        ManifestBackedStudioGroundingProvider grounding = provider(
+                StudioGroundingTestFixtures.emptyTenantDirectory(), infraBaseDir(), tenantRoot);
+
+        List<String> labels = grounding.snapshot(TENANT, "agent").matrix().cells().stream()
+                .map(FixtureCell::label)
+                .filter(label -> label.contains("::"))
+                .toList();
+
+        assertThat(labels.stream().filter(l -> l.endsWith("::segment_positive"))).hasSize(4);
+        assertThat(labels.stream().filter(l -> l.endsWith("::attribute_removed"))).hasSize(4);
+        assertThat(labels.stream().filter(l -> l.endsWith("::cross_tenant"))).hasSize(4);
+        assertThat(labels.stream().filter(l -> l.endsWith("::missing_attribute"))).hasSize(4);
+        assertThat(labels.stream().filter(l -> l.endsWith("::wrong_segment"))).hasSize(4);
     }
 
     private static String labelEndingWith(List<String> labels, String suffix) {

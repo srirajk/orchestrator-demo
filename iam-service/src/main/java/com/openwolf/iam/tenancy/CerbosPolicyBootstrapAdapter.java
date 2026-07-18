@@ -2,7 +2,14 @@ package com.openwolf.iam.tenancy;
 
 import com.openwolf.iam.policystudio.CanonicalPolicyWriter;
 import com.openwolf.iam.policystudio.CerbosCompileGate;
+import com.openwolf.iam.policystudio.BaseBundleGrounding;
 import com.openwolf.iam.policystudio.PolicyIR;
+import com.openwolf.iam.policystudio.lifecycle.BundleCanonicalizer;
+import com.openwolf.iam.policystudio.lifecycle.BundleFile;
+import com.openwolf.iam.policystudio.lifecycle.BundleTestMetadata;
+import com.openwolf.iam.policystudio.lifecycle.PolicyBundle;
+import com.openwolf.iam.policystudio.lifecycle.ResourcePolicyIdentity;
+import com.openwolf.iam.policystudio.lifecycle.SelfContainedBundleAssembler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,7 +22,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
@@ -30,16 +36,17 @@ import java.util.stream.Stream;
  * bundle:
  *
  * <ol>
- *   <li>Read every {@code tenant_default_*.yaml} in the base bundle — these enumerate every
- *       base-ceiling {@code (action, role)} tuple per resource kind (their totality is CI-enforced).
+ *   <li>Read every root resource policy and derive every base-ceiling {@code (action, role)} tuple,
+ *       including roles expanded from imported derived-role modules.
  *   <li>For each, emit a {@code tenant_&lt;id&gt;_&lt;resource&gt;.yaml} that {@code EFFECT_DENY}s the exact
  *       same tuple set under {@code scope: &lt;tenantId&gt;} and
  *       {@code SCOPE_PERMISSIONS_REQUIRE_PARENTAL_CONSENT_FOR_ALLOWS} — so nothing falls through and
  *       the fresh tenant denies EVERYTHING until a reviewed total restriction policy is promoted.
- *   <li>Content-address the bundle (sha-256 over the canonical children) → a stable policy version.
- *   <li>Stage the children under {@code &lt;stagingRoot&gt;/&lt;tenant&gt;/&lt;version&gt;/}, alongside existing
- *       versions; the live bundle is never touched, no empty scope policy is ever written.
- *   <li>Probe: compile each staged child + the immutable base bundle with the pinned Cerbos in an
+ *   <li>Materialize the normal C5 full bundle (all roots/scopes/modules, every exact tenant deny child,
+ *       and manifest refs) so its stable identity is a concrete {@code b_*} version.
+ *   <li>Stage the complete rendered bundle under {@code &lt;stagingRoot&gt;/&lt;tenant&gt;/&lt;b_*&gt;/}, alongside
+ *       existing versions; the live bundle is never touched, no empty scope policy is ever written.
+ *   <li>Probe the self-contained full bundle with the pinned Cerbos in an
  *       ephemeral {@code docker run --rm} (reusing {@link CerbosCompileGate}) — never the running PDP.
  * </ol>
  *
@@ -51,10 +58,10 @@ public class CerbosPolicyBootstrapAdapter implements PolicyBootstrapAdapter {
     private static final Logger log = LoggerFactory.getLogger(CerbosPolicyBootstrapAdapter.class);
 
     private static final String API_VERSION = "api.cerbos.dev/v1";
-    private static final String POLICY_VERSION_FIELD = "default";
+    private static final String POLICY_VERSION_FIELD = BundleCanonicalizer.BUNDLE_VERSION_SENTINEL;
     private static final String PARENTAL_CONSENT = "SCOPE_PERMISSIONS_REQUIRE_PARENTAL_CONSENT_FOR_ALLOWS";
     private static final String DENY = "EFFECT_DENY";
-    private static final Pattern CEILING_FILE = Pattern.compile("tenant_default_.*\\.ya?ml");
+    private static final Pattern RESOURCE_FILE = Pattern.compile(".*_resource\\.ya?ml");
     // Same canonical tenant grammar as TenantClaims/TenantKeyspace — fail closed on anything else.
     private static final Pattern CANONICAL_TENANT_ID = Pattern.compile("[a-z0-9][a-z0-9-]{0,62}");
 
@@ -62,16 +69,36 @@ public class CerbosPolicyBootstrapAdapter implements PolicyBootstrapAdapter {
     private final CerbosCompileGate compileGate;
     private final String baseBundleDir;
     private final String stagingRootDir;
+    private final String registryRootDir;
+    private final SelfContainedBundleAssembler assembler;
+    private final BundleCanonicalizer canonicalizer;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public CerbosPolicyBootstrapAdapter(
             CanonicalPolicyWriter writer,
             CerbosCompileGate compileGate,
+            SelfContainedBundleAssembler assembler,
+            BundleCanonicalizer canonicalizer,
             @Value("${iam.policy-studio.base-bundle-dir:infra/cerbos/policies}") String baseBundleDir,
-            @Value("${iam.tenancy.policy-staging-dir:build/tenant-policy-staging}") String stagingRootDir) {
+            @Value("${iam.tenancy.policy-staging-dir:build/tenant-policy-staging}") String stagingRootDir,
+            @Value("${iam.policy-studio.registry-root:registry}") String registryRootDir) {
         this.writer = writer;
         this.compileGate = compileGate;
+        this.assembler = assembler;
+        this.canonicalizer = canonicalizer;
         this.baseBundleDir = baseBundleDir;
         this.stagingRootDir = stagingRootDir;
+        this.registryRootDir = registryRootDir;
+    }
+
+    /** Convenience constructor for focused tests; still builds the same normal full C5 bundle. */
+    public CerbosPolicyBootstrapAdapter(
+            CanonicalPolicyWriter writer,
+            CerbosCompileGate compileGate,
+            String baseBundleDir,
+            String stagingRootDir) {
+        this(writer, compileGate, new SelfContainedBundleAssembler(baseBundleDir), new BundleCanonicalizer(),
+                baseBundleDir, stagingRootDir, "registry");
     }
 
     @Override
@@ -82,7 +109,7 @@ public class CerbosPolicyBootstrapAdapter implements PolicyBootstrapAdapter {
         Path base = resolveBaseBundleDir();
         List<Ceiling> ceilings = readCeilings(base);
         if (ceilings.isEmpty()) {
-            throw new ProvisioningException("no base-ceiling tenant_default_*.yaml found under " + base);
+            throw new ProvisioningException("no root base-ceiling resource policies found under " + base);
         }
 
         // Deterministic order (by resource) so the content hash is stable across runs.
@@ -90,21 +117,47 @@ public class CerbosPolicyBootstrapAdapter implements PolicyBootstrapAdapter {
         for (Ceiling ceiling : ceilings) {
             childByResource.put(ceiling.resource(), writer.write(denyAll(tenantId, ceiling)));
         }
-        String policyVersion = contentAddress(childByResource);
+        Map<String, BundleFile> byPath = new TreeMap<>();
+        for (BundleFile file : assembler.captureFullPolicySet()) {
+            byPath.put(file.path(), file);
+        }
+        for (Map.Entry<String, String> child : childByResource.entrySet()) {
+            BundleFile tenantChild = new BundleFile(
+                    "policies/" + child.getKey() + "@" + tenantId + ".yaml", child.getValue());
+            ResourcePolicyIdentity.putReplacing(byPath, tenantChild);
+        }
+        List<BundleFile> files = new ArrayList<>(byPath.values());
+        files.sort(java.util.Comparator.comparing(BundleFile::path));
+        String fixtureHash = contentHash(childByResource);
+        int tupleCount = ceilings.stream().mapToInt(c -> c.rules().stream()
+                .mapToInt(r -> r.actions().size() * r.roles().size()).sum()).sum();
+        PolicyBundle policyBundle = PolicyBundle.materialize(
+                tenantId,
+                files,
+                readManifestRefs(),
+                new BundleTestMetadata(fixtureHash, tupleCount,
+                        "b1-exact-deny-all-bootstrap", "deterministic-totality+cerbos-compile"),
+                canonicalizer);
+        String policyVersion = policyBundle.bundleId();
+
+        Map<String, String> renderedChildren = new TreeMap<>();
+        childByResource.forEach((resource, yaml) ->
+                renderedChildren.put(resource, yaml.replace(POLICY_VERSION_FIELD, policyVersion)));
 
         Path stagingDir = resolveStagingRoot().resolve(tenantId).resolve(policyVersion);
         try {
             Files.createDirectories(stagingDir);
-            for (Ceiling ceiling : ceilings) {
-                Path file = stagingDir.resolve("tenant_" + tenantId + "_" + ceiling.resource() + ".yaml");
-                Files.writeString(file, childByResource.get(ceiling.resource()), StandardCharsets.UTF_8);
+            for (BundleFile file : policyBundle.renderedFiles()) {
+                Path staged = stagingDir.resolve(Path.of(file.path()).getFileName().toString());
+                Files.writeString(staged, file.yaml(), StandardCharsets.UTF_8);
             }
         } catch (IOException e) {
             throw new ProvisioningException("could not stage bootstrap bundle for '" + tenantId + "'", e);
         }
         log.info("Staged deny-all bootstrap for tenant '{}' — version {} ({} resource children) at {}",
                 tenantId, policyVersion, childByResource.size(), stagingDir);
-        return new TenantBootstrapBundle(tenantId, policyVersion, stagingDir, childByResource);
+        return new TenantBootstrapBundle(
+                tenantId, policyVersion, stagingDir, renderedChildren, policyBundle);
     }
 
     @Override
@@ -115,14 +168,10 @@ public class CerbosPolicyBootstrapAdapter implements PolicyBootstrapAdapter {
                     bundle.policyVersion(), bundle.tenantId());
             return;
         }
-        Path base = resolveBaseBundleDir();
-        for (Map.Entry<String, String> child : bundle.childByResource().entrySet()) {
-            String candidateFile = "generated_" + child.getKey() + "_" + bundle.tenantId() + ".yaml";
-            CerbosCompileGate.CompileOutcome outcome = compileGate.compile(child.getValue(), base, candidateFile);
-            if (!outcome.success()) {
-                throw new ProvisioningException("cerbos probe rejected bootstrap child '" + child.getKey()
-                        + "' for tenant '" + bundle.tenantId() + "':\n" + outcome.output());
-            }
+        CerbosCompileGate.CompileOutcome outcome = compileGate.compile(bundle.policyBundle().renderedFiles());
+        if (!outcome.success()) {
+            throw new ProvisioningException("cerbos probe rejected full bootstrap bundle for tenant '"
+                    + bundle.tenantId() + "':\n" + outcome.output());
         }
         log.info("Cerbos-probed bootstrap bundle {} for tenant '{}' ({} children compile clean)",
                 bundle.policyVersion(), bundle.tenantId(), bundle.childByResource().size());
@@ -196,12 +245,12 @@ public class CerbosPolicyBootstrapAdapter implements PolicyBootstrapAdapter {
     private List<Ceiling> readCeilings(Path base) {
         List<Ceiling> ceilings = new ArrayList<>();
         try (Stream<Path> files = Files.list(base)) {
-            List<Path> ceilingFiles = files
-                    .filter(p -> CEILING_FILE.matcher(p.getFileName().toString()).matches())
+            List<Path> rootFiles = files
+                    .filter(p -> RESOURCE_FILE.matcher(p.getFileName().toString()).matches())
                     .sorted()
                     .toList();
             Yaml yaml = new Yaml();
-            for (Path p : ceilingFiles) {
+            for (Path p : rootFiles) {
                 Map<String, Object> doc;
                 try {
                     doc = yaml.load(Files.readString(p, StandardCharsets.UTF_8));
@@ -211,19 +260,17 @@ public class CerbosPolicyBootstrapAdapter implements PolicyBootstrapAdapter {
                 Map<String, Object> rp = (Map<String, Object>) doc.get("resourcePolicy");
                 if (rp == null) continue;
                 String resource = String.valueOf(rp.get("resource"));
-                List<Map<String, Object>> ruleMaps = (List<Map<String, Object>>) rp.get("rules");
-                List<Ceiling.RuleTuple> rules = new ArrayList<>();
-                if (ruleMaps != null) {
-                    for (Map<String, Object> rm : ruleMaps) {
-                        List<String> actions = asStrings(rm.get("actions"));
-                        List<String> roles = asStrings(rm.get("roles"));
-                        if (actions.isEmpty() || roles.isEmpty()) continue;
-                        rules.add(new Ceiling.RuleTuple(actions, roles));
-                    }
+                BaseBundleGrounding.Facts grounded = BaseBundleGrounding.read(base, resource);
+                List<Ceiling.RuleTuple> rules = grounded.ceiling().tuples().stream()
+                        .sorted((a, b) -> (a.action() + "@" + a.role())
+                                .compareTo(b.action() + "@" + b.role()))
+                        .map(t -> new Ceiling.RuleTuple(List.of(t.action()), List.of(t.role())))
+                        .toList();
+                if (rules.isEmpty()) {
+                    throw new ProvisioningException("root policy for resource '" + resource
+                            + "' has no ALLOW ceiling tuples; cannot construct an exact total deny child");
                 }
-                if (!rules.isEmpty()) {
-                    ceilings.add(new Ceiling(resource, rules));
-                }
+                ceilings.add(new Ceiling(resource, rules));
             }
         } catch (IOException e) {
             throw new ProvisioningException("could not read base ceiling from " + base, e);
@@ -231,14 +278,7 @@ public class CerbosPolicyBootstrapAdapter implements PolicyBootstrapAdapter {
         return ceilings;
     }
 
-    private static List<String> asStrings(Object o) {
-        if (!(o instanceof List<?> list)) return List.of();
-        List<String> out = new ArrayList<>();
-        for (Object x : list) out.add(String.valueOf(x));
-        return out;
-    }
-
-    private String contentAddress(Map<String, String> childByResource) {
+    private String contentHash(Map<String, String> childByResource) {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
             // TreeMap iteration is sorted → stable input regardless of insertion order.
@@ -248,9 +288,42 @@ public class CerbosPolicyBootstrapAdapter implements PolicyBootstrapAdapter {
                 md.update(e.getValue().getBytes(StandardCharsets.UTF_8));
                 md.update((byte) 0);
             }
-            String hex = HexFormat.of().formatHex(md.digest());
-            return "pv_" + hex.substring(0, 12);
-        } catch (NoSuchAlgorithmException e) {
+            return HexFormat.of().formatHex(md.digest());
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 unavailable", e);
+        }
+    }
+
+    /** Content refs for the same registry manifests Studio uses as trusted grounding. */
+    private List<String> readManifestRefs() {
+        Path root = resolveExisting(registryRootDir,
+                () -> new ProvisioningException("registry root not found: " + registryRootDir));
+        List<String> refs = new ArrayList<>();
+        for (String subtree : List.of("domains", "manifests")) {
+            Path dir = root.resolve(subtree);
+            if (!Files.isDirectory(dir)) {
+                throw new ProvisioningException("registry manifest directory not found: " + dir);
+            }
+            try (Stream<Path> files = Files.walk(dir)) {
+                for (Path file : files.filter(Files::isRegularFile)
+                        .filter(p -> p.toString().endsWith(".json")).sorted().toList()) {
+                    String relative = root.relativize(file).toString().replace('\\', '/');
+                    refs.add(relative + "#" + sha256(Files.readAllBytes(file)).substring(0, 16));
+                }
+            } catch (IOException e) {
+                throw new ProvisioningException("could not read registry manifests under " + dir, e);
+            }
+        }
+        if (refs.isEmpty()) {
+            throw new ProvisioningException("no grounding manifests found under " + root);
+        }
+        return List.copyOf(refs);
+    }
+
+    private static String sha256(byte[] bytes) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+        } catch (java.security.NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 unavailable", e);
         }
     }

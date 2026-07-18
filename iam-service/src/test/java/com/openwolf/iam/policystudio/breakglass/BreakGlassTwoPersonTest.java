@@ -25,8 +25,7 @@ class BreakGlassTwoPersonTest {
 
     private BreakGlassApprovalService approvals() {
         return new BreakGlassApprovalService(
-                new PersistentBreakGlassAuditPartition(BreakGlassFixtures.auditRepo()),
-                "studio_policy_approver");
+                new PersistentBreakGlassAuditPartition(BreakGlassFixtures.auditRepo()));
     }
 
     private BreakGlassArtifact admissibleArtifact(String requestedBy) {
@@ -43,7 +42,7 @@ class BreakGlassTwoPersonTest {
         BreakGlassArtifact art = admissibleArtifact("alice");
         // author "alice" cannot also be the approver — SoD is keyed on the verified author identity.
         assertThatThrownBy(() -> approvals().approveAndIssue(
-                art, "alice", "alice", Set.of("studio_policy_approver"), "corr-1"))
+                art, "alice", "alice", Set.of("policy_approver"), "corr-1"))
                 .isInstanceOf(BreakGlassSodException.class)
                 .hasMessageContaining("author≠approver");
     }
@@ -63,9 +62,9 @@ class BreakGlassTwoPersonTest {
         BreakGlassArtifact art = admissibleArtifact("alice");
         PersistentBreakGlassAuditPartition partition =
                 new PersistentBreakGlassAuditPartition(BreakGlassFixtures.auditRepo());
-        BreakGlassApprovalService svc = new BreakGlassApprovalService(partition, "studio_policy_approver");
+        BreakGlassApprovalService svc = new BreakGlassApprovalService(partition);
 
-        svc.approveAndIssue(art, "alice", "carol", Set.of("studio_policy_approver"), "corr-3");
+        svc.approveAndIssue(art, "alice", "carol", Set.of("policy_approver"), "corr-3");
 
         // Issuance landed in the tenant partition (fully audited — see BreakGlassAuditedTest).
         assertThat(partition.partition("acme")).hasSize(1);
@@ -81,7 +80,7 @@ class BreakGlassTwoPersonTest {
                 BreakGlassFixtures.request("acme"));
         assertThat(crossTenant.admissible()).isFalse();
         assertThatThrownBy(() -> approvals().approveAndIssue(
-                crossTenant, "alice", "carol", Set.of("studio_policy_approver"), "corr-4"))
+                crossTenant, "alice", "carol", Set.of("policy_approver"), "corr-4"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("inadmissible");
     }

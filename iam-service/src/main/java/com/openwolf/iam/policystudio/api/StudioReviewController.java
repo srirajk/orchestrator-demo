@@ -2,6 +2,7 @@ package com.openwolf.iam.policystudio.api;
 
 import com.openwolf.iam.policystudio.ConsequenceReview;
 import com.openwolf.iam.policystudio.GroundedStudioReviewService;
+import com.openwolf.iam.policystudio.lifecycle.PolicyBundle;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -11,6 +12,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.time.Instant;
+import java.util.List;
 
 /**
  * The C4 consequence-diff surface — the adoption unlock: a non-engineer approves business
@@ -46,8 +50,18 @@ public class StudioReviewController {
      */
     public record ReviewPayload(String resourceKind, String canonicalYaml) {}
 
+    /** Server-recorded handoff: the exact reviewed candidate, never reconstructed by the approver. */
+    public record ReviewHandoff(String reviewId, String authorId, ConsequenceReview review,
+                                PolicyBundle candidate, Instant storedAt) {
+        static ReviewHandoff from(StudioSessionStore.StoredReview stored) {
+            return new ReviewHandoff(stored.reviewId(), stored.authorId(), stored.review(),
+                    stored.candidate(), stored.storedAt());
+        }
+    }
+
     /** {@code POST /admin/studio/reviews} — compute the consequence review from real PDP decisions. */
     @PostMapping("/reviews")
+    @PreAuthorize("hasRole('policy_author')")
     public ResponseEntity<ConsequenceReview> compute(@RequestBody ReviewPayload payload, Authentication auth) {
         if (payload == null || payload.canonicalYaml() == null || payload.canonicalYaml().isBlank()) {
             throw new IllegalArgumentException("canonicalYaml is required");
@@ -56,6 +70,14 @@ public class StudioReviewController {
         String tenant = StudioPrincipal.tenant(auth);
         ConsequenceReview review = reviews.assembleAndReview(tenant, author, payload.resourceKind(), payload.canonicalYaml());
         return ResponseEntity.ok(review);
+    }
+
+    /** {@code GET /admin/studio/reviews/pending} — same-tenant approver handoff inbox. */
+    @GetMapping("/reviews/pending")
+    @PreAuthorize("hasAnyRole('policy_approver','platform_admin')")
+    public ResponseEntity<List<ReviewHandoff>> pending(Authentication auth) {
+        String tenant = StudioPrincipal.tenant(auth);
+        return ResponseEntity.ok(store.pendingReviews(tenant).stream().map(ReviewHandoff::from).toList());
     }
 
     /** {@code GET /admin/studio/reviews/{id}} — re-fetch a cached review (404 if absent / another tenant's). */

@@ -34,6 +34,17 @@ class TenantTokenMintTest {
         assertThat(audiences).doesNotContain("conduit-gateway@tenant-b");
     }
 
+    @Test
+    void accessTokenCarriesTenantQualifiedGatewayAndCoverageAudiences() {
+        List<String> audiences = TenantClaims.gatewayAudiences(
+                List.of("conduit-gateway", "conduit-coverage"), "tenant-a");
+
+        assertThat(audiences).containsExactly(
+                "conduit-gateway", "conduit-gateway@tenant-a",
+                "conduit-coverage", "conduit-coverage@tenant-a");
+        assertThat(audiences).noneMatch(audience -> audience.endsWith("@tenant-b"));
+    }
+
     /**
      * A1.2 — tenant_id is mandatory and has no default. A null/blank home tenant makes the
      * principal un-mintable (the mint throws) rather than silently minting a {@code default} token.

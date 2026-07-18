@@ -82,15 +82,44 @@ class StudioLifecycleControllerTest {
 
     @Test
     void examinerReturnsReconstructedChain() throws Exception {
-        ExaminerChain chain = new ExaminerChain("txn-1", "call-1", "b_9", "EFFECT_ALLOW", "kind", "read",
+        ExaminerChain chain = new ExaminerChain("txn-1", "meridian", "call-1", "b_9", "EFFECT_ALLOW", "kind", "read",
                 "b_9", "abc123", new BundleTestMetadata("fs-1", 42, "oracle", "cerbos-0.53.0"),
                 "approver-bob", "crh-1", true, true);
         when(examiner.reconstruct("call-1")).thenReturn(chain);
         mvc.perform(get("/admin/studio/examiner/call-1").with(StudioMvc.principal("d", "meridian", "policy_approver")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.cerbosCallId").value("call-1"))
+                .andExpect(jsonPath("$.tenantId").value("meridian"))
                 .andExpect(jsonPath("$.complete").value(true))
                 .andExpect(jsonPath("$.approverId").value("approver-bob"));
+    }
+
+    @Test
+    void examinerFromAnotherTenantIsDenied403() throws Exception {
+        ExaminerChain chain = new ExaminerChain("txn-1", "acme", "call-cross", "b_9", "EFFECT_ALLOW",
+                "kind", "read", "b_9", "abc123",
+                new BundleTestMetadata("fs-1", 42, "oracle", "cerbos-0.53.0"),
+                "approver-bob", "crh-1", true, true);
+        when(examiner.reconstruct("call-cross")).thenReturn(chain);
+
+        mvc.perform(get("/admin/studio/examiner/call-cross")
+                        .with(StudioMvc.principal("d", "meridian", "policy_approver")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("tenant_scope_violation"));
+    }
+
+    @Test
+    void examinerChainWithoutTenantIsDenied403() throws Exception {
+        ExaminerChain chain = new ExaminerChain("txn-1", null, "call-missing", "b_9", "EFFECT_ALLOW",
+                "kind", "read", "b_9", "abc123",
+                new BundleTestMetadata("fs-1", 42, "oracle", "cerbos-0.53.0"),
+                "approver-bob", "crh-1", true, true);
+        when(examiner.reconstruct("call-missing")).thenReturn(chain);
+
+        mvc.perform(get("/admin/studio/examiner/call-missing")
+                        .with(StudioMvc.principal("d", "meridian", "policy_approver")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("tenant_scope_violation"));
     }
 
     @Test

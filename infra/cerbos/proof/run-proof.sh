@@ -19,7 +19,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
-CERBOS_IMAGE="${CERBOS_IMAGE:-ghcr.io/cerbos/cerbos:latest}"   # latest == 0.53.0 offline
+CERBOS_IMAGE="${CERBOS_IMAGE:-ghcr.io/cerbos/cerbos:0.53.0}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 POL="$HERE/policies"
 STRICT_NAME=cerbos-proof-b1

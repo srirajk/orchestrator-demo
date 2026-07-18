@@ -2,6 +2,7 @@ package ai.conduit.gateway.domain.insights;
 
 import ai.conduit.gateway.domain.auth.CerbosEntitlementAdapter;
 import ai.conduit.gateway.domain.auth.Principal;
+import ai.conduit.gateway.domain.auth.TenantExecutionContext;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
@@ -45,8 +46,13 @@ public class InsightsAuthorizer {
 
     /** @return true iff {@code principal} may read Insights, per the Cerbos PDP (fail-closed). */
     public boolean canRead(Principal principal) {
-        if (principal == null) return false;
-        boolean allowed = cerbos.isAllowed(principal, resourceKind, action, resourceId);
+        return canRead(principal, null);
+    }
+
+    /** Tenant-aware gate pinned to the request's active scoped policy bundle. */
+    public boolean canRead(Principal principal, TenantExecutionContext tenant) {
+        if (principal == null || tenant == null || !tenant.isResolved()) return false;
+        boolean allowed = cerbos.isAllowed(principal, resourceKind, action, resourceId, tenant);
         Counter.builder("conduit.insights.authz")
                 .description("Insights admin-gate decisions")
                 .tag("decision", allowed ? "ALLOW" : "DENY")

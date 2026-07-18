@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-07-13T20:59:24.093Z
-> Files: 1139 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-07-18T00:57:12.206Z
+> Files: 1176 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../private/tmp/claude-501/-Users-srirajkadimisetty-projects-orchestrator-demo/29f180d9-6150-4300-ae30-ee615cfcd441/scratchpad/
 
@@ -508,7 +508,7 @@
 - `agent-manifest.schema.json` — Declares used (~4210 tok)
 - `BUILD_REPORT.md` — Build Report — Conduit AI Gateway (~1028 tok)
 - `CLAUDE.md` — OpenWolf (~3070 tok)
-- `docker-compose.yml` — Docker Compose services (~12100 tok)
+- `docker-compose.yml` — Docker Compose services (~14030 tok)
 - `MORNING-NOTES.md` — Morning notes — OIDC SSO is fixed ✅ (~1292 tok)
 - `README.md` — Project documentation (~5213 tok)
 - `TODO.md` — Conduit — Open TODO / Backlog (~823 tok)
@@ -766,12 +766,21 @@
 - `memory.md` — Chronological action log for session work and outcomes. (~2771 tok)
 - `OPENWOLF.md` — OpenWolf operating protocol for navigation, memory, bug logging, and session-end updates. (~1675 tok)
 
+## Axiom A3 — per-tenant Redis namespacing
+
+
+## Axiom A4 — per-tenant registry ingestion + routing index + bulkheads (WRITE side)
+
+
 ## Glass-box authorization gate trace (2026-07-03)
 
 - `apps/chat/web/src/components/TraceRail.tsx` — collapsible Decision-trace rail: intent→resolve→gate rows (✓/✗ + reason)→answer. (~1400 tok)
 - `apps/chat/web/src/hooks/useTraceStream.ts` — conversation-scoped trace SSE hook + selectDenial(). (~900 tok)
 - `apps/chat/web/src/lib/gatewayTrace.ts` — vendored mirror of @conduit/gateway-client SSE parse + trace types (Docker build-context safe). (~600 tok)
 - `gateway/.../telemetry/event/GateData.java` — Trace payload for one authz gate decision: {gate, effect, reason, agent}; audience|segment|classification|coverage. (~350 tok)
+
+## Structured Clarification Surface — Phase 2/3/4 (feature/clarify-P234)
+
 
 ## admin-ui/
 
@@ -1111,14 +1120,14 @@
 ## gateway/src/main/java/ai/conduit/gateway/domain/clarify/
 
 - `ClarificationComposer.java` — The 4th grounded LLM call site (alongside {@code IntentClassifier}, {@code EntityExtractor}, (~4850 tok)
-- `InteractionKind.java` — Extensible HITL discriminator enum: CLARIFY_ENTITY | CLARIFY_CAPABILITY (consent reserved, unimplemented); String-backed wire, lenient parse (~450 tok)
-- `ClarificationOption.java` — One offered choice {value(submit token),label,secondaryLabel}; all manifest/coverage data, World-B clean (~350 tok)
-- `StructuredInteraction.java` — OOB structured-form envelope (rides `structured_interaction` TraceEvent, not the SSE); options + FreeTextEscape(inputContract=data, rule 4c); no hidden-count (~900 tok)
 - `ClarificationDescriptor.java` — THE single source object; renders twice (plainText→SSE, toStructuredInteraction()→OOB); offeredValues()+validate()=Phase-2 resume contract; withers; atCap() (~1100 tok)
 - `ClarificationDescriptorFactory.java` — @Component; composes descriptor; enumeration-oracle fix (offered = entitledBook ∩ restrictToIds); cap+free-text; World-B (no domain literal) (~900 tok)
 - `ClarificationDescriptorStore.java` — @Component; Redis (gateway ns, primary JedisPooled) key clarify:desc:{convId}; store(setex TTL)/peek/consume(single-use nonce)/invalidate(latest-turn-wins)/inheritedDepth (~800 tok)
-- `ClarificationTrigger.java` — Pure deterministic decisions: shouldOfferForm(abstain&&candidates≥1), decide()=partial-answer split, nextDepth/overCap loop bound; no LLM (~700 tok)
 - `ClarificationDualPlane.java` — @Component; OOB seam: offer()=store+publish structured_interaction; supersede()=invalidate+inherit depth; additive, never touches SSE bytes (~650 tok)
+- `ClarificationOption.java` — One offered choice {value(submit token),label,secondaryLabel}; all manifest/coverage data, World-B clean (~350 tok)
+- `ClarificationTrigger.java` — Pure deterministic decisions: shouldOfferForm(abstain&&candidates≥1), decide()=partial-answer split, nextDepth/overCap loop bound; no LLM (~700 tok)
+- `InteractionKind.java` — Extensible HITL discriminator enum: CLARIFY_ENTITY | CLARIFY_CAPABILITY (consent reserved, unimplemented); String-backed wire, lenient parse (~450 tok)
+- `StructuredInteraction.java` — OOB structured-form envelope (rides `structured_interaction` TraceEvent, not the SSE); options + FreeTextEscape(inputContract=data, rule 4c); no hidden-count (~900 tok)
 
 ## gateway/src/main/java/ai/conduit/gateway/domain/coverage/
 
@@ -1521,8 +1530,8 @@
 ## gateway/src/test/java/ai/conduit/gateway/registry/embedding/
 
 - `ManifestEmbedderTest.java` — The corpus embedder's contract: identical text under an identical model is embedded once, ever; (~1613 tok)
-- `QueryEmbeddingCacheTest.java` — 8 pure-unit tests for the query cache: same-text-hits, behaviour-preserving-vs-uncached matrix, whitespace-collapse, case-preserved, model-stamp-invalidates, bounded-eviction, single-flight (concurrent computes once), disabled pass-through, hit/miss counters. (~1500 tok)
 - `QueryEmbedderCacheTest.java` — 2 pure-unit tests for the QueryEmbedder request-path seam: behaviour-preserving vs bare embedder.embed(normalize(text)) + repeat-caching; modelId/dimension bypass the cache. (~500 tok)
+- `QueryEmbeddingCacheTest.java` — 8 pure-unit tests for the query cache: same-text-hits, behaviour-preserving-vs-uncached matrix, whitespace-collapse, case-preserved, model-stamp-invalidates, bounded-eviction, single-flight (concurrent computes once), disabled pass-through, hit/miss counters. (~1500 tok)
 
 ## gateway/src/test/java/ai/conduit/gateway/registry/index/
 
@@ -1766,36 +1775,34 @@
 
 - `agent_resource.yaml` — BASE scope; rank-0 trap (variables VERBATIM); chat_user/domain_admin via business_derived_roles; platform_admin superuser (~1189 tok)
 - `business_derived_roles.yaml` — B2 shared tenant-equality backstop (tenant_chat_user/tenant_domain_admin/tenant_conduit_admin); parity-neutral has()-guard (~520 tok)
+- `decision_parity_matrix_test.yaml` — B2.1 golden base-scope regression suite (14 cases) (~600 tok)
 - `domain_resource.yaml` — BASE scope; derived-role tenant gate (~380 tok)
 - `iam_derived_roles.yaml` (~542 tok)
 - `iam_resource.yaml` — BASE scope header added; rules unchanged (already tenant-scoped) (~1290 tok)
 - `insights_resource.yaml` — BASE scope; conduit_admin via tenant_conduit_admin (~250 tok)
-- `relationship_resource.yaml` — BASE scope; B2.5 tenant gap CLOSED via tenant_chat_user/tenant_domain_admin (~230 tok)
-- `tenant_default_{agent,relationship,domain,insights,iam}.yaml` — B2.6 default-tenant TOTAL children (REQUIRE_PARENTAL_CONSENT; grant-all-ceiling → effective=base) (~200 tok ea)
-- `decision_parity_matrix_test.yaml` — B2.1 golden base-scope regression suite (14 cases) (~600 tok)
 - `rank0_trap_preserved_test.yaml` — B2.2 unrecognised-classification-denied (7) (~350 tok)
-- `tenant_equality_backstop_test.yaml` — B2.3 mislabeled-scope cross-tenant deny (3) (~350 tok)
+- `relationship_resource.yaml` — BASE scope; B2.5 tenant gap CLOSED via tenant_chat_user/tenant_domain_admin (~230 tok)
 - `relationship_tenant_gap_closed_test.yaml` — B2.5 relationship tenant-equality (3) (~300 tok)
+- `tenant_equality_backstop_test.yaml` — B2.3 mislabeled-scope cross-tenant deny (3) (~350 tok)
 - `tenant_policy_totality_test.yaml` — B2.6 default child reproduces base (18) (~300 tok)
 
-## infra/cerbos/tenants/default/
+## infra/cerbos/proof/
 
-- `domain-segment-map.yaml` — B2.4 tenant deployment config: authoritative domain→segment mapping (relocated from agent_resource comments); NOT loaded as a policy (~260 tok)
+- `config.yaml` — proof-server config mirroring the pinned posture (~200 tok)
+- `policies/base_widget.yaml` — base ceiling fixture (OVERRIDE_PARENT) (~150 tok)
+- `policies/scope_posture_test.yaml` — cerbos compile assertion suite, 11 tests (~700 tok)
+- `policies/tenant_acme_widget.yaml` — grants view, silent on edit (fail-through demo) (~130 tok)
+- `policies/tenant_exceed_widget.yaml` — tries to exceed ceiling (~130 tok)
+- `README.md` — how to run the scope-posture proof harness (~350 tok)
+- `run-proof.sh` — end-to-end empirical proof harness (strict + lenient contrast + junit suite) (~900 tok)
 
 ## infra/cerbos/templates/
 
 - `tenant-deny-all.yaml` — deny-all tenant bootstrap template; explicit EFFECT_DENY per base-ceiling tuple (fail-open-safe) (~600 tok)
 
-## infra/cerbos/proof/
+## infra/cerbos/tenants/default/
 
-- `README.md` — how to run the scope-posture proof harness (~350 tok)
-- `config.yaml` — proof-server config mirroring the pinned posture (~200 tok)
-- `run-proof.sh` — end-to-end empirical proof harness (strict + lenient contrast + junit suite) (~900 tok)
-- `policies/base_widget.yaml` — base ceiling fixture (OVERRIDE_PARENT) (~150 tok)
-- `policies/tenant_acme_widget.yaml` — grants view, silent on edit (fail-through demo) (~130 tok)
-- `policies/tenant_exceed_widget.yaml` — tries to exceed ceiling (~130 tok)
-- `policies/tenant_boot_widget.yaml` / `tenant_boot2_widget.yaml` — deny-all template before/after grant (~130 tok each)
-- `policies/scope_posture_test.yaml` — cerbos compile assertion suite, 11 tests (~700 tok)
+- `domain-segment-map.yaml` — B2.4 tenant deployment config: authoritative domain→segment mapping (relocated from agent_resource comments); NOT loaded as a policy (~260 tok)
 
 ## infra/clickhouse/
 
@@ -2075,6 +2082,10 @@
 
 ## scripts/
 
+- `cerbos-allow-tenant-equality-lint.py` — B2.3 static lint: every base-ceiling EFFECT_ALLOW must be tenant-scoped (derived-role backstop / inline equality) or platform_admin superuser (~650 tok)
+- `cerbos-parity-matrix.py` — B2.1 persona×resource×action decision matrix prober/differ (PRE vs POST; scope '' vs 'default') (~900 tok)
+- `cerbos-parity-run.sh` — B2.1 gate runner: boots PRE+POST cerbos (distinct 36xx ports) and diffs the 800-cell matrix (~500 tok)
+- `cerbos-tenant-totality-lint.py` — rejects a tenant policy leaving any base-allowed (resource,action,role) tuple unmatched (fall-through hole); B2: expands derivedRoles→parentRoles for teeth (~820 tok)
 - `eval_agents.py` — TestHoldingsAgent: call_wealth, build_metrics, test_holdings_faithfulness, test_performance_faithful (~5311 tok)
 - `eval-gate.sh` — Eval release gate — seeds Langfuse datasets, then runs the DeepEval routing (~753 tok)
 - `eval-routing.py` — mint_admin_token, load_prompts, resolve, f1 + 1 more (~1675 tok)
@@ -2086,22 +2097,18 @@
 - `seed-all.sh` — THE single consolidated demo-data seeder (runs in conduit-seeder, once, after the whole stack is healthy). Ordered idempotent steps: (a) health waits, (b) principals→Redis via seed-users.sh, (c) Langfuse prices via seed-langfuse-models.py BEFORE traffic, (d) BFF conversations via seed-conversations-via-bff.py, (e) datasets via /eval/langfuse_seed_datasets.py, (f) dashboard via seed-langfuse-dashboard.sh. Env-only, no docker exec, no host dep. Per-step + summary logging; exit≠0 if any step fails. Replaced seed-users/seed-datasets/seed-langfuse-dashboard/seeder compose services. (~1400 tok)
 - `seed-demo.py` — mint_token, chat, chat_multi, wait_for_gateway + 1 more (~2771 tok)
 - `seed-demo.sh` — Meridian Gateway — Phoenix/Tempo demo seed (~176 tok)
+- `seed-iam-users.py` — Idempotent Python seeder for IAM (Axiom) Postgres demo data: tenant, roles (chat_user/conduit_admin), teams (IAM groups), and 15 login personas with per-segment classification maps + BCrypt(Meridian@2024) passwords (computed in-script). SOURCE OF TRUTH replacing neutralized Flyway data-seeds V4/V5/V7/V8/V9. Readable TENANTS/ROLES/TEAMS/PRINCIPALS dataclass structures (persona→segment→team→tenant) so Axiom A1 multi-tenant extends, not rewrites. Declarative role/team reconcile (retires relationship_manager→chat_user). Runs as seed-all.sh step (b0); env IAM_DB_*/SEED_PASSWORD. (~900 tok)
 - `seed-langfuse-dashboard.sh` — Idempotently seeds the "Conduit — LLM Quality & Cost" Langfuse dashboard by applying seed-data/langfuse-dashboard.sql to Langfuse Postgres. Env-driven (LANGFUSE_DB_*); uses psql (now in the seeder image) else `docker exec`. Called as step (f) of seed-all.sh. (~500 tok)
 - `seed-users.sh` — Idempotently seed demo principals into Redis. PRINCIPALS ONLY now (price/convo/dataset/dashboard tails moved to seed-all.sh). Runs as seed-all.sh step (b) and standalone on host. (~700 tok)
-- `seed-iam-users.py` — Idempotent Python seeder for IAM (Axiom) Postgres demo data: tenant, roles (chat_user/conduit_admin), teams (IAM groups), and 15 login personas with per-segment classification maps + BCrypt(Meridian@2024) passwords (computed in-script). SOURCE OF TRUTH replacing neutralized Flyway data-seeds V4/V5/V7/V8/V9. Readable TENANTS/ROLES/TEAMS/PRINCIPALS dataclass structures (persona→segment→team→tenant) so Axiom A1 multi-tenant extends, not rewrites. Declarative role/team reconcile (retires relationship_manager→chat_user). Runs as seed-all.sh step (b0); env IAM_DB_*/SEED_PASSWORD. (~900 tok)
-- `tests/iam-seeder/test_seed_iam_users.py` — pytest proof (testcontainers Postgres): applies V1 DDL, runs seeder, asserts login-ready BCrypt (bcrypt.checkpw = Spring's check), segments/role/team/tenant, relationship_manager retirement, idempotency (no row/password churn). (~500 tok)
-- `tests/iam-seeder/proof-compose.yml` — throwaway compose (distinct project `iam-seeder-proof`, ports 15432/18084) booting real conduit/iam-service:latest with SPRING_FLYWAY_LOCATIONS=filesystem:/migrations (edited migrations from disk) + fresh Postgres/Redis, for a LIVE /auth/token login proof. Never touches orchestrator-demo. (~300 tok)
 - `smoke-route.sh` — smoke-route.sh — trace-truth routing + entitlement smoke. (~3302 tok)
 - `smoke-ui.sh` — Tier-1 fast gate (invoked first by smoke.sh): 10 health URLs 200, CORS preflights per browser origin (chat→BFF :8099, admin→iam :5182→:8084), 4 personas mint JWT. No LLM/sleeps; exit=#failures. (~550 tok)
 - `smoke.sh` — smoke.sh — full API/CLI smoke for Conduit. Run against a live stack (docker compose up). (~1818 tok)
+- `tests/iam-seeder/proof-compose.yml` — throwaway compose (distinct project `iam-seeder-proof`, ports 15432/18084) booting real conduit/iam-service:latest with SPRING_FLYWAY_LOCATIONS=filesystem:/migrations (edited migrations from disk) + fresh Postgres/Redis, for a LIVE /auth/token login proof. Never touches orchestrator-demo. (~300 tok)
+- `tests/iam-seeder/test_seed_iam_users.py` — pytest proof (testcontainers Postgres): applies V1 DDL, runs seeder, asserts login-ready BCrypt (bcrypt.checkpw = Spring's check), segments/role/team/tenant, relationship_manager retirement, idempotency (no row/password churn). (~500 tok)
 - `verify-telemetry-e2e.sh` — ───────────────────────────────────────────────────────────────────────────── (~1151 tok)
 - `verify.sh` — Full verification script — runs after each phase to confirm acceptance criteria. (~713 tok)
 - `wait-for-healthy.sh` — Wait until all core docker-compose services report healthy, then exit 0. (~323 tok)
 - `world-b-check.sh` — ───────────────────────────────────────────────────────────────────────────── (~1434 tok)
-- `cerbos-tenant-totality-lint.py` — rejects a tenant policy leaving any base-allowed (resource,action,role) tuple unmatched (fall-through hole); B2: expands derivedRoles→parentRoles for teeth (~820 tok)
-- `cerbos-allow-tenant-equality-lint.py` — B2.3 static lint: every base-ceiling EFFECT_ALLOW must be tenant-scoped (derived-role backstop / inline equality) or platform_admin superuser (~650 tok)
-- `cerbos-parity-matrix.py` — B2.1 persona×resource×action decision matrix prober/differ (PRE vs POST; scope '' vs 'default') (~900 tok)
-- `cerbos-parity-run.sh` — B2.1 gate runner: boots PRE+POST cerbos (distinct 36xx ports) and diffs the 800-cell matrix (~500 tok)
 
 ## scripts/eval-worker/
 
@@ -2218,50 +2225,6 @@
 - `synthesis/answer/AnswerSynthesizerCompareTest.java` — Entity-qualified DATA headers, WITHHELD ENTITY (verbatim+manifest copy, no canonical leak), cap note, figure sourceAgent=nodeId. (~800 tok)
 - `test_user_mgmt.py` — Tests: jwks_has_correct_structure, jwks_e_is_65537, jwks_n_length, issue_token_returns_rs256_jwt + 20 more (~7203 tok)
 
-## Structured Clarification Surface — Phase 2/3/4 (feature/clarify-P234)
-- gateway/.../domain/clarify/ClarifyResume.java — resume read-side: consume descriptor by nonce, classify submission (GROUNDED_SELECTION | FREE_TEXT | NONE); no pipeline. ~2k
-- gateway/.../domain/chat/ChatService.java — handleChat(+nonce,+selection) resume overload; withLatestUserContent/injectGroundedReference; FORM_CLARIFY outcome. (large)
-- gateway/.../api/v1/chat/ChatCompletionsController.java — reads X-Clarify-Nonce / X-Clarify-Selection headers.
-- apps/chat/bff/.../chat/ClarifyController.java — POST /api/clarify/resolve; folds answer, re-drives gateway w/ nonce+selection, streams back. ~1.5k
-- apps/chat/bff/.../chat/ClarifyResolveRequest.java — {conversationId,nonce,selection?,freeText?}. ~0.7k
-- apps/chat/bff/.../chat/GatewayClient.java — openChatStream 5-arg resume overload (X-Clarify-* headers).
-- gateway/.../domain/auth/TenantExecutionContext.java — A2 immutable tenant carrier (tenantId, actorTenantId, activePolicyVersion); isResolved() gate. ~0.6k
-- gateway/.../domain/auth/ProvisionedTenantDirectory.java — A2 read interface: find(tenantId)->ProvisionedTenant, hasSnapshot(), snapshotVersion(). ~0.5k
-- gateway/.../domain/auth/TenantContextResolver.java — A2 sole reader of tenant_id claim; resolves+validates vs directory; throws Missing/NotProvisioned/Unavailable. ~0.9k
-- gateway/.../infrastructure/tenancy/TenantSnapshotSource.java — A2 out-of-band snapshot port + TenantSnapshot(version, tenant->policyVersion). ~0.5k
-- gateway/.../infrastructure/tenancy/SnapshotProvisionedTenantDirectory.java — A2 AtomicReference snapshot holder; atomic install/swap; request-path read-only. ~0.8k
-- gateway/.../infrastructure/tenancy/ConfigBackedTenantSnapshotSource.java — A2 @Profile(!multi-tenant) demo/test source from conduit.tenancy.provisioned-tenants; always includes default. ~0.8k
-- gateway/.../infrastructure/tenancy/TenantDirectorySnapshotClient.java — A2 timed background client; sync initial fetch + daemon refresh; @PreDestroy stop. ~0.9k
-- gateway/.../infrastructure/tenancy/TenantDirectoryReadiness.java — A2 HealthIndicator: DOWN until snapshot loaded (readiness group). ~0.5k
-- gateway/.../test/.../domain/auth/TenantContextFailClosedTest.java — A2.3 filter-level fail-closed (401 missing/403 unknown, chain never entered). ~1.5k
-- gateway/.../test/.../domain/auth/TenantContextPropagationTest.java — A2.2 immutable TEC survives VT hop; invocation/coverage/audit observe exact value. ~1.4k
-- gateway/.../test/.../architecture/TenantContextSeamArchTest.java — A2.1 single claim reader (source scan) + no downstream static getTenant + controllers carry TEC. ~1.6k
+## vision/next-steps/
 
-## Axiom A3 — per-tenant Redis namespacing
-- gateway/.../infrastructure/redis/TenantKeyspace.java — A3 seam: legacy names for default tenant / multi-tenant off; intent_idx__{tenant} + t:{tenant}: for real tenants; sourced from TenantExecutionContext. ~0.9k
-- gateway/.../infrastructure/redis/TenantRedisFacade.java — tenant-qualified Redis command facade; no unqualified SCAN/FT._LIST; listOwnKeys bounded to tenant prefix. ~0.6k
-- gateway/.../infrastructure/redis/DefaultTenantUsesLegacyIndexNameTest.java (test) — demo-preservation guard: default→intent_idx/vec:. ~0.5k
-- gateway/.../infrastructure/redis/RedisTenantIsolationProbeIT.java (test, extends RedisContainerTest) — A3.1/A3.2/A3.3/A3.4 isolation probes + FT.SEARCH transcript. ~1.2k
-- iam-service/.../auth/IamOAuthLocatorIsolationTest.java (test) — A3.5 locator can't leak/cross tenant. ~0.7k
-
-## Axiom A4 — per-tenant registry ingestion + routing index + bulkheads (WRITE side)
-- gateway/.../registry/index/VectorIndexWriter.java — MODIFIED: per-tenant ensureIndex/index/removeAgent(ctx) via TenantKeyspace; per-tenant stamp keys; no-arg = legacy(null); 4-arg @Autowired ctor + legacy 3-arg. ~3.2k
-- gateway/.../registry/index/VectorIndex.java — MODIFIED: tenant-aware exists(ctx)/stampedModelId(ctx)/stampedExprDialect(ctx)/documentCount(ctx); no-arg delegate to legacy. ~2.0k
-- gateway/.../registry/readiness/RegistryReadinessVerifier.java — MODIFIED: immutable per-tenant readiness map; default=process-fatal gate, non-default=fail-closed verdict; isReady/requireReady/evaluate/refreshReadiness. ~2.4k
-- gateway/.../registry/readiness/TenantRegistryNotReadyException.java — per-tenant routing deny (context resolves but registry not ready). ~0.3k
-- gateway/.../registry/ingest/RegistryIngestor.java — MODIFIED: TenantKeyspace ctor + ingestTenant(ctx) per-tenant fail-isolated seam (B4 drives folders); default startup path unchanged. ~3.3k
-- gateway/.../infrastructure/tenancy/TenantBulkheads.java — per-tenant R4j bulkheads + global; bounded max-tenants; deprovision/reconcile removal. ~1.0k
-- gateway/.../registry/embedding/RemoteEmbedder.java — MODIFIED: statelessness declaration (shared across tenants; content-addressed cache tenant-agnostic). ~1.4k
-- gateway/.../registry/tenancy/PerTenantTestSupport.java (test) — A4 fixtures: deterministic embedders, manifest builder, index fingerprint. ~0.8k
-- gateway/.../registry/tenancy/PerTenantRoutingIsolationTest.java (test, RedisContainerTest) — A4.2 query never returns other tenant hits. ~0.7k
-- gateway/.../registry/tenancy/PerTenantReadinessTest.java (test, RedisContainerTest) — A4.1 broken tenant fails closed, B serves, B index byte-hash unchanged. ~0.9k
-- gateway/.../registry/tenancy/PerTenantStampTest.java (test, RedisContainerTest) — A4.3 model-stamp mismatch fails only that tenant. ~0.7k
-- gateway/.../registry/tenancy/DefaultTenantWritesLegacyIndexTest.java (test, RedisContainerTest) — WRITE-side demo-preservation: default→intent_idx/vec:/stamp, no tenant artifacts. ~0.6k
-- gateway/.../registry/tenancy/PerTenantBulkheadTest.java (test) — A4.5 isolation + bounded cardinality + deprovision. ~0.6k
-- gateway/.../registry/tenancy/EmbedderStatelessnessTest.java (test) — A4.4 same text same vector across tenants (real RemoteEmbedder vs stub sidecar). ~0.7k
-
-### Cerbos blob runtime storage (spec 12)
-- `iam-service/src/main/java/com/openwolf/iam/policystudio/lifecycle/S3RuntimePolicySink.java` — AWS SDK v2 S3 sink; PromotedBundleLoader writes promoted runtime bundles to the MinIO bucket Cerbos serves via the blob driver (polled). Config-driven (bucket/prefix/endpoint/region/path-style/creds). ~130 lines. (~1.2k tok)
-- `iam-service/src/test/java/com/openwolf/iam/policystudio/lifecycle/PromotionReachesRuntimeEnforcementBlobIT.java` — Testcontainers MinIO + Cerbos-on-blob; proves promote→bucket→poll→enforce (no file-watch) + base-served-from-blob smoke. (~2k tok)
-- `PromotedBundleLoader.java` — now dual-backend: S3 blob (prod) when `iam.policy-studio.runtime.s3.bucket` set, else legacy watched-dir (disk fallback / revert path).
-- `infra/cerbos/config.yaml` — storage.driver: blob (was disk); polls s3://cerbos-policies. `minio-init` seeds the base to base/ prefix before cerbos starts.
+- `LIVE-E2E-FINDING-policy-version.md` — LIVE E2E FINDING — SERVED chat is broken on the live stack (`policyVersion=config-v1`) (~900 tok)

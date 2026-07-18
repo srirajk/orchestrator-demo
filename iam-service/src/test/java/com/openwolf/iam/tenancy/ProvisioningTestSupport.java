@@ -87,6 +87,14 @@ final class ProvisioningTestSupport {
         return mock(ActiveTenantRepository.class);
     }
 
+    static BootstrapPolicyPublisher acceptingPublisher() {
+        return bundle -> {
+            if (!bundle.bundleId().startsWith("b_") || bundle.renderedFiles().isEmpty()) {
+                throw new ProvisioningException("test publisher received an invalid bootstrap bundle");
+            }
+        };
+    }
+
     /** A stateful in-memory {@link AuditLogRepository} for the REAL audit adapter (A6). */
     static AuditLogRepository auditRepo() {
         List<AuditLog> logs = Collections.synchronizedList(new ArrayList<>());

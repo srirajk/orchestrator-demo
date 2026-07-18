@@ -41,7 +41,8 @@ class ProvisioningRetryTest {
                 default -> { }
             }
             TenantProvisioningService service =
-                    new TenantProvisioningService(ops, directory, policy, ns, reg, audit);
+                    new TenantProvisioningService(ops, directory, policy, ns, reg, audit,
+                            ProvisioningTestSupport.acceptingPublisher());
 
             // Attempt 1 fails at the injected stage — tenant stays absent.
             assertThatThrownBy(() -> service.provision(

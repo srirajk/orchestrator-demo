@@ -24,7 +24,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from data import check, discover, owner_tenant, resolve
-from jwt_verify import verify_bearer_token, verify_tenant_binding
+from jwt_verify import verify_bearer_token, verify_book_principal, verify_tenant_binding
 
 log = logging.getLogger("insurance-coverage")
 logging.basicConfig(level=logging.INFO)
@@ -62,6 +62,12 @@ def _enforce_tenant(request: Request, book_owner_tenant: Optional[str]) -> None:
     ok, reason = verify_tenant_binding(claims, header_tenant, book_owner_tenant)
     if not ok:
         log.warning("insurance-coverage: tenant binding rejected — %s (path=%s)", reason, request.url.path)
+        raise HTTPException(status_code=403, detail=reason)
+
+
+def _enforce_book_principal(request: Request, principal_id: str) -> None:
+    ok, reason = verify_book_principal(getattr(request.state, "claims", None), principal_id)
+    if not ok:
         raise HTTPException(status_code=403, detail=reason)
 
 
@@ -118,6 +124,7 @@ def health() -> dict:
 )
 def discover_resources(principal_id: str, request: Request) -> list[CoverageResource]:
     _enforce_tenant(request, owner_tenant(principal_id))
+    _enforce_book_principal(request, principal_id)
     tenant_id = request.headers.get("X-Tenant-Id", "default")
     log.info("DISCOVER principal=%s tenant=%s", principal_id, tenant_id)
     resources = discover(principal_id)
@@ -131,6 +138,7 @@ def discover_resources(principal_id: str, request: Request) -> list[CoverageReso
 )
 def check_resource(principal_id: str, resource_id: str, request: Request) -> CoverageCheckResult:
     _enforce_tenant(request, owner_tenant(principal_id))
+    _enforce_book_principal(request, principal_id)
     tenant_id = request.headers.get("X-Tenant-Id", "default")
     log.info("CHECK principal=%s resource=%s tenant=%s", principal_id, resource_id, tenant_id)
     result = check(principal_id, resource_id)

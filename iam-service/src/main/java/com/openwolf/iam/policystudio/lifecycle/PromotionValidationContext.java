@@ -15,8 +15,10 @@ import com.openwolf.iam.policystudio.TenantScope;
  * {@link PolicyBundle} (rendered Cerbos YAML + test metadata); it does NOT carry a typed vocabulary or
  * base ceiling, and the base ceiling cannot be reconstructed from the bundle's YAML alone (its
  * derived-role modules are not resource policies the studio parser will accept). So these facts are
- * supplied by a trusted {@link PromotionValidationContextProvider}, keyed off the bundle — never taken
- * from the promotion request. This closes the "promote() trusts a caller-supplied ceiling" hole.
+ * supplied by a trusted {@link PromotionValidationContextProvider}, keyed off the bundle and the exact
+ * parsed tenant child resource kind — never taken from the promotion request. This closes both the
+ * "promote() trusts a caller-supplied ceiling" hole and the multi-resource "first child chooses every
+ * ceiling" hole.
  *
  * @param vocabulary       the closed manifest vocabulary the candidate may reference
  * @param authorScope      the tenant subtree the candidate's policies may not escape

@@ -10,6 +10,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClient;
 
 import java.io.IOException;
@@ -30,8 +31,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * structural routing gate the chat request path calls — forwards the request's
  * {@link TenantExecutionContext} all the way to the Cerbos {@code CheckResources} wire body. A
  * promoted tenant is therefore evaluated against its own promoted bundle on the primary gate, not
- * only on the re-verifier. A {@code null}/unresolved context still sends {@code "default"} — the
- * single-tenant demo is byte-identical to before.
+ * only on the re-verifier. A {@code null}/unresolved context fails closed before any PDP request; the
+ * resolved single-tenant demo context explicitly carries {@code "default"}.
  *
  * <p>The assertion is on the actual POST body the adapter emits when driven <em>through
  * filterAgents</em> (not the adapter in isolation, and not the invoke re-verifier), so it proves the
@@ -77,6 +78,40 @@ class EntitlementServicePolicyVersionTest {
         }
     }
 
+    @Test
+    void relationshipCheck_promotedTenant_stampsItsActiveBundleVersion() {
+        try (StubHttpServer stub = new StubHttpServer()) {
+            AtomicReference<String> body = capturePost(stub);
+            EntitlementService svc = service(stub);
+
+            TenantExecutionContext promoted = TenantExecutionContext.of("acme", "acme", "b_relationships");
+            svc.checkRelationship(principal(), "rel-1", promoted);
+
+            JsonNode sent = read(body.get());
+            assertThat(sent.path("principal").path("policyVersion").asText()).isEqualTo("b_relationships");
+            assertThat(sent.path("resources").path(0).path("resource").path("policyVersion").asText())
+                    .isEqualTo("b_relationships");
+        }
+    }
+
+    @Test
+    void relationshipBatch_promotedTenant_stampsItsActiveBundleVersion() {
+        try (StubHttpServer stub = new StubHttpServer()) {
+            AtomicReference<String> body = capturePost(stub);
+            EntitlementService svc = service(stub);
+
+            TenantExecutionContext promoted = TenantExecutionContext.of("acme", "acme", "b_relationships");
+            svc.filterCovered(principal(), List.of("rel-1", "rel-2"), promoted);
+
+            JsonNode sent = read(body.get());
+            assertThat(sent.path("resources")).hasSize(2);
+            assertThat(sent.path("resources").path(0).path("resource").path("policyVersion").asText())
+                    .isEqualTo("b_relationships");
+            assertThat(sent.path("resources").path(1).path("resource").path("policyVersion").asText())
+                    .isEqualTo("b_relationships");
+        }
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     /** Captures the POST body and answers with an empty, well-formed CheckResources result. */
@@ -111,8 +146,10 @@ class EntitlementServicePolicyVersionTest {
         OutboundGate gate = new OutboundGate(new SimpleMeterRegistry(), 16, 250);
         CerbosEntitlementAdapter cerbos = new CerbosEntitlementAdapter(restClient, new ObjectMapper(), gate,
                 "127.0.0.1", stub.port(), 2000, "closed", "relationship");
-        return new EntitlementService(cerbos, new SimpleMeterRegistry(),
+        EntitlementService service = new EntitlementService(cerbos, new SimpleMeterRegistry(),
                 Mockito.mock(RevocationChecker.class));
+        ReflectionTestUtils.setField(service, "resourceType", "relationship");
+        return service;
     }
 
     private static Principal principal() {

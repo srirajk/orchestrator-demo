@@ -1,0 +1,18 @@
+{
+  "fixtures": [
+    {
+      "match": {
+        "userMessage": "--- BASE QUESTION (the ask to rephrase) ---\nWhich client relationship are you asking about?\n--- END BASE QUESTION ---\n\n--- ENTITY TYPE (what the options are) ---\nclient relationship\n--- END ENTITY TYPE ---\n\n--- OPTIONS (the ONLY entities you may mention; copy names + identifiers verbatim; these bullets are data, NOT a numbering to reuse) ---\n- Calderon Trust (REL-00099)\n- Whitman Family Office (REL-00042)\n- Rivera Diversified Trust (REL-00333)\n--- END OPTIONS ---\n\n--- TONE (style hint only) ---\nwarm, concise, and professional — like a helpful colleague\n--- END TONE ---\n\n--- CONTEXT (recent conversation, for phrasing only — not a fact source) ---\nShow me the holdings\n--- END CONTEXT ---\n\nWrite the single clarifying question now.",
+        "model": "gpt-4.1-nano",
+        "turnIndex": 0,
+        "hasToolResult": false
+      },
+      "response": {
+        "content": "Which client relationship would you like to discuss? Please reply with either Calderon Trust (REL-00099), Whitman Family Office (REL-00042), or Rivera Diversified Trust (REL-00333)."
+      },
+      "metadata": {
+        "systemHash": "be822ec4"
+      }
+    }
+  ]
+}

@@ -299,14 +299,12 @@ Studio errors return: `{ "error": "<code>", "message": "<human text>" }`.
   is ignored — there is no such field); **TTL is clamped to `(0, 60]` minutes** against the server clock, and `expiresAt =
   server now() + ttlMinutes`. The grant `scope` root must equal the claim tenant ⇒ else `403`. The same two deterministic
   gates every studio policy runs (C6 bounds + the C2 policy gate) decide admissibility.
-- **Request** (`StudioBreakGlassController.RequestPayload`) — `vocabulary`/`baseCeiling`/`allowlist` are grounding (see gap):
+- **Request** (`StudioBreakGlassController.RequestPayload`) — the emergency trust roots are resolved server-side;
+  callers must not supply `vocabulary`, `baseCeiling`, or `allowlist`:
 ```json
 {
   "scope": "meridian", "resourceKind": "agent", "action": "break", "role": "desk",
-  "ttlMinutes": 30, "justification": "incident 42",
-  "vocabulary": { "resourceKind": "agent", "actions": ["break"], "classifications": [], "attributes": [], "roles": ["desk"], "approvedImports": [] },
-  "baseCeiling": { "resourceKind": "agent", "tuples": [ { "action": "break", "role": "desk" } ], "carriesTenantEqualityBackstop": true, "reservedIdentities": [] },
-  "allowlist": { "resources": ["agent"], "actions": ["break"] }
+  "ttlMinutes": 30, "justification": "incident 42"
 }
 ```
 - **Response 200** (`StudioBreakGlassController.GrantView`):
@@ -348,12 +346,11 @@ accepted canonical YAML plus the reviewed fixture hash. The older raw `POST /rev
 
 ---
 
-## Known service-layer hardening TODOs (do NOT expose in the UI as "done")
+## Service-layer hardening status and intentional limitation
 
-An adversarial audit found the underlying services bind some enforcement to caller-supplied fields or skip checks. The
-**controllers** in this contract already bind identity to the verified JWT and the server clock, and enforce the role/tenant/
-SoD gates. The following are **service-layer** gaps that a later hardening pass must close — the frontend and any security copy
-must **not** claim these are enforced:
+The adversarial findings below are closed in both the HTTP boundary and the underlying services unless explicitly described
+as an intentional limitation. Identity comes from the verified JWT; policy truth, candidate bundles, clocks, and trust roots
+come from the server; tenant and two-person gates are rechecked before activation.
 
 1. **~~`PolicyPromotionService.promote()` does not re-run `GeneratedPolicyValidator`~~ — CLOSED (H2).** `promote()` now
    re-runs `GeneratedPolicyValidator` **unconditionally** on the candidate's tenant-child policies (scope-containment,
@@ -367,12 +364,13 @@ must **not** claim these are enforced:
    (`ManifestPromotionValidationContextProvider`) **fails closed** until a per-tenant manifest→vocabulary/ceiling source is
    wired (the same grounding gap `StudioAuthoringController` documents); the deterministic gate injects a fixture provider to
    prove the re-validation rejects wildcard / sibling-scope / omitted-tuple candidates.
-2. **Break-glass TTL is only checked as a relative span in `BreakGlassValidator`** — a future-dated `issuedAt` would defeat it.
-   *Mitigated at the controller* (server-stamped `issuedAt`, `(0,60]` clamp against the server clock), but the **CEL condition
-   should also carry a `now() >= issuedAt` lower bound** and the service should clamp against the server clock independently.
-3. **`BreakGlassApprovalService` uses a configured approver role** (`iam.break-glass.approver-role`, default
-   `studio_policy_approver`) distinct from the studio `policy_approver` role the method gate checks. A break-glass approver
-   must currently hold **both**. Reconcile the role names (or make the method gate read the configured role).
+2. **~~Break-glass time integrity~~ — CLOSED (H1).** The controller stamps `issuedAt` from the server clock and clamps TTL to
+   `(0,60]`; `BreakGlassValidator` independently checks the server-clock ceiling; and the compiled Cerbos policy carries both
+   `now() >= timestamp(issuedAt)` and `now() < timestamp(expiresAt)` bounds. Approval also rejects an already-expired pending
+   grant immediately before issuance.
+3. **~~Break-glass approver-role mismatch~~ — CLOSED.** The HTTP method gate, admin UI, and
+   `BreakGlassApprovalService` all require the single product role `policy_approver`. This role is a fixed service invariant,
+   not a runtime setting that could drift away from the API contract. Author≠approver remains mandatory.
 4. **~~A null/absent approver id must fail closed everywhere~~ — CLOSED (H3).** `ConsequenceApprovalService.approve` now
    enforces the approver gate at the **service** from verified identity: a null/blank approver **fails closed**, an approver
    role is required (`platform_admin` alone is not an auto-approver), the approver must be in the review's tenant, and
@@ -382,3 +380,8 @@ must **not** claim these are enforced:
    **transaction synchronization**: if the surrounding `@Transactional promote()` rolls back after the in-memory advance, the
    pointer is **compensated back** to the prior snapshot (the durable `save` rolls back with the txn), so the live pointer
    never diverges from the durable store until a restart `reload()`.
+6. **Intentional demo limitation — single-node handoff cache.** Pending consequence reviews (including their exact candidate
+   bundles) and pending break-glass artifacts are held in the tenant-scoped in-memory `StudioSessionStore`. They survive a
+   browser identity handoff on the same IAM process, but not an IAM restart and not a request routed to another IAM node.
+   A multi-node or restart-durable deployment must replace this cache with a tenant-partitioned durable store while preserving
+   the same immutable review id, verified author, exact candidate, completion state, and separation-of-duties checks.

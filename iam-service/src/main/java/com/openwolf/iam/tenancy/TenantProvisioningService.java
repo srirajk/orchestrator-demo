@@ -43,19 +43,22 @@ public class TenantProvisioningService {
     private final TenantNamespaceAdapter namespaceAdapter;
     private final RegistrySpaceAdapter registryAdapter;
     private final AuditPartitionAdapter auditAdapter;
+    private final BootstrapPolicyPublisher policyPublisher;
 
     public TenantProvisioningService(ProvisioningOperationRepository operations,
                                      ActiveTenantDirectory directory,
                                      PolicyBootstrapAdapter policyAdapter,
                                      TenantNamespaceAdapter namespaceAdapter,
                                      RegistrySpaceAdapter registryAdapter,
-                                     AuditPartitionAdapter auditAdapter) {
+                                     AuditPartitionAdapter auditAdapter,
+                                     BootstrapPolicyPublisher policyPublisher) {
         this.operations = operations;
         this.directory = directory;
         this.policyAdapter = policyAdapter;
         this.namespaceAdapter = namespaceAdapter;
         this.registryAdapter = registryAdapter;
         this.auditAdapter = auditAdapter;
+        this.policyPublisher = policyPublisher;
     }
 
     /**
@@ -122,8 +125,25 @@ public class TenantProvisioningService {
             // ── Verify all four before ANY visibility. A gap here keeps the tenant unusable. ──
             verifyAllStaged(op, tenantId);
 
-            // ── Activation compare-and-set — the LAST step. Only now is the tenant visible. ──
-            long directoryVersion = directory.activate(tenantId, bundle.policyVersion());
+            // ── Publish + serving-readiness probe + immutable C5 record BEFORE visibility. The exact
+            // b_* id written into every policy is the pointer B4 activates and Studio later reviews.
+            policyPublisher.publishAndPersist(bundle.policyBundle());
+
+            // ── Activation compare-and-set — the LAST step. A retry after a post-CAS failure may find
+            // the exact bootstrap already active; reconcile that state instead of stale-failing or
+            // publishing a second identity. A different active id is a conflict and fails closed.
+            String activeVersion = directory.find(tenantId).orElse(null);
+            long directoryVersion;
+            if (activeVersion == null) {
+                directoryVersion = directory.compareAndActivate(tenantId, null, bundle.policyVersion());
+            } else if (activeVersion.equals(bundle.policyVersion())) {
+                directoryVersion = directory.version();
+                log.info("Provision '{}' reconciled exact already-active bootstrap {} at directory v{}",
+                        tenantId, activeVersion, directoryVersion);
+            } else {
+                throw new ProvisioningException("tenant '" + tenantId + "' is already active at policy version '"
+                        + activeVersion + "', not requested bootstrap '" + bundle.policyVersion() + "'");
+            }
             op.setStatus(ProvisioningOperation.Status.ACTIVE);
             op.setLastError(null);
             operations.save(op);
@@ -135,16 +155,27 @@ public class TenantProvisioningService {
             // COMPENSATE (H6): clean the already-staged NON-AUDIT artifacts so a failed run leaves no
             // orphaned Redis namespace/index or staged policy bundle — not merely absence from the
             // directory. Runs BEFORE the FAILED save so the durable ledger reflects the compensated state.
-            compensateStaged(op, tenantId, bundle);
+            // Never tear down Redis/registry/policy artifacts underneath an active tenant. This matters
+            // when a save/commit fails after the directory CAS: the transaction compensation may revert
+            // the in-memory pointer later, but until then the tenant is live. Leaving idempotent artifacts
+            // staged is safe and lets the retry reconcile; deleting active dependencies is not.
+            boolean tenantVisible = directory.isActive(tenantId);
+            if (!tenantVisible) {
+                compensateStaged(op, tenantId, bundle);
+            } else {
+                log.warn("Provision '{}' failed after activation; preserving staged/runtime dependencies "
+                        + "while directory remains active for safe reconciliation", tenantId);
+            }
 
             op.setStatus(ProvisioningOperation.Status.FAILED);
             op.setLastError(e.toString());
             operations.save(op);
             // FAIL CLOSED: the tenant is NOT in the directory; a request under it resolves unknown at A2.
-            log.warn("FAIL-CLOSED: provision of tenant '{}' failed after staging {} — staged artifacts "
-                            + "compensated, tenant is ABSENT from the active directory and fully unusable "
+            log.warn("FAIL-CLOSED: provision of tenant '{}' failed after staging {} — staged artifacts {} "
+                            + "and tenant directory active={} "
                             + "(retry key {} to reconcile): {}",
-                    tenantId, op.stagedArtifacts(), key, e.toString());
+                    tenantId, op.stagedArtifacts(), tenantVisible ? "preserved" : "compensated",
+                    tenantVisible, key, e.toString());
             throw (e instanceof ProvisioningException pe)
                     ? pe : new ProvisioningException("provisioning failed for tenant '" + tenantId + "'", e);
         }

@@ -38,19 +38,19 @@ import java.util.stream.Stream;
  *       {@code (action, role)} surface a tenant child must be total over;</li>
  *   <li><b>carriesTenantEqualityBackstop</b> — whether the root policy imports a derived-role module whose
  *       condition carries {@code P.attr.tenant_id == R.attr.tenant_id};</li>
- *   <li><b>reservedIdentities</b> — every {@code resource@scope} identity already present in the base bundle
- *       for the kind;</li>
+ *   <li><b>reservedIdentities</b> — immutable ROOT identities already present in the base bundle. Existing
+ *       tenant children are replaceable by that tenant's next candidate and therefore are not reserved;</li>
  *   <li><b>frontDoorRoles</b> — ceiling roles whose granted action-set is a strict subset of the full
  *       action surface (i.e. they lack the management actions the admin/superuser roles hold) — the
  *       condition-gated "front door" the consequence matrix exercises with attribute negatives.</li>
  * </ul>
  */
-final class BaseBundleGrounding {
+public final class BaseBundleGrounding {
 
     private BaseBundleGrounding() {}
 
     /** The grounding facts derived from the base bundle for one resource kind. */
-    record Facts(
+    public record Facts(
             String resourceKind,
             Set<String> actions,
             Set<String> roles,
@@ -63,7 +63,7 @@ final class BaseBundleGrounding {
      *
      * @throws IllegalStateException if the dir is missing or has no root resource policy for the kind
      */
-    static Facts read(Path baseBundleDir, String resourceKind) {
+    public static Facts read(Path baseBundleDir, String resourceKind) {
         if (resourceKind == null || resourceKind.isBlank()) {
             throw new IllegalArgumentException("resourceKind must be set");
         }
@@ -127,7 +127,9 @@ final class BaseBundleGrounding {
             boolean isRoot = scope == null || scope.isBlank();
             List<String> policyImports = strList(rp.get("importDerivedRoles"));
             imports.addAll(policyImports);
-            reservedIdentities.add(resourceKind + "@" + (scope == null ? "" : scope));
+            if (isRoot) {
+                reservedIdentities.add(resourceKind + "@");
+            }
 
             for (Object r : seq(rp.get("rules"))) {
                 Map<String, Object> rule = asMap(r);

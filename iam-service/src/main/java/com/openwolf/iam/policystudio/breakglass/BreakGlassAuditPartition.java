@@ -18,6 +18,12 @@ public interface BreakGlassAuditPartition {
     /** Record a single USE of an active break-glass grant (a principal exercised the emergency access). */
     void recordUsed(BreakGlassGrant grant, String principalId, String action, String correlationId);
 
+    /** Same event with the durable grant identity included in evidence. */
+    default void recordUsed(String grantId, BreakGlassGrant grant, String principalId,
+                            String action, String correlationId) {
+        recordUsed(grant, principalId, action, correlationId);
+    }
+
     /** The tenant's audit partition slice (A6), newest first. */
     List<AuditLog> partition(String tenantId);
 }

@@ -4,13 +4,12 @@
 the branch tip at STEP 0; `conduit-platform-next` has since advanced +2 commits with the C3
 policy-studio moat, which touches only `iam-service` and nothing on A5's surface).
 
-## Token path taken: **gateway-to-coverage token exchange (scoped) — NOT direct coverage-audience**
+## Token path taken: **tenant-qualified coverage audience on the forwarded access token**
 
-**Why.** A1 (`iam-service/.../auth/JwtClaimsCustomizer.java` + `TenantClaims.java`) mints only the
-gateway audiences `conduit-gateway` and `conduit-gateway@<tenant_id>`. It does **not** mint a
-`conduit-coverage@<tenant>` audience. Per doc 07 A5 (line 275) and A1 (line 120), when the token
-carries no coverage audience, A5 "must use a gateway-to-coverage token exchange rather than
-accepting a gateway-only audience." So the **direct** path is not available on this base.
+**Why.** The A5 contract permits direct forwarding when A1 mints a dedicated coverage audience.
+Access tokens now carry both `conduit-coverage` and `conduit-coverage@<tenant_id>` alongside the
+gateway audiences. Wealth and insurance coverage services require `conduit-coverage`; therefore a
+gateway-only token is rejected while the verified `tenant_id` remains bound independently below.
 
 **What A5 delivers now (the tested second gate).** A5's security value — and its entire tested
 acceptance — is **tenant binding at the coverage/data layer**, which is independent of the audience
@@ -24,13 +23,9 @@ Any disagreement ⇒ **403 from coverage itself**. This makes coverage a genuine
 compromised/buggy gateway sending tenant A's book under tenant B's header — or replaying a valid
 tenant A token against a tenant B book — is rejected at the data layer.
 
-**Honest deferral.** Swapping the forwarded credential to a dedicated `conduit-coverage@<tenant>`
-audience via a real RFC 8693 exchange requires an IAM token-exchange endpoint on the gateway→IAM
-hop. That touches IAM's token/authorization path (its own protected suites) and must be validated
-against the live stack, so it is deliberately **not** built here. The coverage service's expected
-audience stays config-driven (`AGENT_JWT_AUDIENCE`, default `conduit-gateway`) so the running demo
-is not broken; flipping it to the coverage audience is a one-line config change once the exchange
-mints it. No coverage-side code assumes the gateway audience — only the tenant binding is enforced.
+The expected audience stays config-driven (`AGENT_JWT_AUDIENCE`) and now defaults to
+`conduit-coverage` in the two coverage services. A future RFC 8693 exchange can narrow credentials
+further without changing the coverage verification contract; it is no longer required to satisfy A5.
 
 ## Acceptance
 

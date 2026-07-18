@@ -12,7 +12,7 @@ resourcePolicy:
     - platform_admin
     condition:
       match:
-        expr: now() < timestamp("2026-07-17T11:05:35Z")
+        expr: now() >= timestamp("2026-07-18T02:12:57Z") && now() < timestamp("2026-07-18T02:12:56Z")
   - actions:
     - register
     effect: EFFECT_DENY
@@ -20,11 +20,11 @@ resourcePolicy:
     - platform_admin
     condition:
       match:
-        expr: now() >= timestamp("2026-07-17T11:05:35Z")
+        expr: now() < timestamp("2026-07-18T02:12:57Z") || now() >= timestamp("2026-07-18T02:12:56Z")
   - actions:
     - invoke
     - invoke_membership
-    effect: EFFECT_DENY
+    effect: EFFECT_ALLOW
     roles:
     - chat_user
   - actions:
@@ -32,19 +32,19 @@ resourcePolicy:
     - invoke
     - invoke_membership
     - register
-    effect: EFFECT_DENY
+    effect: EFFECT_ALLOW
     roles:
     - domain_admin
   - actions:
     - deregister
     - invoke
     - invoke_membership
-    effect: EFFECT_DENY
+    effect: EFFECT_ALLOW
     roles:
     - platform_admin
   - actions:
     - invoke
     - invoke_membership
-    effect: EFFECT_DENY
+    effect: EFFECT_ALLOW
     roles:
     - relationship_manager

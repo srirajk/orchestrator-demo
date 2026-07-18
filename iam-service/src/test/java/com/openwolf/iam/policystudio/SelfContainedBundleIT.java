@@ -126,6 +126,33 @@ class SelfContainedBundleIT {
                 .isTrue();
     }
 
+    @Test
+    void tenantWideCaptureContainsEveryRuntimeResourceKind() {
+        Path repoPolicies = Files.isDirectory(Path.of("infra/cerbos/policies"))
+                ? Path.of("infra/cerbos/policies")
+                : Path.of("..").resolve("infra/cerbos/policies").normalize();
+        List<BundleFile> captured = new SelfContainedBundleAssembler(
+                repoPolicies.toString()).captureFullPolicySet();
+
+        assertThat(captured).extracting(BundleFile::path)
+                .contains("policies/agent_resource.yaml")
+                .contains("policies/relationship_resource.yaml")
+                .contains("policies/domain_resource.yaml")
+                .contains("policies/insights_resource.yaml")
+                .contains("policies/iam_resource.yaml")
+                .contains("policies/policy_draft_resource.yaml")
+                .contains("policies/policy_approval_resource.yaml")
+                .contains("policies/policy_bundle_resource.yaml")
+                .contains("policies/business_derived_roles.yaml")
+                .contains("policies/policy_studio_derived_roles.yaml");
+
+        assertThat(captured.stream()
+                .filter(f -> f.yaml().contains("resourcePolicy:"))
+                .allMatch(f -> f.yaml().contains(BundleCanonicalizer.BUNDLE_VERSION_SENTINEL)))
+                .as("every resource kind in one tenant snapshot must be stamped with the same bundle id")
+                .isTrue();
+    }
+
     // ── temp-base helpers ───────────────────────────────────────────────────────────────────────────
 
     private interface Edit { String apply(String in); }

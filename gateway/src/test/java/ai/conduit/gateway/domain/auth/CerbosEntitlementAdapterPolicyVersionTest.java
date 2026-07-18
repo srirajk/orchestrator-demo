@@ -24,9 +24,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * S1b — the gateway half of "promotion reaches enforcement". The adapter must stamp the CheckResources
  * {@code policyVersion} from the request's {@link TenantExecutionContext#activePolicyVersion()}, so a
- * promoted tenant is evaluated against its own bundle. The default tenant (and any null/unresolved
- * context) must still send {@code "default"} — the base bundle — so the single-tenant demo is preserved
- * byte-for-byte.
+ * promoted tenant is evaluated against its own bundle and scoped tenant child. A null context must still
+ * send the original unscoped {@code "default"} request so legacy callers and mocks remain unchanged.
  */
 class CerbosEntitlementAdapterPolicyVersionTest {
 
@@ -38,7 +37,7 @@ class CerbosEntitlementAdapterPolicyVersionTest {
             AtomicReference<String> body = capturePost(stub);
             CerbosEntitlementAdapter cerbos = adapter(stub);
 
-            TenantExecutionContext promoted = TenantExecutionContext.of("acme", "acme", "b_xyz");
+            TenantExecutionContext promoted = TenantExecutionContext.of("acme", "operator-tenant", "b_xyz");
             cerbos.checkAgents(principal(), List.of(agent("agent-1")), promoted);
 
             JsonNode sent = read(body.get());
@@ -46,6 +45,13 @@ class CerbosEntitlementAdapterPolicyVersionTest {
                     .as("principal.policyVersion must be the tenant's active bundle version").isEqualTo("b_xyz");
             assertThat(sent.path("resources").path(0).path("resource").path("policyVersion").asText())
                     .as("resource.policyVersion must be the tenant's active bundle version").isEqualTo("b_xyz");
+            assertThat(sent.path("resources").path(0).path("resource").path("scope").asText())
+                    .as("resource.scope selects the tenant restriction child").isEqualTo("acme");
+            assertThat(sent.path("principal").path("attr").path("tenant_id").asText())
+                    .as("principal tenant attribute is the subject/resource tenant, not actor provenance")
+                    .isEqualTo("acme");
+            assertThat(sent.path("resources").path(0).path("resource").path("attr").path("tenant_id").asText())
+                    .as("resource tenant attribute feeds the base equality backstop").isEqualTo("acme");
         }
     }
 
@@ -76,21 +82,28 @@ class CerbosEntitlementAdapterPolicyVersionTest {
             assertThat(sent.path("principal").path("policyVersion").asText()).isEqualTo("default");
             assertThat(sent.path("resources").path(0).path("resource").path("policyVersion").asText())
                     .isEqualTo("default");
+            assertThat(sent.path("principal").path("attr").path("tenant_id").isMissingNode()).isTrue();
+            assertThat(sent.path("resources").path(0).path("resource").path("scope").isMissingNode()).isTrue();
+            assertThat(sent.path("resources").path(0).path("resource").path("attr")
+                    .path("tenant_id").isMissingNode()).isTrue();
         }
     }
 
     @Test
-    void blankVersionContextFallsBackToDefault() {
+    void unresolvedContextFailsClosedWithoutPostingAnUnscopedRequest() {
         try (StubHttpServer stub = new StubHttpServer()) {
             AtomicReference<String> body = capturePost(stub);
-            CerbosEntitlementAdapter cerbos = adapter(stub);
+            CerbosEntitlementAdapter cerbos = adapter(stub, "local");
 
-            // A half-populated context (tenant set, version blank) must fail safe to the base bundle.
+            // A half-populated context must never silently fall back to an unscoped base policy.
             TenantExecutionContext blank = new TenantExecutionContext("acme", "acme", "  ");
-            cerbos.checkRelationships(principal(), List.of("rel-1"), blank);
+            Principal admin = new Principal("admin", List.of("platform_admin"), List.of(), Map.of(), List.of());
+            CerbosEntitlementAdapter.BatchResult result =
+                    cerbos.checkRelationships(admin, List.of("rel-1"), blank);
 
-            assertThat(read(body.get()).path("resources").path(0).path("resource").path("policyVersion").asText())
-                    .isEqualTo("default");
+            assertThat(result.isAllowed("rel-1")).isFalse();
+            assertThat(result.source()).isEqualTo("tenant-context-invalid");
+            assertThat(body.get()).as("unresolved context must be denied before any PDP post").isNull();
         }
     }
 
@@ -117,6 +130,10 @@ class CerbosEntitlementAdapterPolicyVersionTest {
     }
 
     static CerbosEntitlementAdapter adapter(StubHttpServer stub) {
+        return adapter(stub, "closed");
+    }
+
+    static CerbosEntitlementAdapter adapter(StubHttpServer stub, String failMode) {
         HttpClient http = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1)
                 .connectTimeout(Duration.ofMillis(2000))
@@ -126,7 +143,7 @@ class CerbosEntitlementAdapterPolicyVersionTest {
         RestClient restClient = RestClient.builder().requestFactory(factory).baseUrl(stub.baseUrl()).build();
         OutboundGate gate = new OutboundGate(new SimpleMeterRegistry(), 16, 250);
         return new CerbosEntitlementAdapter(restClient, new ObjectMapper(), gate,
-                "127.0.0.1", stub.port(), 2000, "closed", "relationship");
+                "127.0.0.1", stub.port(), 2000, failMode, "relationship");
     }
 
     static Principal principal() {

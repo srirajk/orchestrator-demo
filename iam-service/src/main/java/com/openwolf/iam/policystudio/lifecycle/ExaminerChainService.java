@@ -71,12 +71,22 @@ public class ExaminerChainService {
                             + "be attributed to a request (audit-integrity failure)");
         }
         ApplicationAuditEntry audit = audits.get(0);
+        String tenantId = audit.getTenantId();
+        if (tenantId == null || tenantId.isBlank()) {
+            throw new AuditIntegrityException("application audit entry for cerbosCallId '" + cerbosCallId
+                    + "' has no tenant — the examiner chain cannot be tenant-scoped");
+        }
         String activeVersion = audit.getActivePolicyVersion();
 
         // (2) Cerbos decision entry — same call id, and its version MUST match the audit's.
         CerbosDecisionEntry decision = decisionRepo.findById(cerbosCallId).orElseThrow(() ->
                 new AuditIntegrityException("no Cerbos decision-log entry for cerbosCallId '" + cerbosCallId
                         + "' — application audit references a decision that is not in the decision log"));
+        if (!tenantId.equals(decision.getTenantId())) {
+            throw new AuditIntegrityException("tenant mismatch for cerbosCallId '" + cerbosCallId
+                    + "': application audit belongs to '" + tenantId + "' but decision log belongs to '"
+                    + decision.getTenantId() + "'");
+        }
         if (!decision.getActivePolicyVersion().equals(activeVersion)) {
             throw new AuditIntegrityException("policy-version mismatch for cerbosCallId '" + cerbosCallId
                     + "': application audit ran under '" + activeVersion + "' but the decision log recorded '"
@@ -87,6 +97,11 @@ public class ExaminerChainService {
         PolicyBundleRecord bundle = bundleRepo.findById(activeVersion).orElseThrow(() ->
                 new AuditIntegrityException("no immutable bundle record for active policy version '"
                         + activeVersion + "' — the decision references a bundle that was never recorded"));
+        if (!tenantId.equals(bundle.getTenantId())) {
+            throw new AuditIntegrityException("tenant mismatch for bundle '" + activeVersion
+                    + "': decision chain belongs to '" + tenantId + "' but bundle belongs to '"
+                    + bundle.getTenantId() + "'");
+        }
         if (!bundle.contentMatchesId(canonicalizer)) {
             throw new AuditIntegrityException("bundle '" + activeVersion + "' fails content-addressed integrity "
                     + "— its stored bytes do not hash to its id (tamper)");
@@ -105,6 +120,7 @@ public class ExaminerChainService {
         for (ApprovalRecordEntity a : approvals) {
             ConsequenceApprovalRecord rec = a.toRecord();
             boolean sigValid = rec.decision() == ApprovalDecision.APPROVE
+                    && tenantId.equals(rec.tenantId())
                     && signer.verify(rec.signingPayload(), rec.signature());
             if (sigValid) {
                 approved = a;
@@ -120,7 +136,7 @@ public class ExaminerChainService {
         // testMetadata is non-null by construction; fixtureSetHash is validated in its constructor.
 
         ExaminerChain chain = new ExaminerChain(
-                audit.getTransactionId(), cerbosCallId, activeVersion,
+                audit.getTransactionId(), tenantId, cerbosCallId, activeVersion,
                 decision.getDecision(), decision.getResourceKind(), decision.getAction(),
                 bundle.getBundleId(), gitCommit, tests,
                 approved.getApproverId(), approved.getConsequenceReviewHash(), true, true);

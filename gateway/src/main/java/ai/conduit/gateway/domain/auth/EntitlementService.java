@@ -48,6 +48,20 @@ public class EntitlementService {
      * Checks whether {@code principal} may read {@code relationshipId} according to the PDP.
      */
     public EntitlementResult checkRelationship(Principal principal, String relationshipId) {
+        return checkRelationshipResult(principal, relationshipId,
+                () -> cerbos.checkRelationships(principal, List.of(relationshipId)));
+    }
+
+    /** Tenant-aware relationship check pinned to the request's captured active policy version. */
+    public EntitlementResult checkRelationship(Principal principal, String relationshipId,
+                                               TenantExecutionContext ctx) {
+        return checkRelationshipResult(principal, relationshipId,
+                () -> cerbos.checkRelationships(principal, List.of(relationshipId), ctx));
+    }
+
+    private EntitlementResult checkRelationshipResult(
+            Principal principal, String relationshipId,
+            java.util.function.Supplier<CerbosEntitlementAdapter.BatchResult> check) {
         if (relationshipId == null || relationshipId.isBlank()) {
             String principalId = principal == null ? "anonymous" : principal.id();
             log.warn("Entitlement denied: blank relationship id for principal={}", principalId);
@@ -63,8 +77,7 @@ public class EntitlementService {
         }
 
         // Structural + data-aware check via Cerbos PDP
-        CerbosEntitlementAdapter.BatchResult batch =
-                cerbos.checkRelationships(principal, List.of(relationshipId));
+        CerbosEntitlementAdapter.BatchResult batch = check.get();
 
         boolean allowed = batch.isAllowed(relationshipId);
         String reason = allowed ? "allowed-by-pdp" : "denied-by-pdp";
@@ -83,9 +96,21 @@ public class EntitlementService {
      */
     public List<String> filterCovered(Principal principal, List<String> candidateRelIds) {
         if (candidateRelIds == null || candidateRelIds.isEmpty()) return List.of();
+        return applyRelationshipVerdict(principal, candidateRelIds,
+                cerbos.checkRelationships(principal, candidateRelIds));
+    }
 
-        CerbosEntitlementAdapter.BatchResult batch =
-                cerbos.checkRelationships(principal, candidateRelIds);
+    /** Tenant-aware batch filter pinned to the request's captured active policy version. */
+    public List<String> filterCovered(Principal principal, List<String> candidateRelIds,
+                                      TenantExecutionContext ctx) {
+        if (candidateRelIds == null || candidateRelIds.isEmpty()) return List.of();
+        return applyRelationshipVerdict(principal, candidateRelIds,
+                cerbos.checkRelationships(principal, candidateRelIds, ctx));
+    }
+
+    private List<String> applyRelationshipVerdict(
+            Principal principal, List<String> candidateRelIds,
+            CerbosEntitlementAdapter.BatchResult batch) {
 
         List<String> allowed = candidateRelIds.stream()
                 .filter(batch::isAllowed)
@@ -182,9 +207,23 @@ public class EntitlementService {
      */
     public List<GateResult> explainStructuralGates(Principal principal, List<AgentManifest> manifests) {
         if (manifests == null || manifests.isEmpty()) return List.of();
+        return buildStructuralGates(principal, manifests,
+                cerbos.checkAgentMembership(principal, manifests),
+                cerbos.checkAgents(principal, manifests));
+    }
 
-        Map<String, Boolean> member = cerbos.checkAgentMembership(principal, manifests);
-        CerbosEntitlementAdapter.BatchResult invoke = cerbos.checkAgents(principal, manifests);
+    /** Tenant-aware explanation probes pinned to the same policy version as enforcement. */
+    public List<GateResult> explainStructuralGates(Principal principal, List<AgentManifest> manifests,
+                                                   TenantExecutionContext ctx) {
+        if (manifests == null || manifests.isEmpty()) return List.of();
+        return buildStructuralGates(principal, manifests,
+                cerbos.checkAgentMembership(principal, manifests, ctx),
+                cerbos.checkAgents(principal, manifests, ctx));
+    }
+
+    private List<GateResult> buildStructuralGates(
+            Principal principal, List<AgentManifest> manifests, Map<String, Boolean> member,
+            CerbosEntitlementAdapter.BatchResult invoke) {
 
         List<GateResult> out = new java.util.ArrayList<>();
         for (AgentManifest m : manifests) {

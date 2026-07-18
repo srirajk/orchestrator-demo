@@ -12,6 +12,7 @@ import com.openwolf.iam.policystudio.ConsequenceReview;
 import com.openwolf.iam.policystudio.ConsequenceReviewSigner;
 import com.openwolf.iam.policystudio.GroundedStudioReviewService;
 import com.openwolf.iam.policystudio.ManifestBackedStudioGroundingProvider;
+import com.openwolf.iam.policystudio.StudioGroundingTestFixtures;
 import com.openwolf.iam.policystudio.PolicyIR;
 import com.openwolf.iam.policystudio.PolicyYamlParser;
 import com.openwolf.iam.policystudio.ProductionPdpDecisionSource;
@@ -129,8 +130,10 @@ class BreakGlassMergeAndPromoteIT {
         Path work = Files.createTempDirectory("breakglass-s4-merge-");
         Path conf = work.resolve("conf");
         Path policies = work.resolve("policies");
+        Path tenantDeployments = work.resolve("tenants");
         Files.createDirectories(conf);
         Files.createDirectories(policies);
+        StudioGroundingTestFixtures.writeTenantDeployment(tenantDeployments, TENANT);
         Files.writeString(conf.resolve("config.yaml"), """
                 server:
                   httpListenAddr: ":3592"
@@ -162,7 +165,8 @@ class BreakGlassMergeAndPromoteIT {
         ProductionPdpDecisionSource pdp = new ProductionPdpDecisionSource(cerbos);
 
         ManifestBackedStudioGroundingProvider grounding =
-                new ManifestBackedStudioGroundingProvider(mapper, writer, parser, directory, bundleRepo, "registry", baseDir, "infra/cerbos/tenants", "default");
+                new ManifestBackedStudioGroundingProvider(mapper, writer, parser, directory, bundleRepo,
+                        "registry", baseDir, tenantDeployments.toString());
         StudioSessionStore store = new StudioSessionStore();
         SelfContainedBundleAssembler assembler = new SelfContainedBundleAssembler(baseDir);
         GroundedStudioReviewService reviews = new GroundedStudioReviewService(
@@ -271,13 +275,13 @@ class BreakGlassMergeAndPromoteIT {
     @Test
     void twoPersonSodAndBoundsStillEnforcedOnTheExpeditedPath() {
         BreakGlassApprovalService approval = new BreakGlassApprovalService(
-                mock(BreakGlassAuditPartition.class), "studio_policy_approver");
+                mock(BreakGlassAuditPartition.class));
         BreakGlassArtifact art = artifact(new BreakGlassGrant(
                 TenantScope.of(TENANT), "agent", EMERGENCY_ACTION, ROLE,
                 Instant.now(), Instant.now().plus(Duration.ofMinutes(15)), "incident", "alice"));
         // author == approver ⇒ rejected (two-person by construction).
         assertThatThrownBy(() -> approval.approveAndIssue(
-                art, "alice", "alice", Set.of("studio_policy_approver"), "corr"))
+                art, "alice", "alice", Set.of("policy_approver"), "corr"))
                 .isInstanceOf(BreakGlassSodException.class);
 
         // H1 bounds: a TTL beyond the 60-minute ceiling, and a wildcard action, are inadmissible.

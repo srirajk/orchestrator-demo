@@ -46,6 +46,7 @@ public class StudioGroundingController {
     }
 
     @PostMapping("/reviews/assembled")
+    @PreAuthorize("hasRole('policy_author')")
     public ResponseEntity<ConsequenceReview> assembledReview(@RequestBody AssemblePayload payload, Authentication auth) {
         if (payload == null || payload.canonicalYaml() == null || payload.canonicalYaml().isBlank()) {
             throw new IllegalArgumentException("canonicalYaml is required");
@@ -57,6 +58,7 @@ public class StudioGroundingController {
     }
 
     @PostMapping("/bundles/candidates")
+    @PreAuthorize("hasRole('policy_author')")
     public ResponseEntity<PolicyBundle> candidateBundle(@RequestBody CandidateBundlePayload payload, Authentication auth) {
         if (payload == null || payload.canonicalYaml() == null || payload.canonicalYaml().isBlank()) {
             throw new IllegalArgumentException("canonicalYaml is required");

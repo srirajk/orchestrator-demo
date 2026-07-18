@@ -167,7 +167,11 @@ public class InsightsController {
         if (principal == null) {
             return ResponseEntity.status(401).body(Map.of("error", "unauthorized"));
         }
-        if (!authorizer.canRead(principal)) {
+        var tenant = RequestContext.getTenant();
+        // Insights is protected tenant data: no resolved request tenant means no authorization check can
+        // be correctly scoped, so fail closed instead of falling back to the unscoped base policy.
+        boolean canRead = tenant != null && tenant.isResolved() && authorizer.canRead(principal, tenant);
+        if (!canRead) {
             return ResponseEntity.status(403).body(Map.of("error", "forbidden", "reason", "insights requires admin"));
         }
         return null;

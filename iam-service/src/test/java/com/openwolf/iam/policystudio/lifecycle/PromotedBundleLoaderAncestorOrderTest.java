@@ -61,6 +61,11 @@ class PromotedBundleLoaderAncestorOrderTest {
         assertThat(PromotedBundleLoader.scopeDepth(
                 "resourcePolicy:\n  scopePermissions: SCOPE_PERMISSIONS_REQUIRE_PARENTAL_CONSENT_FOR_ALLOWS\n  scope: \"acme\"\n"))
                 .isEqualTo(1);
+        assertThat(PromotedBundleLoader.publicationTier("derivedRoles:\n  name: roles\n"))
+                .as("a versioned global module must publish before a root that imports it")
+                .isEqualTo(-1);
+        assertThat(PromotedBundleLoader.publicationTier("exportVariables:\n  name: values\n"))
+                .isEqualTo(-1);
     }
 
     @Test

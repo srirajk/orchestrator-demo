@@ -3,7 +3,9 @@ package com.openwolf.iam.tenancy;
 /**
  * The Cerbos artifact of tenant provisioning (Axiom B4): build a NEW tenant-specific full bootstrap
  * bundle from the current approved base ceiling + B1's deny-all child policies, assign a new
- * content-addressed policy version, STAGE it alongside the existing versions, and PROBE it. It NEVER
+ * content-addressed {@code b_*} policy version, STAGE it alongside the existing versions, and PROBE it.
+ * The result is a normal C5 {@link com.openwolf.iam.policystudio.lifecycle.PolicyBundle}, not a separate
+ * bootstrap-only version namespace. It NEVER
  * mutates the current live bundle and NEVER writes an empty scope policy (an empty tenant child is
  * fail-open under parental-consent inheritance — B1).
  */

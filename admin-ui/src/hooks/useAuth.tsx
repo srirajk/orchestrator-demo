@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react'
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import type { User } from '../api/client'
 import { normalizeSegments } from '../api/client'
 import { AUTH_LOGOUT_EVENT, clearAdminToken, readAdminToken, writeAdminToken } from '../auth/tokenStorage'
@@ -54,24 +55,28 @@ export function decodePayload(token: string): User | null {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient()
   const [token, setToken] = useState(() => readAdminToken())
   const [user, setUser] = useState<User | null>(() => {
     const t = readAdminToken()
     return t ? decodePayload(t) : null
   })
+  const identityRef = useRef(user ? `${user.tenantId}:${user.id}` : '')
 
   const login = useCallback((t: string, u: User) => {
+    queryClient.clear()
     writeAdminToken(t)
     const verifiedClaims = decodePayload(t)
     setToken(t)
     setUser(verifiedClaims ? { ...u, ...verifiedClaims } : u)
-  }, [])
+  }, [queryClient])
 
   const logout = useCallback(() => {
+    queryClient.clear()
     clearAdminToken()
     setToken('')
     setUser(null)
-  }, [])
+  }, [queryClient])
 
   const syncFromStorage = useCallback(() => {
     const nextToken = readAdminToken()
@@ -94,6 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
     const onLogout = () => {
+      queryClient.clear()
       setToken('')
       setUser(null)
     }
@@ -103,7 +109,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener('storage', onStorage)
       window.removeEventListener(AUTH_LOGOUT_EVENT, onLogout)
     }
-  }, [syncFromStorage])
+  }, [queryClient, syncFromStorage])
+
+  useEffect(() => {
+    const identity = user ? `${user.tenantId}:${user.id}` : ''
+    if (identityRef.current !== identity) {
+      queryClient.clear()
+      identityRef.current = identity
+    }
+  }, [queryClient, user])
 
   const isAdmin = useMemo(() => user?.roles.includes('platform_admin') ?? false, [user?.roles])
   const value = useMemo(

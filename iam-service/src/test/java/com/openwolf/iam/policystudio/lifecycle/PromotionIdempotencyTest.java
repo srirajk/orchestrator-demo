@@ -6,6 +6,7 @@ import com.openwolf.iam.tenancy.ActiveTenantDirectory;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * C5.3 — a lost-response retry does not double-promote (onboarding §10). The first promotion flips the
@@ -54,5 +55,15 @@ class PromotionIdempotencyTest {
         PromotionRecord op = promotions.findByIdempotencyKey("promo-key-1").orElseThrow();
         assertThat(op.getStatus()).isEqualTo(PromotionRecord.Status.PROMOTED);
         assertThat(promotions.findByTenantIdOrderByCreatedAtDesc(C5LifecycleFixtures.TENANT)).hasSize(1);
+
+        assertThatThrownBy(() -> svc.replayCompleted("promo-key-1", "other-tenant",
+                current.bundleId(), candidate.bundleId(), review.consequenceReviewHash(),
+                "sec-reviewer-01", PromotionRecord.Kind.PROMOTION))
+                .isInstanceOf(UnauthorizedPromotionException.class)
+                .hasMessageContaining("different tenant");
+        assertThatThrownBy(() -> svc.replayCompleted("promo-key-1", C5LifecycleFixtures.TENANT,
+                current.bundleId(), candidate.bundleId(), review.consequenceReviewHash(),
+                "sec-reviewer-01", PromotionRecord.Kind.ROLLBACK))
+                .isInstanceOf(UnauthorizedPromotionException.class);
     }
 }

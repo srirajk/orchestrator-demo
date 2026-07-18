@@ -448,8 +448,17 @@ export interface PromotionReceipt {
   idempotentReplay: boolean
 }
 
+export interface ReviewHandoff {
+  reviewId: string
+  authorId: string
+  review: ConsequenceReview
+  candidate: PolicyBundle
+  storedAt: string
+}
+
 export interface ExaminerChain {
   transactionId: string
+  tenantId: string
   cerbosCallId: string
   activePolicyVersion: string
   decision: string
@@ -471,9 +480,6 @@ export interface BreakGlassRequest {
   role: string
   ttlMinutes: number
   justification: string
-  vocabulary: ManifestVocabulary
-  baseCeiling: BaseCeiling
-  allowlist: { resources: string[]; actions: string[] }
 }
 
 export interface BreakGlassGrant {
@@ -500,15 +506,16 @@ export const studioApi = {
     req<PolicyBundle>('POST', '/admin/studio/bundles/candidates', { resourceKind, canonicalYaml, fixtureSetHash }),
   getReview: (reviewId: string) =>
     req<ConsequenceReview>('GET', `/admin/studio/reviews/${encodeURIComponent(reviewId)}`),
+  listPendingReviews: () => req<ReviewHandoff[]>('GET', '/admin/studio/reviews/pending'),
   listBundles: () => req<BundleView[]>('GET', '/admin/studio/bundles'),
   getBundle: (bundleId: string) =>
     req<BundleView>('GET', `/admin/studio/bundles/${encodeURIComponent(bundleId)}`),
   getExaminerChain: (cerbosCallId: string) =>
     req<ExaminerChain>('GET', `/admin/studio/examiner/${encodeURIComponent(cerbosCallId)}`),
-  promote: (reviewId: string, candidate: PolicyBundle, idempotencyKey: string) =>
-    req<PromotionReceipt>('POST', '/admin/studio/promotions', { reviewId, candidate, idempotencyKey }),
-  rollback: (reviewId: string, candidate: PolicyBundle, idempotencyKey: string) =>
-    req<PromotionReceipt>('POST', '/admin/studio/rollbacks', { reviewId, candidate, idempotencyKey }),
+  promote: (reviewId: string, idempotencyKey: string) =>
+    req<PromotionReceipt>('POST', '/admin/studio/promotions', { reviewId, idempotencyKey }),
+  rollback: (reviewId: string, idempotencyKey: string) =>
+    req<PromotionReceipt>('POST', '/admin/studio/rollbacks', { reviewId, idempotencyKey }),
   requestBreakGlass: (payload: BreakGlassRequest) =>
     req<BreakGlassGrant>('POST', '/admin/studio/break-glass', payload),
   approveBreakGlass: (grantId: string, correlationId?: string) =>
